@@ -1,0 +1,80 @@
+/*
+ * Phase 3 (billing) pieces: invoice badges, the month stepper, editable grids (variable
+ * amounts and meter readings), one-off invoice lines, move-in charge lists and the
+ * invoice run preview. Built only from existing tokens, so light and dark both follow.
+ */
+
+.bl__badges { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* ---- month stepper -------------------------------------------------------- */
+.bl__month { display: inline-flex; align-items: center; gap: 6px; }
+.bl__month .nx-btn { min-width: 34px; padding: 0; justify-content: center; font-size: 16px; }
+.bl__monthlabel { min-width: 128px; text-align: center; font-weight: 500; font-size: 13.5px; }
+
+/* ---- page bits ------------------------------------------------------------ */
+.bl__tabhead { margin-bottom: 12px; }
+.bl__tabhead > p { margin: 0; }
+.bl__toggle { min-height: 38px; font-size: 13px; white-space: nowrap; }
+.bl__headbtns { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.bl__warntext { color: var(--warning); }
+.fld-days { max-width: 260px; display: flex; flex-direction: column; gap: 4px; }
+
+/* ---- editable grids ------------------------------------------------------- */
+.bl__grid td { vertical-align: middle; }
+.bl__grid tfoot th, .bl__lines-table tfoot th, .bl__run tfoot th {
+  border-top: 1px solid var(--border);
+  text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--foreground);
+}
+.bl__lines-table tfoot tr + tr th { border-top: 0; padding-top: 2px; }
+.fld.bl__cell { gap: 2px; min-width: 110px; }
+.fld.bl__cell > input { height: 36px; text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.fld.bl__note { min-width: 140px; }
+.fld.bl__note > input { text-align: left; font-family: inherit; }
+.bl__cell .fld__err { text-align: left; white-space: normal; max-width: 200px; }
+.ad__table.bl__grid { min-width: 0; }
+.ad__table.bl__readings { min-width: 980px; }
+.bl__grid td.num, .bl__lines-table td.num, .bl__run td.num, .bl__invoices td.num { white-space: nowrap; }
+
+/* A void invoice reads as struck off. */
+.bl__void td { color: var(--text-muted); }
+.bl__void .num { text-decoration: line-through; }
+
+/* ---- one-off invoice lines ------------------------------------------------ */
+.bl__lines { display: flex; flex-direction: column; gap: 8px; }
+.bl__line {
+  display: grid; gap: 8px; align-items: start;
+  grid-template-columns: minmax(0, 1fr) 140px auto;
+}
+.bl__line .fld { gap: 2px; }
+.bl__line > .nx-btn { min-height: 44px; width: 44px; padding: 0; justify-content: center; font-size: 18px; }
+.bl__lineamt > input { text-align: right; font-family: var(--font-num); }
+.bl__lineerr { grid-column: 1 / -1; }
+.bl__linefoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
+
+/* ---- move-in charges ------------------------------------------------------ */
+.bl__movein {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--secondary);
+}
+.bl__chargelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.bl__chargelist li { display: flex; justify-content: space-between; gap: 12px; }
+.bl__chargetotal { padding-top: 6px; margin-top: 2px; border-top: 1px solid var(--border); font-weight: 600; }
+
+/* ---- invoice run ---------------------------------------------------------- */
+.bl__runbar { align-items: flex-end; }
+.bl__runbar > .fld { min-width: 180px; }
+.bl__runbar > p { margin: 0; flex: 1 1 280px; }
+.bl__runlines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; min-width: 240px; }
+.bl__runlines li { display: flex; justify-content: space-between; gap: 16px; }
+.bl__missing { margin-top: 6px; margin-right: 6px; }
+
+@media (max-width: 640px) {
+  .bl__stats .ad__stat__value { font-size: 19px; }
+  .bl__month { width: 100%; justify-content: space-between; }
+  .bl__headbtns { width: 100%; }
+  .bl__headbtns > * { flex: 1 1 auto; justify-content: center; }
+  .bl__line { grid-template-columns: minmax(0, 1fr) 110px auto; }
+  .bl__runbar > .fld { width: 100%; }
+}

@@ -1,0 +1,192 @@
+/**
+ * Sign-in — ported from UltimatePOS pos-react (src/styles/auth.css, login redesign 1a).
+ *
+ * Two panels: 46% brand on --nav-background, 54% form on --card. 48px controls, 27px
+ * heading, 420px form column. Every colour is a token so light (the default) and dark
+ * both come out right; the exceptions are the fixed lime on the always-navy brand panel.
+ *
+ * Dropped from the source: the "choose a sign-in method" step, the language picker and
+ * the back-to-methods link — Hodi signs in with one email-or-phone field.
+ */
+
+.au {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---- brand panel --------------------------------------------------------- */
+.au__brand {
+  width: 46%;
+  /* --nav-background, not --primary: the design system flips primary to lime in dark
+     mode, which is correct for buttons and wrong for a half-screen panel. */
+  background: var(--nav-background);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Lime glow, bottom-left. Decorative only. */
+.au__brand::before {
+  content: '';
+  position: absolute;
+  bottom: -140px;
+  left: -100px;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(157 208 0 / 16%) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+.au__brandmark { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+.au__logo {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: block; flex-shrink: 0;
+}
+.au__wordmark { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
+
+.au__pitch { position: relative; z-index: 1; max-width: 430px; }
+.au__pitch h1 {
+  margin: 0 0 14px;
+  font-size: 38px; line-height: 1.15; font-weight: 600;
+  color: #fff; letter-spacing: -0.025em;
+}
+/**
+ * The bright lime, fixed — NOT var(--accent).
+ *
+ * This panel is --nav-background, which is navy in BOTH themes, so everything on it is a
+ * fixed light-on-dark value (the h1 is #fff, the copy white at 62%). --accent is the one
+ * token that flips: lime #9dd000 in dark, olive #4d6b10 in light. Following it here put
+ * olive text on navy at 2.36:1 — below the 3:1 the WCAG large-text floor asks for, and
+ * invisible in the theme this app ships by default. The handoff was authored in dark,
+ * where the same rule looks correct, which is exactly why it read as safe.
+ *
+ * #9dd000 is the same lime already used literally for the glow above and the icon chips.
+ */
+.au__pitch h1 em { font-style: normal; color: #9dd000; }
+.au__pitch p {
+  margin: 0;
+  font-size: 15px; line-height: 1.6;
+  color: rgb(255 255 255 / 62%);
+}
+
+.au__foot {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+}
+.au__support { font-size: 12.5px; color: rgb(255 255 255 / 45%); }
+.au__copy { font-size: 11.5px; color: rgb(255 255 255 / 35%); }
+
+/* ---- form panel ---------------------------------------------------------- */
+.au__panel { width: 54%; background: var(--card); display: flex; flex-direction: column; }
+.au__panelhead {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 16px; padding: 22px 40px;
+  font-size: 13.5px; color: var(--text-muted);
+}
+.au__panelhead a { color: var(--primary); font-weight: 500; text-decoration: none; }
+.au__panelhead a:hover { color: var(--primary-hover); }
+.au__body { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 40px 48px; }
+.au__form { width: 100%; max-width: 420px; }
+.au__form h1 { margin: 0 0 6px; font-size: 27px; font-weight: 600; letter-spacing: -0.02em; }
+.au__lede { margin: 0 0 26px; font-size: 14px; color: var(--text-muted); }
+/* Step change: a 2px lift over 120ms. Anything more on a screen someone sees many times a
+   day becomes a delay they wait through. */
+.au__step { animation: au-step 120ms ease-out both; }
+@keyframes au-step {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .au__step { animation: none; }
+}
+
+/* ---- fields -------------------------------------------------------------- */
+.au__field { margin-top: 20px; }
+.au__field + .au__field { margin-top: 16px; }
+.au__labelrow { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+.au__labelrow label { font-size: 12.5px; font-weight: 500; color: var(--text-secondary); }
+.au__labelrow a, .au__link {
+  font-size: 12.5px; font-weight: 500; color: var(--primary);
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+}
+.au__labelrow a:hover, .au__link:hover { color: var(--primary-hover); }
+
+.au__input {
+  width: 100%; height: 48px;
+  /* Symmetric. Only the password field carries a control inside it, and it says so
+     itself below — the identifier used to inherit a 44px right gutter for a button that
+     was not there. */
+  padding: 0 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--input);
+  background: var(--input-background);
+  font-family: inherit; font-size: 15px;
+  color: var(--foreground);
+  outline: none; display: block;
+}
+/* color-mix so the ring follows --ring through all three theme states — light, OS-dark,
+   and an explicit [data-theme='dark']. A literal would be right in one and wrong in the
+   others, and a prefers-color-scheme override would miss the explicit case entirely. */
+.au__input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 14%, transparent);
+}
+.au__input::placeholder { color: var(--text-muted); }
+
+.au__pw { position: relative; }
+.au__pw .au__input { padding-right: 46px; }
+.au__eye {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px;
+  border: 0; border-radius: 8px;
+  background: transparent; color: var(--text-muted);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.au__eye:hover { background: var(--secondary); }
+
+.au__submit {
+  margin-top: 22px; width: 100%; height: 48px;
+  border: 0; border-radius: var(--radius);
+  background: var(--accent); color: var(--accent-foreground);
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.au__submit:hover:not(:disabled) { background: var(--accent-hover); }
+.au__submit:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.au__note { margin: 18px 0 0; font-size: 12.5px; color: var(--text-muted); text-align: center; }
+/* Nothing styles a bare <a> globally, so a link dropped into a note would arrive as the
+   browser's blue underline. Matches the panel header's treatment instead. */
+.au__note a { color: var(--primary); font-weight: 500; text-decoration: none; }
+.au__note a:hover { color: var(--primary-hover); }
+.au__error {
+  margin: 16px 0 0; padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--destructive-soft); color: var(--destructive);
+  font-size: 13px;
+}
+.au__ok {
+  margin: 16px 0 0; padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--success-soft); color: var(--success);
+  font-size: 13px;
+}
+
+/* Dev-only shortcut into the shell, rendered under import.meta.env.DEV. */
+.au__dev {
+  margin-top: 14px; text-align: center;
+  font-size: 12.5px;
+}
+.au__dev a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
+.au__dev a:hover { color: var(--foreground); }
+
+/* ---- narrow: the brand panel is decorative, so it goes ------------------- */
+@media (max-width: 900px) {
+  .au__brand { display: none; }
+  .au__panel { width: 100%; }
+  .au__body { padding: 16px 20px 40px; }
+}

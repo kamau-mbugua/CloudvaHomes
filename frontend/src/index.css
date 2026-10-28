@@ -1,0 +1,46 @@
+@import './styles/fonts.css';
+@import './styles/tokens.css';
+@import './styles/auth.css';
+@import './styles/shell.css';
+@import './styles/admin.css';
+@import './styles/form.css';
+@import './styles/sidebar.css';
+@import './styles/pages.css';
+@import './styles/identity.css';
+@import './styles/portfolio.css';
+@import './styles/billing.css';
+@import './styles/payments.css';
+@import './styles/mpesa.css';
+@import './styles/reports.css';
+@import './styles/agency.css';
+@import './styles/tenant.css';
+@import './styles/platform.css';
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+  touch-action: manipulation;
+}
+
+/* Digits that line up in a column of money. */
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* Every interactive element is visibly focusable. */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

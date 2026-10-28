@@ -1,0 +1,321 @@
+#!/bin/bash
+
+# Hodi App Build Script
+# Universal build script for all flavors and build types
+# Usage: ./hodi-build <flavor> [type] [options]
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Constants
+VALID_FLAVORS=("dev" "uat" "prod")
+VALID_TYPES=("apk" "aab")
+
+# Help function
+show_help() {
+    cat << HELP
+${BLUE}Hodi App Build Script${NC}
+
+${GREEN}USAGE:${NC}
+    ./hodi-build <flavor> [type] [options]
+
+${GREEN}ARGUMENTS:${NC}
+    flavor              Build flavor (required)
+                        Options: dev, uat, prod
+
+    type                Build type (optional, default: apk)
+                        Options: apk, aab
+
+${GREEN}OPTIONS:${NC}
+    --debug             Build debug variant (default: release)
+    --split-per-abi     Split APK per ABI (smaller files)
+    --obfuscate         Enable code obfuscation (prod recommended)
+    --no-optimize       Skip platform optimization (larger APK)
+    --install           Auto-install after successful build
+    -h, --help          Show this help message
+
+${GREEN}AUTO-VERSIONING:${NC}
+    Production AAB builds automatically increment the build number in pubspec.yaml
+    Example: version 1.0.0+1 → 1.0.0+2 (for 'prod aab' in release mode)
+
+${GREEN}EXAMPLES:${NC}
+    ./hodi-build dev                     # Build dev APK (optimized)
+    ./hodi-build uat aab                 # Build UAT app bundle
+    ./hodi-build prod apk --obfuscate    # Build prod APK with obfuscation
+    ./hodi-build dev --debug --install   # Build and install debug APK
+    ./hodi-build prod aab --obfuscate --install
+
+${GREEN}OUTPUT LOCATIONS:${NC}
+    APK: build/app/outputs/flutter-apk/
+    AAB: build/app/outputs/bundle/
+
+HELP
+}
+
+# Validation functions
+validate_flavor() {
+    local flavor=$1
+    for valid in "${VALID_FLAVORS[@]}"; do
+        if [[ "$flavor" == "$valid" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+validate_type() {
+    local type=$1
+    for valid in "${VALID_TYPES[@]}"; do
+        if [[ "$type" == "$valid" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Error function
+error_exit() {
+    echo -e "${RED}❌ Error: $1${NC}" >&2
+    echo ""
+    echo "Run './hodi-build --help' for usage information."
+    exit 1
+}
+
+# Success function
+success_msg() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+# Info function
+info_msg() {
+    echo -e "${YELLOW}ℹ️  $1${NC}"
+}
+
+# Parse arguments
+FLAVOR=""
+TYPE="apk"
+DEBUG=false
+SPLIT_PER_ABI=false
+OBFUSCATE=false
+NO_OPTIMIZE=false
+AUTO_INSTALL=false
+
+# Check for help flag first
+if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+    show_help
+    exit 0
+fi
+
+# Check if flavor is provided
+if [[ -z "$1" ]]; then
+    error_exit "Flavor not specified"
+fi
+
+FLAVOR="$1"
+shift
+
+# Check if second argument is a type or flag
+if [[ -n "$1" ]] && [[ ! "$1" =~ ^-- ]]; then
+    TYPE="$1"
+    shift
+fi
+
+# Parse optional flags
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --debug)
+            DEBUG=true
+            shift
+            ;;
+        --split-per-abi)
+            SPLIT_PER_ABI=true
+            shift
+            ;;
+        --obfuscate)
+            OBFUSCATE=true
+            shift
+            ;;
+        --no-optimize)
+            NO_OPTIMIZE=true
+            shift
+            ;;
+        --install)
+            AUTO_INSTALL=true
+            shift
+            ;;
+        *)
+            error_exit "Unknown option: $1"
+            ;;
+    esac
+done
+
+# Validate inputs
+if ! validate_flavor "$FLAVOR"; then
+    error_exit "Invalid flavor '$FLAVOR'. Valid options: ${VALID_FLAVORS[*]}"
+fi
+
+if ! validate_type "$TYPE"; then
+    error_exit "Invalid type '$TYPE'. Valid options: ${VALID_TYPES[*]}"
+fi
+
+# Map flavor to entry point
+ENTRY_POINT="lib/main_${FLAVOR}.dart"
+
+# Auto-increment version for production AAB builds
+PUBSPEC_FILE="pubspec.yaml"
+if [[ "$FLAVOR" == "prod" ]] && [[ "$TYPE" == "aab" ]] && [[ "$DEBUG" == false ]]; then
+    echo ""
+    info_msg "Production AAB build detected - auto-incrementing version..."
+
+    # Read current version
+    CURRENT_VERSION=$(grep "^version:" "$PUBSPEC_FILE" | sed 's/version: //')
+    VERSION_NAME=$(echo "$CURRENT_VERSION" | cut -d'+' -f1)
+    BUILD_NUMBER=$(echo "$CURRENT_VERSION" | cut -d'+' -f2)
+
+    # Increment build number
+    NEW_BUILD_NUMBER=$((BUILD_NUMBER + 1))
+    NEW_VERSION="${VERSION_NAME}+${NEW_BUILD_NUMBER}"
+
+    # Update pubspec.yaml
+    sed -i "s/^version: .*/version: ${NEW_VERSION}/" "$PUBSPEC_FILE"
+
+    success_msg "Version updated: ${CURRENT_VERSION} → ${NEW_VERSION}"
+    echo ""
+fi
+
+# Build command construction
+BUILD_CMD=("fvm" "flutter" "build")
+
+if [[ "$TYPE" == "apk" ]]; then
+    BUILD_CMD+=("apk")
+elif [[ "$TYPE" == "aab" ]]; then
+    BUILD_CMD+=("appbundle")
+fi
+
+BUILD_CMD+=("--flavor" "$FLAVOR" "-t" "$ENTRY_POINT")
+
+# Add build mode
+if [[ "$DEBUG" == true ]]; then
+    BUILD_CMD+=("--debug")
+else
+    BUILD_CMD+=("--release")
+fi
+
+# Add platform optimization for APK (unless disabled)
+if [[ "$TYPE" == "apk" ]] && [[ "$NO_OPTIMIZE" == false ]]; then
+    BUILD_CMD+=("--target-platform" "android-arm64,android-x64")
+fi
+
+# Add split per ABI
+if [[ "$SPLIT_PER_ABI" == true ]]; then
+    BUILD_CMD+=("--split-per-abi")
+fi
+
+# Add obfuscation
+if [[ "$OBFUSCATE" == true ]]; then
+    BUILD_CMD+=("--obfuscate" "--split-debug-info=build/debug-info")
+fi
+
+# Display build info
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}🚀 Hodi App Build${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+info_msg "Flavor: ${FLAVOR}"
+info_msg "Type: ${TYPE}"
+info_msg "Mode: $([ "$DEBUG" == true ] && echo "debug" || echo "release")"
+[[ "$NO_OPTIMIZE" == false ]] && [[ "$TYPE" == "apk" ]] && info_msg "Platform: ARM64, x64"
+[[ "$SPLIT_PER_ABI" == true ]] && info_msg "Split per ABI: enabled"
+[[ "$OBFUSCATE" == true ]] && info_msg "Obfuscation: enabled"
+echo ""
+echo -e "${YELLOW}Command:${NC} ${BUILD_CMD[*]}"
+echo ""
+
+# Start timer
+START_TIME=$(date +%s)
+
+# Execute build
+"${BUILD_CMD[@]}"
+BUILD_EXIT_CODE=$?
+
+# Calculate duration
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+MINUTES=$((DURATION / 60))
+SECONDS=$((DURATION % 60))
+
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# Check build result
+if [[ $BUILD_EXIT_CODE -ne 0 ]]; then
+    echo -e "${RED}❌ Build failed!${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    exit 1
+fi
+
+# Success!
+success_msg "Build completed in ${MINUTES}m ${SECONDS}s"
+echo ""
+
+# Determine output path and display file info
+if [[ "$TYPE" == "apk" ]]; then
+    if [[ "$DEBUG" == true ]]; then
+        OUTPUT_PATH="build/app/outputs/flutter-apk/app-${FLAVOR}-debug.apk"
+    else
+        OUTPUT_PATH="build/app/outputs/flutter-apk/app-${FLAVOR}-release.apk"
+    fi
+else
+    # AAB
+    FLAVOR_CAPITALIZED="$(tr '[:lower:]' '[:upper:]' <<< ${FLAVOR:0:1})${FLAVOR:1}"
+    if [[ "$DEBUG" == true ]]; then
+        OUTPUT_PATH="build/app/outputs/bundle/${FLAVOR}Debug/app-${FLAVOR}-debug.aab"
+    else
+        OUTPUT_PATH="build/app/outputs/bundle/${FLAVOR}Release/app-${FLAVOR}-release.aab"
+    fi
+fi
+
+echo -e "${GREEN}📦 Output:${NC}"
+echo "   $OUTPUT_PATH"
+
+# Show file size if it exists
+if [[ -f "$OUTPUT_PATH" ]]; then
+    FILE_SIZE=$(du -h "$OUTPUT_PATH" | cut -f1)
+    echo -e "${GREEN}📊 Size:${NC} $FILE_SIZE"
+fi
+
+# Auto-install if requested
+if [[ "$AUTO_INSTALL" == true ]]; then
+    echo ""
+    info_msg "Installing to connected device..."
+    if [[ "$TYPE" == "apk" ]]; then
+        fvm flutter install
+        if [[ $? -eq 0 ]]; then
+            success_msg "Installation complete"
+        else
+            echo -e "${RED}❌ Installation failed${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Cannot auto-install AAB files. Use Google Play Console.${NC}"
+    fi
+fi
+
+echo ""
+echo -e "${GREEN}📱 Manual install:${NC}"
+if [[ "$TYPE" == "apk" ]]; then
+    echo "   fvm flutter install"
+    echo "   or"
+    echo "   adb install $OUTPUT_PATH"
+else
+    echo "   Upload to Google Play Console"
+fi
+
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""

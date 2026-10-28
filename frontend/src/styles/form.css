@@ -1,0 +1,413 @@
+/*
+ * Forms, buttons, dialogs, toasts and empty states — ported from UltimatePOS pos-react.
+ *
+ * From src/styles/form.css: page/section layout (.fm), fields (.fld), toasts (.tst),
+ * empty states (.es), breadcrumbs (.bc). From src/styles/till.css: the shared button
+ * (.nx-btn) and dialog (.nx-sheet) primitives, which pos-react happened to keep there.
+ * Dropped: product/purchase/serial-capture/variation/branch-picker/import rules.
+ *
+ * Measurements: 14px card radius, 20px card padding, 15.5px/600 section headings, 40px
+ * controls, field grids that reflow with auto-fit/minmax rather than fixed breakpoints.
+ */
+
+.fm {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* One column below the point where a 280px aside stops earning its place. */
+@media (max-width: 900px) {
+  .fm { grid-template-columns: minmax(0, 1fr); }
+  .fm__aside { position: static; }
+}
+
+.fm__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.fm__aside {
+  /* 88px clears the shell's 64px top bar plus the page's own padding. */
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fm__section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.fm__section h2 {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.fm__section > p {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.fm__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* The page heading and its one line of context. */
+.fm__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.fm__sub {
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  color: var(--muted-foreground);
+}
+
+/* Actions that belong to the page, not to a section: Back, Edit, Print. */
+.sl__headactions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.fm__req {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--secondary);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.fm__grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.fm__wide { grid-column: 1 / -1; }
+/* A control with a button beside it — a dropdown and its "New …" shortcut. */
+.fm__inline { display: flex; gap: 8px; align-items: stretch; }
+.fm__inline > select, .fm__inline > input { flex: 1 1 auto; min-width: 0; }
+.fm__inline > .nx-btn { flex: 0 0 auto; white-space: nowrap; }
+
+/* ── Fields ─────────────────────────────────────────────────────────────── */
+
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fld > label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.fld > input,
+.fld > select {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--input);
+  background: var(--input-background);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--foreground);
+  outline: none;
+  width: 100%;
+}
+
+.fld > input:focus,
+.fld > select:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 14%, transparent);
+}
+
+/* A field the server rejected. Colour alone would fail anyone who cannot see it, so the
+   message below carries the same information in words. */
+.fld.is-bad > input,
+.fld.is-bad > select {
+  border-color: var(--destructive);
+}
+
+.fld__err {
+  font-size: 11.5px;
+  color: var(--destructive);
+}
+
+/* A tick inside a field. The label sits BESIDE the box rather than above it — a lone
+   checkbox under a heading reads as a heading with nothing under it, and the whole row
+   should be clickable. */
+.fld__check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  font-size: 13.5px;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.fld__check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* A caution, not a refusal — the form still saves. Deliberately not --destructive: a red
+   message beside a field people are allowed to submit reads as "you have done something
+   wrong", and duplicate names are sometimes correct. */
+.fld__warn {
+  font-size: 12px;
+  color: var(--warning);
+  margin-top: -4px;
+}
+
+.fld__warn a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* ---- toasts -------------------------------------------------------------- */
+/* Bottom-right on desktop, full width at the bottom on a phone where the thumb
+   already is. Above the sheet layer, so a save inside a dialog is still visible. */
+.tst {
+  position: fixed;
+  z-index: 40;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.tst__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 12px 11px 14px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  line-height: 1.45;
+  pointer-events: auto;
+  overflow-wrap: anywhere;
+}
+
+.tst__item--success { border-left-color: var(--success); }
+.tst__item--error { border-left-color: var(--destructive); }
+
+.tst__close {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  opacity: 0.55;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.tst__close:hover { opacity: 1; }
+
+@media (max-width: 640px) {
+  .tst { left: 16px; right: 16px; max-width: none; }
+}
+
+/* ---- sheet close button -------------------------------------------------- */
+.nx-sheet__x {
+  border: 0;
+  background: none;
+  color: inherit;
+  opacity: 0.55;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.nx-sheet__x:hover { opacity: 1; }
+.nx-sheet__x:disabled { opacity: 0.25; cursor: not-allowed; }
+
+/* ---- empty states -------------------------------------------------------- */
+.es {
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.es__badge {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  /* Olive on pale lime in light (~6:1), lime on deep green in dark. */
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.es__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.es__detail {
+  margin: 6px auto 0;
+  max-width: 46ch;
+  font-size: 13px;
+  opacity: 0.72;
+  line-height: 1.5;
+}
+
+.es__actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---- breadcrumbs --------------------------------------------------------- */
+.bc { margin-bottom: 10px; }
+
+.bc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.bc li + li::before {
+  content: "/";
+  margin-right: 6px;
+  opacity: 0.4;
+}
+
+.bc a { color: inherit; opacity: 0.72; text-decoration: none; }
+.bc a:hover { opacity: 1; text-decoration: underline; }
+.bc [aria-current="page"] { font-weight: 600; }
+
+/* `.fm` is a two-column grid, so a breadcrumb dropped in as a direct child would take
+   the first cell and push the form's own header into the aside column. It spans instead. */
+.fm > .bc { grid-column: 1 / -1; }
+
+/* A form with no aside: one column instead of auto-flowing sections into the 280px
+   sidebar track. */
+.fm--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ---- utilities ---------------------------------------------------------- */
+.nx-muted { color: var(--text-muted); }
+.nx-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- buttons ------------------------------------------------------------- */
+.nx-btn {
+  /* Explicit, because `.nx-btn` is worn by both <button> and <a>. A <button> centres its
+     label and honours min-height by default; an <a> does neither, so link-buttons were
+     rendering with the text jammed top-left in a taller box while real buttons beside
+     them looked correct. Stating it here makes the two identical. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  min-height: var(--touch-min);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.nx-btn:hover:not(:disabled) { background: var(--secondary); }
+.nx-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Accent is the "do it" colour in this system — olive in light, lime in dark. */
+.nx-btn--primary {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-foreground);
+}
+.nx-btn--primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.nx-btn--lg { min-height: 52px; font-size: 15px; border-radius: 12px; }
+.nx-btn--sm { min-height: 34px; padding: 0 12px; font-size: 12.5px; }
+.nx-btn--danger { border-color: var(--destructive); color: var(--destructive); background: var(--card); }
+.nx-btn--danger:hover:not(:disabled) { background: var(--destructive-soft); }
+
+/* ---- sheets / dialogs ---------------------------------------------------- */
+.nx-sheet {
+  position: fixed; inset: 0; z-index: 20;
+  background: rgb(10 37 64 / 45%);
+  display: grid; place-items: center; padding: 16px;
+}
+.nx-sheet__panel {
+  width: min(520px, 100%); max-height: 90vh; overflow-y: auto;
+  background: var(--popover); color: var(--popover-foreground);
+  border-radius: var(--radius-card); box-shadow: var(--shadow-lg);
+  padding: 24px; display: flex; flex-direction: column; gap: 16px;
+}
+.nx-sheet__panel--wide { width: min(760px, 100%); }
+.nx-sheet__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.nx-sheet__head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.nx-sheet__panel > p { margin: 0; color: var(--text-secondary); }
+.nx-sheet__error { margin: 0; color: var(--destructive); font-size: 13px; }
+.nx-sheet__actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+
+/* Dialogs dock to the bottom edge on a phone, where the thumb is. */
+@media (max-width: 640px) {
+  .nx-sheet { place-items: end center; padding: 0; }
+  .nx-sheet__panel, .nx-sheet__panel--wide {
+    width: 100%; max-height: 92vh; max-height: 92dvh;
+    border-radius: 16px 16px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  .nx-sheet__actions { grid-template-columns: 1fr 1fr; }
+}

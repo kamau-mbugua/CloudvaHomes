@@ -1,0 +1,128 @@
+/*
+ * Phase 6b (agency accounting) pieces: balance tiles, the owner statement's stacked
+ * lines, payout and portal cards, remittance breakdowns and the owner portal's own
+ * shell. Stacked rows instead of wide tables, so everything reads at 390px. Built only
+ * from existing tokens, so light and dark both follow.
+ */
+
+/* What a negative balance means, in the colour of a negative amount. */
+.ag__negnote { color: var(--destructive); font-weight: 600; }
+.ag__tiles { margin-bottom: 0; }
+
+/* ---- cards ----------------------------------------------------------------- */
+.ag__cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.ag__card {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  background: var(--card); box-shadow: var(--shadow-sm);
+}
+.ag__card > h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.ag__card > p { margin: 0; }
+.ag__cardactions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ag__masked { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.ag__masked .ad__sub { flex-basis: 100%; margin-top: 0; }
+.ag__note { display: block; }
+.ag__warn { border-left-color: var(--warning); background: var(--warning-soft); }
+.ag__warn p, .ag__agreement p { font-size: 13.5px; }
+.ag__warnnote { margin: 0; border-left-color: var(--warning); }
+.ag__amountdue { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+
+/* ---- statement lines ------------------------------------------------------- */
+.ag__stmt { display: flex; flex-direction: column; gap: 14px; }
+.ag__rangebar { margin-bottom: 0; }
+.ag__lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ag__line {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.ag__line > .num { white-space: nowrap; }
+.ag__linelabel { min-width: 0; overflow-wrap: anywhere; }
+.ag__line--edge { font-weight: 600; background: var(--secondary); padding: 10px 10px; margin: 0 -10px; border-radius: 8px; border-bottom: 0; }
+.ag__line--head { font-weight: 600; }
+.ag__line--sub { padding-left: 12px; cursor: pointer; list-style: none; }
+.ag__line--sub::-webkit-details-marker { display: none; }
+.ag__line--sub .ag__linelabel::before { content: '▸ '; color: var(--text-muted); }
+details[open] > .ag__line--sub .ag__linelabel::before { content: '▾ '; }
+.ag__line--detail { padding-left: 28px; font-size: 13px; color: var(--text-secondary); }
+.ag__group { display: block; }
+
+/* ---- properties ------------------------------------------------------------ */
+.ag__props { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+.ag__prop { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); }
+.ag__prop > .ad__sub { margin-top: 8px; }
+.ag__prophead { display: flex; flex-direction: column; }
+.ag__propfacts { margin: 10px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.ag__propfacts dt { font-size: 11.5px; color: var(--text-muted); }
+.ag__propfacts dd { margin: 0; font-size: 14px; font-weight: 600; }
+
+/* ---- payouts --------------------------------------------------------------- */
+.ag__payouts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ag__payout { padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--card); }
+.ag__payout p { margin: 4px 0 0; }
+.ag__payouthead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ag__payoutamt { font-size: 18px; font-weight: 600; }
+
+/* ---- owner portal shell ---------------------------------------------------- */
+.ow { min-height: 100%; display: flex; flex-direction: column; background: var(--background); }
+.ow__top {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px max(16px, env(safe-area-inset-left)) 10px max(16px, env(safe-area-inset-right));
+  background: var(--card); border-bottom: 1px solid var(--border);
+}
+.ow__who { display: flex; flex-direction: column; min-width: 0; }
+.ow__org { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ow__name { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ow__switch {
+  max-width: 100%; height: 36px; padding: 0 8px;
+  border: 1px solid var(--input); border-radius: var(--radius);
+  background: var(--input-background); color: var(--foreground);
+  font: inherit; font-size: 14px; font-weight: 600;
+}
+.ow__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ow__signout {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); color: var(--text-secondary);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.ow__signout svg { width: 16px; height: 16px; }
+.ow__signout:hover:not(:disabled) { background: var(--secondary); }
+.ow__tabs {
+  display: flex; gap: 4px; overflow-x: auto;
+  padding: 8px 16px 0; border-bottom: 1px solid var(--border); background: var(--card);
+}
+.ow__tab {
+  min-height: var(--touch-min); display: inline-flex; align-items: center;
+  padding: 0 14px; border-bottom: 2px solid transparent;
+  color: var(--text-muted); text-decoration: none; font-weight: 500; white-space: nowrap;
+}
+.ow__tab.is-on { color: var(--foreground); border-bottom-color: var(--accent); }
+.ow__page { flex: 1; width: 100%; max-width: 860px; margin: 0 auto; padding: 16px; }
+.ow__stack { display: flex; flex-direction: column; gap: 14px; }
+.ow__h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+.ow__contact { display: flex; flex-direction: column; gap: 4px; }
+.ow__contact a { color: var(--foreground); }
+.ow__foot {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px;
+  padding: 16px; font-size: 12px; color: var(--text-muted);
+  max-width: 860px; width: 100%; margin: 0 auto;
+}
+.ow__foot a { color: var(--text-secondary); }
+
+/* The owner-portal link on the "no organisation" screen is a link styled as the button. */
+a.au__submit { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+
+@media (max-width: 640px) {
+  .ag__card { padding: 12px; }
+  .ag__cardactions > .nx-btn { flex: 1 1 auto; }
+  .ag__rangeto { display: none; }
+  .ow__signout span { display: none; }
+  .ow__page { padding: 12px; }
+  .ag__tiles { grid-template-columns: minmax(0, 1fr); }
+  .ag__tiles .ad__stat__value { font-size: 22px; }
+}

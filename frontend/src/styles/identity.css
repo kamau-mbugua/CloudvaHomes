@@ -1,0 +1,217 @@
+/*
+ * Phase 1 (identity) pieces with no pos-react equivalent: the session splash, the extra
+ * sign-in states (one-time code, field errors), the organisation switcher in the account
+ * menu, the step-up dialog, settings page layout, the role editor's permission matrix
+ * and the audit log's before/after view. Built only from existing tokens, so light and
+ * dark both follow.
+ */
+
+/* ---- session splash ------------------------------------------------------ */
+.splash {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: var(--background); color: var(--text-muted);
+  font-size: 13.5px;
+}
+.splash__mark { width: 40px; height: 40px; border-radius: 11px; animation: splash-pulse 1.4s ease-in-out infinite; }
+@keyframes splash-pulse { 50% { opacity: 0.45; } }
+
+/* ---- auth extras --------------------------------------------------------- */
+.au__code {
+  font-family: var(--font-num);
+  font-size: 22px;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+.au__code::placeholder { letter-spacing: 0.4em; opacity: 0.35; }
+
+.au__field.is-bad .au__input { border-color: var(--destructive); }
+.au__fielderr { margin: 6px 0 0; font-size: 12px; color: var(--destructive); }
+.au__hint { margin: 6px 0 0; font-size: 12px; color: var(--text-muted); }
+
+/* "or" between the password form and the one-time-code path. */
+.au__or {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0 0;
+  font-size: 12px; color: var(--text-muted);
+}
+.au__or::before, .au__or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* The secondary way in: same size as the submit, quiet weight. */
+.au__alt, .au__submit--quiet {
+  margin-top: 14px; width: 100%; height: 48px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); color: var(--foreground);
+  font: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer;
+}
+.au__alt:hover, .au__submit--quiet:hover:not(:disabled) { background: var(--secondary); }
+.au__submit--quiet:disabled { opacity: 0.55; cursor: not-allowed; }
+.au__submit--quiet { margin-top: 24px; }
+
+/* A link dressed as the submit button ("Go to sign in"). */
+.au__submit--link {
+  display: flex; align-items: center; justify-content: center;
+  text-decoration: none;
+}
+
+.au__link:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Organisation picker on the "no active organisation" screen. */
+.orgpick { display: flex; flex-direction: column; gap: 8px; }
+.orgpick__row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); color: var(--foreground);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.orgpick__row:hover:not(:disabled) { border-color: var(--accent); background: var(--secondary); }
+.orgpick__row span { font-size: 12.5px; color: var(--text-muted); }
+
+/* ---- account menu: contact line and organisation switcher ---------------- */
+.sh__menucontact {
+  font-size: 12.5px; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px;
+}
+
+.sh__orgs {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.sh__orgs .sh__themelabel {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px 4px;
+}
+.sh__orgs .sh__themelabel svg { width: 13px; height: 13px; }
+
+.sh__orgitem {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 8px 12px;
+  border: 0; border-radius: 8px;
+  background: transparent; color: var(--foreground);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.sh__orgitem:hover:not(:disabled) { background: var(--secondary); }
+.sh__orgitem:disabled { cursor: progress; }
+.sh__orgitem.is-on { cursor: default; }
+.sh__orgitem svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--accent); }
+.sh__orgname { display: flex; flex-direction: column; min-width: 0; }
+.sh__orgname strong { font-size: 13.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh__orgname span { font-size: 11.5px; color: var(--text-muted); }
+
+/* ---- step-up dialog ------------------------------------------------------ */
+.stepup { display: flex; flex-direction: column; gap: 14px; }
+.stepup__lede { margin: 0; color: var(--text-secondary); font-size: 13.5px; line-height: 1.55; }
+.stepup__resend { margin: 0; font-size: 12.5px; }
+.fld > .stepup__code {
+  height: 48px;
+  font-family: var(--font-num); font-size: 22px; letter-spacing: 0.4em; text-align: center;
+}
+
+/* ---- settings page layout ------------------------------------------------ */
+.pg { max-width: 1180px; margin: 0 auto; }
+.pg-narrow { max-width: 760px; }
+.pg-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.pg-grow { flex: 1 1 auto; margin: 0; }
+.pg-push { margin-left: auto; }
+.pg-gap { margin-top: 16px; }
+@media (min-width: 640px) { .pg-half { max-width: calc(50% - 7px); } }
+
+/* Filter row controls beside .ad__search. */
+.ad__select {
+  height: 38px; min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--input); border-radius: var(--radius);
+  background: var(--input-background); color: var(--foreground);
+  font: inherit; font-size: 13.5px;
+  color-scheme: light dark;
+}
+.ad__select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+select.ad__select { flex: 0 1 180px; }
+
+/* A filter with a visible label above it (dates need one). */
+.ad__filter { display: flex; flex-direction: column; gap: 4px; flex: 1 1 160px; max-width: 220px; }
+.ad__filter label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.ad__filterclear { align-self: flex-end; }
+
+@media (max-width: 640px) {
+  select.ad__select, .ad__filter { flex: 1 1 calc(50% - 5px); max-width: none; }
+  .pg-push { flex: 1 1 100%; margin-left: 0; }
+}
+
+.ad__table--compact { min-width: 560px; }
+
+/* An explanation above a form, neutral rather than warned. */
+.ad__callout--info {
+  display: block;
+  margin: 0;
+  border-left-color: var(--info);
+  font-size: 13px; line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.role-badge { margin-left: 8px; vertical-align: 1px; }
+
+/* Sheets with a form inside them. */
+.sheet-form { display: flex; flex-direction: column; gap: 12px; }
+.sheet-form > p { margin: 0; }
+.sheet-grid { margin-top: 0; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.fld > select:disabled, .fld > input:disabled { opacity: 0.7; cursor: not-allowed; }
+
+/* ---- permission matrix (role editor) ------------------------------------- */
+.pm__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pm__count { margin: 5px 0 0; font-size: 12.5px; color: var(--text-muted); }
+.pm__bulk { display: flex; gap: 8px; }
+
+.pm {
+  margin-top: 16px;
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.pm__group {
+  margin: 0; min-width: 0;
+  padding: 4px 14px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--background);
+}
+.pm__group:disabled .fld__check { cursor: default; }
+.pm__group:disabled input { cursor: default; }
+.pm__legend { padding: 0 4px; margin-left: -4px; }
+.pm__grouplabel { min-height: 36px; font-weight: 600; font-size: 13.5px; }
+.pm__items { display: flex; flex-direction: column; }
+.pm__item { min-height: 34px; font-size: 13px; color: var(--text-secondary); }
+
+/* ---- audit log ----------------------------------------------------------- */
+.audit__when { white-space: nowrap; font-size: 12.5px; }
+.audit__action {
+  font-family: var(--font-num); font-size: 12px;
+  padding: 2px 6px; border-radius: 6px;
+  background: var(--secondary); color: var(--text-secondary);
+}
+.ad__table tr.is-expanded td { border-bottom: 0; }
+.audit__detailrow td { background: var(--background); padding-top: 0; }
+.audit__diff { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); padding-top: 12px; }
+.audit__json { min-width: 0; }
+.audit__jsontitle {
+  display: block; margin-bottom: 6px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.audit__json pre {
+  margin: 0; max-height: 320px; overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); color: var(--foreground);
+  font-size: 12px; line-height: 1.5;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.audit__json p { margin: 0; }
+
+/* Short column headings stay on one line ("Last sign-in"). */
+.ad__table th { white-space: nowrap; }
+
+/* Contains absolutely positioned screen-reader labels (.nx-sr) in header cells; without
+   it they escape the scrolling wrapper and widen the whole page on a phone. */
+.ad__tablewrap { position: relative; }

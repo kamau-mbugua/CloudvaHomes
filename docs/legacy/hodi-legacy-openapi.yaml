@@ -1,0 +1,2827 @@
+openapi: 3.0.3
+info:
+  title: Hodi Rental Management API
+  version: 1.0.0-legacy
+  description: |
+    > **REFERENCE ONLY (2026-10-27).** The Flutter app is being refactored onto the new
+    > platform API, so this legacy contract is NOT binding. Use it to understand how Hodi
+    > operated (domain, flows, enums). The new design is `docs/specs/2026-10-27-hodi-platform-design.md`.
+
+    API contract reverse-engineered from the existing Flutter client (`hodi_app`).
+    The original backend (Spring Boot, judging by the Page/`content` envelopes) was lost.
+    The "compatibility rules" below describe what the *unmodified* app would need.
+
+    Source of every endpoint: `hodi_app/lib/repository/authenticated_repo.dart`,
+    `auth_repo.dart`, and the models in `hodi_app/lib/models/data/**`.
+
+    ## Compatibility rules (read before implementing)
+
+    1. **Response envelopes are NOT uniform.** Each operation documents exactly one of:
+       - **Raw** — the JSON body *is* the object/array (no wrapper).
+       - **Page** — Spring-style page: `{content: [...], number, size, numberOfElements, totalElements, ...}`.
+       - **Envelope** — `{status, message, data}` where `status: "00"` means success.
+       - **Status** — `{status, message}` only (all write operations).
+       Changing an envelope breaks the app.
+    2. **Write operations return HTTP 200 with `status: "00"` on success.** Any other `status`
+       value is treated as a business failure and `message` is shown to the user as a snackbar.
+    3. **Errors (HTTP 4xx/5xx)** must use `{"errors":[{"code":"...","message":"..."}]}`.
+       HTTP 401, or an error with `code: "auth-001"`, logs the user out.
+       For 500/503 the app shows the HTTP status text, not the body.
+    4. **Dart is strictly typed — JSON types must match exactly.**
+       - A field documented as `string` must be a JSON string even if it holds a number or id
+         (e.g. login `userDetails.id`, invoice detail `invoiceAmount`). Sending `123` instead of
+         `"123"` crashes the screen.
+       - A field documented `format: double` must be emitted **with a decimal point**
+         (`5000.0`, not `5000`). Dart decodes `5000` as `int` and several models assign it to a
+         `double` field without conversion, which throws at runtime.
+       - A field documented `integer` must not carry a fractional part.
+       - Fields listed under `required` are parsed without a null fallback — never send `null`.
+    5. **Pagination**: `page` is **0-based**, `pageSize` is the page size. The client stops
+       paging when a page returns fewer than `pageSize` items. Empty filter parameters are sent as
+       empty strings (`propertyId=`) and must be treated as "no filter".
+    6. **Auth**: `Authorization: Bearer <accessToken>` on every request, including login (where it
+       is `Bearer ` with an empty token — ignore it).
+    7. **Images** (meter readings) are sent inline as data URIs:
+       `data:image/<ext>;base64,<payload>`. Payment-type icons are returned as raw base64 strings.
+    8. Two endpoints are called with a **leading slash** (`/user-groups/flags/delete/{id}`,
+       `/user-groups/flags/deactivate/{id}`). Dio resolves these against the host root, i.e.
+       `https://<host>/user-groups/...` **outside** `/api`. Serve them at both paths, or fix the
+       client constants.
+
+    ## Domain glossary
+    - **Estate** — a landlord / management company account (the tenant of the SaaS). Users belong to one estate.
+    - **Property** — a building or compound owned by an estate.
+    - **House** — a rentable unit inside a property (has floor, type, category, rent).
+    - **Tenant invoice** (`/invoices`) — monthly bill to a tenant: rent + utility bills.
+    - **Estate invoice** (`/estate-invoices`) — the platform (Hodi) billing the estate, e.g. a commission
+      per occupied unit. Unpaid estate invoices can block the estate (`check-status`).
+    - **Payment type** — a configured way to receive money (Cash, Cheque, Bank slip, M-Pesa STK…)
+      linked to a bank/paybill account for a property.
+    - **Utility bill** — a charge added to tenant invoices: fixed, variable, or metered.
+    - **Onboard ("new let") fee** — a one-off charge when a tenant moves in (deposit, other).
+
+    ## Enumerations used across endpoints
+    - Invoice status (path param on invoice lists): `0` UNPAID, `2` PAID, `3` BF (brought forward).
+    - Payment type ids used by the client: `1` Cash, `2` Cheque, `11` Bank deposit slip, `12` M-Pesa STK push.
+    - Utility bill `type`: `0` Fixed Amount, `1` Variable Amount, `2` Metred Bill.
+    - Onboard fee `type`: `0` Rent Deposit, `1` Other Fees.
+    - Recurrent expenditure `frequency`: `1` Monthly, `2` Once in two months, `3` Quarterly.
+    - Flag `action` path param: `activate`, `deactivate`, `delete`.
+    - `usertype` values the client checks: `admins`, `tenant`.
+    - Estate check-status: `00` paid, `001` unpaid (prompt to pay), `002` blocked (locked out).
+
+servers:
+  - url: https://hodi.qnex.io/api
+    description: Production (legacy host baked into the prod flavor)
+  - url: https://hodi-test.qnex.io/api
+    description: Dev / UAT (legacy host baked into dev and uat flavors)
+  - url: http://localhost:8080/api
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Dashboard & Reports
+  - name: Properties
+  - name: Houses
+  - name: House Categories
+  - name: Tenants
+  - name: Meters
+  - name: Tenant Invoices
+  - name: Estate Invoices
+  - name: Payments
+  - name: Estate Payments
+  - name: Payment Types
+  - name: Utility Bills
+  - name: Onboard Fees
+  - name: Expenditure
+  - name: Users
+  - name: User Groups
+  - name: Proposed — Payment Integrations
+    description: |
+      NOT called by the current app. Required server-side so that M-Pesa STK (payment type 12)
+      and bank deposits can be confirmed automatically. Shapes follow the Safaricom Daraja API.
+
+paths:
+  # ───────────────────────────── AUTH ─────────────────────────────
+  /login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      summary: Log in with username + password
+      description: Envelope. App reads `data.tokenDetails.accessToken` and stores the whole response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Login result. Non-"00" status shows `message` as the login error.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /forgot-password:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      security: []
+      summary: Start password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, description: Username or email the user typed }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /delete-account:
+    post:
+      tags: [Auth]
+      operationId: deleteAccount
+      summary: Delete own account (app-store requirement)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /otps/initiate-type-otp/{estateId}:
+    get:
+      tags: [Auth]
+      operationId: requestPaymentTypeOtp
+      summary: Send an OTP to the estate admin before adding a payment account
+      description: The OTP is then submitted in `POST /estate/payment-types/new`.
+      parameters:
+        - $ref: '#/components/parameters/EstateIdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── PROFILE ─────────────────────────────
+  /profile/user-details:
+    get:
+      tags: [Profile]
+      operationId: getUserProfile
+      summary: Current user's profile
+      description: Raw object.
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfile' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── DASHBOARD ─────────────────────────────
+  /dashboard/table-data:
+    get:
+      tags: [Dashboard & Reports]
+      operationId: getDashboardTableData
+      summary: Overloaded dashboard / report endpoint (shape depends on `status`)
+      description: |
+        The legacy endpoint returns a different `content` shape depending on `status`:
+        - `status=2` → `content` is a single `DashboardSummary` object (home dashboard).
+        - `status=4` → `content` is a single `UnitComparison` object (occupancy for `month`/`year`).
+        - `status=1` → Page whose `content` is `PropertyReportRow[]` (monthly property report).
+
+        If the estate is blocked/unpaid, return `content: null` (optionally with
+        `{status:"002", message}`); the app then calls `GET /estate-invoices/check-status/{estateId}`.
+
+        Recommendation for the rebuild: implement three handlers behind this one route, and expose
+        clean routes (`/dashboard/summary`, `/dashboard/units`, `/reports/property`) for the web app.
+      parameters:
+        - name: status
+          in: query
+          required: true
+          schema: { type: string, enum: ['1', '2', '4'] }
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/Month'
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: See description for which shape applies.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    title: SummaryResponse (status=2)
+                    properties:
+                      content:
+                        type: object
+                        nullable: true
+                        allOf: [{ $ref: '#/components/schemas/DashboardSummary' }]
+                  - type: object
+                    title: UnitComparisonResponse (status=4)
+                    properties:
+                      content: { $ref: '#/components/schemas/UnitComparison' }
+                  - title: PropertyReportPage (status=1)
+                    allOf:
+                      - $ref: '#/components/schemas/PageMeta'
+                      - type: object
+                        properties:
+                          content:
+                            type: array
+                            items: { $ref: '#/components/schemas/PropertyReportRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── PROPERTIES ─────────────────────────────
+  /properties/all:
+    get:
+      tags: [Properties]
+      operationId: listAllProperties
+      summary: All properties for an estate (unpaginated)
+      description: Raw array.
+      parameters:
+        - $ref: '#/components/parameters/EstateIdQuery'
+      responses:
+        '200':
+          description: Properties
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Property' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /properties/specs/{propertyId}:
+    get:
+      tags: [Properties]
+      operationId: getPropertySpecs
+      summary: Lookup data for the "add house" form
+      description: Raw object.
+      parameters:
+        - $ref: '#/components/parameters/PropertyIdPath'
+      responses:
+        '200':
+          description: Floors, house types, categories and taken house numbers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseSpecs' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /house-features/property/{propertyId}/{floorNo}:
+    get:
+      tags: [Properties]
+      operationId: getPropertyFloorFeatures
+      summary: Features available for houses on a floor
+      description: Raw object.
+      parameters:
+        - $ref: '#/components/parameters/PropertyIdPath'
+        - name: floorNo
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Features
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseFeatures' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── HOUSES ─────────────────────────────
+  /houses:
+    get:
+      tags: [Houses]
+      operationId: listHouses
+      summary: Paginated houses
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/CategoryIdQuery'
+        - $ref: '#/components/parameters/SearchTerm'
+        - name: occupied
+          in: query
+          description: '"true", "false" or empty for all.'
+          schema: { type: string }
+      responses:
+        '200':
+          description: Houses page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/House' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /houses/new:
+    post:
+      tags: [Houses]
+      operationId: createHouse
+      summary: Add a house to a property
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [houseNumber, floor, houseTypeId, rent, categoryId, propertyId, estateId]
+              properties:
+                houseNumber: { type: string }
+                floor: { type: integer }
+                houseTypeId: { type: integer }
+                squareFt: { type: string, description: Numeric string }
+                description: { type: string }
+                rent: { type: string, description: Numeric string }
+                categoryId: { type: integer }
+                propertyId: { type: integer }
+                estateId: { type: integer }
+                featureIds:
+                  type: array
+                  items: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /houses/{houseId}:
+    get:
+      tags: [Houses]
+      operationId: getHouse
+      summary: House detail with current tenant
+      description: Raw object.
+      parameters:
+        - $ref: '#/components/parameters/HouseIdPath'
+      responses:
+        '200':
+          description: House
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseDetails' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /houses/unoccupied/all/{estateId}:
+    get:
+      tags: [Houses]
+      operationId: listUnoccupiedHouses
+      summary: Vacant houses (for assigning a tenant)
+      description: Raw array.
+      parameters:
+        - $ref: '#/components/parameters/EstateIdPath'
+      responses:
+        '200':
+          description: Vacant houses
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UnoccupiedHouse' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /houses/house-features/{houseId}:
+    get:
+      tags: [Houses]
+      operationId: listHouseFeatures
+      summary: Features attached to a house
+      description: Raw array.
+      parameters:
+        - $ref: '#/components/parameters/HouseIdPath'
+      responses:
+        '200':
+          description: Features
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [name]
+                  properties:
+                    name: { type: string }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── HOUSE CATEGORIES ─────────────────────────────
+  /property-categories:
+    get:
+      tags: [House Categories]
+      operationId: listHouseCategories
+      summary: Paginated house categories
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+      responses:
+        '200':
+          description: Categories page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/HouseCategory' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /property-categories/estate/{estateId}:
+    get:
+      tags: [House Categories]
+      operationId: listHouseCategoriesForEstate
+      summary: All categories for an estate (unpaginated)
+      description: Raw array.
+      parameters:
+        - $ref: '#/components/parameters/EstateIdPath'
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/IdName' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /property-categories/flags/{action}/{id}:
+    post:
+      tags: [House Categories]
+      operationId: flagHouseCategory
+      summary: Activate / deactivate / delete a category
+      parameters:
+        - $ref: '#/components/parameters/FlagAction'
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── TENANTS ─────────────────────────────
+  /tenants:
+    get:
+      tags: [Tenants]
+      operationId: listTenants
+      summary: Paginated tenants (current occupancies)
+      description: |
+        Page. When the caller is a tenant, `self=true` limits results to their own occupancies.
+        `userId` is only sent when filtering for one tenant.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - $ref: '#/components/parameters/CategoryIdQuery'
+        - $ref: '#/components/parameters/Self'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/UserIdQuery'
+      responses:
+        '200':
+          description: Tenants page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/TenantRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /tenants/{tenantId}/details:
+    get:
+      tags: [Tenants]
+      operationId: getTenantDetails
+      summary: Tenant profile + totals
+      description: Envelope.
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Tenant details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/TenantDetails' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /tenants/tenant-details:
+    post:
+      tags: [Tenants]
+      operationId: searchTenantByIdNo
+      summary: Look up an existing user by national ID / passport number
+      description: |
+        Envelope. `status: "00"` means the person already exists (form is pre-filled);
+        any other status means "not found — enter details". `data` may be empty in that case.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idNo]
+              properties:
+                idNo: { type: string }
+      responses:
+        '200':
+          description: Search result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/TenantSearchResult' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /tenants/assign-tenant:
+    post:
+      tags: [Tenants]
+      operationId: assignTenant
+      summary: Move a tenant into a house (creates the user if new)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [houseId, tenant, invoice]
+              properties:
+                houseId: { type: string }
+                userId: { type: string, description: 'Existing user id, or empty for a new tenant' }
+                payDate: { type: string, description: Day of month rent is due (e.g. "5") }
+                withArrears: { type: boolean }
+                currency: { type: string, description: 'Empty string from the app; default KES' }
+                generateInvoice: { type: boolean }
+                refundableAmount: { type: integer }
+                tenant:
+                  type: object
+                  required: [firstName, lastName, email, phone, idNo]
+                  properties:
+                    id: { type: string }
+                    firstName: { type: string }
+                    lastName: { type: string }
+                    email: { type: string, format: email }
+                    phone: { type: string }
+                    idNo: { type: string }
+                invoice:
+                  type: object
+                  properties:
+                    utilityBills:
+                      type: array
+                      items: {}
+                    month: { type: integer, description: 'Month number (app sends 12)' }
+                    nextMonth: { type: boolean }
+                    newTenant: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /tenants/house/history:
+    get:
+      tags: [Tenants]
+      operationId: listHouseHistory
+      summary: Past and current occupancies of a house
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: houseId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: History page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/HouseHistoryRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── METERS ─────────────────────────────
+  /metres:
+    get:
+      tags: [Meters]
+      operationId: listMeterReadings
+      summary: Paginated meter readings
+      description: |
+        Page. `currentReading` is only sent when filtering by "read this month" (`true`) vs
+        "not yet read" (`false`); omitted means all.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - name: billId
+          in: query
+          schema: { type: string }
+        - name: currentReading
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/SearchTerm'
+        - name: houseId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Readings page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/MeterReading' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /metres/specs:
+    get:
+      tags: [Meters]
+      operationId: getMeterSpecs
+      summary: Houses and existing meter numbers for a metered bill
+      description: Raw object.
+      parameters:
+        - name: propertyId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: billId
+          in: query
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Simple'
+        - $ref: '#/components/parameters/Metred'
+      responses:
+        '200':
+          description: Meter specs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [houses, metreNos]
+                properties:
+                  houses:
+                    type: array
+                    items: { $ref: '#/components/schemas/IdNameString' }
+                  metreNos:
+                    type: array
+                    items: { type: string }
+        default: { $ref: '#/components/responses/Error' }
+
+  /metres/new:
+    post:
+      tags: [Meters]
+      operationId: createMeterReading
+      summary: Register a meter with its first reading
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metreNo, billId, houseId, currentReading]
+              properties:
+                metreNo: { type: string }
+                billId: { type: string }
+                previousReading: { type: string, description: Numeric string }
+                currentReading: { type: string, description: Numeric string }
+                houseId: { type: string }
+                image: { $ref: '#/components/schemas/DataUriImage' }
+                descrition: { type: string, description: 'Sic — misspelled key, keep it.' }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /metres/update-reading:
+    post:
+      tags: [Meters]
+      operationId: updateMeterReading
+      summary: Record this month's reading
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metreId, currentReading]
+              properties:
+                metreId: { type: string }
+                currentReading: { type: string, description: Numeric string }
+                image: { $ref: '#/components/schemas/DataUriImage' }
+                descrition: { type: string, description: 'Sic — misspelled key, keep it.' }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── TENANT INVOICES ─────────────────────────────
+  /invoices/{invoiceStatus}:
+    get:
+      tags: [Tenant Invoices]
+      operationId: listTenantInvoices
+      summary: Paginated tenant invoices by status
+      description: Page. `userId` is only sent when listing one tenant's invoices.
+      parameters:
+        - $ref: '#/components/parameters/InvoiceStatusPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Month'
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/CategoryIdQuery'
+        - $ref: '#/components/parameters/Self'
+        - name: houseId
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/UserIdQuery'
+      responses:
+        '200':
+          description: Invoices page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/TenantInvoiceRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /invoices/detail/{invoiceRef}:
+    get:
+      tags: [Tenant Invoices]
+      operationId: getTenantInvoice
+      summary: Tenant invoice detail (also used to render the PDF)
+      description: Envelope. Non-"00" status shows `message`.
+      parameters:
+        - $ref: '#/components/parameters/InvoiceRefPath'
+      responses:
+        '200':
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/TenantInvoiceDetail' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── ESTATE INVOICES ─────────────────────────────
+  /estate-invoices/{invoiceStatus}:
+    get:
+      tags: [Estate Invoices]
+      operationId: listEstateInvoices
+      summary: Paginated platform-to-estate invoices by status
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/InvoiceStatusPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Month'
+        - $ref: '#/components/parameters/Year'
+        - $ref: '#/components/parameters/SearchTerm'
+      responses:
+        '200':
+          description: Estate invoices page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstateInvoicePage' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate-invoices/pay:
+    get:
+      tags: [Estate Invoices]
+      operationId: listPayableEstateInvoices
+      summary: Unpaid estate invoices the admin can select to pay
+      description: Page. Path is literal `pay`; route it before `/{invoiceStatus}`.
+      parameters:
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Payable invoices page
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EstateInvoicePage' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate-invoices/detail/{invoiceRef}:
+    get:
+      tags: [Estate Invoices]
+      operationId: getEstateInvoice
+      summary: Estate invoice detail
+      description: Envelope.
+      parameters:
+        - $ref: '#/components/parameters/InvoiceRefPath'
+      responses:
+        '200':
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/EstateInvoiceDetail' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate-invoices/check-status/{estateId}:
+    get:
+      tags: [Estate Invoices]
+      operationId: checkEstateInvoiceStatus
+      summary: Whether the estate is paid up, unpaid, or blocked
+      description: |
+        Status only. `00` paid (no prompt), `001` unpaid (dismissible "Pay now" dialog showing
+        `message`), `002` blocked (non-dismissible lock dialog showing `message`).
+      parameters:
+        - $ref: '#/components/parameters/EstateIdPath'
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      status: { type: string, enum: ['00', '001', '002'] }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── PAYMENTS ─────────────────────────────
+  /payments:
+    get:
+      tags: [Payments]
+      operationId: listPayments
+      summary: Paginated tenant payments
+      description: Page. `startDate`/`endDate` are `yyyy-MM-dd`.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/Self'
+        - $ref: '#/components/parameters/CategoryIdQuery'
+        - $ref: '#/components/parameters/UserIdQuery'
+      responses:
+        '200':
+          description: Payments page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/PaymentRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /payments/detail/{paymentRef}:
+    get:
+      tags: [Payments]
+      operationId: getPayment
+      summary: Payment receipt detail
+      description: Envelope.
+      parameters:
+        - name: paymentRef
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Receipt
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/PaymentDetail' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /payments/receive-payments:
+    post:
+      tags: [Payments]
+      operationId: receiveTenantPayment
+      summary: Record or initiate a payment against tenant invoice(s)
+      description: |
+        Behaviour depends on `paymentTypeId`:
+        - `1` Cash, `2` Cheque, `11` Bank slip → record the payment and allocate it to the invoice(s).
+        - `12` M-Pesa STK → **initiate** an STK push to `phoneNo`; respond `00` once the push is
+          accepted. The invoice is settled later by the Daraja callback (see Proposed endpoints).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceivePaymentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /payments/validate-slip/{slipRef}:
+    get:
+      tags: [Payments]
+      operationId: validateBankSlip
+      summary: Check a bank deposit slip reference against the bank statement
+      description: Envelope. `00` = found; `data.amount` pre-fills the form.
+      parameters:
+        - name: slipRef
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          refNo: { type: string }
+                          message: { type: string }
+                          amount: { type: string }
+        default: { $ref: '#/components/responses/Error' }
+
+  /payment-statements:
+    get:
+      tags: [Payments]
+      operationId: listPaymentStatements
+      summary: Incoming money on the estate's accounts (bank / M-Pesa statement lines)
+      description: Page. `used` = whether the line has been allocated to an invoice.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - name: status
+          in: query
+          schema: { type: integer }
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - name: used
+          in: query
+          description: '"true", "false" or empty.'
+          schema: { type: string }
+        - name: paymentTypeId
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Statement page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/PaymentStatementRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── ESTATE PAYMENTS ─────────────────────────────
+  /estate-payments:
+    get:
+      tags: [Estate Payments]
+      operationId: listEstatePayments
+      summary: Payments the estate made to the platform
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/SearchTerm'
+      responses:
+        '200':
+          description: Estate payments page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/EstatePaymentRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate-payments/receive-payment:
+    post:
+      tags: [Estate Payments]
+      operationId: receiveEstatePayment
+      summary: Pay one or more estate invoices
+      description: Same body as tenant payments but with `invoiceIds` (array). Note singular `receive-payment`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceivePaymentRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── PAYMENT TYPES ─────────────────────────────
+  /estate/payment-types:
+    get:
+      tags: [Payment Types]
+      operationId: listPaymentAccounts
+      summary: Paginated payment accounts configured for properties
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+      responses:
+        '200':
+          description: Payment accounts page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/PaymentAccount' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate/payment-types/estate/{estateId}:
+    get:
+      tags: [Payment Types]
+      operationId: listPaymentTypesForEstate
+      summary: Payment types enabled for an estate (for filters)
+      description: Page (even though it is not paginated by the client).
+      parameters:
+        - $ref: '#/components/parameters/EstateIdPath'
+      responses:
+        '200':
+          description: Types
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/IdName' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate/payment-types/property/{propertyId}:
+    get:
+      tags: [Payment Types]
+      operationId: getPropertyPaymentTypeIds
+      summary: Which types and banks a property accepts
+      description: Envelope.
+      parameters:
+        - $ref: '#/components/parameters/PropertyIdPath'
+      responses:
+        '200':
+          description: Ids
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [bankIds, typeIds]
+                        properties:
+                          bankIds: { type: array, items: { type: integer } }
+                          typeIds: { type: array, items: { type: integer } }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate/payment-types/{originInvoice}/{roleType}/{propertyId}:
+    get:
+      tags: [Payment Types]
+      operationId: listPaymentMethodsForCheckout
+      summary: Payment methods to show on the pay screen
+      description: |
+        Envelope with `data` array.
+        - `originInvoice`: `hodi` when paying an estate invoice, otherwise the tenant-invoice origin.
+        - `roleType`: `"1"` when the payer is the party who owes this invoice (admin paying `hodi`,
+          tenant paying rent), `"0"` when someone records it on their behalf.
+      parameters:
+        - name: originInvoice
+          in: path
+          required: true
+          schema: { type: string }
+        - name: roleType
+          in: path
+          required: true
+          schema: { type: string, enum: ['0', '1'] }
+        - $ref: '#/components/parameters/PropertyIdPath'
+      responses:
+        '200':
+          description: Methods
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/CheckoutPaymentMethod' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate/payment-types/all:
+    post:
+      tags: [Payment Types]
+      operationId: listAssignablePaymentTypesAndBanks
+      summary: Catalogue of types and banks for the "add payment account" form
+      description: Raw object.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                propertyId: { type: string }
+                estateId: { type: string }
+      responses:
+        '200':
+          description: Types and banks
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [types, banks]
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        description: { type: string }
+                  banks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        code: { type: string }
+                        payBillNo: { type: string }
+                        status: { type: integer }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate/payment-types/new:
+    post:
+      tags: [Payment Types]
+      operationId: createPaymentAccount
+      summary: Link a bank account / paybill to a property (OTP-protected)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [typeId, estateId, propertyId, otp]
+              properties:
+                typeId: { type: string }
+                bankId: { type: string }
+                estateId: { type: string }
+                propertyId: { type: string }
+                accountNo: { type: string }
+                accountName: { type: string }
+                payBillNo: { type: string }
+                otp: { type: string, description: 'From GET /otps/initiate-type-otp/{estateId}' }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /estate/payment-types/flags/{action}/{id}:
+    post:
+      tags: [Payment Types]
+      operationId: flagPaymentAccount
+      summary: Activate / deactivate / delete a payment account
+      parameters:
+        - $ref: '#/components/parameters/FlagAction'
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── UTILITY BILLS ─────────────────────────────
+  /utility-bills:
+    get:
+      tags: [Utility Bills]
+      operationId: listUtilityBills
+      summary: Paginated utility bills
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+      responses:
+        '200':
+          description: Utility bills page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/UtilityBillRow' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /utility-bills/all:
+    get:
+      tags: [Utility Bills]
+      operationId: listUtilityBillsForProperty
+      summary: Bills for a property (metered only when `metred=true`)
+      description: Raw array.
+      parameters:
+        - name: propertyId
+          in: query
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Simple'
+        - $ref: '#/components/parameters/Metred'
+      responses:
+        '200':
+          description: Bills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [amount, name, id]
+                  properties:
+                    amount: { type: integer }
+                    name: { type: string }
+                    id: { type: string }
+        default: { $ref: '#/components/responses/Error' }
+
+  /utility-bills/new:
+    post:
+      tags: [Utility Bills]
+      operationId: createUtilityBill
+      summary: Create a utility bill for a property
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, propertyId, estateId]
+              properties:
+                name: { type: string }
+                amount: { type: string, description: Numeric string }
+                type: { type: integer, enum: [0, 1, 2] }
+                propertyId: { type: integer }
+                estateId: { type: integer }
+                metredBillId: { type: string, description: Empty unless type=2 }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /utility-bills/flags/{action}/{id}:
+    post:
+      tags: [Utility Bills]
+      operationId: flagUtilityBill
+      summary: Activate / deactivate / delete a utility bill
+      parameters:
+        - $ref: '#/components/parameters/FlagAction'
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /metred-bills:
+    get:
+      tags: [Utility Bills]
+      operationId: listMeteredBillTypes
+      summary: System catalogue of metered bill kinds (Water, Electricity…)
+      description: Raw array. App always sends `simple=true`.
+      parameters:
+        - $ref: '#/components/parameters/Simple'
+      responses:
+        '200':
+          description: Metered bill kinds
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/IdNameString' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── ONBOARD FEES ─────────────────────────────
+  /onboard-fees:
+    get:
+      tags: [Onboard Fees]
+      operationId: listOnboardFees
+      summary: Paginated move-in (onboard) fees
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+      responses:
+        '200':
+          description: Fees page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/OnboardFee' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /onboard-fees/new:
+    post:
+      tags: [Onboard Fees]
+      operationId: createOnboardFee
+      summary: Create a move-in fee (deposit or other)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, amount, type, propertyId, estateId, refundable]
+              properties:
+                name: { type: string }
+                amount: { type: string, description: Numeric string }
+                type: { type: integer, enum: [0, 1] }
+                propertyId: { type: integer }
+                estateId: { type: integer }
+                months: { type: string, description: 'Number of months of rent (deposit); may be empty' }
+                refundable: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /onboard-fees/flags/{action}/{id}:
+    post:
+      tags: [Onboard Fees]
+      operationId: flagOnboardFee
+      summary: Activate / deactivate / delete a move-in fee
+      parameters:
+        - $ref: '#/components/parameters/FlagAction'
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── EXPENDITURE ─────────────────────────────
+  /expenditure:
+    get:
+      tags: [Expenditure]
+      operationId: listRecurrentExpenditure
+      summary: Recurring expense templates
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+      responses:
+        '200':
+          description: Expenditure page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/RecurrentExpenditure' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /expenditure/new:
+    post:
+      tags: [Expenditure]
+      operationId: createRecurrentExpenditure
+      summary: Create a recurring expense template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, amount, frequency, propertyId, estateId]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                amount: { type: integer }
+                frequency: { type: integer, enum: [1, 2, 3] }
+                frequencyName: { type: string }
+                propertyId: { type: integer }
+                estateId: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /expenditure/flags/{action}/{id}:
+    post:
+      tags: [Expenditure]
+      operationId: flagRecurrentExpenditure
+      summary: Activate / deactivate / delete a recurring expense
+      parameters:
+        - $ref: '#/components/parameters/FlagAction'
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /expenses:
+    get:
+      tags: [Expenditure]
+      operationId: listExpenses
+      summary: Actual expenses incurred
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+        - $ref: '#/components/parameters/PropertyIdQuery'
+        - $ref: '#/components/parameters/EstateIdQuery'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+      responses:
+        '200':
+          description: Expenses page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/Expense' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /expenses/new:
+    post:
+      tags: [Expenditure]
+      operationId: createExpense
+      summary: Record an expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [propertyId, estateId, name, amount]
+              properties:
+                propertyId: { type: integer }
+                estateId: { type: integer }
+                name: { type: string }
+                description: { type: string }
+                amount: { type: string, description: Numeric string }
+                month: { type: integer, description: 'App always sends 0 (current month)' }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /expenses/void/{id}:
+    post:
+      tags: [Expenditure]
+      operationId: voidExpense
+      summary: Void an expense
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── USERS ─────────────────────────────
+  /users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: Paginated staff users
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+      responses:
+        '200':
+          description: Users page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/User' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /users/new:
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a staff user (credentials sent by email/SMS)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, username, idNo, email, phone, estateId, userGroupId]
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                username: { type: string }
+                idNo: { type: string }
+                email: { type: string, format: email }
+                phone: { type: string }
+                estateId: { type: integer }
+                userGroupId: { type: integer }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /users/flags/{action}/{id}:
+    post:
+      tags: [Users]
+      operationId: flagUser
+      summary: Activate / deactivate / delete a user
+      parameters:
+        - $ref: '#/components/parameters/FlagAction'
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────────────── USER GROUPS ─────────────────────────────
+  /user-groups:
+    get:
+      tags: [User Groups]
+      operationId: listUserGroups
+      summary: Paginated roles (a group = a set of ROLE_* authorities)
+      description: Page.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/SearchTerm'
+      responses:
+        '200':
+          description: User groups page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/UserGroup' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /all-user-groups:
+    get:
+      tags: [User Groups]
+      operationId: listAllUserGroups
+      summary: All groups (for the "add user" dropdown)
+      description: Raw array.
+      responses:
+        '200':
+          description: Groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [userTypeId, name, estate, estateId, id]
+                  properties:
+                    userTypeId: { type: integer }
+                    name: { type: string }
+                    estate: { type: string }
+                    estateId: { type: integer }
+                    id: { type: integer }
+        default: { $ref: '#/components/responses/Error' }
+
+  /user-groups/flags/delete/{id}:
+    post:
+      tags: [User Groups]
+      operationId: deleteUserGroup
+      summary: Delete a user group
+      description: 'Called with a leading slash — see compatibility rule 8 (also serve at host root).'
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  /user-groups/flags/deactivate/{id}:
+    post:
+      tags: [User Groups]
+      operationId: deactivateUserGroup
+      summary: Deactivate a user group
+      description: 'Called with a leading slash — see compatibility rule 8 (also serve at host root).'
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+        default: { $ref: '#/components/responses/Error' }
+
+  # ───────────────────── PROPOSED: PAYMENT INTEGRATIONS ─────────────────────
+  /integrations/mpesa/stk-callback:
+    post:
+      tags: [Proposed — Payment Integrations]
+      operationId: mpesaStkCallback
+      security: []
+      summary: Daraja STK Push result callback
+      description: |
+        Safaricom posts the outcome of the STK push started by `POST /payments/receive-payments`
+        (type 12). Match on `CheckoutRequestID`, record the payment idempotently
+        (`MpesaReceiptNumber` is unique), allocate to invoices, then reply with ResultCode 0.
+        Protect with an unguessable path token and/or IP allow-listing — Daraja does not sign callbacks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DarajaStkCallback' }
+      responses:
+        '200': { $ref: '#/components/responses/DarajaAck' }
+
+  /integrations/mpesa/c2b/validation:
+    post:
+      tags: [Proposed — Payment Integrations]
+      operationId: mpesaC2bValidation
+      security: []
+      summary: Daraja C2B validation (tenant pays to paybill directly)
+      description: '`BillRefNumber` should be the house number or invoice ref. Reject unknown accounts if strict mode is on.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DarajaC2bRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/DarajaAck' }
+
+  /integrations/mpesa/c2b/confirmation:
+    post:
+      tags: [Proposed — Payment Integrations]
+      operationId: mpesaC2bConfirmation
+      security: []
+      summary: Daraja C2B confirmation — creates a payment-statement line
+      description: |
+        Writes a `payment-statements` row (`used=false`). Auto-allocate to the matching tenant's
+        oldest unpaid invoice when `BillRefNumber` resolves; otherwise leave for manual allocation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DarajaC2bRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/DarajaAck' }
+
+  /integrations/banks/{bankCode}/notifications:
+    post:
+      tags: [Proposed — Payment Integrations]
+      operationId: bankPaymentNotification
+      security: []
+      summary: Generic inbound bank payment notification (IPN)
+      description: |
+        One adapter per bank (Equity, KCB, Co-op, etc.); each normalises its payload into a
+        `payment-statements` line. Verify the bank's signature/HMAC before trusting the body.
+        Payload shape is bank-specific and will be defined per integration.
+      parameters:
+        - name: bankCode
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { $ref: '#/components/responses/StatusOk' }
+
+  /payments/stk/{checkoutRequestId}/status:
+    get:
+      tags: [Proposed — Payment Integrations]
+      operationId: getStkStatus
+      summary: Poll the result of an STK push (for the web app / a future app version)
+      parameters:
+        - name: checkoutRequestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          state: { type: string, enum: [PENDING, SUCCESS, FAILED, CANCELLED, TIMEOUT] }
+                          mpesaReceiptNumber: { type: string, nullable: true }
+                          amount: { type: number, format: double }
+        default: { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Access token from `POST /login` → `data.tokenDetails.accessToken`.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: 0-based page index.
+      schema: { type: integer, minimum: 0, default: 0 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, default: 10 }
+    SearchTerm:
+      name: searchTerm
+      in: query
+      schema: { type: string }
+    EstateIdQuery:
+      name: estateId
+      in: query
+      description: Empty = the caller's estate.
+      schema: { type: string }
+    PropertyIdQuery:
+      name: propertyId
+      in: query
+      description: Empty = all properties.
+      schema: { type: string }
+    CategoryIdQuery:
+      name: categoryId
+      in: query
+      schema: { type: string }
+    UserIdQuery:
+      name: userId
+      in: query
+      description: Only sent when filtering by one tenant.
+      schema: { type: string }
+    Self:
+      name: self
+      in: query
+      description: true = only records belonging to the logged-in user (tenant view).
+      schema: { type: boolean }
+    Month:
+      name: month
+      in: query
+      description: 1–12, or empty for all.
+      schema: { type: string }
+    Year:
+      name: year
+      in: query
+      schema: { type: string }
+    StartDate:
+      name: startDate
+      in: query
+      schema: { type: string, format: date }
+    EndDate:
+      name: endDate
+      in: query
+      schema: { type: string, format: date }
+    Simple:
+      name: simple
+      in: query
+      schema: { type: boolean }
+    Metred:
+      name: metred
+      in: query
+      schema: { type: boolean }
+    EstateIdPath:
+      name: estateId
+      in: path
+      required: true
+      schema: { type: string }
+    PropertyIdPath:
+      name: propertyId
+      in: path
+      required: true
+      schema: { type: string }
+    HouseIdPath:
+      name: houseId
+      in: path
+      required: true
+      schema: { type: string }
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    InvoiceRefPath:
+      name: invoiceRef
+      in: path
+      required: true
+      description: Invoice RRN (reference number).
+      schema: { type: string }
+    InvoiceStatusPath:
+      name: invoiceStatus
+      in: path
+      required: true
+      description: 0 UNPAID, 2 PAID, 3 BF (brought forward).
+      schema: { type: integer, enum: [0, 2, 3] }
+    FlagAction:
+      name: action
+      in: path
+      required: true
+      schema: { type: string, enum: [activate, deactivate, delete] }
+
+  responses:
+    StatusOk:
+      description: '`status: "00"` = success; anything else is a business failure and `message` is shown.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/StatusResponse' }
+          example: { status: '00', message: Successful }
+    Error:
+      description: 'HTTP error. 401 or `code: auth-001` logs the user out.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+          example:
+            errors:
+              - { code: password, message: The password field is required. }
+    DarajaAck:
+      description: Acknowledgement Safaricom expects
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ResultCode: { type: integer, example: 0 }
+              ResultDesc: { type: string, example: Accepted }
+
+  schemas:
+    # ── Envelopes ──
+    StatusResponse:
+      type: object
+      required: [status, message]
+      properties:
+        status: { type: string, example: '00' }
+        message: { type: string }
+    ErrorResponse:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [code, message]
+            properties:
+              code: { type: string, description: 'Field name, "401", or "auth-001"' }
+              message: { type: string }
+    PageMeta:
+      type: object
+      description: Spring Data Page metadata. Items are in `content`.
+      properties:
+        number: { type: integer, description: Current page (0-based) }
+        size: { type: integer }
+        numberOfElements: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+        first: { type: boolean }
+        last: { type: boolean }
+        empty: { type: boolean }
+        pageable:
+          type: object
+          description: Only parsed for /user-groups — include it everywhere for safety.
+          properties:
+            offset: { type: integer }
+            pageNumber: { type: integer }
+            pageSize: { type: integer }
+            paged: { type: boolean }
+            unpaged: { type: boolean }
+            sort: { $ref: '#/components/schemas/PageSort' }
+        sort: { $ref: '#/components/schemas/PageSort' }
+    PageSort:
+      type: object
+      properties:
+        empty: { type: boolean }
+        sorted: { type: boolean }
+        unsorted: { type: boolean }
+    IdName:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    IdNameString:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+    DataUriImage:
+      type: string
+      description: 'data:image/<ext>;base64,<payload> — store in object storage, keep only the URL.'
+      example: data:image/jpeg;base64,/9j/4AAQSkZJRg...
+
+    # ── Auth / profile ──
+    LoginResponse:
+      type: object
+      required: [status, message, data]
+      properties:
+        status: { type: string }
+        message: { type: string }
+        data:
+          type: object
+          required: [tokenDetails, userDetails]
+          properties:
+            tokenDetails:
+              type: object
+              required: [expiry, accessToken]
+              properties:
+                expiry: { type: string, description: Expiry timestamp as string }
+                accessToken: { type: string }
+            userDetails:
+              type: object
+              required: [name, estate, usertype, id, authorities, username]
+              properties:
+                name: { type: string }
+                estate: { type: string }
+                estateId: { type: string, description: 'STRING, not integer' }
+                usertype: { type: string, example: admins, description: '"admins" or "tenant"' }
+                id: { type: string, description: 'STRING, not integer' }
+                username: { type: string }
+                authorities:
+                  type: array
+                  description: Drives every permission check in the app.
+                  items:
+                    type: object
+                    required: [authority]
+                    properties:
+                      authority: { $ref: '#/components/schemas/Authority' }
+    Authority:
+      type: string
+      enum:
+        - ROLE_CATEGORIES
+        - ROLE_CATEGORIES_DELETE
+        - ROLE_CATEGORIES_EDIT
+        - ROLE_CATEGORIES_NEW
+        - ROLE_CATEGORIES_VIEW
+        - ROLE_DASHBOARD
+        - ROLE_DASHBOARD_VIEW
+        - ROLE_EXPENDITURES
+        - ROLE_EXPENDITURES_DELETE
+        - ROLE_EXPENDITURES_EDIT
+        - ROLE_EXPENDITURES_NEW
+        - ROLE_EXPENDITURES_VIEW
+        - ROLE_EXPENSES
+        - ROLE_EXPENSES_DELETE
+        - ROLE_EXPENSES_NEW
+        - ROLE_EXPENSES_VIEW
+        - ROLE_HOUSES
+        - ROLE_HOUSES_DELETE
+        - ROLE_HOUSES_EDIT
+        - ROLE_HOUSES_NEW
+        - ROLE_HOUSES_VIEW
+        - ROLE_INVOICES
+        - ROLE_INVOICES_DELETE
+        - ROLE_INVOICES_EDIT
+        - ROLE_INVOICES_NEW
+        - ROLE_INVOICES_VIEW
+        - ROLE_METRES
+        - ROLE_METRES_DELETE
+        - ROLE_METRES_EDIT
+        - ROLE_METRES_NEW
+        - ROLE_METRES_VIEW
+        - ROLE_PAYMENTS
+        - ROLE_PAYMENTS_DELETE
+        - ROLE_PAYMENTS_EDIT
+        - ROLE_PAYMENTS_NEW
+        - ROLE_PAYMENTS_VIEW
+        - ROLE_PAYMENT_TYPES
+        - ROLE_PAYMENT_TYPES_DELETE
+        - ROLE_PAYMENT_TYPES_EDIT
+        - ROLE_PAYMENT_TYPES_NEW
+        - ROLE_PAYMENT_TYPES_VIEW
+        - ROLE_PROPERTIES
+        - ROLE_PROPERTIES_DELETE
+        - ROLE_PROPERTIES_EDIT
+        - ROLE_PROPERTIES_NEW
+        - ROLE_PROPERTIES_VIEW
+        - ROLE_PROPERTY_INVOICES
+        - ROLE_PROPERTY_INVOICES_DELETE
+        - ROLE_PROPERTY_INVOICES_EDIT
+        - ROLE_PROPERTY_INVOICES_VIEW
+        - ROLE_PROPERTY_PAYMENTS
+        - ROLE_PROPERTY_PAYMENTS_DELETE
+        - ROLE_PROPERTY_PAYMENTS_EDIT
+        - ROLE_PROPERTY_PAYMENTS_NEW
+        - ROLE_PROPERTY_PAYMENTS_VIEW
+        - ROLE_PROPERTY_REPORTS
+        - ROLE_PROPERTY_REPORTS_VIEW
+        - ROLE_REASON_CODES
+        - ROLE_REASON_CODES_DELETE
+        - ROLE_REASON_CODES_EDIT
+        - ROLE_REASON_CODES_NEW
+        - ROLE_REASON_CODES_VIEW
+        - ROLE_TENANTS
+        - ROLE_TENANTS_DELETE
+        - ROLE_TENANTS_EDIT
+        - ROLE_TENANTS_NEW
+        - ROLE_TENANTS_VIEW
+        - ROLE_TENANT_ACCESS
+        - ROLE_TENANT_ACCESS_DELETE
+        - ROLE_TENANT_ACCESS_NEW
+        - ROLE_TENANT_ACCESS_VIEW
+        - ROLE_USERS
+        - ROLE_USERS_DELETE
+        - ROLE_USERS_EDIT
+        - ROLE_USERS_NEW
+        - ROLE_USERS_VIEW
+        - ROLE_USER_GROUPS
+        - ROLE_USER_GROUPS_DELETE
+        - ROLE_USER_GROUPS_EDIT
+        - ROLE_USER_GROUPS_NEW
+        - ROLE_USER_GROUPS_VIEW
+        - ROLE_UTILITY_BILLS
+        - ROLE_UTILITY_BILLS_DELETE
+        - ROLE_UTILITY_BILLS_EDIT
+        - ROLE_UTILITY_BILLS_NEW
+        - ROLE_UTILITY_BILLS_VIEW
+    UserProfile:
+      type: object
+      required: [lastName, firstName, passwordExpiry, phone, estate, usertype, fullNames, id, userGroup, email]
+      properties:
+        id: { type: integer }
+        firstName: { type: string }
+        lastName: { type: string }
+        fullNames: { type: string }
+        photoUrl: { type: string, nullable: true }
+        passwordExpiry: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        estate: { type: string }
+        usertype: { type: string }
+        userGroup: { type: string }
+
+    # ── Dashboard / reports ──
+    DashboardSummary:
+      type: object
+      properties:
+        expenseCount: { type: integer }
+        invoiceCount: { type: integer }
+        paymentCount: { type: integer }
+        occupiedUnits: { type: integer, nullable: true }
+        totalInvoice: { type: number, format: double }
+        totalPayment: { type: number, format: double }
+        totalArrears: { type: number, format: double }
+        totalRent: { type: number, format: double }
+        totalExpense: { type: number, format: double }
+    UnitComparison:
+      type: object
+      properties:
+        totalUnits: { type: integer }
+        occupiedUnits: { type: integer }
+        totalInvoice: { type: number, format: double }
+        totalPayment: { type: number, format: double }
+        totalArrears: { type: number, format: double }
+        totalRent: { type: number, format: double }
+        totalExpense: { type: number, format: double }
+    PropertyReportRow:
+      type: object
+      required: [expenseCount, estateId, year, estate, invoiceCount, monthName, invoiceAmount, paymentAmount, totalUnits, rentArrears, expenseAmount, month, rentAmount, property, netIncome, occupiedUnits, id, propertyId, paymentCount]
+      properties:
+        id: { type: integer }
+        estateId: { type: integer }
+        estate: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        year: { type: integer }
+        month: { type: integer }
+        monthName: { type: string }
+        totalUnits: { type: integer }
+        occupiedUnits: { type: integer }
+        invoiceCount: { type: integer }
+        paymentCount: { type: integer }
+        expenseCount: { type: integer }
+        rentAmount: { type: number, format: double }
+        invoiceAmount: { type: number, format: double }
+        paymentAmount: { type: number, format: double }
+        expenseAmount: { type: number, format: double }
+        rentArrears: { type: number, format: double }
+        netIncome: { type: number, format: double }
+
+    # ── Properties / houses ──
+    Property:
+      type: object
+      required: [email, location, estateId, id, name]
+      properties:
+        id: { type: integer }
+        estateId: { type: integer }
+        name: { type: string }
+        location: { type: string }
+        email: { type: string }
+    HouseSpecs:
+      type: object
+      required: [floors, houseTypes, houseCategories, houseNumbers]
+      properties:
+        floors:
+          type: array
+          items: { $ref: '#/components/schemas/IdName' }
+        houseTypes:
+          type: array
+          items:
+            type: object
+            required: [id, name, description, units]
+            properties:
+              id: { type: integer }
+              name: { type: string, example: 2 Bedroom }
+              description: { type: string }
+              units: { type: integer }
+        houseCategories:
+          type: array
+          items: { $ref: '#/components/schemas/IdName' }
+        houseNumbers:
+          type: array
+          description: House numbers already used in this property.
+          items: { type: string }
+    HouseFeatures:
+      type: object
+      required: [features, featureIds]
+      properties:
+        features:
+          type: array
+          items:
+            type: object
+            required: [name, id, houseSpecific]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              houseSpecific: { type: boolean }
+        featureIds:
+          type: array
+          items: { type: integer }
+    House:
+      type: object
+      properties:
+        id: { type: integer }
+        estateId: { type: integer }
+        estate: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        location: { type: string }
+        categoryId: { type: integer }
+        category: { type: string }
+        houseTypeId: { type: integer }
+        houseType: { type: string }
+        houseNumber: { type: string }
+        houseName: { type: string }
+        description: { type: string }
+        floor: { type: integer }
+        rent: { type: number, format: double }
+        squareFt: { type: number, format: double }
+        features: { type: integer, description: Feature count }
+        occupied: { type: boolean }
+        overdueEstate: { type: boolean }
+        lastOccupied: { type: string }
+        createdOn: { type: string }
+        status: { type: integer }
+    HouseDetails:
+      type: object
+      required: [rent]
+      properties:
+        houseType: { type: string }
+        houseNumber: { type: string }
+        estate: { type: string }
+        property: { type: string }
+        location: { type: string }
+        floor: { type: string, description: STRING here (integer in the list endpoint) }
+        category: { type: string }
+        rent: { type: number }
+        squareFt: { type: number }
+        isOccupied: { type: boolean }
+        showHistory: { type: boolean }
+        lastOccupiedDate: { type: string, format: date-time, nullable: true }
+        status: { type: integer }
+        tenant:
+          type: object
+          description: Current occupant; send `{}` when vacant.
+          properties:
+            name: { type: string }
+            phone: { type: string }
+            invoiceRrn: { type: string }
+            invoiceMonth: { type: string }
+            dueDate: { type: string, format: date-time }
+            occupiedOn: { type: string, format: date-time }
+            rentOwed: { type: number }
+            refundableAmount: { type: number }
+    UnoccupiedHouse:
+      type: object
+      required: [houseName, houseNumber, id, floor, rent, occupied]
+      properties:
+        id: { type: integer }
+        houseName: { type: string }
+        houseNumber: { type: string }
+        floor: { type: integer }
+        rent: { type: number, format: double }
+        occupied: { type: boolean }
+    HouseCategory:
+      type: object
+      required: [images, name, estate, property, description, units, id, createdOn, categoryId, status]
+      properties:
+        id: { type: integer }
+        categoryId: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        estate: { type: string }
+        property: { type: string }
+        images: { type: integer, description: Image count }
+        units: { type: integer }
+        createdOn: { type: string }
+        status: { type: integer }
+
+    # ── Tenants ──
+    TenantRow:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: string }
+        estateId: { type: integer }
+        estate: { type: string }
+        property: { type: string }
+        category: { type: string }
+        houseType: { type: string }
+        houseName: { type: string }
+        tenantName: { type: string }
+        tenantEmail: { type: string }
+        tenantPhone: { type: string }
+        occupiedOn: { type: string }
+        dueDate: { type: string }
+        monthName: { type: string }
+        invoiceRrn: { type: string }
+        rent: { type: number, format: double }
+        rentOwed: { type: number, format: double }
+        overdueEstate: { type: boolean }
+        self: { type: boolean }
+    TenantDetails:
+      type: object
+      required: [phone, name, self, userId, content, email]
+      properties:
+        userId: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        self: { type: boolean }
+        content:
+          type: object
+          required: [totalPayment, totalArrears, occupiedUnits, totalRent]
+          properties:
+            totalPayment: { type: number, format: double }
+            totalArrears: { type: number, format: double }
+            totalRent: { type: number, format: double }
+            occupiedUnits: { type: integer }
+    TenantSearchResult:
+      type: object
+      properties:
+        id: { type: integer }
+        idNo: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        phone: { type: string }
+    HouseHistoryRow:
+      type: object
+      required: [occupiedOn, houseName, tenantName, property, id, category]
+      properties:
+        id: { type: integer }
+        estateId: { type: integer }
+        estate: { type: string }
+        property: { type: string }
+        category: { type: string }
+        houseType: { type: string }
+        houseName: { type: string }
+        tenantName: { type: string }
+        tenantEmail: { type: string }
+        tenantPhone: { type: string }
+        occupiedOn: { type: string }
+        vacatedOn: { type: string, nullable: true }
+        vacatorName: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        rent: { type: number }
+        rentOwed: { type: number }
+
+    # ── Meters ──
+    MeterReading:
+      type: object
+      properties:
+        id: { type: string, description: STRING }
+        metreNo: { type: string }
+        billName: { type: string }
+        houseName: { type: string }
+        property: { type: string }
+        estate: { type: string }
+        month: { type: integer }
+        monthName: { type: string }
+        previousReading: { type: number, format: double }
+        currentReading: { type: number, format: double }
+        consumedUnits: { type: number, format: double }
+        charge: { type: number, format: double, description: Rate per unit }
+        amount: { type: number, format: double }
+        imageStatus: { description: Image URL or status; may be null }
+        updatable: { type: boolean, description: Whether this month's reading can still be edited }
+        updatedOn: { type: string }
+        status: { type: integer }
+
+    # ── Invoices ──
+    TenantInvoiceRow:
+      type: object
+      properties:
+        id: { type: integer }
+        rrn: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        estate: { type: string }
+        category: { type: string }
+        houseType: { type: string }
+        houseName: { type: string }
+        tenantName: { type: string }
+        tenantEmail: { type: string }
+        tenantPhone: { type: string }
+        monthName: { type: string }
+        dueDate: { type: string }
+        paidOn: { type: string }
+        paidBy: { type: string }
+        rentOwed: { type: number, format: double }
+        rentPaid: { type: number, format: double }
+        overdueEstate: { type: boolean }
+        self: { type: boolean }
+        status: { type: integer }
+    InvoiceBillLine:
+      type: object
+      properties:
+        narration: { type: string, example: Water }
+        value: { type: string, example: '1,200.00' }
+    TenantInvoiceDetail:
+      type: object
+      description: All amounts are pre-formatted STRINGS.
+      properties:
+        id: { type: integer }
+        rrn: { type: string }
+        month: { type: string }
+        date: { type: string }
+        estateId: { type: integer }
+        estateName: { type: string }
+        propertyId: { type: integer }
+        propertyName: { type: string }
+        houseNumber: { type: string }
+        location: { type: string }
+        currency: { type: string, example: KES }
+        invoiceAmount: { type: string }
+        rentOwed: { type: string }
+        paidAmount: { type: string }
+        contactNo: { type: string }
+        contactEmail: { type: string }
+        tenantName: { type: string }
+        tenantPhone: { type: string }
+        tenantEmail: { type: string }
+        status: { type: string }
+        flag: { type: integer }
+        message: { type: string }
+        self: { type: boolean }
+        bills:
+          type: array
+          items: { $ref: '#/components/schemas/InvoiceBillLine' }
+    EstateInvoiceRow:
+      type: object
+      properties:
+        id: { type: integer }
+        rrn: { type: string }
+        estateId: { type: integer }
+        estate: { type: string }
+        monthName: { type: string }
+        dueDate: { type: string }
+        paidOn: { type: string }
+        paymentRrn: { type: string, nullable: true }
+        totalUnits: { type: integer }
+        occupiedUnits: { type: integer }
+        rentAmount: { type: number, format: double }
+        invoiceAmount: { type: integer }
+        paidAmount: { type: integer }
+        adminName: { type: string }
+        adminPhone: { type: string }
+        adminEmail: { type: string }
+        status: { type: integer }
+    EstateInvoicePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/EstateInvoiceRow' }
+    EstateInvoiceDetail:
+      type: object
+      description: Amounts are pre-formatted STRINGS. All fields required (no null fallbacks in the app).
+      required: [rrn, month, estateName, date, location, invoiceAmount, rentOwed, paidAmount, contactNo, contactEmail, office, appName, status, tenantName, tenantPhone, tenantEmail, bills, id]
+      properties:
+        id: { type: integer }
+        rrn: { type: string }
+        month: { type: string }
+        date: { type: string }
+        estateName: { type: string }
+        location: { type: string }
+        invoiceAmount: { type: string }
+        rentOwed: { type: string }
+        paidAmount: { type: string }
+        contactNo: { type: string }
+        contactEmail: { type: string }
+        office: { type: string }
+        appName: { type: string }
+        status: { type: string }
+        tenantName: { type: string, description: The estate admin being billed }
+        tenantPhone: { type: string }
+        tenantEmail: { type: string }
+        bills:
+          type: array
+          items:
+            type: object
+            properties:
+              narration: { type: string }
+              value: { type: string }
+              units: { type: string }
+              occupiedUnits: { type: string }
+              totalRent: { type: string }
+              commission: { type: string }
+
+    # ── Payments ──
+    ReceivePaymentRequest:
+      type: object
+      required: [amount, paidBy, paymentTypeId, propertyId]
+      description: |
+        Built in `payment_form_page.dart` / `payment_page.dart`. Fields by `paymentTypeId`:
+        - 1 Cash: amount, paidBy, description, phoneNo
+        - 2 Cheque: + refNo (cheque no), bankName ("<name>(<bank>)")
+        - 11 Bank slip: + refNo (slip ref), bankId, validateSlip
+        - 12 M-Pesa STK: + bankId, phoneNo (with country code, e.g. 254712345678)
+        Tenant payments may send `invoiceId` (older screen) or `invoiceIds` (newer screen) — accept both.
+      properties:
+        amount: { type: string, description: Numeric string }
+        paidBy: { type: string }
+        description: { type: string }
+        paymentTypeId: { type: integer, enum: [1, 2, 11, 12] }
+        propertyId: { type: string }
+        invoiceId: { type: string }
+        invoiceIds:
+          type: array
+          items: { type: string }
+        bankId: { type: string, nullable: true }
+        phoneNo: { type: string }
+        refNo: { type: string }
+        bankName: { type: string }
+        validateSlip: { type: boolean }
+    PaymentRow:
+      type: object
+      required: [tenantEmail, paidBy, houseType, estate, tenantPhone, monthName, overdueEstate, paymentRrn, paidOn, phoneNo, houseName, tenantName, invoiceRrn, property, rentOwed, id, category, rentPaid]
+      properties:
+        id: { type: integer }
+        paymentRrn: { type: string }
+        invoiceRrn: { type: string }
+        estate: { type: string }
+        property: { type: string }
+        category: { type: string }
+        houseType: { type: string }
+        houseName: { type: string }
+        tenantName: { type: string }
+        tenantEmail: { type: string }
+        tenantPhone: { type: string }
+        monthName: { type: string }
+        paidBy: { type: string }
+        paidOn: { type: string }
+        phoneNo: { type: string }
+        rentOwed: { type: number }
+        rentPaid: { type: number }
+        overdueEstate: { type: boolean }
+        status: { type: string, nullable: true }
+    PaymentDetail:
+      type: object
+      description: Receipt. Amounts are pre-formatted STRINGS. All fields required.
+      required: [rrn, month, estateName, houseNumber, date, location, propertyName, invoiceAmount, paidAmount, rentOwed, contactNo, contactEmail, status, tenantName, tenantPhone, tenantEmail, paidBy, paymentType, bills, currency]
+      properties:
+        rrn: { type: string }
+        month: { type: string }
+        date: { type: string }
+        estateName: { type: string }
+        propertyName: { type: string }
+        houseNumber: { type: string }
+        location: { type: string }
+        currency: { type: string }
+        invoiceAmount: { type: string }
+        paidAmount: { type: string }
+        rentOwed: { type: string }
+        contactNo: { type: string }
+        contactEmail: { type: string }
+        status: { type: string }
+        tenantName: { type: string }
+        tenantPhone: { type: string }
+        tenantEmail: { type: string }
+        paidBy: { type: string }
+        paymentType: { type: string }
+        bills:
+          type: array
+          items: { $ref: '#/components/schemas/InvoiceBillLine' }
+    PaymentStatementRow:
+      type: object
+      properties:
+        id: { type: integer }
+        refNo: { type: string }
+        paymentRrn: { type: string }
+        estate: { type: string }
+        bankName: { type: string }
+        paymentType: { type: string }
+        amount: { type: integer }
+        used: { type: boolean }
+        paidOn: { type: string }
+        createdOn: { type: string }
+    EstatePaymentRow:
+      type: object
+      required: [estateId, paidBy, estate, invoiceCount, paymentRrn, createdOn, phoneNo, paymentType, adminName, adminPhone, invoiceRrn, createdBy, id, paidAmount, adminEmail]
+      properties:
+        id: { type: integer }
+        refNo: { type: string, nullable: true }
+        estateId: { type: integer }
+        estate: { type: string }
+        invoiceCount: { type: integer }
+        invoiceRrn: { type: string }
+        paymentRrn: { type: string }
+        paymentType: { type: string }
+        paidAmount: { type: integer }
+        paidBy: { type: string }
+        phoneNo: { type: string }
+        createdBy: { type: string }
+        createdOn: { type: string }
+        adminName: { type: string }
+        adminPhone: { type: string }
+        adminEmail: { type: string }
+    PaymentAccount:
+      type: object
+      required: [estateId, estate, updatedOn, name, property, typeId, id, propertyId, status]
+      properties:
+        id: { type: integer }
+        typeId: { type: integer }
+        name: { type: string, description: Payment type name }
+        estateId: { type: integer }
+        estate: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        bankName: { type: string, nullable: true }
+        accountName: { type: string, nullable: true }
+        accountNo: { type: string, nullable: true }
+        payBillNo: { type: string, nullable: true }
+        updatedOn: { type: string }
+        status: { type: integer }
+    CheckoutPaymentMethod:
+      type: object
+      properties:
+        typeId: { type: string }
+        name: { type: string }
+        bankId: { type: string }
+        bankName: { type: string }
+        icon: { type: string, description: Raw base64 image (no data-URI prefix) }
+
+    # ── Config ──
+    UtilityBillRow:
+      type: object
+      required: [amount, estateId, name, estate, property, typeName, updatedOn, id, type, propertyId, isMetred, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        type: { type: integer, enum: [0, 1, 2] }
+        typeName: { type: string }
+        isMetred: { type: boolean }
+        amount: { type: number }
+        estateId: { type: integer }
+        estate: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        updatedOn: { type: string }
+        status: { type: integer }
+    OnboardFee:
+      type: object
+      required: [amount, months, estateId, name, estate, property, refundable, updatedOn, id, type, propertyId, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        type: { type: integer, enum: [0, 1] }
+        amount: { type: integer }
+        months: { type: integer }
+        refundable: { type: boolean }
+        estateId: { type: integer }
+        estate: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        updatedOn: { type: string }
+        status: { type: integer }
+    RecurrentExpenditure:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        amount: { type: number, format: double }
+        frequency: { type: integer, enum: [1, 2, 3] }
+        frequencyName: { type: string }
+        incurredMonth: { type: string, nullable: true }
+        estateId: { type: integer }
+        estate: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        status: { type: integer }
+    Expense:
+      type: object
+      required: [amount, updatedBy, estateId, estate, description, updatedOn, recurrentName, name, property, id, propertyId, recurrent, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        amount: { type: number, format: double }
+        recurrent: { type: boolean }
+        recurrentName: { type: string }
+        estateId: { type: integer }
+        estate: { type: string }
+        propertyId: { type: integer }
+        property: { type: string }
+        updatedBy: { type: string }
+        updatedOn: { type: string }
+        status: { type: integer }
+
+    # ── Users ──
+    User:
+      type: object
+      required: [lastName, estateId, estate, fullName, idNo, userGroupId, firstName, groupName, phone, id, email, username, status]
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        fullName: { type: string }
+        idNo: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        estateId: { type: integer }
+        estate: { type: string }
+        userGroupId: { type: integer }
+        groupName: { type: string }
+        status: { type: integer }
+    UserGroup:
+      type: object
+      required: [userType, userTypeId, createdBy, name, modified_at, description, flag, estate, estateId, id, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        userType: { type: string }
+        userTypeId: { type: integer }
+        estateId: { type: integer }
+        estate: { type: string }
+        createdBy: { type: string }
+        modified_at: { type: string, format: date-time, description: 'snake_case key — keep it' }
+        flag: { type: string }
+        status: { type: integer }
+
+    # ── Daraja (proposed) ──
+    DarajaStkCallback:
+      type: object
+      properties:
+        Body:
+          type: object
+          properties:
+            stkCallback:
+              type: object
+              properties:
+                MerchantRequestID: { type: string }
+                CheckoutRequestID: { type: string }
+                ResultCode: { type: integer, description: 0 = success }
+                ResultDesc: { type: string }
+                CallbackMetadata:
+                  type: object
+                  properties:
+                    Item:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          Name: { type: string, example: MpesaReceiptNumber }
+                          Value: {}
+    DarajaC2bRequest:
+      type: object
+      properties:
+        TransactionType: { type: string }
+        TransID: { type: string, description: Unique — use as idempotency key }
+        TransTime: { type: string, example: '20261027143000' }
+        TransAmount: { type: string }
+        BusinessShortCode: { type: string }
+        BillRefNumber: { type: string, description: Account number the payer typed }
+        InvoiceNumber: { type: string }
+        OrgAccountBalance: { type: string }
+        ThirdPartyTransID: { type: string }
+        MSISDN: { type: string, description: Payer phone (may be hashed by Safaricom) }
+        FirstName: { type: string }

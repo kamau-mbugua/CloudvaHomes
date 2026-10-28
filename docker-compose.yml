@@ -1,0 +1,27 @@
+# Local development services. The API and web app run on the host (npm run start:dev /
+# npm run dev); only Postgres runs here.
+#
+#   docker compose up -d
+#
+# Credentials are for local use only.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hodi
+      POSTGRES_PASSWORD: hodi
+      POSTGRES_DB: hodi_dev
+      TZ: Africa/Nairobi
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/docker/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hodi -d hodi_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,0 +1,141 @@
+/*
+ * Phase 6 pieces: attachments (receipt drop zone, previews, meter photo cells), the
+ * expenses list, the dashboard tiles and 12-month chart, and report tables. Built from
+ * existing tokens, plus three chart series colours (--viz-1..3: the dataviz reference
+ * palette's first three categorical slots, stepped separately for the dark surface).
+ */
+
+:root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+  }
+}
+:root[data-theme='dark'] {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+}
+
+/* ---- attachments ----------------------------------------------------------- */
+.up__drop {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--input); border-radius: var(--radius);
+  background: var(--background);
+}
+.up__drop.is-over { border-color: var(--accent); background: var(--accent-soft); }
+.up__droptext { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
+.up__dropbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.up__attached {
+  display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;
+  padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background);
+}
+.up__meta { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 200px; }
+.up__name { font-weight: 500; overflow-wrap: anywhere; }
+.up__preview {
+  width: 120px; height: 120px; object-fit: cover; flex-shrink: 0;
+  border-radius: var(--radius); border: 1px solid var(--border); background: var(--secondary);
+}
+.up__loading { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-muted); }
+.up__full {
+  display: block; max-width: 100%; max-height: 70vh; margin: 0 auto;
+  border-radius: var(--radius); border: 1px solid var(--border); object-fit: contain;
+}
+.up__pdf { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: var(--destructive); }
+.up__pdficon { flex-shrink: 0; }
+.up__linkbtn {
+  border: 0; padding: 0; background: none; color: var(--foreground);
+  font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer;
+}
+
+/* Meter photo cell in the readings grid. */
+.up__cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 120px; }
+.up__cell .ad__sub, .up__cell .fld__err { flex-basis: 100%; margin-top: 0; }
+.up__thumb {
+  width: 40px; height: 40px; padding: 0; flex-shrink: 0; overflow: hidden; cursor: zoom-in;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--secondary);
+}
+.up__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.up__thumbph { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); }
+
+/* ---- expenses -------------------------------------------------------------- */
+.ex__form { margin-top: 0; }
+.ex__total {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 10px; padding: 10px 16px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--card);
+}
+.ex__total strong { font-size: 16px; }
+.ex__table td.num, .ex__date { white-space: nowrap; }
+.ex__table .ad__badge { vertical-align: middle; }
+
+/* ---- dashboard ------------------------------------------------------------- */
+.rp__tiles { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.rp__tile .ad__stat__value { font-size: 19px; overflow-wrap: anywhere; }
+.rp__tilesub { font-size: 12.5px; color: var(--text-muted); }
+.rp__tilesub strong { color: var(--foreground); }
+.rp__attention { color: var(--warning); }
+.rp__panel {
+  margin-bottom: 24px; padding: 16px 18px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow-sm);
+}
+.rp__panel .ad__tablewrap { box-shadow: none; }
+.rp__panelhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.rp__panelhead .ad__h2 { margin: 0; }
+.rp__welcomelinks { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* ---- 12-month chart -------------------------------------------------------- */
+.rp__chart { margin: 0; }
+.rp__charthead { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.rp__legend { list-style: none; margin: 0; padding: 0; display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-secondary); }
+.rp__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.rp__swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; display: inline-block; }
+.rp__chartscroll { overflow-x: auto; }
+.rp__chartinner { position: relative; min-width: 560px; }
+.rp__svg { display: block; width: 100%; height: auto; }
+.rp__grid { stroke: var(--border); stroke-width: 1; }
+.rp__axis { stroke: var(--input); stroke-width: 1; }
+.rp__tick { fill: var(--text-muted); font-size: 11px; font-family: var(--font); }
+.rp__tick.is-on { fill: var(--foreground); font-weight: 600; }
+.rp__hover { fill: var(--secondary); }
+.rp__tip {
+  position: absolute; top: 0; transform: translateX(-50%); pointer-events: none; z-index: 1;
+  display: flex; flex-direction: column; gap: 4px; min-width: 190px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--popover); color: var(--popover-foreground); box-shadow: var(--shadow-md);
+  font-size: 12.5px;
+}
+.rp__tiprow { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 8px; }
+.rp__tabledetails { margin-top: 8px; }
+.rp__tabledetails summary { cursor: pointer; font-size: 13px; color: var(--text-secondary); min-height: var(--touch-min); display: flex; align-items: center; }
+
+/* ---- report tables --------------------------------------------------------- */
+.rp__note { margin: -4px 0 14px; max-width: 88ch; }
+.rp__subhead { margin: 24px 0 10px; }
+.rp__table tbody th { font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 13.5px; color: var(--foreground); }
+.rp__table tfoot th {
+  border-top: 1px solid var(--border);
+  text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--foreground);
+}
+.rp__table td.num, .rp__table th.num { white-space: nowrap; }
+.rp__table .rp__strong { font-weight: 600; }
+.ad__table.rp__table--compact { min-width: 0; }
+
+@media (max-width: 640px) {
+  .rp__tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .rp__tile { padding: 12px; }
+  .rp__tile .ad__stat__value { font-size: 17px; }
+  .rp__panel { padding: 12px; }
+  .up__preview { width: 88px; height: 88px; }
+  .ex__total { padding: 8px 12px; }
+  /* The chart scrolls sideways at ~560px wide; larger viewBox text keeps labels legible. */
+  .rp__tick { font-size: 14px; }
+  .rp__table--compact th, .rp__table--compact td { padding: 10px; }
+}

@@ -1,0 +1,193 @@
+/**
+ * Design tokens — ported from UltimatePOS pos-react (src/styles/tokens.css), which took
+ * them verbatim from the design-system handoff. Till-only tokens are dropped.
+ *
+ * Light is the base set. The system ships a real dark palette too — note that dark is
+ * not an inversion: the navy primary becomes LIME (#84bd00), because navy-on-navy would
+ * disappear. Never invert these by hand.
+ */
+
+:root {
+  /* Tells the browser this page themes itself. Without it Chrome's auto-dark-mode
+     force-darkens the rendering while the authored values stay light, so the page looks
+     dark even though every computed token is the light one. */
+  color-scheme: light dark;
+
+  --background: #fafaf7;
+  --foreground: #0a2540;
+  --card: #ffffff;
+  --card-foreground: #0a2540;
+  --popover: #ffffff;
+  --popover-foreground: #0a2540;
+
+  --primary: #002b4d;
+  --primary-foreground: #ffffff;
+  --primary-hover: #0a3a66;
+
+  --accent: #4d6b10;
+  --accent-foreground: #ffffff;
+  --accent-hover: #3d5509;
+  --accent-soft: #eef6db;
+  /* The system's own accent, kept apart from --accent in case an organisation's brand
+     tint ever overrides that one. */
+  --accent-default: #4d6b10;
+
+  --tertiary: #2b404b;
+  --tertiary-foreground: #ffffff;
+
+  /* Large navy chrome (sidebar, auth brand panel). NOT --primary: the design system flips
+     primary to lime in dark mode, which is right for buttons and wrong for a full-width
+     surface. --nav-background stays dark in both themes. */
+  --nav-background: #002b4d;
+  --nav-foreground: #ffffff;
+
+  --secondary: #f1efe9;
+  --secondary-foreground: #1f3a5c;
+  --muted: #ece9e0;
+  --muted-foreground: #52647e;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --destructive-soft: #fdecec;
+  --success: #1f7a4f;
+  --success-foreground: #ffffff;
+  --success-soft: #e6f4ec;
+  --warning: #9a5b00;
+  --warning-foreground: #ffffff;
+  --warning-soft: #fdf3e3;
+  --info: #337abf;
+  --info-soft: rgba(51, 122, 191, 0.12);
+  --info-text: #28618f;
+
+  --border: rgba(10, 37, 64, 0.12);
+  --input: rgba(10, 37, 64, 0.18);
+  --input-background: #ffffff;
+  --ring: #4d6b10;
+
+  --text-primary: #0a2540;
+  --text-secondary: #1f3a5c;
+  --text-muted: #52647e;
+  --text-subtle: #5b6b82;
+
+  --radius: 0.625rem;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(10, 37, 64, 0.06);
+  --shadow-md: 0 6px 18px rgba(10, 37, 64, 0.08);
+  --shadow-lg: 0 24px 60px rgba(10, 37, 64, 0.28);
+
+  --font: Lufga, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Minimum hit target for primary controls; phones are a first-class surface. */
+  --touch-min: 44px;
+}
+
+/* Dark. Values are the design system's `.dark` block, not an inversion. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --background: #06121f;
+    --foreground: #f2f5f9;
+    --card: #0c1e33;
+    --card-foreground: #f2f5f9;
+    --popover: #0c1e33;
+    --popover-foreground: #f2f5f9;
+
+    --primary: #84bd00;
+    --primary-foreground: #001a2e;
+    --primary-hover: #9dd000;
+
+    --accent: #9dd000;
+    --accent-foreground: #001a2e;
+    --accent-hover: #b0e500;
+    --accent-soft: #1c2e14;
+    --accent-default: #9dd000;
+
+    --tertiary: #1a3050;
+    --nav-background: #001628;
+    --nav-foreground: #f2f5f9;
+    --secondary: #122438;
+    --secondary-foreground: #f2f5f9;
+    --muted: #16293f;
+    --muted-foreground: #9eaec4;
+
+    --destructive: #ef4444;
+    --destructive-soft: #2a1414;
+    --success: #34d399;
+    --success-soft: #0d2a1e;
+    --warning: #fbbf24;
+    --warning-soft: #332100;
+    --info: #5f9fd8;
+    --info-soft: rgba(95, 159, 216, 0.15);
+    --info-text: #8fbce4;
+
+    --border: rgba(255, 255, 255, 0.12);
+    --input: rgba(255, 255, 255, 0.16);
+    --input-background: #0a1b2e;
+    --ring: #84bd00;
+
+    --text-primary: #f2f5f9;
+    --text-secondary: #d7e0ec;
+    --text-muted: #b7c4d6;
+    --text-subtle: #9eaec4;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme='light'] { color-scheme: light; }
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #06121f;
+  --foreground: #f2f5f9;
+  --card: #0c1e33;
+  --card-foreground: #f2f5f9;
+  --popover: #0c1e33;
+  --popover-foreground: #f2f5f9;
+
+  --primary: #84bd00;
+  --primary-foreground: #001a2e;
+  --primary-hover: #9dd000;
+
+  --accent: #9dd000;
+  --accent-foreground: #001a2e;
+  --accent-hover: #b0e500;
+  --accent-soft: #1c2e14;
+  --accent-default: #9dd000;
+
+  --tertiary: #1a3050;
+  --nav-background: #001628;
+  --nav-foreground: #f2f5f9;
+  --secondary: #122438;
+  --secondary-foreground: #f2f5f9;
+  --muted: #16293f;
+  --muted-foreground: #9eaec4;
+
+  --destructive: #ef4444;
+  --destructive-soft: #2a1414;
+  --success: #34d399;
+  --success-soft: #0d2a1e;
+  --warning: #fbbf24;
+  --warning-soft: #332100;
+  --info: #5f9fd8;
+  --info-soft: rgba(95, 159, 216, 0.15);
+  --info-text: #8fbce4;
+
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.16);
+  --input-background: #0a1b2e;
+  --ring: #84bd00;
+
+  --text-primary: #f2f5f9;
+  --text-secondary: #d7e0ec;
+  --text-muted: #b7c4d6;
+  --text-subtle: #9eaec4;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+}

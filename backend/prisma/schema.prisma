@@ -1,0 +1,1282 @@
+// Hodi database schema. Domain models arrive phase by phase — see
+// docs/specs/2026-10-27-hodi-platform-design.md §5.5 for the target model.
+//
+// Conventions: UUID v7 ids; org-owned rows carry `orgId` (scoped automatically by the Prisma
+// extension in src/prisma/org-scope.extension.ts); money is BigInt minor units.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Identity ─────────────────────────────
+
+model User {
+  id              String     @id @default(uuid(7)) @db.Uuid
+  email           String?    @unique // lower-cased
+  phone           String?    @unique // E.164, e.g. +254712345678
+  passwordHash    String?
+  firstName       String
+  lastName        String
+  isPlatformAdmin Boolean    @default(false)
+  status          UserStatus @default(ACTIVE)
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  memberships     Membership[]
+  refreshTokens   RefreshToken[]
+  invitationsSent Invitation[]   @relation("InvitedBy")
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model Organization {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  name            String
+  kind            OrgKind
+  phone           String
+  email           String
+  kraPin          String?
+  status          OrgStatus @default(TRIAL)
+  settings        Json      @default("{}")
+  /// Days between an invoice's issue date and its due date.
+  invoiceDueDays  Int       @default(7)
+  // ── Hodi billing (phase 8) ──
+  billingRef      String?   @unique // "H00001": account number when paying Hodi
+  planId          String?   @db.Uuid
+  priceOverride   BigInt? // per occupied unit; null = the plan's
+  minimumOverride BigInt?
+  trialEndsAt     DateTime? @db.Date
+  noSuspendUntil  DateTime? @db.Date
+  platformCredit  BigInt    @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships Membership[]
+  roles       Role[]
+  landlords   Landlord[]
+  properties  Property[]
+  tenants     Tenant[]
+
+  @@map("organizations")
+}
+
+enum OrgKind {
+  LANDLORD
+  AGENCY
+}
+
+enum OrgStatus {
+  TRIAL
+  ACTIVE
+  GRACE
+  SUSPENDED
+  CLOSED
+}
+
+/// A user's membership of an organisation (staff). Tenants and landlords are not members.
+model Membership {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  orgId       String           @db.Uuid
+  userId      String           @db.Uuid
+  roleId      String           @db.Uuid
+  propertyIds String[]         @db.Uuid // empty = all properties
+  status      MembershipStatus @default(INVITED)
+  invitedAt   DateTime         @default(now())
+  joinedAt    DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  invitations  Invitation[]
+
+  @@unique([orgId, userId])
+  @@index([userId])
+  @@index([orgId, roleId])
+  @@map("memberships")
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  INACTIVE
+}
+
+model Role {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  orgId       String         @db.Uuid
+  name        String
+  description String?
+  systemKey   SystemRoleKey? // set for the four roles every organisation starts with
+  permissions String[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+
+  @@unique([orgId, name])
+  @@unique([orgId, systemKey])
+  @@map("roles")
+}
+
+enum SystemRoleKey {
+  OWNER
+  MANAGER
+  ACCOUNTANT
+  CARETAKER
+}
+
+model Invitation {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  orgId        String    @db.Uuid
+  membershipId String    @db.Uuid
+  tokenHash    String    @unique
+  invitedById  String?   @db.Uuid
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  invitedBy  User?      @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([membershipId])
+  @@map("invitations")
+}
+
+/// Opaque refresh tokens (stored hashed). One family per sign-in; every refresh rotates.
+model RefreshToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @db.Uuid
+  familyId  String    @db.Uuid
+  orgId     String?   @db.Uuid // organisation the session is currently acting in
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime? // set when rotated; a second use means the token was stolen
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model OtpCode {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  target    String // E.164 phone or lower-cased email
+  purpose   OtpPurpose
+  userId    String?    @db.Uuid
+  codeHash  String
+  attempts  Int        @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  @@index([target, purpose, createdAt])
+  @@map("otp_codes")
+}
+
+enum OtpPurpose {
+  LOGIN
+  PASSWORD_RESET
+  STEP_UP
+}
+
+// ───────────────────────────── Portfolio ─────────────────────────────
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// Per-organisation sequences for human-readable codes ("T00042", "L0007", invoice numbers).
+model OrgCounter {
+  orgId String @db.Uuid
+  name  String // "tenant", "landlord", …
+  value Int    @default(0)
+
+  @@id([orgId, name])
+  @@map("org_counters")
+}
+
+/// A property owner who is a client of an AGENCY organisation (design §5.3).
+model Landlord {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  orgId           String        @db.Uuid
+  code            String // "L0007"
+  name            String // person or company
+  kind            LandlordKind
+  phone           String // E.164
+  email           String?
+  kraPin          String?
+  idNumberEnc     Bytes? // national ID / company reg. no. — field-encrypted (src/common/crypto)
+  idNumberIndex   String? // keyed hash of the normalised value, for duplicate checks
+  idNumberHint    String? // last 3 characters, for masked display
+  status          RecordStatus  @default(ACTIVE)
+  /// Where remittances go (phase 6b): encrypted details, masked hint for display.
+  payoutMethod    PayoutMethod?
+  payoutEnc       Bytes?
+  payoutHint      String?
+  payoutUpdatedAt DateTime?
+  /// Owner-portal access: the linked user signs in with a one-time code.
+  userId          String?       @db.Uuid
+  portalInvitedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  properties   Property[]
+  agreements   ManagementAgreement[]
+  ledger       LandlordLedgerEntry[]
+  remittances  Remittance[]
+
+  @@unique([orgId, code])
+  @@unique([orgId, idNumberIndex])
+  @@index([orgId, name])
+  @@map("landlords")
+}
+
+enum PayoutMethod {
+  BANK
+  MPESA
+  CHEQUE
+}
+
+enum LandlordKind {
+  INDIVIDUAL
+  COMPANY
+}
+
+model Property {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  orgId      String       @db.Uuid
+  landlordId String?      @db.Uuid // required in AGENCY organisations, null otherwise
+  name       String
+  code       String // short upper-case code, used in paybill account references
+  location   String?
+  county     String?
+  floors     Int          @default(1)
+  status     RecordStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  landlord          Landlord?          @relation(fields: [landlordId], references: [id], onDelete: Restrict)
+  units             Unit[]
+  chargeTypes       ChargeType[]
+  moveInCharges     MoveInCharge[]
+  expenses          Expense[]
+  recurringExpenses RecurringExpense[]
+
+  @@unique([orgId, code])
+  @@index([orgId, name])
+  @@index([landlordId])
+  @@map("properties")
+}
+
+/// "Bedsitter", "2 Bedroom"
+model UnitType {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  orgId       String   @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  units Unit[]
+
+  @@unique([orgId, name])
+  @@map("unit_types")
+}
+
+/// "Standard", "Executive"
+model UnitCategory {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  orgId       String   @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  units Unit[]
+
+  @@unique([orgId, name])
+  @@map("unit_categories")
+}
+
+/// "Balcony", "Parking". Units reference features by id in `Unit.featureIds`.
+model UnitFeature {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  orgId       String   @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([orgId, name])
+  @@map("unit_features")
+}
+
+/// A rentable space. Occupancy is derived from its tenancies, never stored.
+model Unit {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  orgId       String       @db.Uuid
+  propertyId  String       @db.Uuid
+  unitTypeId  String?      @db.Uuid
+  categoryId  String?      @db.Uuid
+  number      String // "A4"
+  floor       Int          @default(0)
+  sizeSqft    Int?
+  rentAmount  BigInt // default rent for new tenancies (minor units)
+  description String?
+  featureIds  String[]     @db.Uuid
+  status      RecordStatus @default(ACTIVE) // INACTIVE = not lettable (e.g. renovation)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  property  Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  unitType  UnitType?     @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
+  category  UnitCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  tenancies Tenancy[]
+  meters    Meter[]
+
+  @@unique([propertyId, number])
+  @@index([orgId, propertyId])
+  @@map("units")
+}
+
+/// A person renting. Linked to a User once they get a portal login (phase 7).
+model Tenant {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  orgId                 String    @db.Uuid
+  userId                String?   @db.Uuid
+  code                  String // "T00042" — paybill account reference
+  firstName             String
+  lastName              String
+  phone                 String // E.164
+  email                 String?
+  kraPin                String?
+  idNumberEnc           Bytes? // national ID / passport — field-encrypted
+  idNumberIndex         String?
+  idNumberHint          String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  notes                 String?
+  creditBalance         BigInt    @default(0) // unallocated money (phase 4)
+  portalInvitedAt       DateTime? // tenant portal (phase 7)
+  remindersOff          Boolean   @default(false) // no automatic SMS reminders
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tenancies    Tenancy[]
+  payments     Payment[]
+
+  @@unique([orgId, code])
+  @@unique([orgId, phone])
+  @@unique([orgId, idNumberIndex])
+  @@index([orgId, lastName, firstName])
+  @@map("tenants")
+}
+
+/// Tenant × unit × period. At most one ACTIVE/NOTICE tenancy per unit (partial unique index).
+model Tenancy {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  orgId         String        @db.Uuid
+  tenantId      String        @db.Uuid
+  unitId        String        @db.Uuid
+  rentAmount    BigInt
+  billingDay    Int // 1–28
+  startDate     DateTime      @db.Date
+  endDate       DateTime?     @db.Date // expected (NOTICE) or actual (ENDED) move-out
+  noticeGivenAt DateTime?
+  depositHeld   BigInt        @default(0)
+  status        TenancyStatus @default(ACTIVE)
+  moveOutReason String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  unit     Unit                 @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  invoices Invoice[]
+  deposits DepositTransaction[]
+
+  @@index([orgId, status])
+  @@index([unitId])
+  @@index([tenantId])
+  @@map("tenancies")
+}
+
+enum TenancyStatus {
+  ACTIVE
+  NOTICE
+  ENDED
+}
+
+// ───────────────────────────── Billing ─────────────────────────────
+
+/// A recurring charge on a property's units (legacy "utility bill").
+model ChargeType {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  orgId      String       @db.Uuid
+  propertyId String       @db.Uuid
+  name       String // "Water", "Garbage"
+  kind       ChargeKind
+  amount     BigInt? // FIXED: per unit per month
+  unitRate   BigInt? // METERED: per unit consumed
+  unitLabel  String? // METERED: "m³", "kWh"
+  unitIds    String[]     @db.Uuid // empty = every unit of the property
+  status     RecordStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  property Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  meters   Meter[]
+  entries  ChargeEntry[]
+
+  @@unique([propertyId, name])
+  @@index([orgId, propertyId])
+  @@map("charge_types")
+}
+
+enum ChargeKind {
+  FIXED
+  VARIABLE
+  METERED
+}
+
+/// One-off charge billed at move-in (legacy "onboard fee"), e.g. deposit = 2 × rent.
+model MoveInCharge {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  orgId      String       @db.Uuid
+  propertyId String       @db.Uuid
+  name       String
+  kind       MoveInKind
+  amount     BigInt? // fixed amount, or…
+  rentMonths Int? // …this many months of the tenancy's rent
+  refundable Boolean      @default(false)
+  status     RecordStatus @default(ACTIVE)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  @@unique([propertyId, name])
+  @@index([orgId, propertyId])
+  @@map("move_in_charges")
+}
+
+enum MoveInKind {
+  DEPOSIT
+  FEE
+}
+
+/// The month's amount of a VARIABLE charge for one unit. Locked once billed (invoiceId set).
+model ChargeEntry {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  orgId        String   @db.Uuid
+  chargeTypeId String   @db.Uuid
+  unitId       String   @db.Uuid
+  period       String // "2026-10"
+  amount       BigInt
+  invoiceId    String?  @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  chargeType ChargeType @relation(fields: [chargeTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([chargeTypeId, unitId, period])
+  @@index([orgId, period])
+  @@map("charge_entries")
+}
+
+model Meter {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  orgId          String       @db.Uuid
+  unitId         String       @db.Uuid
+  chargeTypeId   String       @db.Uuid
+  serialNo       String
+  initialReading Decimal      @default(0) @db.Decimal(14, 3)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  unit       Unit           @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  chargeType ChargeType     @relation(fields: [chargeTypeId], references: [id], onDelete: Restrict)
+  readings   MeterReading[]
+
+  @@unique([orgId, serialNo])
+  @@unique([unitId, chargeTypeId])
+  @@map("meters")
+}
+
+/// One reading per meter per month. Locked once billed (invoiceId set).
+model MeterReading {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  orgId         String   @db.Uuid
+  meterId       String   @db.Uuid
+  period        String // "2026-10"
+  previous      Decimal  @db.Decimal(14, 3)
+  current       Decimal  @db.Decimal(14, 3)
+  note          String?
+  readById      String   @db.Uuid
+  readAt        DateTime @default(now())
+  invoiceId     String?  @db.Uuid
+  photoUploadId String?  @unique @db.Uuid
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  meter Meter @relation(fields: [meterId], references: [id], onDelete: Restrict)
+
+  @@unique([meterId, period])
+  @@index([orgId, period])
+  @@map("meter_readings")
+}
+
+/// Never edited after issue: changes are credit notes or a void (design §5.1).
+model Invoice {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  orgId          String        @db.Uuid
+  number         String // "INV-2026-000123"
+  tenancyId      String        @db.Uuid
+  tenantId       String        @db.Uuid
+  unitId         String        @db.Uuid
+  propertyId     String        @db.Uuid
+  period         String // "2026-10"
+  kind           InvoiceKind
+  issueDate      DateTime      @db.Date
+  dueDate        DateTime      @db.Date
+  total          BigInt
+  amountPaid     BigInt        @default(0) // maintained from payment allocations (phase 4)
+  creditedAmount BigInt        @default(0) // sum of credit notes
+  status         InvoiceStatus @default(ISSUED)
+  voidedAt       DateTime?
+  voidReason     String?
+  createdById    String?       @db.Uuid // null = the scheduled invoice run
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  tenancy     Tenancy             @relation(fields: [tenancyId], references: [id], onDelete: Restrict)
+  lines       InvoiceLine[]
+  creditNotes CreditNote[]
+  allocations PaymentAllocation[]
+
+  // + partial unique index (raw migration): one live MONTHLY / MOVE_IN invoice per tenancy per period
+  @@unique([orgId, number])
+  @@index([orgId, status, dueDate])
+  @@index([tenantId])
+  @@index([orgId, propertyId, period])
+  @@map("invoices")
+}
+
+enum InvoiceKind {
+  MONTHLY
+  MOVE_IN
+  ADHOC
+}
+
+enum InvoiceStatus {
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+model InvoiceLine {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  orgId          String   @db.Uuid
+  invoiceId      String   @db.Uuid
+  position       Int
+  kind           LineKind
+  description    String
+  quantity       Decimal  @default(1) @db.Decimal(14, 3)
+  unitAmount     BigInt
+  amount         BigInt
+  refundable     Boolean  @default(false) // deposits
+  chargeTypeId   String?  @db.Uuid
+  moveInChargeId String?  @db.Uuid
+  meterReadingId String?  @db.Uuid
+  chargeEntryId  String?  @db.Uuid
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([chargeTypeId])
+  @@index([moveInChargeId])
+  @@map("invoice_lines")
+}
+
+enum LineKind {
+  RENT
+  CHARGE
+  MOVE_IN
+  ADJUSTMENT
+}
+
+model CreditNote {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  orgId       String   @db.Uuid
+  number      String // "CN-2026-000007"
+  invoiceId   String   @db.Uuid
+  amount      BigInt
+  reason      String
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@unique([orgId, number])
+  @@index([invoiceId])
+  @@map("credit_notes")
+}
+
+// ───────────────────────────── Payments ─────────────────────────────
+
+/// Where money arrives (design §5.2). Daraja / bank credentials arrive in phase 5.
+model PaymentChannel {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  orgId           String       @db.Uuid
+  kind            ChannelKind
+  name            String
+  shortcode       String? // paybill / till number
+  bankName        String?
+  accountNumber   String?
+  accountName     String?
+  propertyIds     String[]     @db.Uuid // empty = all properties
+  status          RecordStatus @default(ACTIVE)
+  // ── Daraja (M-Pesa channels) ──
+  darajaEnv       DarajaEnv?
+  secretsEnc      Bytes? // consumer key/secret + passkey, field-encrypted; never returned
+  callbackToken   String?      @unique // unguessable webhook path segment
+  c2bRegisteredAt DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  payments Payment[]
+  inbound  InboundTransaction[]
+  stk      StkRequest[]
+
+  @@unique([orgId, name])
+  @@map("payment_channels")
+}
+
+enum ChannelKind {
+  MPESA_PAYBILL
+  MPESA_TILL
+  BANK_ACCOUNT
+  CASH
+  CHEQUE
+}
+
+enum DarajaEnv {
+  SANDBOX
+  PRODUCTION
+}
+
+enum PaymentMethod {
+  MPESA_PAYBILL
+  MPESA_TILL
+  BANK_ACCOUNT
+  CASH
+  CHEQUE
+  DEPOSIT // a held deposit used to pay the tenant's invoices
+}
+
+/// Money received from a tenant. Never edited or deleted: mistakes are reversed by a negative
+/// payment (`reversesId`) that mirrors the original's allocations.
+model Payment {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  orgId          String        @db.Uuid
+  number         String // "RCT-2026-000012"
+  tenantId       String        @db.Uuid
+  channelId      String?       @db.Uuid // null for DEPOSIT
+  tenancyId      String?       @db.Uuid // DEPOSIT: whose deposit
+  method         PaymentMethod
+  amount         BigInt // negative = reversal
+  unallocated    BigInt        @default(0) // tenant credit still held by this payment
+  reference      String? // M-Pesa code, cheque no., slip no.
+  paidBy         String?
+  note           String?
+  receivedAt     DateTime      @db.Date
+  reversesId     String?       @unique @db.Uuid
+  reversalReason String?
+  recordedById   String?       @db.Uuid
+  /// Client-supplied `Idempotency-Key`: a retried request returns the payment it already made.
+  idempotencyKey String?
+  inboundId      String?       @unique @db.Uuid // the M-Pesa transaction it came from
+  createdAt      DateTime      @default(now())
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  channel     PaymentChannel?     @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  reverses    Payment?            @relation("Reversal", fields: [reversesId], references: [id], onDelete: Restrict)
+  reversedBy  Payment?            @relation("Reversal")
+  allocations PaymentAllocation[]
+
+  // + partial unique index (raw migration): one positive payment per channel + reference
+  @@unique([orgId, number])
+  @@unique([orgId, idempotencyKey])
+  @@index([tenantId, receivedAt])
+  @@index([orgId, receivedAt])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  orgId     String   @db.Uuid
+  paymentId String   @db.Uuid
+  invoiceId String   @db.Uuid
+  amount    BigInt // negative on reversals
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([paymentId])
+  @@index([invoiceId])
+  @@map("payment_allocations")
+}
+
+/// Deposit ledger per tenancy; `Tenancy.depositHeld` is its sum.
+model DepositTransaction {
+  id          String      @id @default(uuid(7)) @db.Uuid
+  orgId       String      @db.Uuid
+  tenancyId   String      @db.Uuid
+  kind        DepositKind
+  amount      BigInt // signed: + held more, − held less
+  paymentId   String?     @db.Uuid
+  invoiceId   String?     @db.Uuid
+  reference   String?
+  note        String?
+  createdById String?     @db.Uuid
+  createdAt   DateTime    @default(now())
+
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Restrict)
+
+  @@index([tenancyId])
+  @@map("deposit_transactions")
+}
+
+enum DepositKind {
+  OPENING // held before Hodi (entered at move-in)
+  RECEIVED // paid on a refundable move-in line
+  APPLIED // used to pay the tenant's invoices
+  REFUNDED // paid back to the tenant
+  REVERSAL // a payment reversal undoing RECEIVED or APPLIED
+}
+
+// ───────────────────────────── M-Pesa ─────────────────────────────
+
+/// A raw money-in event from M-Pesa, stored before (and whatever the result of) matching.
+model InboundTransaction {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  orgId         String        @db.Uuid
+  channelId     String        @db.Uuid
+  source        InboundSource
+  providerRef   String // M-Pesa receipt, e.g. "SJR4XK2L9P"
+  amount        BigInt
+  payerName     String?
+  payerPhone    String? // may be masked by Safaricom
+  accountRef    String? // what the payer typed (C2B)
+  occurredAt    DateTime
+  raw           Json // full payload — personal data; reconciliation:view only
+  matchStatus   MatchStatus   @default(UNMATCHED)
+  matchedBy     MatchMethod?
+  tenantId      String?       @db.Uuid
+  paymentId     String?       @db.Uuid
+  ignoredReason String?
+  resolvedById  String?       @db.Uuid
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+
+  channel PaymentChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
+
+  @@unique([channelId, providerRef])
+  @@index([orgId, matchStatus, occurredAt])
+  @@map("inbound_transactions")
+}
+
+enum InboundSource {
+  MPESA_STK
+  MPESA_C2B
+}
+
+enum MatchStatus {
+  UNMATCHED
+  MATCHED
+  IGNORED
+}
+
+enum MatchMethod {
+  AUTO_STK
+  AUTO_ACCOUNT
+  AUTO_PHONE
+  MANUAL
+  EXISTING // the same receipt was already entered by hand
+}
+
+/// A payment prompt pushed to a phone (Lipa na M-Pesa Online).
+model StkRequest {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  orgId             String    @db.Uuid
+  channelId         String    @db.Uuid
+  tenantId          String    @db.Uuid
+  invoiceIds        String[]  @db.Uuid
+  phone             String
+  amount            BigInt
+  accountRef        String
+  merchantRequestId String?
+  checkoutRequestId String?   @unique
+  state             StkState  @default(PENDING)
+  resultCode        String?
+  resultDesc        String?
+  mpesaReceipt      String?
+  inboundId         String?   @db.Uuid
+  paymentId         String?   @db.Uuid
+  idempotencyKey    String?
+  requestedById     String?   @db.Uuid
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  channel PaymentChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
+
+  @@unique([orgId, idempotencyKey])
+  @@index([state, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("stk_requests")
+}
+
+enum StkState {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+// ───────────────────────────── Expenses & files ─────────────────────────────
+
+/// A private file (receipt, meter photo) in object storage. Served only through the API.
+model Upload {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  orgId        String        @db.Uuid
+  purpose      UploadPurpose
+  key          String        @unique // org/<orgId>/<purpose>/<uuid>
+  contentType  String
+  size         Int
+  sha256       String
+  uploadedById String        @db.Uuid
+  attachedAt   DateTime?
+  createdAt    DateTime      @default(now())
+
+  @@index([attachedAt, createdAt])
+  @@map("uploads")
+}
+
+enum UploadPurpose {
+  EXPENSE_RECEIPT
+  METER_PHOTO
+}
+
+enum ExpenseCategory {
+  REPAIRS
+  UTILITIES
+  SECURITY
+  CLEANING
+  SALARIES
+  TAXES
+  INSURANCE
+  MANAGEMENT
+  OTHER
+}
+
+model RecurringExpense {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  orgId       String          @db.Uuid
+  propertyId  String          @db.Uuid
+  category    ExpenseCategory
+  name        String
+  payee       String?
+  amount      BigInt
+  everyMonths Int // 1 monthly … 12 yearly
+  dayOfMonth  Int // 1–28
+  nextDue     DateTime        @db.Date
+  endDate     DateTime?       @db.Date
+  status      RecordStatus    @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  expenses Expense[]
+
+  @@index([status, nextDue])
+  @@map("recurring_expenses")
+}
+
+/// Money spent on a property. Edited (audited) or voided, never deleted.
+model Expense {
+  id                 String          @id @default(uuid(7)) @db.Uuid
+  orgId              String          @db.Uuid
+  propertyId         String          @db.Uuid
+  recurringExpenseId String?         @db.Uuid
+  category           ExpenseCategory
+  name               String
+  payee              String?
+  reference          String?
+  amount             BigInt
+  incurredOn         DateTime        @db.Date
+  receiptUploadId    String?         @unique @db.Uuid
+  voidedAt           DateTime?
+  voidReason         String?
+  createdById        String?         @db.Uuid // null = generated from a recurring expense
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  property  Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  recurring RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: Restrict)
+
+  @@unique([recurringExpenseId, incurredOn])
+  @@index([orgId, propertyId, incurredOn])
+  @@map("expenses")
+}
+
+// ───────────────────────────── Agency accounting ─────────────────────────────
+
+/// Terms between an agency and a landlord (design §5.3). A change of terms is a new agreement.
+model ManagementAgreement {
+  id                  String          @id @default(uuid(7)) @db.Uuid
+  orgId               String          @db.Uuid
+  landlordId          String          @db.Uuid
+  propertyIds         String[]        @db.Uuid // empty = all the landlord's properties
+  commissionBasis     CommissionBasis
+  commissionBps       Int? // 1000 = 10%
+  fixedAmount         BigInt? // FIXED_MONTHLY
+  commissionableLines LineKind[]      @default([RENT])
+  collection          CollectionMode  @default(AGENCY_COLLECTS)
+  remittanceDay       Int // 1–28
+  deductExpenses      Boolean         @default(true)
+  holdDeposits        Boolean         @default(true)
+  startDate           DateTime        @db.Date
+  endDate             DateTime?       @db.Date
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  landlord Landlord @relation(fields: [landlordId], references: [id], onDelete: Restrict)
+
+  @@index([orgId, landlordId])
+  @@map("management_agreements")
+}
+
+enum CommissionBasis {
+  PERCENT_OF_COLLECTED
+  PERCENT_OF_INVOICED
+  FIXED_MONTHLY
+}
+
+enum CollectionMode {
+  AGENCY_COLLECTS
+  LANDLORD_COLLECTS
+}
+
+/// Append-only. + = owed to the landlord. PAYABLE = money due to them; DEPOSIT_HELD = their
+/// tenants' deposits the agency holds.
+model LandlordLedgerEntry {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  orgId        String       @db.Uuid
+  landlordId   String       @db.Uuid
+  propertyId   String?      @db.Uuid
+  bucket       LedgerBucket
+  kind         LedgerKind
+  amount       BigInt
+  agreementId  String?      @db.Uuid
+  paymentId    String?      @db.Uuid
+  allocationId String?      @db.Uuid
+  invoiceId    String?      @db.Uuid
+  expenseId    String?      @db.Uuid
+  remittanceId String?      @db.Uuid
+  tenancyId    String?      @db.Uuid
+  occurredAt   DateTime     @db.Date // the event's date (statements use it)
+  memo         String?
+  createdById  String?      @db.Uuid
+  createdAt    DateTime     @default(now())
+
+  landlord Landlord @relation(fields: [landlordId], references: [id], onDelete: Restrict)
+
+  @@index([landlordId, bucket, createdAt])
+  @@index([landlordId, occurredAt])
+  @@map("landlord_ledger_entries")
+}
+
+enum LedgerBucket {
+  PAYABLE
+  DEPOSIT_HELD
+}
+
+enum LedgerKind {
+  COLLECTION // rent and charges collected (or, landlord-collects, information only)
+  COMMISSION
+  EXPENSE
+  DEPOSIT
+  REMITTANCE
+  ADJUSTMENT
+}
+
+model Remittance {
+  id              String              @id @default(uuid(7)) @db.Uuid
+  orgId           String              @db.Uuid
+  number          String // "REM-2026-000031"
+  landlordId      String              @db.Uuid
+  period          String // "2026-10"
+  direction       RemittanceDirection
+  collections     BigInt
+  commission      BigInt
+  expenses        BigInt
+  adjustments     BigInt
+  net             BigInt // ≥ 0; direction says who pays whom
+  cutoff          DateTime // ledger entries up to here are covered
+  status          RemittanceStatus    @default(DRAFT)
+  draftedById     String?             @db.Uuid // null = drafted by the nightly job
+  approvedById    String?             @db.Uuid
+  approvedAt      DateTime?
+  paidById        String?             @db.Uuid
+  paidAt          DateTime?
+  method          PayoutMethod?
+  reference       String?
+  payoutMasked    String?
+  cancelledReason String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  landlord Landlord @relation(fields: [landlordId], references: [id], onDelete: Restrict)
+
+  // + partial unique (raw migration): one live remittance per landlord per month
+  @@unique([orgId, number])
+  @@index([orgId, status])
+  @@map("remittances")
+}
+
+enum RemittanceDirection {
+  TO_LANDLORD
+  FROM_LANDLORD
+}
+
+enum RemittanceStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+// ───────────────────────────── Messages ─────────────────────────────
+
+/// Every message sent to a tenant (reminders, portal invitations), so staff can see what went out.
+model Message {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  orgId       String         @db.Uuid
+  tenantId    String?        @db.Uuid
+  kind        MessageKind
+  channel     MessageChannel @default(SMS)
+  to          String
+  text        String
+  status      MessageStatus
+  error       String?
+  day         DateTime       @db.Date // Nairobi date it was sent for (reminder de-duplication)
+  createdById String?        @db.Uuid // null = automatic
+  createdAt   DateTime       @default(now())
+
+  // + partial unique (raw migration): one automatic reminder of a kind per tenant per day
+  @@index([orgId, tenantId, createdAt])
+  @@map("messages")
+}
+
+enum MessageKind {
+  REMINDER_DUE
+  REMINDER_OVERDUE
+  REMINDER_MANUAL
+  PORTAL_ACCESS
+}
+
+enum MessageChannel {
+  SMS
+  EMAIL
+}
+
+enum MessageStatus {
+  SENT
+  FAILED
+}
+
+// ───────────────────────────── Platform billing (Hodi → organisations) ─────────────────────────────
+// Not org-scoped by the extension: platform code reads across organisations, and
+// organisation-facing endpoints filter by the caller's orgId explicitly.
+
+model Plan {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  name           String   @unique
+  description    String?
+  pricePerUnit   BigInt // per occupied unit per month
+  minimumMonthly BigInt   @default(0)
+  trialDays      Int      @default(30)
+  isDefault      Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("plans")
+}
+
+model PlatformInvoice {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  orgId         String        @db.Uuid
+  number        String        @unique // "HODI-2026-000001"
+  period        String // "2026-10"
+  occupiedUnits Int
+  rate          BigInt
+  minimum       BigInt
+  total         BigInt
+  amountPaid    BigInt        @default(0)
+  issueDate     DateTime      @db.Date
+  dueDate       DateTime      @db.Date
+  status        InvoiceStatus @default(ISSUED)
+  voidReason    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  allocations PlatformAllocation[]
+
+  // + partial unique (raw migration): one live invoice per organisation per month
+  @@index([orgId, status, dueDate])
+  @@map("platform_invoices")
+}
+
+enum PlatformPayMethod {
+  MPESA
+  BANK
+  CHEQUE
+  OTHER
+}
+
+enum PlatformPaySource {
+  STK
+  C2B
+  MANUAL
+}
+
+model PlatformPayment {
+  id           String            @id @default(uuid(7)) @db.Uuid
+  orgId        String            @db.Uuid
+  amount       BigInt
+  unallocated  BigInt
+  method       PlatformPayMethod
+  source       PlatformPaySource
+  reference    String            @unique // M-Pesa receipt, bank reference
+  payerName    String?
+  note         String?
+  receivedAt   DateTime          @db.Date
+  recordedById String?           @db.Uuid
+  raw          Json?
+  createdAt    DateTime          @default(now())
+
+  allocations PlatformAllocation[]
+
+  @@index([orgId, receivedAt])
+  @@map("platform_payments")
+}
+
+model PlatformAllocation {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  paymentId String   @db.Uuid
+  invoiceId String   @db.Uuid
+  amount    BigInt
+  createdAt DateTime @default(now())
+
+  payment PlatformPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  invoice PlatformInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@map("platform_allocations")
+}
+
+model PlatformStkRequest {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  orgId             String    @db.Uuid
+  phone             String
+  amount            BigInt
+  checkoutRequestId String?   @unique
+  state             StkState  @default(PENDING)
+  resultDesc        String?
+  mpesaReceipt      String?
+  paymentId         String?   @db.Uuid
+  idempotencyKey    String?   @unique
+  requestedById     String?   @db.Uuid
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  @@index([state, createdAt])
+  @@map("platform_stk_requests")
+}
+
+/// The single row of Hodi's own billing settings (id = 1).
+model PlatformSettings {
+  id               Int        @id @default(1)
+  dueDays          Int        @default(10)
+  suspendAfterDays Int        @default(21)
+  defaultPlanId    String?    @db.Uuid
+  paybill          String?
+  darajaEnv        DarajaEnv?
+  secretsEnc       Bytes?
+  callbackToken    String?    @unique
+  updatedAt        DateTime   @updatedAt
+
+  @@map("platform_settings")
+}
+
+// ───────────────────────────── Cross-cutting ─────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  orgId     String?  @db.Uuid
+  actorId   String?  @db.Uuid
+  action    String // "user.invite", "role.update", …
+  entity    String // "membership", "role", "organization", …
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  requestId String?
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([orgId, entity, createdAt])
+  @@map("audit_logs")
+}
+
+/// Fixed-window counters for rate limiting (design §4.1: no Redis at launch).
+model RateLimitBucket {
+  key         String // e.g. "login:id:+254712345678"
+  windowStart DateTime
+  count       Int      @default(0)
+  expiresAt   DateTime
+
+  @@id([key, windowStart])
+  @@index([expiresAt])
+  @@map("rate_limit_buckets")
+}

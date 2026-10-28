@@ -1,0 +1,110 @@
+/*
+ * Phase 7: the tenant portal (phone first — designed at 390px, big tap targets, the
+ * balance and "Pay now" at the top) and the staff portal-access / reminders / messages
+ * pieces. Built only from existing tokens, so light and dark both follow.
+ */
+
+/* ---- balance and Pay now --------------------------------------------------- */
+.tp__due {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+  padding: 18px 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  background: var(--card); box-shadow: var(--shadow-sm);
+}
+.tp__due--owed { border-color: var(--accent); background: var(--accent-soft); }
+.tp__duelabel { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.tp__dueamt { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--foreground); }
+.tp__duenote { font-size: 13.5px; color: var(--text-secondary); }
+.tp__overdue { color: var(--destructive); font-weight: 600; }
+.tp__paybtn { margin-top: 8px; width: 100%; }
+.tp__paysubmit { flex: 1 1 auto; }
+.tp__bigin { min-height: 48px; font-size: 18px !important; }
+.tp__in { color: var(--success); }
+
+/* ---- cards ----------------------------------------------------------------- */
+.tp__cardhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tp__cardhead h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.tp__cardhead a { color: var(--foreground); font-weight: 500; min-height: var(--touch-min); display: inline-flex; align-items: center; }
+.tp__facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 14px; }
+.tp__facts dt { font-size: 12px; color: var(--text-muted); }
+.tp__facts dd { margin: 0; font-size: 14px; font-weight: 600; }
+.tp__home { display: flex; flex-direction: column; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.tp__contact { display: flex; flex-direction: column; gap: 8px; }
+.tp__contact .nx-btn { min-height: var(--touch-min); justify-content: flex-start; overflow-wrap: anywhere; }
+.tp__back { color: var(--text-secondary); text-decoration: none; min-height: var(--touch-min); display: inline-flex; align-items: center; align-self: flex-start; font-weight: 500; }
+
+/* ---- how to pay ------------------------------------------------------------ */
+.tp__way { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.tp__way + .tp__way { border-top: 1px solid var(--border); padding-top: 12px; }
+.tp__wayname { font-weight: 600; }
+.tp__copy {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label btn' 'value btn';
+  align-items: center; gap: 0 12px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--secondary);
+}
+.tp__copylabel { grid-area: label; font-size: 12px; color: var(--text-muted); }
+.tp__copyvalue { grid-area: value; font-size: 20px; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.tp__copybtn { grid-area: btn; min-height: var(--touch-min); min-width: 76px; }
+.tp__steps { margin: 0; padding-left: 20px; font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px; }
+
+/* ---- rows (invoices, payments) --------------------------------------------- */
+.tp__rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.tp__rows--card { gap: 8px; }
+.tp__row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  min-height: 56px; padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground); text-decoration: none;
+}
+.tp__rows--card .tp__row {
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--card);
+}
+a.tp__row:hover { background: var(--secondary); }
+.tp__rowmain { display: flex; flex-direction: column; min-width: 0; }
+.tp__rowmain > strong { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tp__rowamt { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; text-align: right; }
+
+/* ---- invoice filter chips --------------------------------------------------- */
+.tp__chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.tp__chip {
+  flex-shrink: 0; min-height: 40px; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+  background: var(--card); color: var(--text-secondary); font: inherit; font-size: 13.5px; cursor: pointer;
+}
+.tp__chip.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--foreground); font-weight: 600; }
+
+/* ---- statement --------------------------------------------------------------- */
+.tp__range { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tp__date { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--text-muted); }
+.tp__date input {
+  min-height: var(--touch-min); padding: 0 10px; width: 100%;
+  border: 1px solid var(--input); border-radius: var(--radius);
+  background: var(--input-background); color: var(--foreground); font: inherit; font-size: 15px;
+}
+.tp__rangeactions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.tp__rangeactions > .nx-btn { flex: 1 1 auto; min-height: var(--touch-min); }
+.tp__stmtline { align-items: flex-start; }
+.tp__stmtline a { color: var(--foreground); font-weight: 600; }
+.tp__stmtamt { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; }
+
+/* Footer: the person's other places. */
+.ow__places { display: inline-flex; gap: 14px; flex-wrap: wrap; }
+
+/* Portal chooser rows are links. */
+a.orgpick__row { text-decoration: none; }
+
+/* ---- staff: portal access, reminders, messages ------------------------------ */
+.tm__portal { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.tm__toggle { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.tm__toggle input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+.tm__toggle span { display: flex; flex-direction: column; }
+.tm__msgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tm__msg { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.tm__msghead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.tm__msg p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tm__msgerr { color: var(--destructive); font-size: 13px; }
+
+@media (max-width: 640px) {
+  .tp__dueamt { font-size: 30px; }
+  .ow--tenant .ow__page { padding: 12px 12px 24px; }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+src/generated/
+openapi.json
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo

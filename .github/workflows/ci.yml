@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hodi
+          POSTGRES_PASSWORD: hodi
+          POSTGRES_DB: hodi_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hodi -d hodi_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://hodi:hodi@localhost:5432/hodi_test
+      TEST_DATABASE_URL: postgresql://hodi:hodi@localhost:5432/hodi_test
+      # Test-only value; real secrets live in GCP Secret Manager.
+      JWT_SECRET: ci-only-not-a-real-secret-0123456789abcdef
+      # CI-only keys (32 bytes of 0x01 / 0x02); real keys live in Secret Manager.
+      FIELD_ENCRYPTION_KEYS: ci1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+      FIELD_INDEX_KEY: AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx prettier --check "src/**/*.ts" "test/**/*.ts"
+      - run: npm test
+      - run: npm run test:e2e
+      - run: npm run build
+      - name: OpenAPI document builds
+        run: npm run openapi:export -- openapi.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: backend/openapi.json
+      - name: Docker images build (runtime + migrate)
+        run: |
+          docker build -t hodi-api:ci .
+          docker build --target migrate -t hodi-migrate:ci .
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

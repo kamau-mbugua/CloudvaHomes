@@ -1,0 +1,31 @@
+/*
+ * Hodi-specific page pieces that pos-react has no equivalent for: the placeholder card
+ * every not-yet-built screen renders, and the compact brand row shown on the sign-in
+ * screen once the brand panel is hidden (≤ 900px).
+ */
+
+.ph {
+  max-width: 720px;
+  margin: 24px auto 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.au__mobilebrand {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.au__mobilebrand img { width: 30px; height: 30px; border-radius: 8px; }
+
+@media (max-width: 900px) {
+  .au__mobilebrand { display: inline-flex; }
+  .au__panelhead { padding: 18px 20px; }
+}

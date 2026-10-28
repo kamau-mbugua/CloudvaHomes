@@ -1,0 +1,295 @@
+/**
+ * Shared shell pieces — ported from UltimatePOS pos-react (src/styles/shell.css), plus
+ * the command palette (which pos-react kept in dashboard.css).
+ *
+ * Kept: the top-bar pill and primary action, the avatar and its account menu, the
+ * appearance switch. Dropped: the cash-register control, branch switcher, impersonation
+ * and billing banners — POS-specific, or not needed until a later phase.
+ */
+
+/* ---- top-bar controls ---------------------------------------------------- */
+
+/* A secondary top-bar button — sits beside .sh__cta and differs only in weight. */
+.sh__pill {
+  display: flex; align-items: center; gap: 6px;
+  height: 36px; padding: 0 10px;
+  border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--card);
+  font: inherit; font-size: 13px; color: var(--text-secondary);
+  cursor: pointer;
+}
+.sh__pill:hover { background: var(--secondary); }
+
+/* The one primary action in a top bar — "New invoice", "Save changes". Sits beside
+   .sh__pill, so it matches its height and shape and differs only in weight. */
+.sh__cta {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 36px; padding: 0 14px;
+  border-radius: var(--radius); border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-foreground);
+  font: inherit; font-size: 13px; font-weight: 500;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+.sh__cta:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.sh__cta:disabled { opacity: 0.55; cursor: not-allowed; }
+.sh__avatar {
+  width: 34px; height: 34px; border-radius: var(--radius-pill);
+  background: var(--tertiary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 500; flex-shrink: 0;
+}
+
+
+/* ── Account menu ───────────────────────────────────────────────────────── */
+
+.sh__account { position: relative; }
+
+.sh__avatar--button {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.sh__avatar--button:hover { filter: brightness(1.1); }
+
+.sh__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 12px 32px rgb(9 14 22 / 28%);
+}
+
+.sh__menuwho {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.sh__menulabel { font-size: 11.5px; color: var(--muted-foreground); }
+.sh__menuwho strong { font-size: 14px; font-weight: 600; }
+
+.sh__menurole {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--secondary);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.sh__menuitem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sh__menuitem:hover:not(:disabled) { background: var(--secondary); }
+.sh__menuitem:disabled { opacity: 0.55; cursor: not-allowed; }
+.sh__menuitem svg { width: 17px; height: 17px; flex-shrink: 0; color: var(--muted-foreground); }
+
+/* ── Appearance ─────────────────────────────────────────────────────────── */
+
+/* A segmented pair rather than a switch: a switch says "dark mode: off", which names one
+   state and hides the other. Both options are always visible and always labelled. The
+   top bar also carries a one-tap icon toggle (.sh__icon) for the same setting. */
+.sh__theme {
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.sh__themelabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+
+.sh__themeswitch {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--secondary);
+}
+
+.sh__themeopt {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.sh__themeopt svg { width: 15px; height: 15px; }
+.sh__themeopt:hover { color: var(--foreground); }
+
+.sh__themeopt.is-on {
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+/* A square icon button in the top bar — the theme toggle. Same height as .sh__pill. */
+.sh__icon {
+  width: 36px; height: 36px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); color: var(--text-secondary);
+  cursor: pointer;
+}
+.sh__icon:hover { background: var(--secondary); color: var(--foreground); }
+.sh__icon svg { width: 18px; height: 18px; }
+
+/* ── Command palette ────────────────────────────────────────────────────── */
+/* ⌘K / Ctrl+K. Above the phone drawer (z 50) and its scrim. */
+
+.cp {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(10 37 64 / 45%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+}
+
+.cp__panel {
+  width: 100%;
+  max-width: 620px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgb(10 37 64 / 28%);
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
+.cp__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cp__input {
+  flex: 1 1 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--foreground);
+  outline: none;
+  min-width: 0;
+}
+
+/* The panel's own search row is the focus indicator; a ring inside it is noise. */
+.cp__input:focus-visible { outline: none; }
+
+.cp__kbd {
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+.cp__results {
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.cp__group {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 10px 4px;
+}
+
+.cp__row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--foreground);
+}
+
+.cp__row.is-on { background: var(--secondary); }
+
+.cp__label { font-size: 13.5px; }
+
+.cp__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.cp__empty {
+  padding: 16px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.cp__foot {
+  display: flex;
+  gap: 14px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.cp__note { margin-left: auto; }
+
+@media (max-width: 560px) {
+  .cp__note { display: none; }
+}

@@ -1,0 +1,27 @@
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Node (per-app .gitignore files add more)
+node_modules/
+npm-debug.log*
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+keystore_setup.txt
+key.properties
+local.properties
+service-account*.json
+
+# Local tool output
+.playwright-mcp/
+
+# Local file storage (receipts, meter photos)
+.storage/

@@ -1,0 +1,95 @@
+/*
+ * Phase 4 (payments) pieces: negative (reversal) amounts, the record-payment sheet's
+ * allocation list and receipt, the statement table, deposit ledgers and date ranges.
+ * Built only from existing tokens, so light and dark both follow.
+ */
+
+/* A reversal is money going back: shown negative, in the destructive colour. */
+.py__neg { color: var(--destructive); }
+.py__struck { text-decoration: line-through; color: var(--text-muted); }
+.py__reversalrow td { background: color-mix(in srgb, var(--destructive-soft) 55%, transparent); }
+.py__reversedrow td { color: var(--text-muted); }
+.py__reversalnote a { color: inherit; font-weight: 600; }
+.py__table td.num, .py__stmt td.num, .py__ledger td.num { white-space: nowrap; }
+
+/* ---- filters -------------------------------------------------------------- */
+.py__daterange { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-muted); }
+.py__daterange > input { min-width: 150px; }
+
+/* ---- record-payment sheet ------------------------------------------------- */
+.py__picked {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--secondary);
+}
+.py__code { text-transform: uppercase; font-family: var(--font-num); letter-spacing: 0.04em; }
+
+.py__alloc {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--background);
+}
+.py__alloc.is-bad { border-color: var(--destructive); }
+.py__allochead { display: flex; align-items: center; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; }
+.py__allochead .fld__check { font-size: 13px; min-height: 32px; }
+.py__allocrows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.py__allocrow {
+  display: grid; gap: 8px; align-items: center;
+  grid-template-columns: minmax(0, 1fr) 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card);
+}
+.py__allocrow.is-bad { border-color: var(--destructive); }
+.py__allocinv { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.py__allocinv .ad__sub { flex-basis: 100%; margin-top: 0; }
+.fld.py__allocamt { gap: 2px; }
+.fld.py__allocamt > input { height: 38px; text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.fld.py__allocamt > input:disabled { opacity: 1; color: var(--text-secondary); background: var(--secondary); }
+.py__allocamt .fld__err { text-align: left; }
+.py__resuggest { align-self: flex-start; }
+.py__allocfoot {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-top: 8px; border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+
+/* The receipt shown once a payment is saved. */
+.py__done { display: flex; flex-direction: column; gap: 12px; }
+.py__donehead { margin: 0; font-size: 15px; }
+.py__done .pf__facts { margin-top: 0; }
+.py__done a, .py__stmt a, .py__ledger a { color: var(--foreground); }
+.py__done .ad__h2 { margin: 4px 0 0; }
+.py__alloclist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.py__alloclist li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+
+/* ---- tenant page ---------------------------------------------------------- */
+.py__tiles .ad__sub { margin-top: -2px; }
+.py__tileactions { display: flex; gap: 8px; flex-wrap: wrap; }
+.py__statement { display: flex; flex-direction: column; gap: 14px; }
+.py__statementbar { margin-bottom: 0; }
+.py__stmt tfoot th {
+  border-top: 1px solid var(--border);
+  text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--foreground);
+}
+.py__stmtedge td { font-weight: 600; background: var(--secondary); }
+.ad__table.py__stmt { min-width: 720px; }
+
+/* ---- deposits ------------------------------------------------------------- */
+.py__deposits { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; }
+.py__deposit { display: flex; flex-direction: column; gap: 10px; }
+.py__deposithead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.py__ledger tfoot th {
+  border-top: 1px solid var(--border);
+  text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--foreground);
+}
+.py__settlefacts { margin-top: 0; }
+
+@media (max-width: 640px) {
+  .py__daterange { flex: 1 1 140px; }
+  .py__daterange > input { min-width: 0; width: 100%; }
+  .py__allocrow { grid-template-columns: minmax(0, 1fr) 118px; padding: 8px; }
+  .py__tileactions > .nx-btn { flex: 1 1 auto; justify-content: center; }
+}

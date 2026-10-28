@@ -1,0 +1,64 @@
+/*
+ * Phase 8 (platform billing) pieces: the staff app's Hodi bill banner, the organisation's
+ * Plan & billing page and the platform admin area. Built only from existing tokens, so
+ * light and dark both follow.
+ */
+
+/* ---- banner (between the top bar and the page; never over the content) ---- */
+.hb__banner {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  border-left: 4px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--foreground);
+}
+.hb__banner--alert { border-left-color: var(--destructive); background: var(--destructive-soft); }
+.hb__banner--off { border-left-color: var(--text-muted); background: var(--muted); }
+.hb__bannertext { margin: 0; font-size: 13.5px; line-height: 1.45; max-width: 90ch; }
+.hb__banner--warn .hb__bannertext strong { color: var(--warning); }
+.hb__banner--alert .hb__bannertext strong { color: var(--destructive); }
+.hb__banneractions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.hb__bannerlink { color: var(--foreground); font-size: 13px; font-weight: 500; }
+
+/* ---- Plan & billing --------------------------------------------------------- */
+.hb__top { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.hb__cardhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hb__cardhead h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.hb__owed--warn { border-color: var(--warning); }
+.hb__owed--alert { border-color: var(--destructive); }
+.hb__owed p { margin: 0; }
+.hb__amount { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+.hb__overdue { color: var(--destructive); font-weight: 600; }
+.hb__paybtn { align-self: flex-start; }
+.hb__facts { margin: 0; }
+.hb__price { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.hb__custom { padding: 1px 7px; font-size: 11px; }
+.hb__table td .ad__badge + .ad__sub { margin-top: 4px; }
+.hb__table td.num, .hb__table td.num .ad__sub, .hb__table td:first-child strong { white-space: nowrap; }
+
+/* ---- admin area ------------------------------------------------------------- */
+.adm__tag { white-space: nowrap; }
+.adm__head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin: 8px 0 16px; }
+.adm__h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.adm__facts { margin: 0 0 20px; }
+.adm__terms { margin-top: 0; }
+.adm__override { display: flex; align-items: center; gap: 8px; }
+.adm__override input {
+  flex: 1 1 auto; min-width: 0;
+  height: 40px; padding: 0 12px;
+  border-radius: var(--radius); border: 1px solid var(--input);
+  background: var(--input-background); color: var(--foreground);
+  font-family: inherit; font-size: 14px; outline: none;
+}
+.adm__override input:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 14%, transparent); }
+.fld.is-bad .adm__override input { border-color: var(--destructive); }
+
+@media (max-width: 640px) {
+  .hb__banner { padding: 10px 16px; }
+  .hb__banneractions { width: 100%; }
+  .adm__tag { display: none; }
+  .adm__head .pg-actions { width: 100%; justify-content: flex-start; }
+}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- Stamps the chosen theme before any CSS is parsed. Inline and blocking on purpose:
+         doing this from React paints one frame of the wrong theme first. Kept in lockstep
+         with src/lib/theme.ts — the key and the default must match. -->
+    <script>
+      (function () {
+        var theme = 'light';
+        try { if (localStorage.getItem('hodi.theme') === 'dark') theme = 'dark'; } catch (e) {}
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#002b4d" />
+    <!-- The page themes itself; both values are reachable via the script above. -->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Hodi — rent collection and property management for Kenyan landlords and agencies." />
+    <title>Hodi</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+/**
+ * Lufga — the UltimatePOS design system's typeface, copied from pos-react. The .woff files
+ * live in public/fonts/ and are referenced by absolute URL so Vite serves them as-is.
+ *
+ * LICENCE — UNCONFIRMED. Lufga is a commercial typeface. It shipped inside the
+ * UltimatePOS design handoff; whether that licence covers a NEW product (Hodi) is an open
+ * owner decision (see docs/specs §10, question 2). Confirm before production — a webfont
+ * is served publicly. Every rule falls back to the system sans (see --font in
+ * tokens.css), so deleting these four @font-face rules and the files degrades gracefully.
+ */
+@font-face { font-family:'Lufga'; src:url('/fonts/LufgaRegular.woff')  format('woff'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family:'Lufga'; src:url('/fonts/LufgaMedium.woff')   format('woff'); font-weight:500; font-style:normal; font-display:swap; }
+@font-face { font-family:'Lufga'; src:url('/fonts/LufgaSemiBold.woff') format('woff'); font-weight:600; font-style:normal; font-display:swap; }
+@font-face { font-family:'Lufga'; src:url('/fonts/LufgaBold.woff')     format('woff'); font-weight:700; font-style:normal; font-display:swap; }

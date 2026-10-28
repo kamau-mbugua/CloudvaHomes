@@ -1,0 +1,84 @@
+/*
+ * Phase 5 (M-Pesa) pieces: the M-Pesa connection cards on Payment channels, the payment
+ * request (STK) progress, reconciliation tabs and the raw payload. Built only from
+ * existing tokens, so light and dark both follow.
+ */
+
+/* ---- M-Pesa connection (Payment channels) --------------------------------- */
+.mp__daraja { margin-top: 20px; }
+.mp__lead { margin: 0 0 12px; max-width: 72ch; }
+.mp__cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+.mp__card {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-card);
+  background: var(--card);
+}
+.mp__card p { margin: 0; }
+.mp__cardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px 12px; flex-wrap: wrap; }
+.mp__badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.mp__urls { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.mp__url dt { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
+.mp__url dd { margin: 0; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mp__url code {
+  flex: 1 1 auto; min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--secondary); color: var(--foreground);
+  font-size: 12px; overflow-wrap: anywhere; word-break: break-all;
+}
+.mp__url .nx-btn { flex-shrink: 0; }
+.mp__hint { display: block; }
+.mp__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.mp__explain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+
+/* ---- payment request (STK) ------------------------------------------------ */
+.mp__fixed {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 40px;
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--secondary);
+}
+.mp__stk { display: flex; flex-direction: column; gap: 12px; }
+.mp__stk p { margin: 0; }
+.mp__stkhead { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.mp__stkmsg { font-size: 14.5px; }
+.mp__stk--success .mp__stkmsg { color: var(--success); font-weight: 600; }
+.mp__stk--failed .mp__stkmsg, .mp__stk--cancelled .mp__stkmsg { color: var(--destructive); }
+.mp__stkfacts { margin-top: 0; }
+.mp__stk a { color: var(--foreground); font-weight: 600; }
+.mp__spinner {
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%;
+  animation: mp-spin 0.9s linear infinite;
+}
+@keyframes mp-spin { to { transform: rotate(360deg); } }
+
+/* ---- reconciliation ------------------------------------------------------- */
+.mp__tabcount {
+  margin-left: 6px; min-width: 20px; padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--destructive); color: #fff;
+  font-size: 11px; line-height: 18px; text-align: center;
+}
+.mp__table td.num { white-space: nowrap; }
+.mp__table .ad__sub .ad__badge { margin-top: 2px; }
+.mp__resolved a { color: inherit; font-weight: 600; }
+.mp__suggestions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mp__suggestion {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card);
+}
+.mp__suggestion a { color: var(--foreground); }
+.mp__raw summary { cursor: pointer; font-weight: 600; min-height: var(--touch-min); display: flex; align-items: center; }
+.mp__raw .hint { display: block; margin-bottom: 8px; }
+.mp__raw pre {
+  margin: 0; max-height: 420px; overflow: auto;
+  padding: 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--secondary); color: var(--foreground);
+  font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .mp__card { padding: 12px; }
+  .mp__actions > .nx-btn { flex: 1 1 auto; justify-content: center; }
+  .mp__suggestion { flex-wrap: wrap; }
+}
