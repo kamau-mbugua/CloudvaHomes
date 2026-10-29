@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import { AuthLayout } from './AuthLayout';
@@ -13,8 +13,9 @@ import { authErrorMessage } from './authErrors';
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [params] = useSearchParams();
   const [identifier, setIdentifier] = useState(
-    ((location.state ?? {}) as { identifier?: string }).identifier ?? '',
+    params.get('identifier') ?? ((location.state ?? {}) as { identifier?: string }).identifier ?? '',
   );
 
   const forgot = useMutation({

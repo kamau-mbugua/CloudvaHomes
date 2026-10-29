@@ -112,7 +112,7 @@ export function LoginPage() {
   const submitCode = (event: FormEvent) => {
     event.preventDefault();
     if (!isOtpCode(code)) {
-      setCodeError('Enter the 6-digit code from the SMS.');
+      setCodeError('Enter the 6-digit code we sent you.');
       return;
     }
     setCodeError(null);
@@ -125,6 +125,9 @@ export function LoginPage() {
     verifyOtp.reset();
     verifyAdminTwoFactor.reset();
     setCodeError(null);
+    if (to === 'otp-phone' && !phone.trim() && identifier.trim()) {
+      setPhone(identifier.trim());
+    }
     setMode(to);
   };
 
@@ -179,17 +182,20 @@ export function LoginPage() {
         <form className="au__form" onSubmit={submitPhone} key="otp-phone">
           <div className="au__step">
             <h1>Sign in with a code</h1>
-            <p className="au__lede">We will text a 6-digit code to your phone.</p>
+            <p className="au__lede">We will send a 6-digit code to your email address or phone number.</p>
 
             <div className="au__field">
-              <div className="au__labelrow"><label htmlFor="phone">Phone number</label></div>
+              <div className="au__labelrow"><label htmlFor="phone">Email or phone number</label></div>
               <input
                 id="phone"
                 className="au__input"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="0712 345 678"
+                type="text"
+                inputMode="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="you@example.com or 0712 345 678"
                 autoFocus
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -228,7 +234,7 @@ export function LoginPage() {
             <div className="au__field">
               <div className="au__labelrow">
                 <label htmlFor="code">Code</label>
-                <button type="button" className="au__link" onClick={() => switchTo('otp-phone')}>Change number</button>
+                <button type="button" className="au__link" onClick={() => switchTo('otp-phone')}>Change email or phone</button>
               </div>
               <CodeInput id="code" value={code} onChange={setCode} autoFocus />
             </div>

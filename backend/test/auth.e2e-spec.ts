@@ -228,6 +228,81 @@ describe('Auth (e2e)', () => {
         .send({ phone: OWNER_PHONE, code: fresh })
         .expect(200);
     });
+
+    it('signs in with a one-time code sent to an email address', async () => {
+      await t.http().post('/api/v1/auth/otp/request').send({ phone: OWNER_EMAIL }).expect(202);
+      const code = lastCode(OWNER_EMAIL);
+      const res = await t
+        .http()
+        .post('/api/v1/auth/otp/verify')
+        .send({ phone: OWNER_EMAIL, code })
+        .expect(200);
+      expect(res.body.data.activeOrganization.name).toBe('Acme Homes');
+    });
+
+    it('lets a newly created tenant set their password via forgot-password email OTP or sign in by email code', async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Sunrise Homes',
+        ownerEmail: 'sunrise@example.invalid',
+        ownerPhone: '+254700000044',
+      });
+      outbox.length = 0;
+
+      const tenantEmail = 'grace.tenant@example.invalid';
+      await t
+        .http()
+        .post('/api/v1/tenants')
+        .set(auth(owner))
+        .send({
+          firstName: 'Grace',
+          lastName: 'Wanjiku',
+          phone: '0712333444',
+          email: tenantEmail,
+        })
+        .expect(201);
+
+      const welcome = outbox.find(
+        (m): m is Extract<(typeof outbox)[number], { channel: 'email' }> =>
+          m.channel === 'email' && m.to === tenantEmail,
+      );
+      expect(welcome).toBeDefined();
+      expect(welcome!.text).toContain(
+        `/forgot-password?identifier=${encodeURIComponent(tenantEmail)}`,
+      );
+
+      // Tenant requests password reset using their email -> receives OTP email
+      await t
+        .http()
+        .post('/api/v1/auth/password/forgot')
+        .send({ identifier: tenantEmail })
+        .expect(202);
+      const resetCode = lastCode(tenantEmail);
+      await t
+        .http()
+        .post('/api/v1/auth/password/reset')
+        .send({
+          identifier: tenantEmail,
+          code: resetCode,
+          newPassword: 'Grace-new-password-2026',
+        })
+        .expect(204);
+
+      // Tenant can sign in with their newly set password
+      const pwLogin = await login(t, tenantEmail, 'Grace-new-password-2026');
+      expect(pwLogin.body).toMatchObject({
+        tenantOf: [expect.objectContaining({ name: 'Grace Wanjiku' })],
+      });
+
+      // Tenant can also sign in with a 6-digit code sent to their email
+      await t.http().post('/api/v1/auth/otp/request').send({ phone: tenantEmail }).expect(202);
+      const emailOtp = lastCode(tenantEmail);
+      const otpLogin = await t
+        .http()
+        .post('/api/v1/auth/otp/verify')
+        .send({ phone: tenantEmail, code: emailOtp })
+        .expect(200);
+      expect(otpLogin.body.data.tenantOf).toHaveLength(1);
+    });
   });
 
   describe('password reset', () => {

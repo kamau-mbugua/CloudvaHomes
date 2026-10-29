@@ -7,7 +7,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { hashPassword, verifyPassword } from './crypto.js';
 import { authContext } from './decorators.js';
-import { normalizePhone, parseIdentifier, passwordProblem } from './identifiers.js';
+import { type Identifier, parseIdentifier, passwordProblem } from './identifiers.js';
 import { OTP_TTL_MINUTES, OtpService } from './otp.service.js';
 import { type IssuedSession, SessionsService } from './sessions.service.js';
 import { TokensService } from './tokens.service.js';
@@ -73,9 +73,7 @@ export class AuthService {
       await verifyPassword(null, password);
       throw invalid;
     }
-    const user = await this.prisma.user.findUnique({
-      where: id.kind === 'email' ? { email: id.value } : { phone: id.value },
-    });
+    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: true });
     const ok = await verifyPassword(user?.passwordHash, password);
     if (!user || !ok || user.status !== 'ACTIVE') throw invalid;
 
@@ -154,24 +152,34 @@ export class AuthService {
     return session;
   }
 
-  /** Always resolves (202) — whether the number is registered is not disclosed. */
-  async requestLoginOtp(phoneInput: string): Promise<void> {
-    const phone = normalizePhone(phoneInput);
-    if (!phone)
-      throw AppError.fieldInvalid('phone', 'Enter a valid phone number, e.g. 0712 345 678');
+  /** Always resolves (202) — whether the email/number is registered is not disclosed. */
+  async requestLoginOtp(identifierInput: string): Promise<void> {
+    const id = parseIdentifier(identifierInput);
+    if (!id) {
+      throw AppError.fieldInvalid(
+        'phone',
+        'Enter a valid email address or phone number, e.g. you@example.com or 0712 345 678',
+      );
+    }
     await this.rateLimit.hit(
-      { key: `otp:phone:${phone}`, limit: 3, windowSeconds: 15 * MIN },
+      { key: `otp:phone:${id.value}`, limit: 3, windowSeconds: 15 * MIN },
       { key: `otp:ip:${this.ip()}`, limit: 10, windowSeconds: HOUR },
     );
-    const user = await this.prisma.user.findUnique({ where: { phone } });
+    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: true });
     if (!user || user.status !== 'ACTIVE') return;
-    const code = await this.otp.issue(phone, 'LOGIN', user.id);
-    await this.deliverCode({ phone }, 'login', code, OTP_TTL_MINUTES.LOGIN, { silent: true });
+    const code = await this.otp.issue(id.value, 'LOGIN', user.id);
+    await this.deliverCode(
+      id.kind === 'phone' ? { phone: id.value } : { email: id.value },
+      'login',
+      code,
+      OTP_TTL_MINUTES.LOGIN,
+      { silent: true },
+    );
   }
 
-  async verifyLoginOtp(phoneInput: string, code: string): Promise<IssuedSession> {
-    const phone = normalizePhone(phoneInput);
-    if (!phone)
+  async verifyLoginOtp(identifierInput: string, code: string): Promise<IssuedSession> {
+    const id = parseIdentifier(identifierInput);
+    if (!id)
       throw AppError.unauthenticated(
         'INVALID_CODE',
         'That code is wrong or has expired. Request a new one.',
@@ -181,7 +189,7 @@ export class AuthService {
       limit: 30,
       windowSeconds: 15 * MIN,
     });
-    const userId = await this.otp.verify(phone, 'LOGIN', code);
+    const userId = await this.otp.verify(id.value, 'LOGIN', code);
     const user = userId ? await this.prisma.user.findUnique({ where: { id: userId } }) : null;
     if (!user || user.status !== 'ACTIVE') {
       throw AppError.unauthenticated(
@@ -201,7 +209,7 @@ export class AuthService {
     return session;
   }
 
-  /** Always resolves (202). The code goes to whichever identifier the user typed. */
+  /** Always resolves (202). Sends the reset code to the user's email and/or phone. */
   async forgotPassword(identifier: string): Promise<void> {
     const id = parseIdentifier(identifier);
     if (!id) throw AppError.fieldInvalid('identifier', 'Enter your email address or phone number');
@@ -209,13 +217,11 @@ export class AuthService {
       { key: `reset:id:${id.value}`, limit: 3, windowSeconds: HOUR },
       { key: `reset:ip:${this.ip()}`, limit: 10, windowSeconds: HOUR },
     );
-    const user = await this.prisma.user.findUnique({
-      where: id.kind === 'email' ? { email: id.value } : { phone: id.value },
-    });
+    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: false });
     if (!user || user.status !== 'ACTIVE') return;
     const code = await this.otp.issue(id.value, 'PASSWORD_RESET', user.id);
     await this.deliverCode(
-      id.kind === 'phone' ? { phone: id.value } : { email: id.value },
+      id.kind === 'phone' ? { phone: id.value, email: user.email } : { email: id.value },
       'reset',
       code,
       OTP_TTL_MINUTES.PASSWORD_RESET,
@@ -235,9 +241,7 @@ export class AuthService {
       limit: 30,
       windowSeconds: 15 * MIN,
     });
-    const user = await this.prisma.user.findUnique({
-      where: id.kind === 'email' ? { email: id.value } : { phone: id.value },
-    });
+    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: false });
     if (!user) throw invalid;
     const problem = passwordProblem(newPassword, [user.email, user.phone]);
     if (problem) throw AppError.fieldInvalid('newPassword', problem);
@@ -257,6 +261,138 @@ export class AuthService {
       actorId: user.id,
       orgId: null,
     });
+  }
+
+  /**
+   * Resolves a global `User` by email or phone. If a tenant record already exists with that
+   * email/phone (for example, onboarded before portal access was explicitly granted) or if the
+   * user row is missing the tenant's email, provisions/updates the `User` and links the tenant.
+   */
+  private async resolveUserForAuth(
+    id: Identifier,
+    opts: { requireEmailIfUnlinkedTenant: boolean },
+  ) {
+    let user = await this.prisma.user.findUnique({
+      where: id.kind === 'email' ? { email: id.value } : { phone: id.value },
+    });
+
+    if (id.kind === 'email') {
+      if (!user) {
+        const tenant = await this.prisma.tenant.findFirst({
+          where: {
+            email: { equals: id.value, mode: 'insensitive' },
+            organization: { status: { not: 'CLOSED' } },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (!tenant) return null;
+        user = await this.prisma.user.findFirst({
+          where: {
+            OR: [
+              ...(tenant.userId ? [{ id: tenant.userId }] : []),
+              { phone: tenant.phone },
+              { email: id.value },
+            ],
+          },
+        });
+        if (!user) {
+          user = await this.prisma.user.create({
+            data: {
+              phone: tenant.phone,
+              email: id.value,
+              firstName: tenant.firstName,
+              lastName: tenant.lastName,
+            },
+          });
+        } else if (!user.email) {
+          const emailTaken = await this.prisma.user.count({
+            where: { email: id.value, id: { not: user.id } },
+          });
+          if (!emailTaken) {
+            user = await this.prisma.user.update({
+              where: { id: user.id },
+              data: { email: id.value },
+            });
+          }
+        }
+      }
+      await this.prisma.tenant.updateMany({
+        where: {
+          userId: null,
+          OR: [
+            ...(user.phone ? [{ phone: user.phone }] : []),
+            { email: { equals: id.value, mode: 'insensitive' } },
+          ],
+        },
+        data: { userId: user.id, portalInvitedAt: new Date() },
+      });
+      return user;
+    }
+
+    // id.kind === 'phone'
+    if (!user) {
+      const tenant = await this.prisma.tenant.findFirst({
+        where: {
+          phone: id.value,
+          ...(opts.requireEmailIfUnlinkedTenant ? { email: { not: null } } : {}),
+          organization: { status: { not: 'CLOSED' } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!tenant) return null;
+      const tenantEmail = tenant.email ? tenant.email.trim().toLowerCase() : null;
+      if (tenantEmail) {
+        user = await this.prisma.user.findUnique({ where: { email: tenantEmail } });
+      }
+      if (!user) {
+        const emailFree = tenantEmail
+          ? !(await this.prisma.user.count({ where: { email: tenantEmail } }))
+          : false;
+        user = await this.prisma.user.create({
+          data: {
+            phone: tenant.phone,
+            email: emailFree ? tenantEmail : null,
+            firstName: tenant.firstName,
+            lastName: tenant.lastName,
+          },
+        });
+      } else if (!user.phone) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { phone: tenant.phone },
+        });
+      }
+      await this.prisma.tenant.updateMany({
+        where: { userId: null, phone: tenant.phone },
+        data: { userId: user.id, portalInvitedAt: new Date() },
+      });
+      return user;
+    }
+
+    if (!user.email) {
+      const tenantWithEmail = await this.prisma.tenant.findFirst({
+        where: {
+          phone: id.value,
+          email: { not: null },
+          organization: { status: { not: 'CLOSED' } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (tenantWithEmail?.email) {
+        const email = tenantWithEmail.email.trim().toLowerCase();
+        const emailTaken = await this.prisma.user.count({
+          where: { email, id: { not: user.id } },
+        });
+        if (!emailTaken) {
+          user = await this.prisma.user.update({
+            where: { id: user.id },
+            data: { email },
+          });
+        }
+      }
+    }
+
+    return user;
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {

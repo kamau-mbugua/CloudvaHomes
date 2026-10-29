@@ -175,17 +175,28 @@ export class NotificationsService {
       'admin-2fa': 'admin_2fa',
     }[purpose];
     const smsText = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
-    if (to.phone) await this.dispatchSms(to.phone, smsText);
-    else if (to.email) {
-      const rendered = await this.renderSystemEmailTemplate('verification_code', {
-        codeType: what,
-        code,
-        minutes,
-      });
-      await this.dispatchEmail(
-        { to: to.email, subject: rendered.subject, text: rendered.text },
-        kind,
+    const tasks: Promise<void>[] = [];
+    if (to.phone) {
+      tasks.push(this.dispatchSms(to.phone, smsText));
+    }
+    if (to.email) {
+      const emailAddr = to.email;
+      tasks.push(
+        this.renderSystemEmailTemplate('verification_code', {
+          codeType: what,
+          code,
+          minutes,
+        }).then((rendered) =>
+          this.dispatchEmail(
+            { to: emailAddr, subject: rendered.subject, text: rendered.text },
+            kind,
+          ),
+        ),
       );
+    }
+    const results = await Promise.allSettled(tasks);
+    if (tasks.length && results.every((r) => r.status === 'rejected')) {
+      throw (results[0] as PromiseRejectedResult).reason;
     }
   }
 
@@ -371,8 +382,10 @@ export class NotificationsService {
     },
   ): Promise<void> {
     if (!to.email) return;
-    const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
-    const signInIdentifier = [to.phone, to.email].filter(Boolean).join(' / ');
+    const baseUrl = this.env.APP_URL.replace(/\/$/, '');
+    const portalLink = `${baseUrl}/tenant`;
+    const setPasswordLink = `${baseUrl}/forgot-password?identifier=${encodeURIComponent(to.email)}`;
+    const signInIdentifier = [to.email, to.phone].filter(Boolean).join(' or ');
     const rendered = await this.renderSystemEmailTemplate('tenant_welcome', {
       firstName: p.firstName,
       lastName: p.lastName,
@@ -380,6 +393,7 @@ export class NotificationsService {
       tenantCode: p.tenantCode,
       signInIdentifier,
       portalLink,
+      setPasswordLink,
     });
     await this.dispatchEmail(
       { to: to.email, subject: rendered.subject, text: rendered.text },

@@ -188,7 +188,7 @@ export function PaymentChannelsPage() {
 const FIELDS = ['name', 'kind', 'shortcode', 'bankName', 'accountNumber', 'accountName', 'propertyIds', 'status'] as const;
 type FieldName = (typeof FIELDS)[number];
 
-function ChannelSheet({ channel, onClose }: { channel?: PaymentChannel; onClose: () => void }) {
+export function ChannelSheet({ channel, onClose }: { channel?: PaymentChannel; onClose: () => void }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const form = useForm<FieldName>({

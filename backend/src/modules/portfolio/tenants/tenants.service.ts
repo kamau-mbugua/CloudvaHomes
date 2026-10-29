@@ -281,10 +281,11 @@ export class TenantsService {
       const notes = optionalText(dto.notes);
       if (!existingInOrg.notes && notes) patch.notes = notes;
       if (Object.keys(patch).length > 0) {
-        await tx.tenant.update({
+        const patched = await tx.tenant.update({
           where: { id: existingInOrg.id },
           data: patch,
         });
+        await this.ensurePortalUserInTx(tx, patched);
       }
       return { tenantId: existingInOrg.id, wasBrandNewPerson: false };
     }
@@ -315,11 +316,64 @@ export class TenantsService {
         ...this.ids.seal(idNumber, orgId, 'tenant'),
       },
     });
+    await this.ensurePortalUserInTx(tx, created);
     await this.audit.record(
       { action: 'tenant.create', entity: 'tenant', entityId: created.id, after: snapshot(created) },
       tx,
     );
     return created.id;
+  }
+
+  /**
+   * When a tenant has an email address, automatically provision or link their global `User`
+   * record so they can immediately set/reset their password or sign in by email/phone code
+   * using the link in their welcome email.
+   */
+  private async ensurePortalUserInTx(
+    tx: Tx,
+    t: {
+      id: string;
+      phone: string;
+      email: string | null;
+      firstName: string;
+      lastName: string;
+      userId?: string | null;
+    },
+  ): Promise<void> {
+    if (!t.email) return;
+    const email = t.email.trim().toLowerCase();
+    const phone = t.phone;
+    let user = await tx.user.findFirst({
+      where: {
+        OR: [{ phone }, { email: { equals: email, mode: 'insensitive' } }],
+      },
+    });
+    if (!user) {
+      user = await tx.user.create({
+        data: {
+          phone,
+          email,
+          firstName: t.firstName,
+          lastName: t.lastName,
+        },
+      });
+    } else if (!user.email) {
+      const emailTaken = await tx.user.count({
+        where: { email: { equals: email, mode: 'insensitive' }, id: { not: user.id } },
+      });
+      if (!emailTaken) {
+        user = await tx.user.update({
+          where: { id: user.id },
+          data: { email },
+        });
+      }
+    }
+    if (t.userId !== user.id) {
+      await tx.tenant.update({
+        where: { id: t.id },
+        data: { userId: user.id, portalInvitedAt: new Date() },
+      });
+    }
   }
 
   async update(id: string, dto: UpdateTenantDto) {
@@ -353,6 +407,7 @@ export class TenantsService {
           ...(dto.remindersOff !== undefined ? { remindersOff: dto.remindersOff } : {}),
         },
       });
+      await this.ensurePortalUserInTx(tx, updated);
       await this.audit.record(
         {
           action: 'tenant.update',

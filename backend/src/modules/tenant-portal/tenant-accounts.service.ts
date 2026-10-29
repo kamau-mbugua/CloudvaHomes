@@ -160,6 +160,14 @@ export class TenantAccountsService {
           lastName: t.lastName,
         },
       });
+    } else if (!user.email && email) {
+      const emailFree = !(await this.prisma.user.count({ where: { email } }));
+      if (emailFree) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { email },
+        });
+      }
     }
     await this.db.$transaction(async (tx) => {
       await tx.tenant.update({

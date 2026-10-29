@@ -299,8 +299,10 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       '--- Your Tenant Account ---\n' +
       'Organisation: {{organizationName}}\n' +
       'Tenant account code: {{tenantCode}}\n' +
-      'Sign-in phone / email: {{signInIdentifier}}\n' +
-      'Tenant portal: {{portalLink}}\n\n' +
+      'Sign-in email / phone: {{signInIdentifier}}\n\n' +
+      '--- Set Your Password & Sign In ---\n' +
+      'Set your password here: {{setPasswordLink}}\n' +
+      'Or sign in anytime using a 6-digit one-time code sent to your email or phone: {{portalLink}}\n\n' +
       'Whenever you are assigned a house or billed for rent and utilities, you will receive updates here and can view your statements and receipts in the tenant portal.',
     variables: [
       { key: 'firstName', description: "Tenant's first name", sample: 'Grace' },
@@ -318,7 +320,12 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'signInIdentifier',
         description: 'Phone number and/or email on file for the tenant',
-        sample: '+254712345678 / grace@example.com',
+        sample: 'grace@example.com or +254712345678',
+      },
+      {
+        key: 'setPasswordLink',
+        description: 'Direct link for the tenant to set or reset their account password',
+        sample: 'https://app.kodihub.co.ke/forgot-password?identifier=grace%40example.com',
       },
       {
         key: 'portalLink',

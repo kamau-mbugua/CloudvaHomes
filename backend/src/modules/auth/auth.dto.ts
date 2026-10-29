@@ -30,16 +30,16 @@ export class LoginDto extends ClientDto {
 }
 
 export class OtpRequestDto {
-  @ApiProperty({ example: '0712345678' })
+  @ApiProperty({ example: '0712345678', description: 'Email address or phone number' })
   @IsString()
-  @MaxLength(20)
+  @MaxLength(254)
   phone!: string;
 }
 
 export class OtpVerifyDto extends ClientDto {
-  @ApiProperty({ example: '0712345678' })
+  @ApiProperty({ example: '0712345678', description: 'Email address or phone number' })
   @IsString()
-  @MaxLength(20)
+  @MaxLength(254)
   phone!: string;
 
   @ApiProperty({ example: '123456' })
