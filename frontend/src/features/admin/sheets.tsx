@@ -7,10 +7,11 @@ import { formatKES, parseAmount } from '../../lib/money';
 import { formatPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { Sheet } from '../../components/Sheet';
-import { Field } from '../portfolio/ui';
+import { InvoiceBadges } from '../billing/ui';
+import { Fact, Field } from '../portfolio/ui';
 import { downloadHodiInvoicePdf, keys, platformErrorMessage } from '../platform/api';
 import { MANUAL_METHODS, PLATFORM_METHOD } from '../platform/labels';
-import { checkPlatformPayment } from '../platform/rules';
+import { checkPlatformPayment, formatDayish } from '../platform/rules';
 import type { PaymentDraft } from '../platform/rules';
 import type { PlatformInvoice } from '../platform/types';
 
@@ -169,10 +170,11 @@ export function VoidHodiInvoiceSheet({ invoice, onClose }: { invoice: PlatformIn
   );
 }
 
-/** A row's PDF and Void buttons in the admin invoice tables. Paid-on invoices can't be voided. */
+/** A row's Details, PDF and Void buttons in the admin invoice tables. Paid-on invoices can't be voided. */
 export function AdminInvoiceActions({ invoice, onVoid }: { invoice: PlatformInvoice; onVoid?: (invoice: PlatformInvoice) => void }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const pdf = async () => {
     setBusy(true);
     try {
@@ -185,6 +187,7 @@ export function AdminInvoiceActions({ invoice, onVoid }: { invoice: PlatformInvo
   };
   return (
     <>
+      <button type="button" className="nx-btn nx-btn--sm" onClick={() => setViewing(true)}>Details</button>
       <button type="button" className="nx-btn nx-btn--sm" onClick={pdf} disabled={busy}>{busy ? 'Getting…' : 'PDF'}</button>
       {onVoid && invoice.status !== 'VOID' ? (
         <button type="button" className="nx-btn nx-btn--sm nx-btn--danger" onClick={() => onVoid(invoice)}
@@ -192,6 +195,54 @@ export function AdminInvoiceActions({ invoice, onVoid }: { invoice: PlatformInvo
           Void
         </button>
       ) : null}
+      {viewing ? <AdminInvoiceDetailSheet invoice={invoice} onClose={() => setViewing(false)} onPdf={pdf} busyPdf={busy} /> : null}
     </>
+  );
+}
+
+function AdminInvoiceDetailSheet({
+  invoice: inv,
+  onClose,
+  onPdf,
+  busyPdf,
+}: {
+  invoice: PlatformInvoice;
+  onClose: () => void;
+  onPdf: () => void;
+  busyPdf: boolean;
+}) {
+  const fromMinimum = inv.minimum > 0 && inv.occupiedUnits * inv.rate < inv.minimum;
+  return (
+    <Sheet
+      title={`${inv.number} — ${formatPeriod(inv.period, true)}`}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="nx-btn" onClick={onPdf} disabled={busyPdf}>
+            {busyPdf ? 'Getting…' : 'Download PDF'}
+          </button>
+          <button type="button" className="nx-btn nx-btn--primary" onClick={onClose}>Done</button>
+        </>
+      )}
+    >
+      <div className="sheet-form">
+        <InvoiceBadges invoice={inv} />
+        <dl className="pf__facts">
+          {inv.organization?.name ? <Fact label="Organisation">{inv.organization.name}</Fact> : null}
+          {inv.organization?.billingRef ? <Fact label="Billing ref"><span className="num">{inv.organization.billingRef}</span></Fact> : null}
+          <Fact label="Let units on the last day"><span className="num">{inv.occupiedUnits}</span></Fact>
+          <Fact label="Price per unit"><span className="num">{formatKES(inv.rate)}</span></Fact>
+          <Fact label="Monthly minimum"><span className="num">{formatKES(inv.minimum)}</span></Fact>
+          <Fact label="Total">
+            <span className="num">{formatKES(inv.total)}</span>
+            {fromMinimum ? <span className="ad__sub">The monthly minimum, as units × price came to less.</span> : null}
+          </Fact>
+          <Fact label="Paid"><span className="num">{formatKES(inv.amountPaid)}</span></Fact>
+          <Fact label="Balance"><span className={`num ${inv.overdue ? 'ad__owed' : ''}`}>{formatKES(inv.balance)}</span></Fact>
+          <Fact label="Issued">{formatDayish(inv.issueDate)}</Fact>
+          <Fact label="Due">{formatDayish(inv.dueDate)}</Fact>
+        </dl>
+      </div>
+    </Sheet>
   );
 }

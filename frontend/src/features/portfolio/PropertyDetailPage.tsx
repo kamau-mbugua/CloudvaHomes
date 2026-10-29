@@ -14,7 +14,7 @@ import { PropertySheet } from './PropertySheet';
 import type { Property, Unit } from './types';
 import { UnitSheet } from './UnitSheet';
 import { UnitsTable } from './UnitsTable';
-import { useListFilters } from './hooks';
+import { useDebounced } from './hooks';
 import { Badge, Breadcrumbs, Fact } from './ui';
 
 /**
@@ -31,9 +31,11 @@ export function PropertyDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const filters = useListFilters();
-  const { q, page } = filters;
-  const occupancy = filters.get('occupancy');
+  const [search, setSearch] = useState('');
+  const q = useDebounced(search.trim());
+  const [occupancy, setOccupancy] = useState('');
+  const [page, setPage] = useState(1);
+  const [rawTab, setRawTab] = useState<'units' | 'details'>('units');
 
   const canUpdate = useCan('properties:update');
   const canDelete = useCan('properties:delete');
@@ -78,7 +80,6 @@ export function PropertyDetailPage() {
   const p = property.data;
   const rows = units.data?.data ?? [];
   const where = [p.location, p.county].filter(Boolean).join(', ');
-  const rawTab = filters.get('tab');
   const tab: 'units' | 'details' = !canSeeUnits || rawTab === 'details' ? 'details' : 'units';
 
   return (
@@ -127,7 +128,7 @@ export function PropertyDetailPage() {
               role="tab"
               aria-selected={tab === 'units'}
               className="pf__tab"
-              onClick={() => filters.setFilter({ tab: '' })}
+              onClick={() => setRawTab('units')}
             >
               Units ({p.unitCount})
             </button>
@@ -136,7 +137,7 @@ export function PropertyDetailPage() {
               role="tab"
               aria-selected={tab === 'details'}
               className="pf__tab"
-              onClick={() => filters.setFilter({ tab: 'details' })}
+              onClick={() => setRawTab('details')}
             >
               Property details
             </button>
@@ -163,8 +164,8 @@ export function PropertyDetailPage() {
           </div>
           <div className="ad__filters pg-gap">
             <input className="ad__search" type="search" placeholder="Search by unit number or tenant" aria-label="Search units"
-              value={filters.search} onChange={(e) => filters.setSearch(e.target.value)} />
-            <select className="ad__select" aria-label="Occupancy" value={occupancy} onChange={(e) => filters.setFilter({ occupancy: e.target.value })}>
+              value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            <select className="ad__select" aria-label="Occupancy" value={occupancy} onChange={(e) => { setOccupancy(e.target.value); setPage(1); }}>
               <option value="">Any occupancy</option>
               {optionsOf(OCCUPANCY).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -173,11 +174,11 @@ export function PropertyDetailPage() {
             : units.isPending ? <p className="ad__muted" role="status">Loading…</p>
               : rows.length === 0 ? (
                 q || occupancy
-                  ? <EmptyState title="No units match" onClear={() => filters.clear()} />
+                  ? <EmptyState title="No units match" onClear={() => { setSearch(''); setOccupancy(''); setPage(1); }} />
                   : <EmptyState title="No units yet" detail="Add them one at a time, or a whole block from a number range."
                       action={canAddUnits ? <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => setAdding(true)}>Add units</button> : undefined} />
               ) : <UnitsTable rows={rows} showProperty={false} />}
-          <Pager meta={units.data?.meta} onPage={(next) => filters.setFilter({ page: String(next) })} />
+          <Pager meta={units.data?.meta} onPage={(next) => setPage(next)} />
         </section>
       ) : null}
 

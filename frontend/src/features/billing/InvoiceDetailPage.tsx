@@ -47,6 +47,7 @@ export function InvoiceDetailPage() {
   const canSeeChannels = useCan('channels:view');
   const [dialog, setDialog] = useState<'credit' | 'void' | 'pay' | 'stk' | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useState<'lines' | 'details' | 'credits' | 'payments'>('lines');
 
   const invoice = useQuery({
     queryKey: [...keys.invoices, 'detail', invoiceId],
@@ -121,70 +122,95 @@ export function InvoiceDetailPage() {
         </div>
       </div>
 
-      <section className="fm__section">
-        <h2>Details</h2>
-        <dl className="pf__facts">
-          <Fact label="Issued">{formatDay(inv.issueDate)}</Fact>
-          <Fact label="Due">{formatDay(inv.dueDate)}</Fact>
-          <Fact label="Period">{formatPeriod(inv.period, true)}</Fact>
-          <Fact label="Tenant"><>{personName(inv.tenant)}<span className="ad__sub num">{inv.tenant.code} · {inv.tenant.phone}</span></></Fact>
-          <Fact label="Unit">{inv.unit.number}, {inv.property.name}</Fact>
-          <Fact label="Created">{formatDateTime(inv.createdAt)}</Fact>
-        </dl>
-      </section>
-
-      <section className="fm__section">
-        <h2>Lines</h2>
-        <div className="ad__tablewrap">
-          <table className="ad__table bl__lines-table">
-            <thead>
-              <tr><th>Description</th><th className="num">Qty</th><th className="num">Unit amount</th><th className="num">Amount</th></tr>
-            </thead>
-            <tbody>
-              {inv.lines.map((line) => (
-                <tr key={line.id}>
-                  <td>
-                    {line.description}
-                    <span className="ad__sub">{LINE_KIND[line.kind] ?? line.kind}{line.refundable ? ' · refundable' : ''}</span>
-                  </td>
-                  <td className="num">{trimQuantity(line.quantity)}</td>
-                  <td className="num">{formatKES(line.unitAmount)}</td>
-                  <td className="num">{formatKES(line.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr><th colSpan={3}>Total</th><th className="num">{formatKES(inv.total)}</th></tr>
-              {inv.creditedAmount > 0 ? <tr><th colSpan={3}>Credited</th><th className="num">-{formatKES(inv.creditedAmount)}</th></tr> : null}
-              {inv.amountPaid > 0 ? <tr><th colSpan={3}>Paid</th><th className="num">-{formatKES(inv.amountPaid)}</th></tr> : null}
-              <tr><th colSpan={3}>Balance</th><th className="num">{formatKES(inv.balance)}</th></tr>
-            </tfoot>
-          </table>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Invoice sections">
+          <button type="button" role="tab" aria-selected={tab === 'lines'} className="pf__tab" onClick={() => setTab('lines')}>
+            Lines ({inv.lines.length})
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'details'} className="pf__tab" onClick={() => setTab('details')}>
+            Details
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'credits'} className="pf__tab" onClick={() => setTab('credits')}>
+            Credit notes ({inv.creditNotes.length})
+          </button>
+          {inv.payments ? (
+            <button type="button" role="tab" aria-selected={tab === 'payments'} className="pf__tab" onClick={() => setTab('payments')}>
+              Payments ({inv.payments.length})
+            </button>
+          ) : null}
         </div>
-      </section>
+      </div>
 
-      <section className="fm__section">
-        <div className="pf__sectionhead"><h2>Credit notes</h2></div>
-        {inv.creditNotes.length === 0 ? <p className="ad__muted">None.</p> : (
+      {tab === 'details' ? (
+        <section className="fm__section">
+          <h2>Details</h2>
+          <dl className="pf__facts">
+            <Fact label="Issued">{formatDay(inv.issueDate)}</Fact>
+            <Fact label="Due">{formatDay(inv.dueDate)}</Fact>
+            <Fact label="Period">{formatPeriod(inv.period, true)}</Fact>
+            <Fact label="Tenant"><>{personName(inv.tenant)}<span className="ad__sub num">{inv.tenant.code} · {inv.tenant.phone}</span></></Fact>
+            <Fact label="Unit">{inv.unit.number}, {inv.property.name}</Fact>
+            <Fact label="Created">{formatDateTime(inv.createdAt)}</Fact>
+          </dl>
+        </section>
+      ) : null}
+
+      {tab === 'lines' ? (
+        <section className="fm__section">
+          <h2>Lines</h2>
           <div className="ad__tablewrap">
-            <table className="ad__table">
-              <thead><tr><th>Number</th><th>Reason</th><th>By</th><th className="num">Amount</th></tr></thead>
+            <table className="ad__table bl__lines-table">
+              <thead>
+                <tr><th>Description</th><th className="num">Qty</th><th className="num">Unit amount</th><th className="num">Amount</th></tr>
+              </thead>
               <tbody>
-                {inv.creditNotes.map((cn) => (
-                  <tr key={cn.id}>
-                    <td><strong className="num">{cn.number}</strong><span className="ad__sub">{formatDateTime(cn.createdAt)}</span></td>
-                    <td>{cn.reason}</td>
-                    <td>{cn.createdBy?.name ?? '—'}</td>
-                    <td className="num">{formatKES(cn.amount)}</td>
+                {inv.lines.map((line) => (
+                  <tr key={line.id}>
+                    <td>
+                      {line.description}
+                      <span className="ad__sub">{LINE_KIND[line.kind] ?? line.kind}{line.refundable ? ' · refundable' : ''}</span>
+                    </td>
+                    <td className="num">{trimQuantity(line.quantity)}</td>
+                    <td className="num">{formatKES(line.unitAmount)}</td>
+                    <td className="num">{formatKES(line.amount)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr><th colSpan={3}>Total</th><th className="num">{formatKES(inv.total)}</th></tr>
+                {inv.creditedAmount > 0 ? <tr><th colSpan={3}>Credited</th><th className="num">-{formatKES(inv.creditedAmount)}</th></tr> : null}
+                {inv.amountPaid > 0 ? <tr><th colSpan={3}>Paid</th><th className="num">-{formatKES(inv.amountPaid)}</th></tr> : null}
+                <tr><th colSpan={3}>Balance</th><th className="num">{formatKES(inv.balance)}</th></tr>
+              </tfoot>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
-      {inv.payments ? (
+      {tab === 'credits' ? (
+        <section className="fm__section">
+          <div className="pf__sectionhead"><h2>Credit notes</h2></div>
+          {inv.creditNotes.length === 0 ? <p className="ad__muted">None.</p> : (
+            <div className="ad__tablewrap">
+              <table className="ad__table">
+                <thead><tr><th>Number</th><th>Reason</th><th>By</th><th className="num">Amount</th></tr></thead>
+                <tbody>
+                  {inv.creditNotes.map((cn) => (
+                    <tr key={cn.id}>
+                      <td><strong className="num">{cn.number}</strong><span className="ad__sub">{formatDateTime(cn.createdAt)}</span></td>
+                      <td>{cn.reason}</td>
+                      <td>{cn.createdBy?.name ?? '—'}</td>
+                      <td className="num">{formatKES(cn.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {tab === 'payments' && inv.payments ? (
         <section className="fm__section">
           <div className="pf__sectionhead"><h2>Payments</h2></div>
           {inv.payments.length === 0 ? <p className="ad__muted">None yet.</p> : (

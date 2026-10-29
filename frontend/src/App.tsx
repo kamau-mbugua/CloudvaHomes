@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { queryClient } from './lib/api/queryClient';
 import { ToastProvider } from './components/Toast';
+import { RouteDrawer, WithRouteDrawer } from './components/RouteDrawer';
 import { AppShell } from './app/AppShell';
 import { RequireAdmin, RequireAuth, RequireOwner, RequirePermission, RequireSuperAdmin, RequireTenant } from './app/guards';
 import { NotFoundPage, PlaceholderPage } from './app/PlaceholderPage';
@@ -80,40 +81,40 @@ import {
 const PAGES = destinations(ORG_NAV);
 
 /** Path (relative to /app) → the screen that replaces its placeholder. */
-const BUILT: Record<string, { element: ReactNode; children?: { path: string; element: ReactNode }[] }> = {
+const BUILT: Record<string, { element: ReactNode; children?: { path: string; title: string; element: ReactNode }[] }> = {
   'settings/organization': { element: <OrganizationPage /> },
   'settings/users': { element: <UsersPage /> },
   'settings/roles': {
     element: <RolesPage />,
     children: [
-      { path: 'new', element: <RoleEditorPage /> },
-      { path: ':roleId', element: <RoleEditorPage /> },
+      { path: 'new', title: 'New role', element: <RoleEditorPage /> },
+      { path: ':roleId', title: 'Role details', element: <RoleEditorPage /> },
     ],
   },
   'settings/audit': { element: <AuditLogPage /> },
   'settings/plan': { element: <PlanBillingPage /> },
   'settings/payouts': { element: <PayoutsPage /> },
-  landlords: { element: <LandlordsPage />, children: [{ path: ':landlordId', element: <LandlordDetailPage /> }] },
-  properties: { element: <PropertiesPage />, children: [{ path: ':propertyId', element: <PropertyDetailPage /> }] },
-  units: { element: <UnitsPage />, children: [{ path: ':unitId', element: <UnitDetailPage /> }] },
+  landlords: { element: <LandlordsPage />, children: [{ path: ':landlordId', title: 'Landlord details', element: <LandlordDetailPage /> }] },
+  properties: { element: <PropertiesPage />, children: [{ path: ':propertyId', title: 'Property details', element: <PropertyDetailPage /> }] },
+  units: { element: <UnitsPage />, children: [{ path: ':unitId', title: 'Unit details', element: <UnitDetailPage /> }] },
   'unit-categories': { element: <UnitSetupPage /> },
-  tenants: { element: <TenantsPage />, children: [{ path: ':tenantId', element: <TenantDetailPage /> }] },
+  tenants: { element: <TenantsPage />, children: [{ path: ':tenantId', title: 'Tenant details', element: <TenantDetailPage /> }] },
   tenancies: { element: <TenanciesPage /> },
   // `invoices/run` is its own nav entry and route. React Router ranks the static `run`
   // above the dynamic `:invoiceId`, so the detail route never swallows it (tested in
   // routes.test.ts).
-  invoices: { element: <InvoicesPage />, children: [{ path: ':invoiceId', element: <InvoiceDetailPage /> }] },
+  invoices: { element: <InvoicesPage />, children: [{ path: ':invoiceId', title: 'Invoice details', element: <InvoiceDetailPage /> }] },
   'invoices/run': { element: <InvoiceRunPage /> },
   'meter-readings': { element: <MeterReadingsPage /> },
   charges: { element: <ChargesPage /> },
-  payments: { element: <PaymentsPage />, children: [{ path: ':paymentId', element: <PaymentDetailPage /> }] },
+  payments: { element: <PaymentsPage />, children: [{ path: ':paymentId', title: 'Payment details', element: <PaymentDetailPage /> }] },
   'payment-channels': { element: <PaymentChannelsPage /> },
-  reconciliation: { element: <ReconciliationPage />, children: [{ path: ':inboundId', element: <InboundDetailPage /> }] },
+  reconciliation: { element: <ReconciliationPage />, children: [{ path: ':inboundId', title: 'Transaction details', element: <InboundDetailPage /> }] },
   expenses: { element: <ExpensesPage /> },
   reports: { element: <ReportsPage /> },
   agreements: { element: <AgreementsPage /> },
   'owner-statements': { element: <OwnerStatementsPage /> },
-  remittances: { element: <RemittancesPage />, children: [{ path: ':remittanceId', element: <RemittanceDetailPage /> }] },
+  remittances: { element: <RemittancesPage />, children: [{ path: ':remittanceId', title: 'Remittance details', element: <RemittanceDetailPage /> }] },
 };
 
 export default function App() {
@@ -142,24 +143,51 @@ export default function App() {
                   if (!built) {
                     return <Route key={page.to} path={`${path}/*`} element={guard(<PlaceholderPage />)} />;
                   }
-                  return [
-                    <Route key={page.to} path={path} element={guard(built.element)} />,
-                    ...(built.children ?? []).map((child) => (
-                      <Route key={`${page.to}/${child.path}`} path={`${path}/${child.path}`} element={guard(child.element)} />
-                    )),
-                  ];
+                  if (built.children && built.children.length > 0) {
+                    return (
+                      <Route key={page.to} path={path} element={guard(<WithRouteDrawer>{built.element}</WithRouteDrawer>)}>
+                        {built.children.map((child) => (
+                          <Route
+                            key={`${page.to}/${child.path}`}
+                            path={child.path}
+                            element={(
+                              <RouteDrawer title={child.title} backTo={page.to}>
+                                {child.element}
+                              </RouteDrawer>
+                            )}
+                          />
+                        ))}
+                      </Route>
+                    );
+                  }
+                  return <Route key={page.to} path={path} element={guard(built.element)} />;
                 })}
                 {/* Phase 0 spelled it the British way; keep old links working. */}
                 <Route path="settings/organisation" element={<Navigate to="/app/settings/organization" replace />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
-              {/* The platform admin area: Hodi's own staff, its own shell (phase 8 & phase 11). */}
+              {/* The platform admin area: KodiHub's own staff, its own shell (phase 8 & phase 11). */}
               <Route path="/admin" element={<RequireAdmin><AdminShell /></RequireAdmin>}>
                 <Route index element={<AdminOverviewPage />} />
-                <Route path="organizations" element={<AdminOrganizationsPage />} />
-                <Route path="organizations/new" element={<CreateOrganizationPage />} />
-                <Route path="organizations/:organizationId" element={<AdminOrganizationDetailPage />} />
+                <Route path="organizations" element={<WithRouteDrawer><AdminOrganizationsPage /></WithRouteDrawer>}>
+                  <Route
+                    path="new"
+                    element={(
+                      <RouteDrawer title="New organisation" backTo="/admin/organizations">
+                        <CreateOrganizationPage />
+                      </RouteDrawer>
+                    )}
+                  />
+                  <Route
+                    path=":organizationId"
+                    element={(
+                      <RouteDrawer title="Organisation details" backTo="/admin/organizations">
+                        <AdminOrganizationDetailPage />
+                      </RouteDrawer>
+                    )}
+                  />
+                </Route>
                 <Route path="plans" element={<RequireSuperAdmin><AdminPlansPage /></RequireSuperAdmin>} />
                 <Route path="invoices" element={<AdminInvoicesPage />} />
                 <Route path="payments" element={<AdminPaymentsPage />} />
@@ -183,8 +211,16 @@ export default function App() {
               {/* The tenant portal: a tenant's own account and paying by M-Pesa, its own shell. */}
               <Route path="/tenant" element={<RequireTenant><TenantShell /></RequireTenant>}>
                 <Route index element={<TenantHomePage />} />
-                <Route path="invoices" element={<TenantInvoicesPage />} />
-                <Route path="invoices/:invoiceId" element={<TenantInvoicePage />} />
+                <Route path="invoices" element={<WithRouteDrawer><TenantInvoicesPage /></WithRouteDrawer>}>
+                  <Route
+                    path=":invoiceId"
+                    element={(
+                      <RouteDrawer title="Invoice details" backTo="/tenant/invoices">
+                        <TenantInvoicePage />
+                      </RouteDrawer>
+                    )}
+                  />
+                </Route>
                 <Route path="statement" element={<TenantStatementPage />} />
                 <Route path="payments" element={<TenantPaymentsPage />} />
                 <Route path="*" element={<Navigate to="/tenant" replace />} />

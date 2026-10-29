@@ -36,6 +36,7 @@ export function PaymentDetailPage() {
   const canSeeInbound = useCan('reconciliation:view');
   const [reversing, setReversing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useState<'allocations' | 'details'>('allocations');
 
   const payment = useQuery({
     queryKey: [...keys.payments, 'detail', paymentId],
@@ -117,52 +118,65 @@ export function PaymentDetailPage() {
         ) : null}
       </div>
 
-      <section className="fm__section">
-        <h2>Details</h2>
-        <dl className="pf__facts">
-          <Fact label="Method">{methodText(p)}</Fact>
-          <Fact label="Reference"><span className="num">{p.reference}</span></Fact>
-          <Fact label="Received on">{formatDay(p.receivedAt)}</Fact>
-          <Fact label="Paid by">{p.paidBy}</Fact>
-          <Fact label="Tenant"><>{personName(p.tenant)}<span className="ad__sub num">{p.tenant.code} · {p.tenant.phone}</span></></Fact>
-          <Fact label="Recorded">{`${formatDateTime(p.createdAt)}${p.recordedBy ? ` by ${p.recordedBy.name}` : ''}`}</Fact>
-          {p.inboundId ? (
-            <Fact label="Source">
-              {canSeeInbound
-                ? <Link to={`/app/reconciliation/${p.inboundId}`}>From M-Pesa — see the transaction</Link>
-                : 'From M-Pesa (recorded automatically)'}
-            </Fact>
-          ) : null}
-          {p.note ? <Fact label="Note" wide>{p.note}</Fact> : null}
-        </dl>
-      </section>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Payment sections">
+          <button type="button" role="tab" aria-selected={tab === 'allocations'} className="pf__tab" onClick={() => setTab('allocations')}>
+            {reversal ? 'Taken back from' : 'Allocated to'} ({p.allocations.length})
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'details'} className="pf__tab" onClick={() => setTab('details')}>
+            Details
+          </button>
+        </div>
+      </div>
 
-      <section className="fm__section">
-        <div className="pf__sectionhead"><h2>{reversal ? 'Taken back from' : 'Allocated to'}</h2></div>
-        {p.allocations.length === 0 ? (
-          <p className="ad__muted">{reversal ? 'Nothing — the original had not been allocated.' : 'No invoices. The whole amount is the tenant’s credit.'}</p>
-        ) : (
-          <div className="ad__tablewrap">
-            <table className="ad__table">
-              <thead><tr><th>Invoice</th><th>Period</th><th>Kind</th><th className="num">Amount</th></tr></thead>
-              <tbody>
-                {p.allocations.map((a) => (
-                  <tr key={a.invoice.id}>
-                    <td>
-                      {canSeeInvoices
-                        ? <Link className="ad__link" to={`/app/invoices/${a.invoice.id}`}><strong className="num">{a.invoice.number}</strong></Link>
-                        : <strong className="num">{a.invoice.number}</strong>}
-                    </td>
-                    <td>{formatPeriod(a.invoice.period)}</td>
-                    <td>{INVOICE_KIND[a.invoice.kind]?.label ?? a.invoice.kind}</td>
-                    <td className="num"><SignedAmount minor={a.amount} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      {tab === 'details' ? (
+        <section className="fm__section">
+          <h2>Details</h2>
+          <dl className="pf__facts">
+            <Fact label="Method">{methodText(p)}</Fact>
+            <Fact label="Reference"><span className="num">{p.reference}</span></Fact>
+            <Fact label="Received on">{formatDay(p.receivedAt)}</Fact>
+            <Fact label="Paid by">{p.paidBy}</Fact>
+            <Fact label="Tenant"><>{personName(p.tenant)}<span className="ad__sub num">{p.tenant.code} · {p.tenant.phone}</span></></Fact>
+            <Fact label="Recorded">{`${formatDateTime(p.createdAt)}${p.recordedBy ? ` by ${p.recordedBy.name}` : ''}`}</Fact>
+            {p.inboundId ? (
+              <Fact label="Source">
+                {canSeeInbound
+                  ? <Link to={`/app/reconciliation/${p.inboundId}`}>From M-Pesa — see the transaction</Link>
+                  : 'From M-Pesa (recorded automatically)'}
+              </Fact>
+            ) : null}
+            {p.note ? <Fact label="Note" wide>{p.note}</Fact> : null}
+          </dl>
+        </section>
+      ) : (
+        <section className="fm__section">
+          <div className="pf__sectionhead"><h2>{reversal ? 'Taken back from' : 'Allocated to'}</h2></div>
+          {p.allocations.length === 0 ? (
+            <p className="ad__muted">{reversal ? 'Nothing — the original had not been allocated.' : 'No invoices. The whole amount is the tenant’s credit.'}</p>
+          ) : (
+            <div className="ad__tablewrap">
+              <table className="ad__table">
+                <thead><tr><th>Invoice</th><th>Period</th><th>Kind</th><th className="num">Amount</th></tr></thead>
+                <tbody>
+                  {p.allocations.map((a) => (
+                    <tr key={a.invoice.id}>
+                      <td>
+                        {canSeeInvoices
+                          ? <Link className="ad__link" to={`/app/invoices/${a.invoice.id}`}><strong className="num">{a.invoice.number}</strong></Link>
+                          : <strong className="num">{a.invoice.number}</strong>}
+                      </td>
+                      <td>{formatPeriod(a.invoice.period)}</td>
+                      <td>{INVOICE_KIND[a.invoice.kind]?.label ?? a.invoice.kind}</td>
+                      <td className="num"><SignedAmount minor={a.amount} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {reversing ? <ReverseDialog payment={p} onClose={() => setReversing(false)} /> : null}
     </div>

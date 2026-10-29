@@ -36,6 +36,11 @@ export function useDialogBehaviour(
 
       if (!panel) return;
 
+      // When a sheet or confirmation is opened inside a route drawer, only the topmost
+      // dialog in the DOM handles Escape and Tab.
+      const allDialogs = document.querySelectorAll<HTMLElement>('[role="dialog"]');
+      if (allDialogs.length > 0 && allDialogs[allDialogs.length - 1] !== panel) return;
+
       if (event.key === 'Escape') {
         // Stopped so it does not also close a dialog further out, or clear a filter
         // behind this one.

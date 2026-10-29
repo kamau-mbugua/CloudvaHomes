@@ -46,6 +46,7 @@ export function RemittanceDetailPage() {
   // How the landlord is paid: from the remittance when the server says, else their account.
   const account = useLandlordAccount(landlordId, canSeeLandlord && remittance.data?.payoutTo === undefined);
   const [dialog, setDialog] = useState<'pay' | 'cancel' | 'send' | 'resolve' | null>(null);
+  const [tab, setTab] = useState<'breakdown' | 'history'>('breakdown');
   const refresh = () => Promise.all(AFTER_LEDGER_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 
   const status = remittance.data?.status;
@@ -148,34 +149,47 @@ export function RemittanceDetailPage() {
         <section className="ag__card bk__payoutstate" aria-live="polite"><p className="bk__live"><span className="mp__spinner" aria-hidden="true" />Sending by M-Pesa…</p></section>
       ) : null}
 
-      <section className="ag__card ag__breakdown" aria-labelledby="rm-breakdown">
-        <h3 id="rm-breakdown">How the amount was worked out</h3>
-        <ul className="ag__lines">
-          {typeof r.broughtForward === 'number' ? <Line label="Brought forward" minor={r.broughtForward} /> : null}
-          <Line label="Collected from tenants" minor={r.collections} />
-          <Line label="Commission" minor={-Math.abs(r.commission)} />
-          <Line label="Expenses" minor={-Math.abs(r.expenses)} />
-          {r.adjustments ? <Line label="Adjustments" minor={r.adjustments} /> : null}
-          <li className="ag__line ag__line--edge">
-            <span className="ag__linelabel">{toLandlord ? 'To pay the landlord' : 'Landlord owes the agency'}</span>
-            <SignedAmount minor={r.net} />
-          </li>
-        </ul>
-        <p className="hint ag__note">{describeNet(r)}. Amounts in red reduce what the landlord is paid.</p>
-      </section>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Remittance sections">
+          <button type="button" role="tab" aria-selected={tab === 'breakdown'} className="pf__tab" onClick={() => setTab('breakdown')}>
+            Breakdown
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'history'} className="pf__tab" onClick={() => setTab('history')}>
+            History &amp; audit
+          </button>
+        </div>
+      </div>
 
-      <section className="fm__section">
-        <h2>History</h2>
-        <dl className="pf__facts">
-          <Fact label="Drafted">{r.draftedBy ? `${personLabel(r.draftedBy)} · ` : 'Automatically · '}{formatDateTime(r.createdAt)}</Fact>
-          <Fact label="Approved">{r.approvedAt ? `${personLabel(r.approvedBy)} · ${formatDateTime(r.approvedAt)}` : null}</Fact>
-          <Fact label="Paid">{r.paidAt ? `${personLabel(r.paidBy)} · ${formatDay(r.paidAt.slice(0, 10))}` : null}</Fact>
-          <Fact label="Method">{r.method ? PAYOUT_METHOD[r.method] ?? r.method : null}</Fact>
-          <Fact label="Reference">{r.reference ? <span className="num">{r.reference}</span> : null}</Fact>
-          <Fact label="Paid to">{r.payoutMasked ? <span className="num">{r.payoutMasked}</span> : null}</Fact>
-          {r.status === 'CANCELLED' ? <Fact label="Cancelled because" wide>{r.cancelledReason}</Fact> : null}
-        </dl>
-      </section>
+      {tab === 'breakdown' ? (
+        <section className="ag__card ag__breakdown" aria-labelledby="rm-breakdown">
+          <h3 id="rm-breakdown">How the amount was worked out</h3>
+          <ul className="ag__lines">
+            {typeof r.broughtForward === 'number' ? <Line label="Brought forward" minor={r.broughtForward} /> : null}
+            <Line label="Collected from tenants" minor={r.collections} />
+            <Line label="Commission" minor={-Math.abs(r.commission)} />
+            <Line label="Expenses" minor={-Math.abs(r.expenses)} />
+            {r.adjustments ? <Line label="Adjustments" minor={r.adjustments} /> : null}
+            <li className="ag__line ag__line--edge">
+              <span className="ag__linelabel">{toLandlord ? 'To pay the landlord' : 'Landlord owes the agency'}</span>
+              <SignedAmount minor={r.net} />
+            </li>
+          </ul>
+          <p className="hint ag__note">{describeNet(r)}. Amounts in red reduce what the landlord is paid.</p>
+        </section>
+      ) : (
+        <section className="fm__section">
+          <h2>History</h2>
+          <dl className="pf__facts">
+            <Fact label="Drafted">{r.draftedBy ? `${personLabel(r.draftedBy)} · ` : 'Automatically · '}{formatDateTime(r.createdAt)}</Fact>
+            <Fact label="Approved">{r.approvedAt ? `${personLabel(r.approvedBy)} · ${formatDateTime(r.approvedAt)}` : null}</Fact>
+            <Fact label="Paid">{r.paidAt ? `${personLabel(r.paidBy)} · ${formatDay(r.paidAt.slice(0, 10))}` : null}</Fact>
+            <Fact label="Method">{r.method ? PAYOUT_METHOD[r.method] ?? r.method : null}</Fact>
+            <Fact label="Reference">{r.reference ? <span className="num">{r.reference}</span> : null}</Fact>
+            <Fact label="Paid to">{r.payoutMasked ? <span className="num">{r.payoutMasked}</span> : null}</Fact>
+            {r.status === 'CANCELLED' ? <Fact label="Cancelled because" wide>{r.cancelledReason}</Fact> : null}
+          </dl>
+        </section>
+      )}
 
       {dialog === 'pay' ? <MarkPaidSheet remittance={r} onClose={() => setDialog(null)} /> : null}
       {dialog === 'cancel' ? <CancelSheet remittance={r} onClose={() => setDialog(null)} /> : null}

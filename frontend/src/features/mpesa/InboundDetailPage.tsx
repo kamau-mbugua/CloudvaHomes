@@ -37,6 +37,7 @@ export function InboundDetailPage() {
   const canUpdate = useCan('reconciliation:update');
   const canSeeTenants = useCan('tenants:view');
   const [dialog, setDialog] = useState<{ kind: 'assign'; tenant?: MpesaTenantRef } | { kind: 'ignore' } | null>(null);
+  const [tab, setTab] = useState<'details' | 'suggestions' | 'raw'>('details');
   const inbound = useInboundDetail(inboundId);
 
   if (inbound.isPending) return <p className="ad__muted" role="status">Loading…</p>;
@@ -103,22 +104,40 @@ export function InboundDetailPage() {
         </div>
       )}
 
-      <section className="fm__section">
-        <h2>Details</h2>
-        <dl className="pf__facts">
-          <Fact label="Amount"><span className="num">{formatKES(t.amount)}</span></Fact>
-          <Fact label={t.source.startsWith('BANK') ? 'Bank reference' : 'M-Pesa receipt'}><span className="num">{t.providerRef}</span></Fact>
-          <Fact label="Paid at">{formatDateTime(t.occurredAt)}</Fact>
-          <Fact label="Source"><Badge table={SOURCE} value={t.source} /></Fact>
-          <Fact label="Payer">{t.payerName}</Fact>
-          <Fact label="Payer’s phone">{t.payerPhone ? <span className="num">{t.payerPhone}</span> : null}</Fact>
-          <Fact label="Account reference">{t.accountRef ? <span className="num">{t.accountRef}</span> : null}</Fact>
-          <Fact label="Into">{t.channel.name}</Fact>
-          <Fact label="KodiHub was told">{formatDateTime(t.createdAt)}</Fact>
-        </dl>
-      </section>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Inbound transaction sections">
+          <button type="button" role="tab" aria-selected={tab === 'details'} className="pf__tab" onClick={() => setTab('details')}>
+            Details
+          </button>
+          {unmatched ? (
+            <button type="button" role="tab" aria-selected={tab === 'suggestions'} className="pf__tab" onClick={() => setTab('suggestions')}>
+              Might be ({suggestions.length})
+            </button>
+          ) : null}
+          <button type="button" role="tab" aria-selected={tab === 'raw'} className="pf__tab" onClick={() => setTab('raw')}>
+            Raw payload
+          </button>
+        </div>
+      </div>
 
-      {unmatched ? (
+      {tab === 'details' ? (
+        <section className="fm__section">
+          <h2>Details</h2>
+          <dl className="pf__facts">
+            <Fact label="Amount"><span className="num">{formatKES(t.amount)}</span></Fact>
+            <Fact label={t.source.startsWith('BANK') ? 'Bank reference' : 'M-Pesa receipt'}><span className="num">{t.providerRef}</span></Fact>
+            <Fact label="Paid at">{formatDateTime(t.occurredAt)}</Fact>
+            <Fact label="Source"><Badge table={SOURCE} value={t.source} /></Fact>
+            <Fact label="Payer">{t.payerName}</Fact>
+            <Fact label="Payer’s phone">{t.payerPhone ? <span className="num">{t.payerPhone}</span> : null}</Fact>
+            <Fact label="Account reference">{t.accountRef ? <span className="num">{t.accountRef}</span> : null}</Fact>
+            <Fact label="Into">{t.channel.name}</Fact>
+            <Fact label="KodiHub was told">{formatDateTime(t.createdAt)}</Fact>
+          </dl>
+        </section>
+      ) : null}
+
+      {unmatched && tab === 'suggestions' ? (
         <section className="fm__section">
           <div className="pf__sectionhead"><h2>Might be</h2></div>
           {suggestions.length === 0 ? (
@@ -141,13 +160,13 @@ export function InboundDetailPage() {
         </section>
       ) : null}
 
-      <section className="fm__section">
-        <details className="mp__raw">
-          <summary>What Safaricom sent</summary>
+      {tab === 'raw' ? (
+        <section className="fm__section">
+          <h2>What Safaricom sent</h2>
           <p className="hint">The notice exactly as received, kept unchanged for the record.</p>
           <pre className="num">{prettyJson(t.raw)}</pre>
-        </details>
-      </section>
+        </section>
+      ) : null}
 
       {dialog?.kind === 'assign' ? <AssignSheet inbound={t} suggestions={suggestions} initial={dialog.tenant} onClose={() => setDialog(null)} /> : null}
       {dialog?.kind === 'ignore' ? <IgnoreSheet inbound={t} onClose={() => setDialog(null)} /> : null}

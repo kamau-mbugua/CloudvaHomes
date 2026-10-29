@@ -383,31 +383,84 @@
 .nx-btn--danger { border-color: var(--destructive); color: var(--destructive); background: var(--card); }
 .nx-btn--danger:hover:not(:disabled) { background: var(--destructive-soft); }
 
-/* ---- sheets / dialogs ---------------------------------------------------- */
+/* ---- sheets / right-side drawers ----------------------------------------- */
+@keyframes nx-sheet-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 .nx-sheet {
-  position: fixed; inset: 0; z-index: 20;
+  position: fixed; inset: 0; z-index: 25;
   background: rgb(10 37 64 / 45%);
-  display: grid; place-items: center; padding: 16px;
+  display: flex; justify-content: flex-end; align-items: stretch;
+  padding: 0;
 }
+.nx-sheet--route { z-index: 18; }
+
 .nx-sheet__panel {
-  width: min(520px, 100%); max-height: 90vh; overflow-y: auto;
+  width: min(560px, 100vw);
+  height: 100vh; height: 100dvh; max-height: 100dvh;
+  overflow-y: auto;
   background: var(--popover); color: var(--popover-foreground);
-  border-radius: var(--radius-card); box-shadow: var(--shadow-lg);
-  padding: 24px; display: flex; flex-direction: column; gap: 16px;
+  border-left: 1px solid var(--border);
+  border-radius: 16px 0 0 16px;
+  box-shadow: -16px 0 48px rgb(9 14 22 / 24%);
+  padding: 24px;
+  display: flex; flex-direction: column; gap: 16px;
+  animation: nx-sheet-slide-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.nx-sheet__panel--wide { width: min(760px, 100%); }
-.nx-sheet__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.nx-sheet__panel--wide { width: min(820px, 100vw); }
+.nx-sheet__panel--xl { width: min(1020px, 100vw); }
+
+.nx-sheet__head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: -24px; z-index: 2;
+  background: var(--popover);
+  margin: -24px -24px 0;
+  padding: 18px 24px 14px;
+}
 .nx-sheet__head h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .nx-sheet__panel > p { margin: 0; color: var(--text-secondary); }
 .nx-sheet__error { margin: 0; color: var(--destructive); font-size: 13px; }
-.nx-sheet__actions { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.nx-sheet__actions {
+  display: grid; grid-template-columns: 1fr 2fr; gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  position: sticky; bottom: -24px; z-index: 2;
+  background: var(--popover);
+  margin-left: -24px; margin-right: -24px; margin-bottom: -24px;
+  padding: 14px 24px 18px;
+}
 
-/* Dialogs dock to the bottom edge on a phone, where the thumb is. */
+/* Detail & form pages rendered inside a right-side route drawer */
+.nx-sheet__panel--xl > .pg,
+.nx-sheet__panel--xl > .fm {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  width: 100%;
+}
+.nx-sheet__panel--xl .bc { display: none; }
+
 @media (max-width: 640px) {
-  .nx-sheet { place-items: end center; padding: 0; }
-  .nx-sheet__panel, .nx-sheet__panel--wide {
-    width: 100%; max-height: 92vh; max-height: 92dvh;
-    border-radius: 16px 16px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  .nx-sheet__panel, .nx-sheet__panel--wide, .nx-sheet__panel--xl {
+    width: 100vw;
+    border-radius: 0;
+    border-left: 0;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
   }
-  .nx-sheet__actions { grid-template-columns: 1fr 1fr; }
+  .nx-sheet__head {
+    top: -20px;
+    margin: -20px -16px 0;
+    padding: 16px;
+  }
+  .nx-sheet__actions {
+    grid-template-columns: 1fr 1fr;
+    bottom: -20px;
+    margin-left: -16px; margin-right: -16px; margin-bottom: -20px;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  }
 }
