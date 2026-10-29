@@ -406,10 +406,7 @@ export class NotificationsService {
    * Sent whenever a tenant is assigned to a house / unit (1st unit, additional units in the
    * same property, or units across different properties).
    */
-  async sendTenantUnitAssigned(
-    to: Recipient,
-    p: TenantUnitAssignedEmailPayload,
-  ): Promise<void> {
+  async sendTenantUnitAssigned(to: Recipient, p: TenantUnitAssignedEmailPayload): Promise<void> {
     if (!to.email) return;
     const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
     const rendered = await this.renderSystemEmailTemplate('tenant_unit_assigned', {
@@ -425,10 +422,7 @@ export class NotificationsService {
   /**
    * Sent whenever a Move-In, Monthly, or Ad-hoc invoice is issued for a tenant.
    */
-  async sendTenantInvoiceIssued(
-    to: Recipient,
-    p: TenantInvoiceEmailPayload,
-  ): Promise<void> {
+  async sendTenantInvoiceIssued(to: Recipient, p: TenantInvoiceEmailPayload): Promise<void> {
     if (!to.email) return;
     const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
     const rendered = await this.renderSystemEmailTemplate('tenant_invoice', {

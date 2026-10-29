@@ -4,10 +4,7 @@ import { AppError } from '../../../common/errors/app-error.js';
 import type { InvoiceKind } from '../../../generated/prisma/client.js';
 import type { Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
-import {
-  formatKesMinor,
-  NotificationsService,
-} from '../../notifications/notifications.service.js';
+import { formatKesMinor, NotificationsService } from '../../notifications/notifications.service.js';
 import { nextCode } from '../../portfolio/codes.js';
 import { addDays, balanceOf } from '../billing-math.js';
 import type { DraftLine } from './invoice-builder.js';
@@ -186,11 +183,7 @@ export class InvoiceIssuer {
       const unit = fullInvoice.tenancy.unit;
       const orgName = org?.name ?? 'KodiHub';
       const kindLabel =
-        r.kind === 'MOVE_IN'
-          ? 'Move-in'
-          : r.kind === 'ADHOC'
-            ? 'Ad-hoc / Adjustment'
-            : 'Monthly';
+        r.kind === 'MOVE_IN' ? 'Move-in' : r.kind === 'ADHOC' ? 'Ad-hoc / Adjustment' : 'Monthly';
 
       const linesSummary = r.lines
         .map((l) => `- ${l.description}: KES ${formatKesMinor(l.amount)}`)

@@ -12,10 +12,7 @@ import { violatesUnique } from '../../../prisma/errors.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
-import {
-  formatKesMinor,
-  NotificationsService,
-} from '../../notifications/notifications.service.js';
+import { formatKesMinor, NotificationsService } from '../../notifications/notifications.service.js';
 import { tenancyScope } from '../property-scope.js';
 import { mapTenantConflict, TenantsService } from '../tenants/tenants.service.js';
 import { CURRENT, lockUnit, UnitsService } from '../units/units.service.js';

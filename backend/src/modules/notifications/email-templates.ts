@@ -23,10 +23,7 @@ export interface EmailTemplateDefinition {
   key: EmailTemplateKey;
   name: string;
   category:
-    | 'Onboarding & Invitations'
-    | 'Platform Billing'
-    | 'Security & Access'
-    | 'Tenant Communications';
+    'Onboarding & Invitations' | 'Platform Billing' | 'Security & Access' | 'Tenant Communications';
   description: string;
   defaultSubject: string;
   defaultBody: string;
@@ -370,7 +367,8 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     category: 'Tenant Communications',
     description:
       'Sent every time a tenant is assigned to a house/unit (including additional units in the same property or across different properties, and during CSV import).',
-    defaultSubject: 'You have been added to {{propertyName}} (Unit {{unitNumber}}) — {{organizationName}}',
+    defaultSubject:
+      'You have been added to {{propertyName}} (Unit {{unitNumber}}) — {{organizationName}}',
     defaultBody:
       'Hi {{firstName}},\n\n' +
       'You have been assigned to Unit {{unitNumber}} at {{propertyName}} managed by {{organizationName}}.\n\n' +
@@ -478,7 +476,11 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       { key: 'period', description: 'Billing month (YYYY-MM)', sample: '2026-10' },
       { key: 'propertyName', description: 'Property name', sample: 'Ivory Breeze Apartments' },
       { key: 'unitNumber', description: 'Unit / house number', sample: 'A1' },
-      { key: 'issueDate', description: 'Date invoice was issued (YYYY-MM-DD)', sample: '2026-10-01' },
+      {
+        key: 'issueDate',
+        description: 'Date invoice was issued (YYYY-MM-DD)',
+        sample: '2026-10-01',
+      },
       { key: 'dueDate', description: 'Date payment is due (YYYY-MM-DD)', sample: '2026-10-08' },
       {
         key: 'linesSummary',

@@ -269,7 +269,16 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
 
     // List system email templates
     const templates = (await get(admin, '/platform/email/templates')).data;
-    expect(templates.length).toBe(6);
+    expect(templates.length).toBe(10);
+    const templateKeys = templates.map((tpl: any) => tpl.key);
+    expect(templateKeys).toEqual(
+      expect.arrayContaining([
+        'tenant_welcome',
+        'tenant_added_to_org',
+        'tenant_unit_assigned',
+        'tenant_invoice',
+      ]),
+    );
     const ownerWelcomeTpl = templates.find((tpl: any) => tpl.key === 'owner_welcome');
     expect(ownerWelcomeTpl).toBeDefined();
     expect(ownerWelcomeTpl.customized).toBe(false);
