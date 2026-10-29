@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { currentContext, withoutOrgScope } from '../../common/context/request-context.js';
 import {
   formatDateOnly,
@@ -8,6 +8,7 @@ import {
 import { AppError } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
+import { money } from '../../common/pdf/pdf.js';
 import type {
   Organization,
   Plan,
@@ -19,6 +20,7 @@ import { violatesUnique } from '../../prisma/errors.js';
 import { DB, type Db, type Tx } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
 import { addDays, invoiceStatus, todayInNairobi } from '../billing/billing-math.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { monthBounds } from '../reports/report-math.js';
 import { platformTotal, previousPeriod, statusFor, type OrgStatus } from './platform-math.js';
 import type { ListPlatformInvoicesDto, ListPlatformPaymentsDto } from './platform.dto.js';
@@ -34,6 +36,7 @@ export class PlatformBillingService {
   constructor(
     @Inject(DB) private readonly prisma: Db,
     private readonly audit: AuditService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   settings() {
@@ -89,17 +92,17 @@ export class PlatformBillingService {
   private async billOrg(orgId: string, period: string): Promise<boolean> {
     const { end } = monthBounds(period);
     const settings = await this.settings();
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT 1 FROM "organizations" WHERE "id" = ${orgId}::uuid FOR UPDATE`;
       const org = await tx.organization.findUniqueOrThrow({ where: { id: orgId } });
-      if (org.trialEndsAt && org.trialEndsAt >= end) return false; // the whole month was trial
+      if (org.trialEndsAt && org.trialEndsAt >= end) return null; // the whole month was trial
       if (await tx.platformInvoice.count({ where: { orgId, period, status: { not: 'VOID' } } }))
-        return false;
+        return null;
       const plan = org.planId ? await tx.plan.findUnique({ where: { id: org.planId } }) : null;
       const price = this.price(org, plan);
       const units = await this.occupiedUnits(tx, orgId, end);
       const total = platformTotal(units, price.pricePerUnit, price.minimumMonthly);
-      if (total === 0n) return false;
+      if (total === 0n) return null;
       const today = parseDateOnly(todayInNairobi());
       const [{ n }] = await tx.$queryRaw<
         { n: bigint }[]
@@ -129,8 +132,55 @@ export class PlatformBillingService {
         tx,
       );
       await this.applyCredit(tx, orgId);
-      return true;
+      const finalInv = await tx.platformInvoice.findUniqueOrThrow({ where: { id: inv.id } });
+      return { inv: finalInv, org };
     });
+
+    if (!created) return false;
+
+    if (this.notifications) {
+      try {
+        const ownerMembership = await this.prisma.membership.findFirst({
+          where: {
+            orgId,
+            status: { in: ['ACTIVE', 'INVITED'] },
+            role: { systemKey: 'OWNER' },
+          },
+          include: { user: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        const recipientEmail = ownerMembership?.user.email ?? created.org.email ?? null;
+        if (recipientEmail) {
+          const { inv, org } = created;
+          const balance = inv.total - inv.amountPaid;
+          await this.notifications.sendPlatformInvoiceIssued(
+            { email: recipientEmail },
+            {
+              ownerFirstName: ownerMembership?.user.firstName ?? null,
+              organizationName: org.name,
+              billingRef: org.billingRef,
+              invoiceNumber: inv.number,
+              period: inv.period,
+              occupiedUnits: inv.occupiedUnits,
+              rateKes: money(inv.rate),
+              minimumKes: money(inv.minimum),
+              totalKes: money(inv.total),
+              amountPaidKes: money(inv.amountPaid),
+              balanceKes: money(balance > 0n ? balance : 0n),
+              dueDate: formatDateOnly(inv.dueDate),
+              paybill: settings.paybill ?? null,
+            },
+          );
+        }
+      } catch (err) {
+        this.log.warn(
+          { err, orgId, invoiceId: created.inv.id },
+          'Platform invoice email delivery failed',
+        );
+      }
+    }
+
+    return true;
   }
 
   voidInvoice(id: string, reason: string) {

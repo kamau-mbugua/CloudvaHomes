@@ -22,6 +22,34 @@ export interface Recipient {
   phone?: string | null;
 }
 
+export interface OwnerWelcomeBilling {
+  billingRef: string | null;
+  planName: string | null;
+  pricePerUnitKes: string;
+  minimumMonthlyKes: string;
+  trialEndsAt: string | null;
+  firstPaidDate: string;
+  firstInvoiceDate: string;
+  dueDays: number;
+  paybill: string | null;
+}
+
+export interface PlatformInvoiceEmailPayload {
+  ownerFirstName?: string | null;
+  organizationName: string;
+  billingRef: string | null;
+  invoiceNumber: string;
+  period: string;
+  occupiedUnits: number;
+  rateKes: string;
+  minimumKes: string;
+  totalKes: string;
+  amountPaidKes: string;
+  balanceKes: string;
+  dueDate: string;
+  paybill: string | null;
+}
+
 export function isAllowedByAllowlist(
   email: string,
   allowlistRaw: string | null | undefined,
@@ -86,20 +114,48 @@ export class NotificationsService {
 
   async sendInvitation(
     to: Recipient,
-    p: { firstName: string; organizationName: string; inviterName: string | null; token: string },
+    p: {
+      firstName: string;
+      organizationName: string;
+      inviterName: string | null;
+      token: string;
+      ownerBilling?: OwnerWelcomeBilling;
+    },
   ): Promise<void> {
     const link = `${this.env.APP_URL.replace(/\/$/, '')}/invite/${p.token}`;
     const by = p.inviterName ? `${p.inviterName} invited you` : 'You have been invited';
     const tasks: Promise<void>[] = [];
     if (to.email) {
+      const signInId = [to.email, to.phone].filter(Boolean).join(' or ');
+      const ob = p.ownerBilling;
+      const billingBlock = ob
+        ? `\n\n--- Login & Account Setup ---\n` +
+          `Sign-in identifier: ${signInId}\n` +
+          `Set password & sign in: ${link}\n` +
+          `\n--- Subscription & Free Trial ---\n` +
+          `Plan: ${ob.planName ?? 'Custom'}\n` +
+          `Rate: KES ${ob.pricePerUnitKes} per let unit / month (monthly minimum KES ${ob.minimumMonthlyKes})\n` +
+          (ob.trialEndsAt
+            ? `Free trial ends: ${ob.trialEndsAt}\n` +
+              `Paid billing starts: ${ob.firstPaidDate} (first invoice issued on ${ob.firstInvoiceDate}, due within ${ob.dueDays} days)\n`
+            : `First invoice issued on: ${ob.firstInvoiceDate} (due within ${ob.dueDays} days)\n`) +
+          (ob.billingRef
+            ? `Billing account reference: ${ob.billingRef}` +
+              (ob.paybill ? ` (M-Pesa Paybill ${ob.paybill})` : '') +
+              `\n`
+            : '')
+        : '';
       tasks.push(
         this.dispatchEmail(
           {
             to: to.email,
-            subject: `Join ${p.organizationName} on Hodi`,
+            subject: ob
+              ? `Welcome to Hodi — Set up ${p.organizationName}`
+              : `Join ${p.organizationName} on Hodi`,
             text:
               `Hi ${p.firstName},\n\n${by} to join ${p.organizationName} on Hodi.\n\n` +
-              `Accept the invitation: ${link}\n\nThe link expires in 7 days.`,
+              `Accept the invitation: ${link}\n\nThe link expires in 7 days.` +
+              billingBlock,
           },
           'invitation',
         ),
@@ -120,6 +176,37 @@ export class NotificationsService {
       );
       if (failed.length === results.length) throw new Error('Invitation could not be delivered');
     }
+  }
+
+  /** Monthly Hodi platform invoice notification to the organisation owner. */
+  async sendPlatformInvoiceIssued(to: Recipient, p: PlatformInvoiceEmailPayload): Promise<void> {
+    if (!to.email) return;
+    const appUrl = this.env.APP_URL.replace(/\/$/, '');
+    const greeting = p.ownerFirstName ? `Hi ${p.ownerFirstName},` : `Hello ${p.organizationName},`;
+    const payInstructions =
+      p.paybill && p.billingRef
+        ? `Pay via M-Pesa Paybill ${p.paybill}, Account ${p.billingRef}, or in Hodi under Settings -> Plan & billing (${appUrl}/settings/billing).`
+        : `Pay in Hodi under Settings -> Plan & billing (${appUrl}/settings/billing).`;
+    const text =
+      `${greeting}\n\n` +
+      `Your Hodi subscription invoice ${p.invoiceNumber} for ${p.organizationName} (period ${p.period}) has been issued.\n\n` +
+      `--- Invoice Summary ---\n` +
+      `Invoice number: ${p.invoiceNumber}\n` +
+      `Billing period: ${p.period}\n` +
+      `Let (occupied) units: ${p.occupiedUnits} @ KES ${p.rateKes} / unit (minimum KES ${p.minimumKes})\n` +
+      `Total billed: KES ${p.totalKes}\n` +
+      `Credit / paid applied: KES ${p.amountPaidKes}\n` +
+      `Balance due: KES ${p.balanceKes}\n` +
+      `Due date: ${p.dueDate}\n\n` +
+      `${payInstructions}`;
+    await this.dispatchEmail(
+      {
+        to: to.email,
+        subject: `Hodi Invoice ${p.invoiceNumber} (${p.period}) — ${p.organizationName}`,
+        text,
+      },
+      'platform_invoice',
+    );
   }
 
   /**

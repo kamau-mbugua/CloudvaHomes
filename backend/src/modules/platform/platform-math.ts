@@ -1,6 +1,29 @@
+import { formatDateOnly, parseDateOnly } from '../../common/dates/date-only.js';
+import { addDays } from '../billing/billing-math.js';
+import { monthBounds } from '../reports/report-math.js';
+
 /** Pure platform-billing rules. */
 
 export type OrgStatus = 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'CLOSED';
+
+/**
+ * Computes when an organisation's paid subscription starts (`firstPaidDate`) and when its first
+ * monthly Hodi invoice will be issued (`firstInvoiceDate`, the 1st of the month following the
+ * first billable calendar month).
+ */
+export function firstPlatformBillingDates(
+  trialEndsAt: Date | null,
+  today: string,
+): { firstPaidDate: string; firstBillablePeriod: string; firstInvoiceDate: string } {
+  const trialStr = trialEndsAt ? formatDateOnly(trialEndsAt) : null;
+  const firstPaid =
+    trialEndsAt && trialStr && trialStr >= today ? addDays(trialEndsAt, 1) : parseDateOnly(today);
+  const firstPaidDate = formatDateOnly(firstPaid);
+  const firstBillablePeriod = firstPaidDate.slice(0, 7);
+  const { end } = monthBounds(firstBillablePeriod);
+  const firstInvoiceDate = formatDateOnly(addDays(end, 1));
+  return { firstPaidDate, firstBillablePeriod, firstInvoiceDate };
+}
 
 /** The month's Hodi charge: units × price, never below the minimum. */
 export function platformTotal(units: number, rate: bigint, minimum: bigint): bigint {

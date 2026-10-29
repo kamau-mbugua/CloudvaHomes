@@ -1,4 +1,6 @@
 import { todayInNairobi } from '../src/modules/billing/billing-math.js';
+import { outbox } from '../src/modules/notifications/senders.js';
+import { previousPeriod } from '../src/modules/platform/platform-math.js';
 import {
   auth,
   createPlatformAdmin,
@@ -174,12 +176,58 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     expect(step2.body.data.user.isPlatformAdmin).toBe(true);
   });
 
-  it('configures Email SMTP settings, sends test & broadcast emails, and records PlatformEmailLog entries', async () => {
-    await onboardOrg(t, admin, {
+  it('configures Email SMTP settings, sends owner welcome + platform invoice + test + broadcast emails, and records PlatformEmailLog entries', async () => {
+    await post(
+      admin,
+      '/platform/plans',
+      { name: 'Standard', pricePerUnit: 25000, minimumMonthly: 100000, isDefault: true },
+      201,
+    );
+    await put(admin, '/platform/settings', { paybill: '4091234' });
+
+    const { orgId } = await onboardOrg(t, admin, {
       name: 'Kilimani Estates',
       ownerEmail: 'owner@kilimani.test',
       ownerPhone: '+254711222333',
     });
+
+    // Verify owner welcome email includes login details, plan, trial end date, first invoice date, and billing ref
+    const welcomeEmail = outbox.find(
+      (m): m is Extract<(typeof outbox)[number], { channel: 'email' }> =>
+        m.channel === 'email' && m.to === 'owner@kilimani.test',
+    );
+    expect(welcomeEmail).toBeDefined();
+    expect(welcomeEmail!.subject).toContain('Welcome to Hodi — Set up Kilimani Estates');
+    expect(welcomeEmail!.text).toContain(
+      'Sign-in identifier: owner@kilimani.test or +254711222333',
+    );
+    expect(welcomeEmail!.text).toContain('Plan: Standard');
+    expect(welcomeEmail!.text).toContain(
+      'Rate: KES 250.00 per let unit / month (monthly minimum KES 1,000.00)',
+    );
+    expect(welcomeEmail!.text).toContain('Free trial ends:');
+    expect(welcomeEmail!.text).toContain('first invoice issued on');
+    expect(welcomeEmail!.text).toMatch(
+      /Billing account reference: H\d{5} \(M-Pesa Paybill 4091234\)/,
+    );
+
+    // Move trial end into the past and run monthly billing -> owner receives platform_invoice email
+    await patch(admin, `/platform/organizations/${orgId}`, { trialEndsAt: '2025-01-01' });
+    const lastMonth = previousPeriod(todayInNairobi());
+    const runRes = await post(admin, '/platform/invoices/run', { period: lastMonth });
+    expect(runRes.data.created).toBe(1);
+
+    const invoiceEmail = outbox.find(
+      (m): m is Extract<(typeof outbox)[number], { channel: 'email' }> =>
+        m.channel === 'email' &&
+        m.to === 'owner@kilimani.test' &&
+        m.subject.includes(`(${lastMonth})`),
+    );
+    expect(invoiceEmail).toBeDefined();
+    expect(invoiceEmail!.text).toContain(`Billing period: ${lastMonth}`);
+    expect(invoiceEmail!.text).toContain('Total billed: KES 1,000.00');
+    expect(invoiceEmail!.text).toContain('Balance due: KES 1,000.00');
+    expect(invoiceEmail!.text).toMatch(/Pay via M-Pesa Paybill 4091234, Account H\d{5}/);
 
     // Save SMTP settings
     const smtp = (
@@ -210,11 +258,12 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     expect(broadcastRes.data.total).toBe(1);
     expect(broadcastRes.data.sent).toBe(1);
 
-    // Verify email logs recorded the invitation, test, and broadcast emails
+    // Verify email logs recorded the invitation, platform_invoice, test, and broadcast emails
     const logs = await get(admin, '/platform/email/logs');
-    expect(logs.data.length).toBeGreaterThanOrEqual(3);
+    expect(logs.data.length).toBeGreaterThanOrEqual(4);
     const kinds = logs.data.map((l: any) => l.kind);
     expect(kinds).toContain('invitation');
+    expect(kinds).toContain('platform_invoice');
     expect(kinds).toContain('test');
     expect(kinds).toContain('broadcast');
   });

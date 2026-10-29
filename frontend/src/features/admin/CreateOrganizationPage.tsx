@@ -12,8 +12,11 @@ import { Breadcrumbs, Field } from '../portfolio/ui';
 import { keys, platformErrorMessage, usePlans, usePlatformOperators } from '../platform/api';
 
 interface CreateOrgResponse {
-  organization: { id: string; name: string; kind: OrgKind; status: string };
-  ownerInvitation: { id: string; email: string; phone: string; expiresAt: string };
+  id?: string;
+  name?: string;
+  invitationDelivered?: boolean;
+  organization?: { id: string; name: string; kind: OrgKind; status: string };
+  ownerInvitation?: { id: string; email: string; phone: string; expiresAt: string };
 }
 
 /**
@@ -51,9 +54,16 @@ export function CreateOrganizationPage() {
     mutationFn: (body: Record<string, unknown>) =>
       api.post<unknown>('/platform/organizations', body).then((res) => unwrap<CreateOrgResponse>(res)),
     onSuccess: async (res) => {
-      toast.saved(`${res.organization.name} created and owner invitation sent to ${res.ownerInvitation.email}.`);
+      const orgId = res.id ?? res.organization?.id ?? '';
+      const orgName = res.name ?? res.organization?.name ?? name.trim();
+      const targetEmail = res.ownerInvitation?.email ?? ownerEmail.trim();
+      toast.saved(
+        res.invitationDelivered === false
+          ? `${orgName} created (invitation email could not be delivered — check Email settings).`
+          : `${orgName} created and owner invitation sent to ${targetEmail}.`,
+      );
       await queryClient.invalidateQueries({ queryKey: keys.platform });
-      navigate(`/admin/organizations/${encodeURIComponent(res.organization.id)}`);
+      navigate(`/admin/organizations/${encodeURIComponent(orgId)}`);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.status === 422 && Object.keys(error.fieldErrors).length > 0) {

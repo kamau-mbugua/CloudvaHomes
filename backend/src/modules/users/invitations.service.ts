@@ -1,13 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { formatDateOnlyOrNull } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { withoutOrgScope } from '../../common/context/request-context.js';
+import { money } from '../../common/pdf/pdf.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { Tx } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
 import { hashPassword, randomToken, sha256 } from '../auth/crypto.js';
 import { passwordProblem } from '../auth/identifiers.js';
 import { type IssuedSession, SessionsService } from '../auth/sessions.service.js';
-import { NotificationsService } from '../notifications/notifications.service.js';
+import { todayInNairobi } from '../billing/billing-math.js';
+import {
+  NotificationsService,
+  type OwnerWelcomeBilling,
+} from '../notifications/notifications.service.js';
+import { firstPlatformBillingDates } from '../platform/platform-math.js';
 
 export const INVITATION_TTL_DAYS = 7;
 
@@ -117,12 +124,38 @@ export class InvitationsService {
   async deliver(membershipId: string, token: string): Promise<boolean> {
     const m = await this.prisma.membership.findUniqueOrThrow({
       where: { id: membershipId },
-      include: { user: true, organization: true },
+      include: { user: true, organization: true, role: true },
     });
     const invitation = await this.prisma.invitation.findUnique({
       where: { tokenHash: sha256(token) },
       include: { invitedBy: true },
     });
+    let ownerBilling: OwnerWelcomeBilling | undefined;
+    if (m.role.systemKey === 'OWNER') {
+      const [plan, settings] = await Promise.all([
+        m.organization.planId
+          ? this.prisma.plan.findUnique({ where: { id: m.organization.planId } })
+          : null,
+        this.prisma.platformSettings.findUnique({ where: { id: 1 } }),
+      ]);
+      const pricePerUnit = m.organization.priceOverride ?? plan?.pricePerUnit ?? 0n;
+      const minimumMonthly = m.organization.minimumOverride ?? plan?.minimumMonthly ?? 0n;
+      const { firstPaidDate, firstInvoiceDate } = firstPlatformBillingDates(
+        m.organization.trialEndsAt,
+        todayInNairobi(),
+      );
+      ownerBilling = {
+        billingRef: m.organization.billingRef,
+        planName: plan?.name ?? null,
+        pricePerUnitKes: money(pricePerUnit),
+        minimumMonthlyKes: money(minimumMonthly),
+        trialEndsAt: formatDateOnlyOrNull(m.organization.trialEndsAt),
+        firstPaidDate,
+        firstInvoiceDate,
+        dueDays: settings?.dueDays ?? 10,
+        paybill: settings?.paybill ?? null,
+      };
+    }
     try {
       await this.notifications.sendInvitation(
         { email: m.user.email, phone: m.user.phone },
@@ -133,6 +166,7 @@ export class InvitationsService {
             ? `${invitation.invitedBy.firstName} ${invitation.invitedBy.lastName}`
             : null,
           token,
+          ownerBilling,
         },
       );
       return true;

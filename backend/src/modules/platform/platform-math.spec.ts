@@ -1,4 +1,10 @@
-import { platformTotal, previousPeriod, statusFor } from './platform-math.js';
+import { parseDateOnly } from '../../common/dates/date-only.js';
+import {
+  firstPlatformBillingDates,
+  platformTotal,
+  previousPeriod,
+  statusFor,
+} from './platform-math.js';
 
 describe('platform billing rules', () => {
   it('charges units × price with a minimum', () => {
@@ -37,5 +43,23 @@ describe('platform billing rules', () => {
     expect(
       statusFor({ ...base, oldestOverdueDue: '2026-10-01', noSuspendUntil: '2026-11-19' }),
     ).toBe('SUSPENDED');
+  });
+
+  it('computes first paid date and first platform invoice date after free trial', () => {
+    expect(firstPlatformBillingDates(parseDateOnly('2026-11-28'), '2026-10-29')).toEqual({
+      firstPaidDate: '2026-11-29',
+      firstBillablePeriod: '2026-11',
+      firstInvoiceDate: '2026-12-01',
+    });
+    expect(firstPlatformBillingDates(parseDateOnly('2026-11-30'), '2026-10-31')).toEqual({
+      firstPaidDate: '2026-12-01',
+      firstBillablePeriod: '2026-12',
+      firstInvoiceDate: '2027-01-01',
+    });
+    expect(firstPlatformBillingDates(null, '2026-10-29')).toEqual({
+      firstPaidDate: '2026-10-29',
+      firstBillablePeriod: '2026-10',
+      firstInvoiceDate: '2026-11-01',
+    });
   });
 });
