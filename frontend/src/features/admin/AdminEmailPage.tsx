@@ -10,19 +10,20 @@ import { Pager } from '../../components/Pager';
 import { unwrap } from '../payments/rules';
 import { useListFilters } from '../portfolio/hooks';
 import { Field } from '../portfolio/ui';
-import { PAGE_SIZE, keys, platformErrorMessage, usePlatformEmailSettings } from '../platform/api';
-import type { PlatformEmailLog, PlatformEmailSettings } from '../platform/types';
+import { PAGE_SIZE, keys, platformErrorMessage, usePlatformEmailSettings, usePlatformEmailTemplates } from '../platform/api';
+import type { PlatformEmailLog, PlatformEmailSettings, PlatformEmailTemplate } from '../platform/types';
 
-type EmailTab = 'settings' | 'broadcast' | 'logs';
+type EmailTab = 'settings' | 'templates' | 'broadcast' | 'logs';
 
 /**
- * Admin → Email & Logs (`/admin/email`): SMTP configuration, test sender, broadcast to
- * active organisation owners, and searchable delivery logs (`platform_email_logs`).
+ * Admin → Email & Logs (`/admin/email`): SMTP configuration, system email templates,
+ * broadcast to active organisation owners, and searchable delivery logs (`platform_email_logs`).
  */
 export function AdminEmailPage() {
   const filters = useListFilters();
   const rawTab = filters.get('tab');
-  const tab: EmailTab = rawTab === 'broadcast' || rawTab === 'logs' ? rawTab : 'settings';
+  const tab: EmailTab =
+    rawTab === 'templates' || rawTab === 'broadcast' || rawTab === 'logs' ? rawTab : 'settings';
 
   return (
     <div className="pg">
@@ -36,6 +37,15 @@ export function AdminEmailPage() {
             onClick={() => filters.setFilter({ tab: '' })}
           >
             SMTP settings
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'templates'}
+            className="pf__tab"
+            onClick={() => filters.setFilter({ tab: 'templates' })}
+          >
+            Email templates
           </button>
           <button
             type="button"
@@ -58,7 +68,15 @@ export function AdminEmailPage() {
         </div>
       </div>
 
-      {tab === 'settings' ? <EmailSettingsTab /> : tab === 'broadcast' ? <BroadcastTab /> : <EmailLogsTab />}
+      {tab === 'settings' ? (
+        <EmailSettingsTab />
+      ) : tab === 'templates' ? (
+        <EmailTemplatesTab />
+      ) : tab === 'broadcast' ? (
+        <BroadcastTab />
+      ) : (
+        <EmailLogsTab />
+      )}
     </div>
   );
 }
@@ -240,6 +258,372 @@ function TestEmailSection({ configured }: { configured: boolean }) {
         </button>
       </div>
     </form>
+  );
+}
+
+function interpolateSample(template: string, sampleMap: Record<string, string>): string {
+  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (full, key: string) =>
+    Object.prototype.hasOwnProperty.call(sampleMap, key) ? sampleMap[key]! : full,
+  );
+}
+
+function EmailTemplatesTab() {
+  const query = usePlatformEmailTemplates();
+  const [selectedKey, setSelectedKey] = useState<string>('owner_welcome');
+
+  if (query.isPending) return <p className="ad__muted" role="status">Loading email templates…</p>;
+  if (query.isError) return <p className="ad__error" role="alert">{platformErrorMessage(query.error)}</p>;
+
+  const templates = query.data ?? [];
+  const active = templates.find((t) => t.key === selectedKey) ?? templates[0];
+
+  if (!active) {
+    return (
+      <div className="ad__tablewrap">
+        <EmptyState title="No email templates found" detail="System email templates will appear here." />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: '1.25rem' }}>
+      <div className="fm__section" style={{ padding: '1rem 1.25rem' }}>
+        <div className="mp__cardhead" style={{ marginBottom: '0.5rem' }}>
+          <div>
+            <h2>System email templates</h2>
+            <p style={{ margin: '0.25rem 0 0 0' }}>
+              Control the subject and message body for every automated email KodiHub sends. Use{' '}
+              <code>{'{{variable}}'}</code> placeholders to insert dynamic organisation, user, and invoice details.
+            </p>
+          </div>
+          <span className="ad__badge ad__badge--info">
+            {templates.filter((t) => t.customized).length} of {templates.length} customised
+          </span>
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Select an email template"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gap: '0.6rem',
+            marginTop: '0.75rem',
+          }}
+        >
+          {templates.map((tpl) => {
+            const isSelected = tpl.key === active.key;
+            return (
+              <button
+                key={tpl.key}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                onClick={() => setSelectedKey(tpl.key)}
+                style={{
+                  textAlign: 'left',
+                  padding: '0.75rem 0.9rem',
+                  borderRadius: '10px',
+                  border: isSelected ? '2px solid #3f6212' : '1px solid var(--border, #e5e5e0)',
+                  background: isSelected ? 'rgba(63, 98, 18, 0.06)' : 'var(--surface, #fff)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.3rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', opacity: 0.7 }}>
+                    {tpl.category}
+                  </span>
+                  <span className={`ad__badge ${tpl.customized ? 'ad__badge--ok' : 'ad__badge--off'}`}>
+                    {tpl.customized ? 'Customised' : 'Default'}
+                  </span>
+                </div>
+                <strong style={{ fontSize: '0.92rem' }}>{tpl.name}</strong>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <EmailTemplateEditor
+        key={`${active.key}-${active.updatedAt ?? 'default'}-${active.subject}-${active.body}`}
+        template={active}
+      />
+    </div>
+  );
+}
+
+function EmailTemplateEditor({ template }: { template: PlatformEmailTemplate }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const [subject, setSubject] = useState(template.subject);
+  const [body, setBody] = useState(template.body);
+  const [testTo, setTestTo] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  const sampleMap = Object.fromEntries(template.variables.map((v) => [v.key, v.sample]));
+  const previewSubject = interpolateSample(subject, sampleMap);
+  const previewBody = interpolateSample(body, sampleMap);
+  const isDirty = subject !== template.subject || body !== template.body;
+  const differsFromDefault = subject !== template.defaultSubject || body !== template.defaultBody;
+
+  const save = useMutation({
+    mutationFn: (payload: { subject?: string; body?: string; reset?: boolean }) =>
+      api
+        .put<unknown>(`/platform/email/templates/${encodeURIComponent(template.key)}`, payload)
+        .then((res) => unwrap<PlatformEmailTemplate>(res)),
+    onSuccess: async (updated, vars) => {
+      toast.saved(vars.reset ? `${template.name} reset to default.` : `${template.name} saved.`);
+      setSubject(updated.subject);
+      setBody(updated.body);
+      await queryClient.invalidateQueries({ queryKey: keys.emailTemplates });
+    },
+    onError: (e) => {
+      setError(platformErrorMessage(e));
+    },
+  });
+
+  const sendTest = useMutation({
+    mutationFn: (to: string) =>
+      api
+        .post<unknown>(`/platform/email/templates/${encodeURIComponent(template.key)}/test`, {
+          to,
+          subject: subject.trim(),
+          body: body.trim(),
+        })
+        .then((res) => unwrap<{ sent: boolean; to: string; subject: string }>(res)),
+    onSuccess: async (res) => {
+      toast.saved(`Sample "${template.name}" email sent to ${res.to}.`);
+      setTestTo('');
+      await queryClient.invalidateQueries({ queryKey: keys.emailLogs });
+    },
+    onError: async (e) => {
+      await queryClient.invalidateQueries({ queryKey: keys.emailLogs });
+      setTestError(platformErrorMessage(e));
+    },
+  });
+
+  const handleSave = (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    if (subject.trim().length < 2 || body.trim().length < 2) {
+      setError('Both subject and email body are required.');
+      return;
+    }
+    save.mutate({ subject: subject.trim(), body: body.trim() });
+  };
+
+  const handleReset = () => {
+    setError(null);
+    setSubject(template.defaultSubject);
+    setBody(template.defaultBody);
+    if (template.customized) {
+      save.mutate({ reset: true });
+    }
+  };
+
+  const handleInsertVariable = (varKey: string) => {
+    const token = `{{${varKey}}}`;
+    setBody((prev) => (prev.endsWith(' ') || prev.endsWith('\n') || !prev ? `${prev}${token}` : `${prev} ${token}`));
+  };
+
+  const handleSendTest = (event: FormEvent) => {
+    event.preventDefault();
+    setTestError(null);
+    if (!testTo.trim() || !testTo.includes('@')) {
+      setTestError('Enter a valid recipient email address.');
+      return;
+    }
+    sendTest.mutate(testTo.trim());
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
+      <form className="fm__section" onSubmit={handleSave} noValidate style={{ margin: 0 }}>
+        <div className="mp__cardhead">
+          <div>
+            <h2>{template.name}</h2>
+            <p style={{ margin: '0.25rem 0 0 0' }}>{template.description}</p>
+          </div>
+          <div className="mp__badges">
+            <span className={`ad__badge ${template.customized ? 'ad__badge--ok' : 'ad__badge--off'}`}>
+              {template.customized ? 'Customised' : 'System default'}
+            </span>
+          </div>
+        </div>
+
+        <div className="fm__grid">
+          <Field id="et-subject" label="Email subject" wide>
+            <input
+              id="et-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              maxLength={300}
+            />
+          </Field>
+
+          <Field
+            id="et-body"
+            label="Email body"
+            wide
+            hint="Use --- Section Title --- for styled section headings and Label: Value for bold key-value rows."
+          >
+            <textarea
+              id="et-body"
+              rows={13}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              maxLength={20000}
+              style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '0.86rem' }}
+            />
+          </Field>
+        </div>
+
+        <div style={{ marginTop: '0.9rem' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.45rem' }}>
+            Available placeholders (click to insert into body):
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {template.variables.map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                className="nx-btn nx-btn--ghost"
+                title={`${v.description} — e.g. ${v.sample}`}
+                onClick={() => handleInsertVariable(v.key)}
+                style={{
+                  padding: '0.2rem 0.55rem',
+                  fontSize: '0.78rem',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                }}
+              >
+                {`{{${v.key}}}`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {error ? <p className="ad__error" role="alert">{error}</p> : null}
+
+        <div className="pg-actions" style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            className="nx-btn nx-btn--ghost"
+            disabled={save.isPending || (!template.customized && !differsFromDefault)}
+            onClick={handleReset}
+          >
+            Reset to default
+          </button>
+          <button
+            type="submit"
+            className="nx-btn nx-btn--primary"
+            disabled={save.isPending || !isDirty}
+          >
+            {save.isPending ? 'Saving…' : 'Save template'}
+          </button>
+        </div>
+      </form>
+
+      <div style={{ display: 'grid', gap: '1.25rem' }}>
+        <div className="fm__section" style={{ margin: 0 }}>
+          <div className="mp__cardhead">
+            <h2>Live sample preview</h2>
+            <span className="ad__badge ad__badge--info">Sample data</span>
+          </div>
+          <p style={{ marginBottom: '0.75rem' }}>
+            Shows how this template renders when populated with sample organisation and billing data.
+          </p>
+
+          <div
+            style={{
+              border: '1px solid #e5e5e0',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              background: '#ffffff',
+            }}
+          >
+            <div style={{ background: '#1a2e05', color: '#ffffff', padding: '0.85rem 1.15rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: '0.98rem', letterSpacing: '-0.01em' }}>KodiHub</strong>
+              <span style={{ fontSize: '0.75rem', opacity: 0.85 }}>Subject: {previewSubject}</span>
+            </div>
+            <div
+              style={{
+                padding: '1.15rem',
+                whiteSpace: 'pre-wrap',
+                fontSize: '0.88rem',
+                lineHeight: 1.6,
+                color: '#1f2937',
+              }}
+            >
+              {previewBody}
+            </div>
+            <div
+              style={{
+                padding: '0.65rem 1.15rem',
+                background: '#fafaf7',
+                borderTop: '1px solid #ecece6',
+                fontSize: '0.75rem',
+                color: '#6b7280',
+              }}
+            >
+              Sent by KodiHub · Property Management Platform
+            </div>
+          </div>
+
+          <details style={{ marginTop: '0.85rem', fontSize: '0.82rem' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Placeholder reference &amp; sample values</summary>
+            <div className="ad__tablewrap" style={{ marginTop: '0.5rem' }}>
+              <table className="ad__table">
+                <thead>
+                  <tr>
+                    <th>Variable</th>
+                    <th>Meaning</th>
+                    <th>Sample value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {template.variables.map((v) => (
+                    <tr key={v.key}>
+                      <td><code>{`{{${v.key}}}`}</code></td>
+                      <td>{v.description}</td>
+                      <td className="ad__muted">{v.sample}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+
+        <form className="fm__section" onSubmit={handleSendTest} noValidate style={{ margin: 0 }}>
+          <h2>Send test of this template</h2>
+          <p>
+            Sends this template (including any unsaved edits above) populated with sample values to verify formatting in your inbox.
+          </p>
+          <div className="fm__grid">
+            <Field id="et-test-to" label="Recipient email" wide>
+              <input
+                id="et-test-to"
+                type="email"
+                value={testTo}
+                onChange={(e) => setTestTo(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </Field>
+          </div>
+          {testError ? <p className="ad__error" role="alert">{testError}</p> : null}
+          <div className="pg-actions">
+            <button type="submit" className="nx-btn" disabled={sendTest.isPending}>
+              {sendTest.isPending ? 'Sending sample…' : 'Send sample email'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

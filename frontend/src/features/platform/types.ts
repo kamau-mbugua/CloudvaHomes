@@ -263,6 +263,31 @@ export interface PlatformEmailLog {
   createdAt: string;
 }
 
+export interface PlatformEmailTemplateVariable {
+  key: string;
+  description: string;
+  sample: string;
+}
+
+export interface PlatformEmailTemplate {
+  key: string;
+  name: string;
+  category: string;
+  description: string;
+  subject: string;
+  body: string;
+  defaultSubject: string;
+  defaultBody: string;
+  customized: boolean;
+  updatedAt: string | null;
+  variables: PlatformEmailTemplateVariable[];
+  samplePreview?: {
+    subject: string;
+    text: string;
+    html: string;
+  };
+}
+
 export interface RateLimitLock {
   key: string;
   count: number;

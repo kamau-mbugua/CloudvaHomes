@@ -55,7 +55,9 @@ import {
   RunPlatformDto,
   SendBroadcastEmailDto,
   SendTestEmailDto,
+  SendTestEmailTemplateDto,
   UpdateEmailSettingsDto,
+  UpdateEmailTemplateDto,
   UpdateOperatorDto,
   UpdateOrgBillingDto,
   UpdatePlanDto,
@@ -378,6 +380,25 @@ export class PlatformController {
   @PlatformAdminOnly()
   async emailLogs(@Query() q: ListEmailLogsQueryDto) {
     return this.admin.emailLogs(q);
+  }
+
+  @Get('email/templates')
+  @PlatformAdminOnly()
+  async emailTemplates() {
+    return ok(await this.admin.getEmailTemplates());
+  }
+
+  @Put('email/templates/:key')
+  @PlatformAdminOnly()
+  async updateEmailTemplate(@Param('key') key: string, @Body() dto: UpdateEmailTemplateDto) {
+    return ok(await this.admin.updateEmailTemplate(key, dto));
+  }
+
+  @Post('email/templates/:key/test')
+  @PlatformAdminOnly()
+  @HttpCode(200)
+  async sendTestEmailTemplate(@Param('key') key: string, @Body() dto: SendTestEmailTemplateDto) {
+    return ok(await this.admin.sendTestEmailTemplate(key, dto));
   }
 
   // ── Security / OTP Locks ──

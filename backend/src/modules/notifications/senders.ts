@@ -6,6 +6,7 @@ export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }
 
 export interface SmsSender {
@@ -113,7 +114,13 @@ export class SmtpEmailSender implements EmailSender {
   }
 
   async send(m: EmailMessage): Promise<void> {
-    await this.transport.sendMail({ from: this.from, to: m.to, subject: m.subject, text: m.text });
+    await this.transport.sendMail({
+      from: this.from,
+      to: m.to,
+      subject: m.subject,
+      text: m.text,
+      ...(m.html ? { html: m.html } : {}),
+    });
   }
 }
 

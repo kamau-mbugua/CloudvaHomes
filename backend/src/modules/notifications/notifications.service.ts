@@ -6,6 +6,12 @@ import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
+  type EmailTemplateKey,
+  interpolateTemplate,
+  renderBrandedEmailHtml,
+  resolveEmailTemplate,
+} from './email-templates.js';
+import {
   AfricasTalkingSmsSender,
   createEmailSender,
   createSmsSender,
@@ -122,10 +128,19 @@ export class NotificationsService {
       'step-up': 'step_up',
       'admin-2fa': 'admin_2fa',
     }[purpose];
-    const text = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
-    if (to.phone) await this.dispatchSms(to.phone, text);
-    else if (to.email)
-      await this.dispatchEmail({ to: to.email, subject: `Your KodiHub ${what}`, text }, kind);
+    const smsText = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
+    if (to.phone) await this.dispatchSms(to.phone, smsText);
+    else if (to.email) {
+      const rendered = await this.renderSystemEmailTemplate('verification_code', {
+        codeType: what,
+        code,
+        minutes,
+      });
+      await this.dispatchEmail(
+        { to: to.email, subject: rendered.subject, text: rendered.text },
+        kind,
+      );
+    }
   }
 
   async sendInvitation(
@@ -144,38 +159,61 @@ export class NotificationsService {
     if (to.email) {
       const signInId = [to.email, to.phone].filter(Boolean).join(' or ');
       const ob = p.ownerBilling;
-      const billingBlock = ob
-        ? `\n\n--- Login & Account Setup ---\n` +
-          `Sign-in identifier: ${signInId}\n` +
-          `Set password & sign in: ${link}\n` +
-          `\n--- Subscription & Free Trial ---\n` +
-          `Plan: ${ob.planName ?? 'Custom'}\n` +
-          `Rate: KES ${ob.pricePerUnitKes} per let unit / month (monthly minimum KES ${ob.minimumMonthlyKes})\n` +
-          (ob.trialEndsAt
-            ? `Free trial ends: ${ob.trialEndsAt}\n` +
-              `Paid billing starts: ${ob.firstPaidDate} (first invoice issued on ${ob.firstInvoiceDate}, due within ${ob.dueDays} days)\n`
-            : `First invoice issued on: ${ob.firstInvoiceDate} (due within ${ob.dueDays} days)\n`) +
-          (ob.billingRef
-            ? `Billing account reference: ${ob.billingRef}` +
-              (ob.paybill ? ` (M-Pesa Paybill ${ob.paybill})` : '') +
-              `\n`
-            : '')
-        : '';
-      tasks.push(
-        this.dispatchEmail(
-          {
-            to: to.email,
-            subject: ob
-              ? `Welcome to KodiHub — Set up ${p.organizationName}`
-              : `Join ${p.organizationName} on KodiHub`,
-            text:
-              `Hi ${p.firstName},\n\n${by} to join ${p.organizationName} on KodiHub.\n\n` +
-              `Accept the invitation: ${link}\n\nThe link expires in 7 days.` +
-              billingBlock,
-          },
-          'invitation',
-        ),
-      );
+      if (ob) {
+        const trialSummary = ob.trialEndsAt
+          ? `Free trial ends: ${ob.trialEndsAt}\n` +
+            `Paid billing starts: ${ob.firstPaidDate} (first invoice issued on ${ob.firstInvoiceDate}, due within ${ob.dueDays} days)`
+          : `First invoice issued on: ${ob.firstInvoiceDate} (due within ${ob.dueDays} days)`;
+        const billingRefLine = ob.billingRef
+          ? `Billing account reference: ${ob.billingRef}` +
+            (ob.paybill ? ` (M-Pesa Paybill ${ob.paybill})` : '')
+          : '';
+        const rendered = await this.renderSystemEmailTemplate('owner_welcome', {
+          firstName: p.firstName,
+          organizationName: p.organizationName,
+          inviterLine: by,
+          inviteLink: link,
+          signInIdentifier: signInId,
+          planName: ob.planName ?? 'Custom',
+          pricePerUnitKes: ob.pricePerUnitKes,
+          minimumMonthlyKes: ob.minimumMonthlyKes,
+          trialEndsAt: ob.trialEndsAt ?? 'No free trial',
+          firstPaidDate: ob.firstPaidDate,
+          firstInvoiceDate: ob.firstInvoiceDate,
+          dueDays: ob.dueDays,
+          trialSummary,
+          billingRef: ob.billingRef ?? '',
+          paybill: ob.paybill ?? '',
+          billingRefLine,
+        });
+        tasks.push(
+          this.dispatchEmail(
+            {
+              to: to.email,
+              subject: rendered.subject,
+              text: rendered.text,
+            },
+            'invitation',
+          ),
+        );
+      } else {
+        const rendered = await this.renderSystemEmailTemplate('staff_invitation', {
+          firstName: p.firstName,
+          organizationName: p.organizationName,
+          inviterLine: by,
+          inviteLink: link,
+        });
+        tasks.push(
+          this.dispatchEmail(
+            {
+              to: to.email,
+              subject: rendered.subject,
+              text: rendered.text,
+            },
+            'invitation',
+          ),
+        );
+      }
     }
     if (to.phone) {
       tasks.push(
@@ -203,23 +241,27 @@ export class NotificationsService {
       p.paybill && p.billingRef
         ? `Pay via M-Pesa Paybill ${p.paybill}, Account ${p.billingRef}, or in KodiHub under Settings -> Plan & billing (${appUrl}/settings/billing).`
         : `Pay in KodiHub under Settings -> Plan & billing (${appUrl}/settings/billing).`;
-    const text =
-      `${greeting}\n\n` +
-      `Your KodiHub subscription invoice ${p.invoiceNumber} for ${p.organizationName} (period ${p.period}) has been issued.\n\n` +
-      `--- Invoice Summary ---\n` +
-      `Invoice number: ${p.invoiceNumber}\n` +
-      `Billing period: ${p.period}\n` +
-      `Let (occupied) units: ${p.occupiedUnits} @ KES ${p.rateKes} / unit (minimum KES ${p.minimumKes})\n` +
-      `Total billed: KES ${p.totalKes}\n` +
-      `Credit / paid applied: KES ${p.amountPaidKes}\n` +
-      `Balance due: KES ${p.balanceKes}\n` +
-      `Due date: ${p.dueDate}\n\n` +
-      `${payInstructions}`;
+    const rendered = await this.renderSystemEmailTemplate('platform_invoice', {
+      greeting,
+      organizationName: p.organizationName,
+      invoiceNumber: p.invoiceNumber,
+      period: p.period,
+      occupiedUnits: p.occupiedUnits,
+      rateKes: p.rateKes,
+      minimumKes: p.minimumKes,
+      totalKes: p.totalKes,
+      amountPaidKes: p.amountPaidKes,
+      balanceKes: p.balanceKes,
+      dueDate: p.dueDate,
+      billingRef: p.billingRef ?? '',
+      paybill: p.paybill ?? '',
+      paymentInstructions: payInstructions,
+    });
     await this.dispatchEmail(
       {
         to: to.email,
-        subject: `KodiHub Invoice ${p.invoiceNumber} (${p.period}) — ${p.organizationName}`,
-        text,
+        subject: rendered.subject,
+        text: rendered.text,
       },
       'platform_invoice',
     );
@@ -239,8 +281,11 @@ export class NotificationsService {
   /** A landlord was given owner-portal access. */
   async sendOwnerPortalAccess(to: Recipient, p: { organizationName: string }): Promise<void> {
     const link = `${this.env.APP_URL.replace(/\/$/, '')}/owner`;
-    const text = `${p.organizationName} has given you access to your property statements on KodiHub: ${link} - sign in with a code sent to this phone or email.`;
-    await this.deliver(to, `Your statements from ${p.organizationName}`, text, 'portal_access');
+    const rendered = await this.renderSystemEmailTemplate('owner_portal_access', {
+      organizationName: p.organizationName,
+      portalLink: link,
+    });
+    await this.deliver(to, rendered.subject, rendered.text, 'portal_access');
   }
 
   /** Payout details changed — always tell the landlord (a common fraud route). */
@@ -249,8 +294,11 @@ export class NotificationsService {
     p: { organizationName: string; masked: string | null },
   ): Promise<void> {
     const what = p.masked ? `to ${p.masked}` : 'were removed';
-    const text = `${p.organizationName}: the account your rent payouts go to was changed ${what}. If you did not ask for this, contact them now.`;
-    await this.deliver(to, 'Your payout details were changed', text, 'payout_changed');
+    const rendered = await this.renderSystemEmailTemplate('payout_changed', {
+      organizationName: p.organizationName,
+      changeDescription: what,
+    });
+    await this.deliver(to, rendered.subject, rendered.text, 'payout_changed');
   }
 
   /** A plain SMS (callers log it). Throws if the provider refuses. */
@@ -260,7 +308,24 @@ export class NotificationsService {
 
   /** Sends a direct platform email (e.g. SMTP test or broadcast) and records it in PlatformEmailLog. */
   async sendRawEmail(m: EmailMessage & { kind?: string }): Promise<void> {
-    await this.dispatchEmail({ to: m.to, subject: m.subject, text: m.text }, m.kind ?? 'other');
+    await this.dispatchEmail(
+      { to: m.to, subject: m.subject, text: m.text, html: m.html },
+      m.kind ?? 'other',
+    );
+  }
+
+  private async renderSystemEmailTemplate(
+    key: EmailTemplateKey,
+    vars: Record<string, string | number | null | undefined>,
+  ): Promise<{ subject: string; text: string }> {
+    const settings = this.prisma
+      ? await this.prisma.platformSettings.findUnique({ where: { id: 1 } })
+      : null;
+    const tpl = resolveEmailTemplate(key, settings?.emailTemplates);
+    return {
+      subject: interpolateTemplate(tpl.subject, vars).trim(),
+      text: interpolateTemplate(tpl.body, vars).trimEnd(),
+    };
   }
 
   /** SMS and email where available; succeeds if at least one went out. */
@@ -336,7 +401,14 @@ export class NotificationsService {
         const fromAddr = parsedFrom.email || this.env.EMAIL_FROM;
         const fromName = settings.smtpFromName || parsedFrom.name;
         const from = fromName ? `"${fromName}" <${fromAddr}>` : fromAddr;
-        await transport.sendMail({ from, to: m.to, subject: m.subject, text: m.text });
+        const html =
+          m.html ??
+          renderBrandedEmailHtml({
+            subject: m.subject,
+            text: m.text,
+            brandName: fromName || 'KodiHub',
+          });
+        await transport.sendMail({ from, to: m.to, subject: m.subject, text: m.text, html });
       } else {
         await this.email.send(m);
       }

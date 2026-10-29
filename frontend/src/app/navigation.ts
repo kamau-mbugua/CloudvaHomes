@@ -343,7 +343,8 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Platform',
     children: [
       { label: 'Administrators & salespeople', to: '/admin/admins', phase: '11', hint: 'Manage superadmins, salespeople and organisation assignments' },
-      { label: 'Email', to: '/admin/email', phase: '11', hint: 'SMTP setup, owner broadcasts and outbound email logs' },
+      { label: 'Email', to: '/admin/email', phase: '11', hint: 'SMTP setup, email templates, owner broadcasts and outbound email logs' },
+      { label: 'Email templates', to: '/admin/email?tab=templates', phase: '11', hint: 'Customise welcome, invoice, verification and portal email templates' },
       { label: 'Settings', to: '/admin/settings', phase: '8', hint: 'Billing rules, Admin 2FA, M-Pesa, SMS, signup and app version floor' },
       { label: 'My account', to: '/admin/account', phase: '8', hint: 'Your name and password' },
     ],
@@ -354,6 +355,7 @@ export const SUPERADMIN_ONLY_PATHS = new Set<string>([
   '/admin/plans',
   '/admin/admins',
   '/admin/email',
+  '/admin/email?tab=templates',
   '/admin/settings',
 ]);
 

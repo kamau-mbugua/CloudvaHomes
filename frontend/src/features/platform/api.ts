@@ -3,7 +3,7 @@ import { ApiError, STEP_UP_REQUIRED, api } from '../../lib/api/client';
 import { mpesaErrorMessage } from '../mpesa/api';
 import { unwrap, unwrapList } from '../payments/rules';
 import type {
-  BillingSummary, Plan, PlatformEmailSettings, PlatformOperator, PlatformSettings, PlatformStats, RateLimitLock, UnassignedOrganization,
+  BillingSummary, Plan, PlatformEmailSettings, PlatformEmailTemplate, PlatformOperator, PlatformSettings, PlatformStats, RateLimitLock, UnassignedOrganization,
 } from './types';
 
 /**
@@ -27,6 +27,7 @@ export const keys = {
   settings: ['platform', 'settings'] as const,
   operators: ['platform', 'operators'] as const,
   emailSettings: ['platform', 'email-settings'] as const,
+  emailTemplates: ['platform', 'email-templates'] as const,
   emailLogs: ['platform', 'email-logs'] as const,
   locks: ['platform', 'locks'] as const,
   reports: ['platform', 'reports'] as const,
@@ -91,6 +92,15 @@ export function usePlatformEmailSettings(enabled = true) {
   return useQuery({
     queryKey: keys.emailSettings,
     queryFn: () => api.get<unknown>('/platform/email/settings').then((body) => unwrap<PlatformEmailSettings>(body)),
+    enabled,
+  });
+}
+
+export function usePlatformEmailTemplates(enabled = true) {
+  return useQuery({
+    queryKey: keys.emailTemplates,
+    queryFn: () =>
+      api.get<unknown>('/platform/email/templates').then((body) => unwrapList<PlatformEmailTemplate>(body)),
     enabled,
   });
 }

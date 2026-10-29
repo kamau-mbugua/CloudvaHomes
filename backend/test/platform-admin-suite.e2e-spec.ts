@@ -266,6 +266,58 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     expect(kinds).toContain('platform_invoice');
     expect(kinds).toContain('test');
     expect(kinds).toContain('broadcast');
+
+    // List system email templates
+    const templates = (await get(admin, '/platform/email/templates')).data;
+    expect(templates.length).toBe(6);
+    const ownerWelcomeTpl = templates.find((tpl: any) => tpl.key === 'owner_welcome');
+    expect(ownerWelcomeTpl).toBeDefined();
+    expect(ownerWelcomeTpl.customized).toBe(false);
+    expect(ownerWelcomeTpl.samplePreview.subject).toContain('Kilimani Crest Estates');
+
+    // Customise the owner_welcome template
+    const updatedTpl = (
+      await put(admin, '/platform/email/templates/owner_welcome', {
+        subject: 'Karibu KodiHub: {{organizationName}} ({{planName}})',
+        body: 'Jambo {{firstName}}, activate {{organizationName}} at {{inviteLink}} (Ref {{billingRef}})',
+      })
+    ).data;
+    expect(updatedTpl.customized).toBe(true);
+    expect(updatedTpl.subject).toBe('Karibu KodiHub: {{organizationName}} ({{planName}})');
+
+    // Send a test of the customised template
+    const tplTestRes = await post(admin, '/platform/email/templates/owner_welcome/test', {
+      to: 'preview@kilimani.test',
+    });
+    expect(tplTestRes.data.sent).toBe(true);
+    expect(tplTestRes.data.subject).toBe(
+      '[Test] Karibu KodiHub: Kilimani Crest Estates (Standard)',
+    );
+
+    // Onboard another organisation and verify it uses the customised owner_welcome template
+    await onboardOrg(t, admin, {
+      name: 'Lavington Court',
+      ownerEmail: 'amina@lavington.test',
+      ownerPhone: '+254722888999',
+    });
+    const customEmail = outbox.find(
+      (m): m is Extract<(typeof outbox)[number], { channel: 'email' }> =>
+        m.channel === 'email' && m.to === 'amina@lavington.test',
+    );
+    expect(customEmail).toBeDefined();
+    expect(customEmail!.subject).toBe('Karibu KodiHub: Lavington Court (Standard)');
+    expect(customEmail!.text).toMatch(
+      /Jambo Olive, activate Lavington Court at http.*\/invite\/.* \(Ref H\d{5}\)/,
+    );
+
+    // Reset the template back to system default
+    const resetTpl = (
+      await put(admin, '/platform/email/templates/owner_welcome', {
+        reset: true,
+      })
+    ).data;
+    expect(resetTpl.customized).toBe(false);
+    expect(resetTpl.subject).toBe(resetTpl.defaultSubject);
   });
 
   it('serves all 11 superadmin reports', async () => {

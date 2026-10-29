@@ -379,6 +379,45 @@ export class SendBroadcastEmailDto {
   body!: string;
 }
 
+export class UpdateEmailTemplateDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(300)
+  subject?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(20_000)
+  body?: string;
+
+  @ApiPropertyOptional({ description: 'When true, resets this template to the system default' })
+  @IsOptional()
+  @IsBoolean()
+  reset?: boolean;
+}
+
+export class SendTestEmailTemplateDto {
+  @ApiProperty()
+  @IsEmail()
+  to!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  subject?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20_000)
+  body?: string;
+}
+
 export class ListEmailLogsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) q?: string;
   @ApiPropertyOptional({ enum: ['SENT', 'FAILED'] })

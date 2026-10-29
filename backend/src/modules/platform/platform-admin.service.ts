@@ -15,6 +15,17 @@ import { hashPassword } from '../auth/crypto.js';
 import { authContext } from '../auth/decorators.js';
 import { normalizeEmail, normalizePhone, passwordProblem } from '../auth/identifiers.js';
 import { todayInNairobi } from '../billing/billing-math.js';
+import {
+  DEFAULT_EMAIL_TEMPLATES,
+  type EmailTemplateKey,
+  interpolateTemplate,
+  isEmailTemplateKey,
+  parseStoredEmailTemplates,
+  renderBrandedEmailHtml,
+  type ResolvedEmailTemplate,
+  resolveAllEmailTemplates,
+  resolveEmailTemplate,
+} from '../notifications/email-templates.js';
 import { NotificationsService, SMTP_PASS_CONTEXT } from '../notifications/notifications.service.js';
 import { PlatformBillingService } from './platform-billing.service.js';
 import type {
@@ -24,7 +35,9 @@ import type {
   ListEmailLogsQueryDto,
   ListOrgsQueryDto,
   SendBroadcastEmailDto,
+  SendTestEmailTemplateDto,
   UpdateEmailSettingsDto,
+  UpdateEmailTemplateDto,
   UpdateOperatorDto,
   UpdateOrgBillingDto,
   UpdatePlanDto,
@@ -689,6 +702,115 @@ export class PlatformAdminService {
       });
       return { total: recipients.length, sent, failed };
     });
+  }
+
+  private withSamplePreview(tpl: ResolvedEmailTemplate, brandName?: string | null) {
+    const sampleVars = Object.fromEntries(tpl.variables.map((v) => [v.key, v.sample]));
+    const subject = interpolateTemplate(tpl.subject, sampleVars).trim();
+    const text = interpolateTemplate(tpl.body, sampleVars).trimEnd();
+    const html = renderBrandedEmailHtml({
+      subject,
+      text,
+      brandName: brandName || 'KodiHub',
+    });
+    return {
+      ...tpl,
+      samplePreview: { subject, text, html },
+    };
+  }
+
+  getEmailTemplates() {
+    return withoutOrgScope(async () => {
+      const settings = await this.db.platformSettings.findUnique({ where: { id: 1 } });
+      return resolveAllEmailTemplates(settings?.emailTemplates).map((tpl) =>
+        this.withSamplePreview(tpl, settings?.smtpFromName),
+      );
+    });
+  }
+
+  updateEmailTemplate(rawKey: string, dto: UpdateEmailTemplateDto) {
+    if (!isEmailTemplateKey(rawKey)) {
+      throw AppError.notFound('Email template');
+    }
+    const key: EmailTemplateKey = rawKey;
+    return withoutOrgScope(async () => {
+      const settings = await this.db.platformSettings.findUnique({ where: { id: 1 } });
+      const stored = parseStoredEmailTemplates(settings?.emailTemplates);
+      const before = resolveEmailTemplate(key, stored);
+      const def = DEFAULT_EMAIL_TEMPLATES[key];
+
+      if (dto.reset) {
+        delete stored[key];
+      } else {
+        const nextSubject = dto.subject?.trim() ?? before.subject;
+        const nextBody = dto.body?.trim() ?? before.body;
+        if (nextSubject === def.defaultSubject && nextBody === def.defaultBody) {
+          delete stored[key];
+        } else {
+          stored[key] = {
+            subject: nextSubject,
+            body: nextBody,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      }
+
+      const jsonPayload = stored as unknown as Prisma.InputJsonValue;
+      await this.db.$transaction(async (tx) => {
+        await tx.platformSettings.upsert({
+          where: { id: 1 },
+          create: { id: 1, emailTemplates: jsonPayload },
+          update: { emailTemplates: jsonPayload },
+        });
+        const after = resolveEmailTemplate(key, stored);
+        await this.audit.record(
+          {
+            action: dto.reset ? 'platform.email_template_reset' : 'platform.email_template_update',
+            entity: 'email_template',
+            entityId: key,
+            orgId: null,
+            before: { subject: before.subject, body: before.body, customized: before.customized },
+            after: { subject: after.subject, body: after.body, customized: after.customized },
+          },
+          tx,
+        );
+      });
+
+      const resolved = resolveEmailTemplate(key, stored);
+      return this.withSamplePreview(resolved, settings?.smtpFromName);
+    });
+  }
+
+  async sendTestEmailTemplate(rawKey: string, dto: SendTestEmailTemplateDto) {
+    if (!isEmailTemplateKey(rawKey)) {
+      throw AppError.notFound('Email template');
+    }
+    const email = normalizeEmail(dto.to);
+    if (!email) throw AppError.fieldInvalid('to', 'Enter a valid email address');
+
+    const settings = await withoutOrgScope(() =>
+      this.db.platformSettings.findUnique({ where: { id: 1 } }),
+    );
+    const resolved = resolveEmailTemplate(rawKey, settings?.emailTemplates);
+    const sampleVars = Object.fromEntries(resolved.variables.map((v) => [v.key, v.sample]));
+    const rawSubject = dto.subject?.trim() || resolved.subject;
+    const rawBody = dto.body?.trim() || resolved.body;
+    const subject = `[Test] ${interpolateTemplate(rawSubject, sampleVars).trim()}`;
+    const text = interpolateTemplate(rawBody, sampleVars).trimEnd();
+
+    try {
+      await this.notifications.sendRawEmail({
+        to: email,
+        subject,
+        text,
+        kind: `template_test:${rawKey}`,
+      });
+    } catch (e) {
+      if (e instanceof AppError) throw e;
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new AppError(422, 'SMTP_DELIVERY_FAILED', `Could not send test email: ${reason}`);
+    }
+    return { sent: true, to: email, templateKey: rawKey, subject };
   }
 
   emailLogs(q: ListEmailLogsQueryDto) {

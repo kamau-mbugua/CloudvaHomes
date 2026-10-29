@@ -1355,6 +1355,7 @@ model PlatformSettings {
   smtpFromEmail         String?
   smtpFromName          String?
   smtpAllowlist         String?
+  emailTemplates        Json           @default("{}")
   // ── SMS Africa's Talking (phase 11) ──
   atUsername            String?
   atSenderId            String?
