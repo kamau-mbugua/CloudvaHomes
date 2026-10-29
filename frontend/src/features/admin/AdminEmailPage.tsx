@@ -70,10 +70,11 @@ function EmailSettingsTab() {
   if (query.isError) return <p className="ad__error" role="alert">{platformErrorMessage(query.error)}</p>;
 
   const s = query.data;
+  const isConfigured = s.configured ?? Boolean(s.host || s.source === 'env' || s.source === 'database');
   return (
     <div className="pg-narrow">
-      <SmtpForm key={`${s.host ?? ''}-${s.port}-${s.user ?? ''}-${s.fromEmail ?? ''}-${s.fromName ?? ''}-${s.encryption}-${s.allowlist ?? ''}-${s.passwordSet}`} settings={s} />
-      <TestEmailSection configured={s.configured} />
+      <SmtpForm key={`${s.host ?? ''}-${s.port}-${s.username ?? s.user ?? ''}-${s.fromEmail ?? ''}-${s.fromName ?? ''}-${s.encryption}-${s.allowlist ?? ''}-${s.passwordSet}`} settings={s} />
+      <TestEmailSection configured={isConfigured} />
     </div>
   );
 }
@@ -84,7 +85,7 @@ function SmtpForm({ settings }: { settings: PlatformEmailSettings }) {
 
   const [host, setHost] = useState(settings.host ?? '');
   const [port, setPort] = useState(String(settings.port ?? 587));
-  const [user, setUser] = useState(settings.user ?? '');
+  const [user, setUser] = useState(settings.username ?? settings.user ?? '');
   const [password, setPassword] = useState('');
   const [encryption, setEncryption] = useState<'tls' | 'ssl' | 'none'>(settings.encryption ?? 'tls');
   const [fromEmail, setFromEmail] = useState(settings.fromEmail ?? '');
@@ -113,7 +114,7 @@ function SmtpForm({ settings }: { settings: PlatformEmailSettings }) {
     save.mutate({
       host: host.trim() || null,
       port: parsedPort,
-      user: user.trim() || null,
+      username: user.trim() || null,
       ...(password ? { password } : {}),
       encryption,
       fromEmail: fromEmail.trim() || null,
@@ -122,12 +123,14 @@ function SmtpForm({ settings }: { settings: PlatformEmailSettings }) {
     });
   };
 
+  const isConfigured = settings.configured ?? Boolean(settings.host || settings.source === 'env' || settings.source === 'database');
+
   return (
     <form className="fm__section" onSubmit={submit} noValidate autoComplete="off">
       <div className="mp__cardhead">
         <h2>Outgoing mail (SMTP)</h2>
         <div className="mp__badges">
-          {settings.configured
+          {isConfigured
             ? <span className="ad__badge ad__badge--ok">Connected ({settings.source})</span>
             : <span className="ad__badge ad__badge--off">Not configured</span>}
           {settings.passwordSet ? <span className="ad__badge ad__badge--info">Password saved</span> : null}
@@ -240,10 +243,12 @@ function BroadcastTab() {
   const broadcast = useMutation({
     mutationFn: (payload: { subject: string; body: string }) =>
       api.post<unknown>('/platform/email/broadcast', payload).then((res) =>
-        unwrap<{ totalRecipients: number; sentCount: number; failedCount: number }>(res),
+        unwrap<{ total?: number; sent?: number; failed?: number; totalRecipients?: number; sentCount?: number }>(res),
       ),
     onSuccess: async (res) => {
-      toast.saved(`Broadcast sent to ${res.sentCount} of ${res.totalRecipients} organisation owners.`);
+      const sent = res.sent ?? res.sentCount ?? 0;
+      const total = res.total ?? res.totalRecipients ?? 0;
+      toast.saved(`Broadcast sent to ${sent} of ${total} organisation owners.`);
       setSubject('');
       setBody('');
       await queryClient.invalidateQueries({ queryKey: keys.emailLogs });
@@ -350,12 +355,12 @@ function EmailLogsTab() {
               {rows.map((log) => (
                 <tr key={log.id}>
                   <td>{formatDateTime(log.createdAt)}</td>
-                  <td><strong>{log.recipient}</strong></td>
+                  <td><strong>{log.to ?? log.recipient}</strong></td>
                   <td>
                     {log.subject}
                     {log.error ? <span className="ad__sub ad__owed">{log.error}</span> : null}
                   </td>
-                  <td><span className="num">{log.template ?? '—'}</span></td>
+                  <td><span className="num">{log.kind ?? log.template ?? '—'}</span></td>
                   <td>
                     <span className={`ad__badge ${log.status === 'SENT' ? 'ad__badge--ok' : 'ad__badge--warn'}`}>
                       {log.status === 'SENT' ? 'Sent' : 'Failed'}

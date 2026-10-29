@@ -153,7 +153,7 @@ export function CreateOrganizationPage() {
                 <option value="">Unassigned</option>
                 {allOperators.map((op) => (
                   <option key={op.id} value={op.id}>
-                    {op.firstName} {op.lastName} ({op.email}) — {op.platformRole === 'SALESPERSON' ? 'Salesperson' : 'Superadmin'}
+                    {op.firstName} {op.lastName} ({op.email}) — {(op.role ?? op.platformRole) === 'SALESPERSON' ? 'Salesperson' : 'Superadmin'}
                   </option>
                 ))}
               </select>

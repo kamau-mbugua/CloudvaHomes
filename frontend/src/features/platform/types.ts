@@ -197,7 +197,9 @@ export interface PlatformSettings {
     configured: boolean;
     username: string | null;
     senderId: string | null;
-    apiKey: boolean;
+    apiKeySet?: boolean;
+    apiKey?: boolean;
+    source?: 'database' | 'env' | 'log';
   };
   allowPublicSignup?: boolean;
   minAppVersionCode?: number;
@@ -211,14 +213,16 @@ export interface PlatformSettings {
 
 export interface PlatformOperator {
   id: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   firstName: string;
   lastName: string;
   status: 'ACTIVE' | 'DISABLED' | 'LOCKED' | 'INVITED';
-  isPlatformAdmin: boolean;
-  platformRole: 'SUPERADMIN' | 'SALESPERSON';
-  organizationCount: number;
+  role: 'SUPERADMIN' | 'SALESPERSON';
+  platformRole?: 'SUPERADMIN' | 'SALESPERSON';
+  organizationsCount: number;
+  activeOrganizationsCount?: number;
+  organizationCount?: number;
   createdAt: string;
   lastLoginAt: string | null;
 }
@@ -232,36 +236,36 @@ export interface UnassignedOrganization {
 }
 
 export interface PlatformEmailSettings {
-  configured: boolean;
-  source: 'database' | 'environment' | 'none';
+  configured?: boolean;
+  source: 'database' | 'env' | 'log' | 'environment' | 'none';
   host: string | null;
   port: number;
-  user: string | null;
+  username: string | null;
+  user?: string | null;
   passwordSet: boolean;
   encryption: 'tls' | 'ssl' | 'none';
   fromEmail: string | null;
   fromName: string | null;
   allowlist: string | null;
+  updatedAt?: string;
 }
 
 export interface PlatformEmailLog {
   id: string;
-  recipient: string;
+  to: string;
+  recipient?: string;
   subject: string;
-  body: string | null;
-  template: string | null;
+  kind: string | null;
+  template?: string | null;
   status: 'SENT' | 'FAILED';
   error: string | null;
-  sentByUserId: string | null;
-  orgId: string | null;
+  triggeredBy?: { id: string; firstName: string; lastName: string; email: string | null } | null;
   createdAt: string;
 }
 
 export interface RateLimitLock {
   key: string;
-  scope: string;
-  identifier: string;
   count: number;
-  ttlSeconds: number;
-  locked: boolean;
+  windowStart: string;
+  expiresAt: string;
 }

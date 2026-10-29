@@ -70,7 +70,11 @@ export function usePlatformSettings() {
 export function usePlatformOperators(enabled = true) {
   return useQuery({
     queryKey: keys.operators,
-    queryFn: () => api.get<unknown>('/platform/operators').then((body) => unwrapList<PlatformOperator>(body)),
+    queryFn: () =>
+      api.get<unknown>('/platform/operators').then((body) => {
+        const res = unwrap<{ operators?: PlatformOperator[] } | PlatformOperator[]>(body);
+        return Array.isArray(res) ? res : (res.operators ?? []);
+      }),
     enabled,
   });
 }

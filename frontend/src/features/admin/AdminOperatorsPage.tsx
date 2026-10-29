@@ -41,7 +41,8 @@ export function AdminOperatorsPage() {
   });
 
   const all = operators.data ?? [];
-  const rows = roleFilter === 'ALL' ? all : all.filter((op) => op.platformRole === roleFilter);
+  const roleOf = (op: PlatformOperator) => op.role ?? op.platformRole ?? 'SALESPERSON';
+  const rows = roleFilter === 'ALL' ? all : all.filter((op) => roleOf(op) === roleFilter);
 
   return (
     <div className="pg">
@@ -51,10 +52,10 @@ export function AdminOperatorsPage() {
             All ({all.length})
           </button>
           <button type="button" role="tab" aria-selected={roleFilter === 'SUPERADMIN'} className="pf__tab" onClick={() => setRoleFilter('SUPERADMIN')}>
-            Superadmins ({all.filter((o) => o.platformRole === 'SUPERADMIN').length})
+            Superadmins ({all.filter((o) => roleOf(o) === 'SUPERADMIN').length})
           </button>
           <button type="button" role="tab" aria-selected={roleFilter === 'SALESPERSON'} className="pf__tab" onClick={() => setRoleFilter('SALESPERSON')}>
-            Salespeople ({all.filter((o) => o.platformRole === 'SALESPERSON').length})
+            Salespeople ({all.filter((o) => roleOf(o) === 'SALESPERSON').length})
           </button>
         </div>
         <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setCreating(true)}>
@@ -86,6 +87,7 @@ export function AdminOperatorsPage() {
             <tbody>
               {rows.map((op) => {
                 const isSelf = op.id === user?.id;
+                const opRole = roleOf(op);
                 return (
                   <tr key={op.id}>
                     <td>
@@ -93,8 +95,8 @@ export function AdminOperatorsPage() {
                       <span className="ad__sub">{op.email}{op.phone ? ` · ${op.phone}` : ''}</span>
                     </td>
                     <td>
-                      <span className={`ad__badge ${op.platformRole === 'SUPERADMIN' ? 'ad__badge--info' : 'ad__badge--ok'}`}>
-                        {op.platformRole === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson'}
+                      <span className={`ad__badge ${opRole === 'SUPERADMIN' ? 'ad__badge--info' : 'ad__badge--ok'}`}>
+                        {opRole === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson'}
                       </span>
                     </td>
                     <td>
@@ -102,7 +104,7 @@ export function AdminOperatorsPage() {
                         {op.status === 'ACTIVE' ? 'Active' : op.status}
                       </span>
                     </td>
-                    <td className="num">{op.organizationCount}</td>
+                    <td className="num">{op.organizationsCount ?? op.organizationCount ?? 0}</td>
                     <td>{op.lastLoginAt ? formatDateTime(op.lastLoginAt) : formatDayish(op.createdAt)}</td>
                     <td className="ad__rowactions">
                       <div>
@@ -117,10 +119,10 @@ export function AdminOperatorsPage() {
                               disabled={updateOperator.isPending}
                               onClick={() => updateOperator.mutate({
                                 id: op.id,
-                                body: { platformRole: op.platformRole === 'SUPERADMIN' ? 'SALESPERSON' : 'SUPERADMIN' },
+                                body: { role: opRole === 'SUPERADMIN' ? 'SALESPERSON' : 'SUPERADMIN' },
                               })}
                             >
-                              Make {op.platformRole === 'SUPERADMIN' ? 'Salesperson' : 'Superadmin'}
+                              Make {opRole === 'SUPERADMIN' ? 'Salesperson' : 'Superadmin'}
                             </button>
                             <button
                               type="button"
@@ -198,7 +200,7 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
       email: email.trim(),
       ...(phone.trim() ? { phone: phone.trim() } : {}),
       password,
-      platformRole,
+      role: platformRole,
     });
   };
 

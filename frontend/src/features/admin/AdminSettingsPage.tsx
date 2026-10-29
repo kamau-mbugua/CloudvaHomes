@@ -361,8 +361,8 @@ function SecurityLocksSection() {
   const locks = usePlatformLocks();
 
   const clear = useMutation({
-    mutationFn: (identifier?: string) =>
-      api.post<unknown>('/platform/security/locks/clear', identifier ? { identifier } : {}),
+    mutationFn: (key?: string) =>
+      api.post<unknown>('/platform/security/locks/clear', key ? { key } : {}),
     onSuccess: async () => {
       toast.saved('Rate-limit locks cleared.');
       await queryClient.invalidateQueries({ queryKey: keys.locks });
@@ -388,7 +388,7 @@ function SecurityLocksSection() {
         ) : null}
       </div>
       <p>
-        Accounts or IP addresses that repeatedly enter wrong passwords or OTP codes are temporarily throttled in Redis.
+        Accounts or IP addresses that repeatedly enter wrong passwords or OTP codes are temporarily throttled.
         You can clear a counter here if a legitimate user is locked out.
       </p>
 
@@ -401,27 +401,25 @@ function SecurityLocksSection() {
           <table className="ad__table ad__table--compact">
             <thead>
               <tr>
-                <th>Scope</th>
-                <th>Identifier</th>
+                <th>Bucket key</th>
                 <th className="num">Attempts</th>
-                <th className="num">Expires in (s)</th>
+                <th>Expires at</th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.key}>
-                  <td><span className="num">{row.scope}</span></td>
-                  <td><strong>{row.identifier}</strong></td>
+                  <td><strong className="num">{row.key}</strong></td>
                   <td className="num">{row.count}</td>
-                  <td className="num">{row.ttlSeconds}s</td>
+                  <td>{formatDateTime(row.expiresAt)}</td>
                   <td className="ad__rowactions">
                     <div>
                       <button
                         type="button"
                         className="nx-btn nx-btn--sm"
                         disabled={clear.isPending}
-                        onClick={() => clear.mutate(row.identifier)}
+                        onClick={() => clear.mutate(row.key)}
                       >
                         Clear
                       </button>
@@ -443,6 +441,7 @@ function SmsSettingsForm({ settings }: { settings: PlatformSettings }) {
   const [username, setUsername] = useState(settings.sms?.username ?? '');
   const [senderId, setSenderId] = useState(settings.sms?.senderId ?? '');
   const [apiKey, setApiKey] = useState('');
+  const apiKeySet = Boolean(settings.sms?.apiKeySet ?? settings.sms?.apiKey);
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.put<unknown>('/platform/settings', body),
@@ -471,12 +470,11 @@ function SmsSettingsForm({ settings }: { settings: PlatformSettings }) {
           {settings.sms?.configured
             ? <span className="ad__badge ad__badge--ok">Configured</span>
             : <span className="ad__badge ad__badge--off">Using environment / log</span>}
-          {settings.sms?.apiKey ? <span className="ad__badge ad__badge--info">API key saved</span> : null}
+          {apiKeySet ? <span className="ad__badge ad__badge--info">API key saved</span> : null}
         </div>
       </div>
       <p>
         Used for OTP verification codes, owner invitations, and tenant rent receipts sent by SMS.
-        Updating the API key requires step-up verification.
       </p>
 
       <div className="fm__grid">
@@ -487,7 +485,7 @@ function SmsSettingsForm({ settings }: { settings: PlatformSettings }) {
           <input id="at-sender" value={senderId} onChange={(e) => setSenderId(e.target.value)} />
         </Field>
         <Field id="at-key" label="API key" optional wide
-          hint={settings.sms?.apiKey ? 'Stored encrypted. Leave blank to keep the current API key.' : 'Stored encrypted and never shown again.'}>
+          hint={apiKeySet ? 'Stored encrypted. Leave blank to keep the current API key.' : 'Stored encrypted and never shown again.'}>
           <input id="at-key" type="password" autoComplete="new-password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
         </Field>
       </div>

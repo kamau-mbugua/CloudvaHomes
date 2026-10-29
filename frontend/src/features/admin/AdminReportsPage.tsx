@@ -13,6 +13,12 @@ import { formatDayish } from '../platform/rules';
 import type { OrgStatus } from '../platform/types';
 import { OrgStatusBadge } from '../platform/ui';
 
+/** Defensive KES formatter so undefined/null/non-integer values never crash a report view. */
+function kes(value: unknown): string {
+  const n = typeof value === 'number' ? Math.trunc(value) : Number.parseInt(String(value ?? '0'), 10);
+  return formatKES(Number.isFinite(n) ? n : 0);
+}
+
 export type AdminReportKey =
   | 'collections'
   | 'aged-receivables'
@@ -29,17 +35,17 @@ export type AdminReportKey =
 const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; usesDateRange: boolean }> = {
   collections: {
     title: 'Collections',
-    subtitle: 'Platform subscription payments received by payment method and day.',
+    subtitle: 'Platform subscription payments received over the selected period.',
     usesDateRange: true,
   },
   'aged-receivables': {
     title: 'Aged receivables',
-    subtitle: 'Unpaid and overdue Hodi platform invoices grouped by aging bucket (Current, 1–30, 31–60, 61–90, 90+ days).',
+    subtitle: 'Unpaid and overdue Hodi platform invoices grouped by organisation and aging bucket (Current, 1–30, 31–60, 61–90, 90+ days).',
     usesDateRange: false,
   },
   activity: {
     title: 'Organisation activity',
-    subtitle: 'Properties, units, let units, active staff, and last sign-in across every organisation.',
+    subtitle: 'Properties, units, let units, tenants, and latest activity across every organisation.',
     usesDateRange: false,
   },
   'subscription-changes': {
@@ -49,7 +55,7 @@ const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; use
   },
   onboarding: {
     title: 'Onboarding funnel',
-    subtitle: 'Conversion from organisation signup to owner activation, property setup, let units, and first Hodi payment.',
+    subtitle: 'Conversion from organisation signup to owner activation, property setup, let units, rent collection, and first Hodi payment.',
     usesDateRange: true,
   },
   invoices: {
@@ -59,13 +65,13 @@ const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; use
   },
   plans: {
     title: 'Plan performance',
-    subtitle: 'Active and trial organisations, let units, estimated MRR, and lifetime revenue per plan.',
-    usesDateRange: false,
+    subtitle: 'Active and trial organisations, let units, estimated MRR, collections, and arrears per plan.',
+    usesDateRange: true,
   },
   reconciliation: {
     title: 'Reconciliation',
-    subtitle: 'Platform payments matched to Hodi invoices versus unallocated credit.',
-    usesDateRange: true,
+    subtitle: 'Platform payments with unallocated credit and M-Pesa STK payment push requests.',
+    usesDateRange: false,
   },
   'price-variance': {
     title: 'Price vs plan',
@@ -74,7 +80,7 @@ const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; use
   },
   salespeople: {
     title: 'Salesperson performance',
-    subtitle: 'Book of business, active/trial organisations, let units, billed revenue, collections, and arrears per operator.',
+    subtitle: 'Book of business, active/trial organisations, let units, MRR, collections, and arrears per operator.',
     usesDateRange: true,
   },
   audit: {
@@ -225,25 +231,38 @@ function ReportBody({
 }
 
 function CollectionsView({ data }: { data: Record<string, unknown> }) {
-  const totals = (data.totals as { count: number; amount: number }) ?? { count: 0, amount: 0 };
-  const byMethod = (data.byMethod as { method: string; count: number; amount: number }[]) ?? [];
-  const byDay = (data.byDay as { day: string; count: number; amount: number }[]) ?? [];
+  const totals = (data.totals as { count?: number; amount?: number; byMethod?: Record<string, number> }) ?? {};
+  const byMethod = totals.byMethod ?? {};
+  const rows = (data.rows as {
+    id: string;
+    receivedAt: string;
+    orgId: string;
+    organizationName: string;
+    billingRef: string | null;
+    salesperson: string | null;
+    invoiceNumbers: string | null;
+    amount: number;
+    unallocated: number;
+    method: string;
+    source: string;
+    reference: string;
+  }[]) ?? [];
 
   return (
     <>
       <div className="ad__stats">
         <div className="ad__stat">
           <span className="ad__stat__label">Total collected</span>
-          <span className="ad__stat__value num">{formatKES(totals.amount)}</span>
+          <span className="ad__stat__value num">{kes(totals.amount)}</span>
         </div>
         <div className="ad__stat">
           <span className="ad__stat__label">Payments count</span>
-          <span className="ad__stat__value num">{totals.count}</span>
+          <span className="ad__stat__value num">{totals.count ?? rows.length}</span>
         </div>
-        {byMethod.map((m) => (
-          <div key={m.method} className="ad__stat">
-            <span className="ad__stat__label">{m.method} ({m.count})</span>
-            <span className="ad__stat__value num">{formatKES(m.amount)}</span>
+        {Object.entries(byMethod).map(([method, amount]) => (
+          <div key={method} className="ad__stat">
+            <span className="ad__stat__label">{method}</span>
+            <span className="ad__stat__value num">{kes(amount)}</span>
           </div>
         ))}
       </div>
@@ -252,12 +271,12 @@ function CollectionsView({ data }: { data: Record<string, unknown> }) {
         <button
           type="button"
           className="nx-btn nx-btn--sm pg-push"
-          disabled={byDay.length === 0}
+          disabled={rows.length === 0}
           onClick={() =>
             downloadCsvFile(
               'hodi-collections.csv',
-              ['Day', 'Payments', 'Amount (KES cents)'],
-              byDay.map((r) => [r.day, r.count, r.amount]),
+              ['Received', 'Organisation', 'Billing ref', 'Reference', 'Method', 'Source', 'Amount (KES cents)'],
+              rows.map((r) => [r.receivedAt, r.organizationName, r.billingRef, r.reference, r.method, r.source, r.amount]),
             )
           }
         >
@@ -265,24 +284,37 @@ function CollectionsView({ data }: { data: Record<string, unknown> }) {
         </button>
       </div>
 
-      {byDay.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="ad__tablewrap"><EmptyState title="No collections in this date range" /></div>
       ) : (
         <div className="ad__tablewrap">
           <table className="ad__table">
             <thead>
               <tr>
-                <th>Day</th>
-                <th className="num">Payments</th>
+                <th>Received</th>
+                <th>Organisation</th>
+                <th>Salesperson</th>
+                <th>Reference</th>
+                <th>Method</th>
+                <th>Invoices</th>
                 <th className="num">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {byDay.map((row) => (
-                <tr key={row.day}>
-                  <td>{formatDayish(row.day)}</td>
-                  <td className="num">{row.count}</td>
-                  <td className="num">{formatKES(row.amount)}</td>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{formatDayish(row.receivedAt)}</td>
+                  <td>
+                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(row.orgId)}`}>
+                      <strong>{row.organizationName}</strong>
+                    </Link>
+                    {row.billingRef ? <span className="ad__sub num">{row.billingRef}</span> : null}
+                  </td>
+                  <td>{row.salesperson ?? '—'}</td>
+                  <td className="num">{row.reference}</td>
+                  <td>{row.method} · {row.source}</td>
+                  <td className="num">{row.invoiceNumbers ?? 'Credit'}</td>
+                  <td className="num">{kes(row.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -294,31 +326,59 @@ function CollectionsView({ data }: { data: Record<string, unknown> }) {
 }
 
 function AgedReceivablesView({ data }: { data: Record<string, unknown> }) {
-  const totals = (data.totals as { count: number; balance: number }) ?? { count: 0, balance: 0 };
-  const buckets = (data.buckets as { key: string; label: string; count: number; balance: number }[]) ?? [];
+  const totals = (data.totals as {
+    current?: number;
+    days1to30?: number;
+    days31to60?: number;
+    days61to90?: number;
+    daysOver90?: number;
+    total?: number;
+    organizationsCount?: number;
+  }) ?? {};
   const rows = (data.rows as {
-    id: string;
-    number: string;
-    period: string;
-    dueDate: string;
-    ageDays: number;
-    balance: number;
-    organization: { id: string; name: string; billingRef: string } | null;
+    orgId: string;
+    organizationName: string;
+    billingRef: string | null;
+    status: OrgStatus;
+    salesperson: string | null;
+    oldestDueDate: string | null;
+    current: number;
+    days1to30: number;
+    days31to60: number;
+    days61to90: number;
+    daysOver90: number;
+    total: number;
   }[]) ?? [];
+
+  const totalUnpaid = totals.total ?? 0;
 
   return (
     <>
       <div className="ad__stats">
         <div className="ad__stat">
-          <span className="ad__stat__label">Total unpaid</span>
-          <span className={`ad__stat__value num ${totals.balance > 0 ? 'ad__owed' : ''}`}>{formatKES(totals.balance)}</span>
+          <span className="ad__stat__label">Total unpaid ({totals.organizationsCount ?? rows.length} orgs)</span>
+          <span className={`ad__stat__value num ${totalUnpaid > 0 ? 'ad__owed' : ''}`}>{kes(totalUnpaid)}</span>
         </div>
-        {buckets.map((b) => (
-          <div key={b.key} className="ad__stat">
-            <span className="ad__stat__label">{b.label} ({b.count})</span>
-            <span className="ad__stat__value num">{formatKES(b.balance)}</span>
-          </div>
-        ))}
+        <div className="ad__stat">
+          <span className="ad__stat__label">Current (not yet due)</span>
+          <span className="ad__stat__value num">{kes(totals.current)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">1–30 days</span>
+          <span className="ad__stat__value num">{kes(totals.days1to30)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">31–60 days</span>
+          <span className="ad__stat__value num">{kes(totals.days31to60)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">61–90 days</span>
+          <span className="ad__stat__value num">{kes(totals.days61to90)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Over 90 days</span>
+          <span className={`ad__stat__value num ${(totals.daysOver90 ?? 0) > 0 ? 'ad__owed' : ''}`}>{kes(totals.daysOver90)}</span>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -328,30 +388,36 @@ function AgedReceivablesView({ data }: { data: Record<string, unknown> }) {
           <table className="ad__table">
             <thead>
               <tr>
-                <th>Invoice</th>
                 <th>Organisation</th>
-                <th>Month</th>
-                <th>Due date</th>
-                <th className="num">Days overdue</th>
-                <th className="num">Balance</th>
+                <th>Status</th>
+                <th>Salesperson</th>
+                <th>Oldest due</th>
+                <th className="num">Current</th>
+                <th className="num">1–30d</th>
+                <th className="num">31–60d</th>
+                <th className="num">61–90d</th>
+                <th className="num">90+d</th>
+                <th className="num">Total owed</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
-                  <td><strong className="num">{r.number}</strong></td>
+                <tr key={r.orgId}>
                   <td>
-                    {r.organization ? (
-                      <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.organization.id)}`}>
-                        <strong>{r.organization.name}</strong>
-                      </Link>
-                    ) : '—'}
-                    {r.organization?.billingRef ? <span className="ad__sub num">{r.organization.billingRef}</span> : null}
+                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.orgId)}`}>
+                      <strong>{r.organizationName}</strong>
+                    </Link>
+                    {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
                   </td>
-                  <td>{formatPeriod(r.period)}</td>
-                  <td>{formatDayish(r.dueDate)}</td>
-                  <td className="num">{r.ageDays}</td>
-                  <td className="num ad__owed">{formatKES(r.balance)}</td>
+                  <td><OrgStatusBadge status={r.status} /></td>
+                  <td>{r.salesperson ?? '—'}</td>
+                  <td>{formatDayish(r.oldestDueDate)}</td>
+                  <td className="num">{kes(r.current)}</td>
+                  <td className="num">{kes(r.days1to30)}</td>
+                  <td className="num">{kes(r.days31to60)}</td>
+                  <td className="num">{kes(r.days61to90)}</td>
+                  <td className="num">{kes(r.daysOver90)}</td>
+                  <td className="num ad__owed">{kes(r.total)}</td>
                 </tr>
               ))}
             </tbody>
@@ -363,6 +429,14 @@ function AgedReceivablesView({ data }: { data: Record<string, unknown> }) {
 }
 
 function ActivityView({ data }: { data: Record<string, unknown> }) {
+  const totals = (data.totals as {
+    organizations?: number;
+    activeOrganizations?: number;
+    properties?: number;
+    units?: number;
+    occupiedUnits?: number;
+    tenants?: number;
+  }) ?? {};
   const rows = (data.rows as {
     id: string;
     name: string;
@@ -370,47 +444,76 @@ function ActivityView({ data }: { data: Record<string, unknown> }) {
     kind: string;
     status: OrgStatus;
     planName: string | null;
+    salesperson: string | null;
     propertiesCount: number;
     unitsCount: number;
-    occupiedUnitsCount: number;
-    activeUsersCount: number;
-    lastLoginAt: string | null;
+    occupiedUnits?: number;
+    occupiedUnitsCount?: number;
+    tenantsCount?: number;
+    lastRentPaymentAt?: string | null;
+    lastPlatformPaymentAt?: string | null;
+    lastStaffLoginAt?: string | null;
   }[]) ?? [];
 
-  return rows.length === 0 ? (
-    <div className="ad__tablewrap"><EmptyState title="No organisations yet" /></div>
-  ) : (
-    <div className="ad__tablewrap">
-      <table className="ad__table">
-        <thead>
-          <tr>
-            <th>Organisation</th>
-            <th>Status</th>
-            <th>Plan</th>
-            <th className="num">Properties</th>
-            <th className="num">Units (Let / Total)</th>
-            <th className="num">Staff</th>
-            <th>Last sign-in</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.id)}`}><strong>{r.name}</strong></Link>
-                <span className="ad__sub"><span className="num">{r.billingRef}</span> · {r.kind}</span>
-              </td>
-              <td><OrgStatusBadge status={r.status} /></td>
-              <td>{r.planName ?? '—'}</td>
-              <td className="num">{r.propertiesCount}</td>
-              <td className="num">{r.occupiedUnitsCount} / {r.unitsCount}</td>
-              <td className="num">{r.activeUsersCount}</td>
-              <td>{r.lastLoginAt ? formatDateTime(r.lastLoginAt) : '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+  return (
+    <>
+      <div className="ad__stats">
+        <div className="ad__stat">
+          <span className="ad__stat__label">Organisations (Active/Trial)</span>
+          <span className="ad__stat__value num">{totals.activeOrganizations ?? 0} / {totals.organizations ?? rows.length}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Properties</span>
+          <span className="ad__stat__value num">{totals.properties ?? 0}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Units (Let / Total)</span>
+          <span className="ad__stat__value num">{totals.occupiedUnits ?? 0} / {totals.units ?? 0}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Tenants</span>
+          <span className="ad__stat__value num">{totals.tenants ?? 0}</span>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="ad__tablewrap"><EmptyState title="No organisations yet" /></div>
+      ) : (
+        <div className="ad__tablewrap">
+          <table className="ad__table">
+            <thead>
+              <tr>
+                <th>Organisation</th>
+                <th>Status</th>
+                <th>Plan</th>
+                <th>Salesperson</th>
+                <th className="num">Properties</th>
+                <th className="num">Units (Let / Total)</th>
+                <th className="num">Tenants</th>
+                <th>Last sign-in</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.id)}`}><strong>{r.name}</strong></Link>
+                    <span className="ad__sub"><span className="num">{r.billingRef}</span> · {r.kind}</span>
+                  </td>
+                  <td><OrgStatusBadge status={r.status} /></td>
+                  <td>{r.planName ?? '—'}</td>
+                  <td>{r.salesperson ?? '—'}</td>
+                  <td className="num">{r.propertiesCount ?? 0}</td>
+                  <td className="num">{r.occupiedUnits ?? r.occupiedUnitsCount ?? 0} / {r.unitsCount ?? 0}</td>
+                  <td className="num">{r.tenantsCount ?? 0}</td>
+                  <td>{r.lastStaffLoginAt ? formatDateTime(r.lastStaffLoginAt) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -421,7 +524,12 @@ function SubscriptionChangesView({ data }: { data: Record<string, unknown> }) {
     orgId: string | null;
     organizationName: string | null;
     billingRef: string | null;
+    actorName?: string | null;
     actorEmail: string | null;
+    beforeStatus?: string | null;
+    afterStatus?: string | null;
+    beforePlan?: string | null;
+    afterPlan?: string | null;
     createdAt: string;
   }[]) ?? [];
 
@@ -435,6 +543,7 @@ function SubscriptionChangesView({ data }: { data: Record<string, unknown> }) {
             <th>When</th>
             <th>Organisation</th>
             <th>Action</th>
+            <th>Details</th>
             <th>By</th>
           </tr>
         </thead>
@@ -451,7 +560,11 @@ function SubscriptionChangesView({ data }: { data: Record<string, unknown> }) {
                 {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
               </td>
               <td><span className="num">{r.action}</span></td>
-              <td>{r.actorEmail ?? 'System'}</td>
+              <td>
+                {r.beforeStatus || r.afterStatus ? <span>Status: {r.beforeStatus ?? '—'} → {r.afterStatus ?? '—'} </span> : null}
+                {r.beforePlan || r.afterPlan ? <span>Plan: {r.beforePlan ?? '—'} → {r.afterPlan ?? '—'}</span> : null}
+              </td>
+              <td>{r.actorName || r.actorEmail || 'System'}</td>
             </tr>
           ))}
         </tbody>
@@ -461,36 +574,99 @@ function SubscriptionChangesView({ data }: { data: Record<string, unknown> }) {
 }
 
 function OnboardingView({ data }: { data: Record<string, unknown> }) {
-  const stages = (data.stages as { stage: string; count: number; conversionRatePct: number }[]) ?? [];
+  const totals = (data.totals as {
+    created?: number;
+    ownerAccepted?: number;
+    addedProperty?: number;
+    addedUnits?: number;
+    addedTenants?: number;
+    collectedRent?: number;
+    paidHodi?: number;
+  }) ?? {};
+  const rows = (data.rows as {
+    id: string;
+    name: string;
+    billingRef: string | null;
+    status: OrgStatus;
+    salesperson: string | null;
+    ownerAccepted: boolean;
+    addedProperty: boolean;
+    addedUnits: boolean;
+    addedTenants: boolean;
+    collectedRent: boolean;
+    paidHodi: boolean;
+    completedSteps: number;
+    totalSteps: number;
+    createdAt: string;
+  }[]) ?? [];
+
+  const created = totals.created ?? rows.length;
+  const stages = [
+    { label: 'Organisations created', count: created },
+    { label: 'Owner accepted invite', count: totals.ownerAccepted ?? 0 },
+    { label: 'Added first property', count: totals.addedProperty ?? 0 },
+    { label: 'Added units', count: totals.addedUnits ?? 0 },
+    { label: 'Added tenants', count: totals.addedTenants ?? 0 },
+    { label: 'Collected rent', count: totals.collectedRent ?? 0 },
+    { label: 'Paid Hodi subscription', count: totals.paidHodi ?? 0 },
+  ];
 
   return (
-    <div className="ad__tablewrap">
-      <table className="ad__table">
-        <thead>
-          <tr>
-            <th>Funnel stage</th>
-            <th className="num">Organisations</th>
-            <th className="num">Conversion rate</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stages.map((s) => (
-            <tr key={s.stage}>
-              <td><strong>{s.stage}</strong></td>
-              <td className="num">{s.count}</td>
-              <td className="num">{s.conversionRatePct}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="ad__stats">
+        {stages.map((s) => (
+          <div key={s.label} className="ad__stat">
+            <span className="ad__stat__label">{s.label}</span>
+            <span className="ad__stat__value num">
+              {s.count}{created > 0 ? ` (${Math.round((s.count / created) * 100)}%)` : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="ad__tablewrap"><EmptyState title="No organisations created in this period" /></div>
+      ) : (
+        <div className="ad__tablewrap">
+          <table className="ad__table">
+            <thead>
+              <tr>
+                <th>Organisation</th>
+                <th>Status</th>
+                <th>Salesperson</th>
+                <th>Progress</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.id)}`}><strong>{r.name}</strong></Link>
+                    {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
+                  </td>
+                  <td><OrgStatusBadge status={r.status} /></td>
+                  <td>{r.salesperson ?? '—'}</td>
+                  <td className="num">{r.completedSteps} / {r.totalSteps} milestones</td>
+                  <td>{formatDayish(r.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }
 
 function InvoicesReportView({ data }: { data: Record<string, unknown> }) {
-  const totals = (data.totals as { count: number; totalBilled: number; totalPaid: number; totalBalance: number }) ?? {
-    count: 0, totalBilled: 0, totalPaid: 0, totalBalance: 0,
-  };
+  const totals = (data.totals as {
+    count?: number;
+    billed?: number;
+    paid?: number;
+    outstanding?: number;
+    overdue?: number;
+  }) ?? {};
   const rows = (data.rows as {
     id: string;
     number: string;
@@ -500,29 +676,32 @@ function InvoicesReportView({ data }: { data: Record<string, unknown> }) {
     amountPaid: number;
     balance: number;
     status: string;
-    issueDate: string;
-    dueDate: string;
-    organization: { id: string; name: string; billingRef: string } | null;
+    orgId?: string;
+    organizationName?: string;
+    billingRef?: string | null;
+    salesperson?: string | null;
   }[]) ?? [];
+
+  const outstanding = totals.outstanding ?? 0;
 
   return (
     <>
       <div className="ad__stats">
         <div className="ad__stat">
           <span className="ad__stat__label">Invoices issued</span>
-          <span className="ad__stat__value num">{totals.count}</span>
+          <span className="ad__stat__value num">{totals.count ?? rows.length}</span>
         </div>
         <div className="ad__stat">
           <span className="ad__stat__label">Total billed</span>
-          <span className="ad__stat__value num">{formatKES(totals.totalBilled)}</span>
+          <span className="ad__stat__value num">{kes(totals.billed)}</span>
         </div>
         <div className="ad__stat">
           <span className="ad__stat__label">Total paid</span>
-          <span className="ad__stat__value num">{formatKES(totals.totalPaid)}</span>
+          <span className="ad__stat__value num">{kes(totals.paid)}</span>
         </div>
         <div className="ad__stat">
           <span className="ad__stat__label">Outstanding balance</span>
-          <span className={`ad__stat__value num ${totals.totalBalance > 0 ? 'ad__owed' : ''}`}>{formatKES(totals.totalBalance)}</span>
+          <span className={`ad__stat__value num ${outstanding > 0 ? 'ad__owed' : ''}`}>{kes(outstanding)}</span>
         </div>
       </div>
 
@@ -535,6 +714,7 @@ function InvoicesReportView({ data }: { data: Record<string, unknown> }) {
               <tr>
                 <th>Invoice</th>
                 <th>Organisation</th>
+                <th>Salesperson</th>
                 <th>Month</th>
                 <th className="num">Let units</th>
                 <th className="num">Billed</th>
@@ -548,17 +728,19 @@ function InvoicesReportView({ data }: { data: Record<string, unknown> }) {
                 <tr key={r.id}>
                   <td><strong className="num">{r.number}</strong></td>
                   <td>
-                    {r.organization ? (
-                      <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.organization.id)}`}>
-                        <strong>{r.organization.name}</strong>
+                    {r.orgId ? (
+                      <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.orgId)}`}>
+                        <strong>{r.organizationName ?? r.orgId}</strong>
                       </Link>
-                    ) : '—'}
+                    ) : (r.organizationName ?? '—')}
+                    {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
                   </td>
+                  <td>{r.salesperson ?? '—'}</td>
                   <td>{formatPeriod(r.period)}</td>
                   <td className="num">{r.occupiedUnits}</td>
-                  <td className="num">{formatKES(r.total)}</td>
-                  <td className="num">{formatKES(r.amountPaid)}</td>
-                  <td className="num">{formatKES(r.balance)}</td>
+                  <td className="num">{kes(r.total)}</td>
+                  <td className="num">{kes(r.amountPaid)}</td>
+                  <td className="num">{kes(r.balance)}</td>
                   <td><span className="num">{r.status}</span></td>
                 </tr>
               ))}
@@ -571,90 +753,141 @@ function InvoicesReportView({ data }: { data: Record<string, unknown> }) {
 }
 
 function PlansReportView({ data }: { data: Record<string, unknown> }) {
+  const totals = (data.totals as {
+    organizationsTotal?: number;
+    organizationsActive?: number;
+    occupiedUnits?: number;
+    mrr?: number;
+    collected?: number;
+    outstanding?: number;
+  }) ?? {};
   const rows = (data.rows as {
-    id: string;
-    name: string;
+    planId: string | null;
+    planName: string;
     active: boolean;
     pricePerUnit: number;
     minimumMonthly: number;
-    totalOrganizations: number;
-    activeOrganizations: number;
-    trialOrganizations: number;
+    organizationsTotal: number;
+    organizationsActive: number;
+    organizationsTrial: number;
     occupiedUnits: number;
-    estimatedMonthlyRevenue: number;
-    lifetimeCollected: number;
-  }[]) ?? [];
-
-  return rows.length === 0 ? (
-    <div className="ad__tablewrap"><EmptyState title="No plans configured" /></div>
-  ) : (
-    <div className="ad__tablewrap">
-      <table className="ad__table">
-        <thead>
-          <tr>
-            <th>Plan</th>
-            <th className="num">Rate / Minimum</th>
-            <th className="num">Orgs (Active / Trial / Total)</th>
-            <th className="num">Let units</th>
-            <th className="num">Est. MRR</th>
-            <th className="num">Lifetime collected</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <strong>{r.name}</strong>
-                {!r.active ? <span className="ad__sub">Inactive</span> : null}
-              </td>
-              <td className="num">{formatKES(r.pricePerUnit)} · min {formatKES(r.minimumMonthly)}</td>
-              <td className="num">{r.activeOrganizations} / {r.trialOrganizations} / {r.totalOrganizations}</td>
-              <td className="num">{r.occupiedUnits}</td>
-              <td className="num">{formatKES(r.estimatedMonthlyRevenue)}</td>
-              <td className="num">{formatKES(r.lifetimeCollected)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ReconciliationView({ data }: { data: Record<string, unknown> }) {
-  const totals = (data.totals as { totalPayments: number; allocatedAmount: number; unallocatedCredit: number }) ?? {
-    totalPayments: 0, allocatedAmount: 0, unallocatedCredit: 0,
-  };
-  const rows = (data.rows as {
-    id: string;
-    amount: number;
-    allocated: number;
-    unallocated: number;
-    method: string;
-    source: string;
-    reference: string;
-    receivedAt: string;
-    organization: { id: string; name: string; billingRef: string } | null;
+    mrr: number;
+    collected: number;
+    outstanding: number;
   }[]) ?? [];
 
   return (
     <>
       <div className="ad__stats">
         <div className="ad__stat">
-          <span className="ad__stat__label">Total received</span>
-          <span className="ad__stat__value num">{formatKES(totals.totalPayments)}</span>
+          <span className="ad__stat__label">Estimated MRR</span>
+          <span className="ad__stat__value num">{kes(totals.mrr)}</span>
         </div>
         <div className="ad__stat">
-          <span className="ad__stat__label">Allocated to invoices</span>
-          <span className="ad__stat__value num">{formatKES(totals.allocatedAmount)}</span>
+          <span className="ad__stat__label">Collected in period</span>
+          <span className="ad__stat__value num">{kes(totals.collected)}</span>
         </div>
         <div className="ad__stat">
-          <span className="ad__stat__label">Unallocated credit</span>
-          <span className="ad__stat__value num">{formatKES(totals.unallocatedCredit)}</span>
+          <span className="ad__stat__label">Outstanding</span>
+          <span className="ad__stat__value num">{kes(totals.outstanding)}</span>
         </div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="ad__tablewrap"><EmptyState title="No payments in this period" /></div>
+        <div className="ad__tablewrap"><EmptyState title="No plans configured" /></div>
+      ) : (
+        <div className="ad__tablewrap">
+          <table className="ad__table">
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th className="num">Rate / Minimum</th>
+                <th className="num">Orgs (Active / Trial / Total)</th>
+                <th className="num">Let units</th>
+                <th className="num">Est. MRR</th>
+                <th className="num">Collected</th>
+                <th className="num">Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, idx) => (
+                <tr key={r.planId ?? `unassigned-${idx}`}>
+                  <td>
+                    <strong>{r.planName}</strong>
+                    {r.planId && !r.active ? <span className="ad__sub">Inactive</span> : null}
+                  </td>
+                  <td className="num">{kes(r.pricePerUnit)} · min {kes(r.minimumMonthly)}</td>
+                  <td className="num">{r.organizationsActive} / {r.organizationsTrial} / {r.organizationsTotal}</td>
+                  <td className="num">{r.occupiedUnits}</td>
+                  <td className="num">{kes(r.mrr)}</td>
+                  <td className="num">{kes(r.collected)}</td>
+                  <td className="num">{kes(r.outstanding)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReconciliationView({ data }: { data: Record<string, unknown> }) {
+  const totals = (data.totals as {
+    unallocatedCount?: number;
+    unallocatedAmount?: number;
+    stkPendingCount?: number;
+    stkFailedCount?: number;
+    stkSuccessCount?: number;
+  }) ?? {};
+  const unallocatedRows = (data.unallocatedPayments as {
+    id: string;
+    organizationName: string;
+    billingRef: string | null;
+    amount: number;
+    unallocated: number;
+    method: string;
+    source: string;
+    reference: string;
+    receivedAt: string;
+  }[]) ?? [];
+  const stkRows = (data.stkRequests as {
+    id: string;
+    orgId: string;
+    organizationName: string;
+    billingRef: string | null;
+    phone: string;
+    amount: number;
+    state: string;
+    mpesaReceipt: string | null;
+    resultDesc: string | null;
+    createdAt: string;
+  }[]) ?? [];
+
+  return (
+    <>
+      <div className="ad__stats">
+        <div className="ad__stat">
+          <span className="ad__stat__label">Unallocated credit ({totals.unallocatedCount ?? unallocatedRows.length})</span>
+          <span className="ad__stat__value num">{kes(totals.unallocatedAmount)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">STK push succeeded</span>
+          <span className="ad__stat__value num">{totals.stkSuccessCount ?? 0}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">STK push pending</span>
+          <span className="ad__stat__value num">{totals.stkPendingCount ?? 0}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">STK push failed</span>
+          <span className="ad__stat__value num">{totals.stkFailedCount ?? 0}</span>
+        </div>
+      </div>
+
+      <h2 className="ad__h2">Payments with unallocated credit</h2>
+      {unallocatedRows.length === 0 ? (
+        <div className="ad__tablewrap"><EmptyState title="No unallocated payment credits" /></div>
       ) : (
         <div className="ad__tablewrap">
           <table className="ad__table">
@@ -665,26 +898,57 @@ function ReconciliationView({ data }: { data: Record<string, unknown> }) {
                 <th>Reference</th>
                 <th>Method</th>
                 <th className="num">Amount</th>
-                <th className="num">Allocated</th>
-                <th className="num">Credit</th>
+                <th className="num">Unallocated credit</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {unallocatedRows.map((r) => (
                 <tr key={r.id}>
                   <td>{formatDayish(r.receivedAt)}</td>
                   <td>
-                    {r.organization ? (
-                      <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.organization.id)}`}>
-                        <strong>{r.organization.name}</strong>
-                      </Link>
-                    ) : '—'}
+                    <strong>{r.organizationName}</strong>
+                    {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
                   </td>
                   <td className="num">{r.reference}</td>
                   <td>{r.method} · {r.source}</td>
-                  <td className="num">{formatKES(r.amount)}</td>
-                  <td className="num">{formatKES(r.allocated)}</td>
-                  <td className="num">{formatKES(r.unallocated)}</td>
+                  <td className="num">{kes(r.amount)}</td>
+                  <td className="num">{kes(r.unallocated)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h2 className="ad__h2" style={{ marginTop: '1.5rem' }}>Recent M-Pesa STK payment requests</h2>
+      {stkRows.length === 0 ? (
+        <div className="ad__tablewrap"><EmptyState title="No M-Pesa STK payment requests yet" /></div>
+      ) : (
+        <div className="ad__tablewrap">
+          <table className="ad__table">
+            <thead>
+              <tr>
+                <th>Requested</th>
+                <th>Organisation</th>
+                <th>Phone</th>
+                <th className="num">Amount</th>
+                <th>Status</th>
+                <th>Receipt / Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stkRows.map((s) => (
+                <tr key={s.id}>
+                  <td>{formatDateTime(s.createdAt)}</td>
+                  <td>
+                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(s.orgId)}`}>
+                      <strong>{s.organizationName}</strong>
+                    </Link>
+                  </td>
+                  <td className="num">{s.phone}</td>
+                  <td className="num">{kes(s.amount)}</td>
+                  <td><span className="num">{s.state}</span></td>
+                  <td>{s.mpesaReceipt ?? s.resultDesc ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -696,38 +960,52 @@ function ReconciliationView({ data }: { data: Record<string, unknown> }) {
 }
 
 function PriceVarianceView({ data }: { data: Record<string, unknown> }) {
-  const totals = (data.totals as { customOrgsCount: number; totalMonthlyDelta: number }) ?? {
-    customOrgsCount: 0, totalMonthlyDelta: 0,
-  };
+  const totals = (data.totals as {
+    organizationsCount?: number;
+    customizedCount?: number;
+    standardMrr?: number;
+    effectiveMrr?: number;
+    netVarianceMrr?: number;
+  }) ?? {};
   const rows = (data.rows as {
-    id: string;
-    name: string;
-    billingRef: string;
+    orgId: string;
+    organizationName: string;
+    billingRef: string | null;
     status: OrgStatus;
-    planName: string | null;
+    salesperson: string | null;
+    planName: string;
     occupiedUnits: number;
+    custom: boolean;
     standardMonthly: number;
     effectiveMonthly: number;
-    monthlyDelta: number;
+    varianceMonthly: number;
   }[]) ?? [];
+
+  const netVariance = totals.netVarianceMrr ?? 0;
 
   return (
     <>
       <div className="ad__stats">
         <div className="ad__stat">
-          <span className="ad__stat__label">Organisations on custom pricing</span>
-          <span className="ad__stat__value num">{totals.customOrgsCount}</span>
+          <span className="ad__stat__label">Custom pricing orgs</span>
+          <span className="ad__stat__value num">{totals.customizedCount ?? 0} / {totals.organizationsCount ?? rows.length}</span>
         </div>
         <div className="ad__stat">
-          <span className="ad__stat__label">Net monthly variance vs plan</span>
-          <span className={`ad__stat__value num ${totals.totalMonthlyDelta < 0 ? 'ad__owed' : ''}`}>
-            {formatKES(totals.totalMonthlyDelta)}
-          </span>
+          <span className="ad__stat__label">Standard plan MRR</span>
+          <span className="ad__stat__value num">{kes(totals.standardMrr)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Effective MRR</span>
+          <span className="ad__stat__value num">{kes(totals.effectiveMrr)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Net monthly variance</span>
+          <span className={`ad__stat__value num ${netVariance < 0 ? 'ad__owed' : ''}`}>{kes(netVariance)}</span>
         </div>
       </div>
 
       {rows.length === 0 ? (
-        <div className="ad__tablewrap"><EmptyState title="No custom pricing overrides" detail="All organisations use their plan’s standard rate and minimum." /></div>
+        <div className="ad__tablewrap"><EmptyState title="No organisations found" /></div>
       ) : (
         <div className="ad__tablewrap">
           <table className="ad__table">
@@ -736,25 +1014,29 @@ function PriceVarianceView({ data }: { data: Record<string, unknown> }) {
                 <th>Organisation</th>
                 <th>Status</th>
                 <th>Plan</th>
+                <th>Salesperson</th>
                 <th className="num">Let units</th>
                 <th className="num">Standard monthly</th>
-                <th className="num">Custom monthly</th>
+                <th className="num">Effective monthly</th>
                 <th className="num">Variance</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.orgId}>
                   <td>
-                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.id)}`}><strong>{r.name}</strong></Link>
-                    <span className="ad__sub num">{r.billingRef}</span>
+                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.orgId)}`}>
+                      <strong>{r.organizationName}</strong>
+                    </Link>
+                    {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
                   </td>
                   <td><OrgStatusBadge status={r.status} /></td>
-                  <td>{r.planName ?? '—'}</td>
+                  <td>{r.planName}</td>
+                  <td>{r.salesperson ?? '—'}</td>
                   <td className="num">{r.occupiedUnits}</td>
-                  <td className="num">{formatKES(r.standardMonthly)}</td>
-                  <td className="num">{formatKES(r.effectiveMonthly)}</td>
-                  <td className={`num ${r.monthlyDelta < 0 ? 'ad__owed' : ''}`}>{formatKES(r.monthlyDelta)}</td>
+                  <td className="num">{kes(r.standardMonthly)}</td>
+                  <td className="num">{kes(r.effectiveMonthly)}</td>
+                  <td className={`num ${r.varianceMonthly < 0 ? 'ad__owed' : ''}`}>{kes(r.varianceMonthly)}</td>
                 </tr>
               ))}
             </tbody>
@@ -766,59 +1048,92 @@ function PriceVarianceView({ data }: { data: Record<string, unknown> }) {
 }
 
 function SalespeopleView({ data }: { data: Record<string, unknown> }) {
+  const totals = (data.totals as {
+    organizationsTotal?: number;
+    organizationsActive?: number;
+    onboardedInRange?: number;
+    occupiedUnits?: number;
+    mrr?: number;
+    collected?: number;
+    overdue?: number;
+  }) ?? {};
   const rows = (data.rows as {
-    id: string;
+    salespersonId: string;
     name: string;
-    email: string;
+    email: string | null;
     role: string;
-    status: string;
-    totalOrganizations: number;
-    activeOrganizations: number;
-    trialOrganizations: number;
+    organizationsTotal: number;
+    organizationsActive: number;
+    onboardedInRange: number;
     occupiedUnits: number;
-    billedInRange: number;
-    collectedInRange: number;
-    outstandingBalance: number;
+    mrr: number;
+    collected: number;
+    overdue: number;
   }[]) ?? [];
 
-  return rows.length === 0 ? (
-    <div className="ad__tablewrap"><EmptyState title="No platform operators found" /></div>
-  ) : (
-    <div className="ad__tablewrap">
-      <table className="ad__table">
-        <thead>
-          <tr>
-            <th>Operator</th>
-            <th>Role</th>
-            <th className="num">Orgs (Active / Trial / Total)</th>
-            <th className="num">Let units</th>
-            <th className="num">Billed in period</th>
-            <th className="num">Collected in period</th>
-            <th className="num">Outstanding</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <strong>{r.name}</strong>
-                <span className="ad__sub">{r.email}</span>
-              </td>
-              <td>
-                <span className={`ad__badge ${r.role === 'SUPERADMIN' ? 'ad__badge--info' : 'ad__badge--ok'}`}>
-                  {r.role === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson'}
-                </span>
-              </td>
-              <td className="num">{r.activeOrganizations} / {r.trialOrganizations} / {r.totalOrganizations}</td>
-              <td className="num">{r.occupiedUnits}</td>
-              <td className="num">{formatKES(r.billedInRange)}</td>
-              <td className="num">{formatKES(r.collectedInRange)}</td>
-              <td className={`num ${r.outstandingBalance > 0 ? 'ad__owed' : ''}`}>{formatKES(r.outstandingBalance)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+  return (
+    <>
+      <div className="ad__stats">
+        <div className="ad__stat">
+          <span className="ad__stat__label">Total book MRR</span>
+          <span className="ad__stat__value num">{kes(totals.mrr)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Collected in period</span>
+          <span className="ad__stat__value num">{kes(totals.collected)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Overdue balance</span>
+          <span className={`ad__stat__value num ${(totals.overdue ?? 0) > 0 ? 'ad__owed' : ''}`}>{kes(totals.overdue)}</span>
+        </div>
+        <div className="ad__stat">
+          <span className="ad__stat__label">Onboarded in period</span>
+          <span className="ad__stat__value num">{totals.onboardedInRange ?? 0}</span>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="ad__tablewrap"><EmptyState title="No platform operators found" /></div>
+      ) : (
+        <div className="ad__tablewrap">
+          <table className="ad__table">
+            <thead>
+              <tr>
+                <th>Operator</th>
+                <th>Role</th>
+                <th className="num">Orgs (Active / Total)</th>
+                <th className="num">New in period</th>
+                <th className="num">Let units</th>
+                <th className="num">Est. MRR</th>
+                <th className="num">Collected</th>
+                <th className="num">Overdue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.salespersonId}>
+                  <td>
+                    <strong>{r.name}</strong>
+                    {r.email ? <span className="ad__sub">{r.email}</span> : null}
+                  </td>
+                  <td>
+                    <span className={`ad__badge ${r.role === 'SUPERADMIN' ? 'ad__badge--info' : 'ad__badge--ok'}`}>
+                      {r.role === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson'}
+                    </span>
+                  </td>
+                  <td className="num">{r.organizationsActive} / {r.organizationsTotal}</td>
+                  <td className="num">{r.onboardedInRange}</td>
+                  <td className="num">{r.occupiedUnits}</td>
+                  <td className="num">{kes(r.mrr)}</td>
+                  <td className="num">{kes(r.collected)}</td>
+                  <td className={`num ${r.overdue > 0 ? 'ad__owed' : ''}`}>{kes(r.overdue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -826,12 +1141,15 @@ function AuditReportView({ data, onPage }: { data: Record<string, unknown>; onPa
   const rows = (data.data as {
     id: string;
     action: string;
-    entityType: string;
+    entity?: string;
+    entityType?: string;
     entityId: string | null;
     orgId: string | null;
-    organizationName: string | null;
-    actorEmail: string | null;
-    actorName: string | null;
+    organization?: { id: string; name: string; billingRef: string | null } | null;
+    organizationName?: string | null;
+    actor?: { id: string; firstName: string; lastName: string; email: string | null } | null;
+    actorEmail?: string | null;
+    actorName?: string | null;
     ip: string | null;
     createdAt: string;
   }[]) ?? [];
@@ -857,18 +1175,25 @@ function AuditReportView({ data, onPage }: { data: Record<string, unknown>; onPa
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{formatDateTime(r.createdAt)}</td>
-                  <td><strong className="num">{r.action}</strong></td>
-                  <td>
-                    {r.actorName || r.actorEmail || 'System'}
-                    {r.ip ? <span className="ad__sub num">{r.ip}</span> : null}
-                  </td>
-                  <td>{r.organizationName ?? '—'}</td>
-                  <td><span className="num">{r.entityType}{r.entityId ? `:${r.entityId.slice(0, 8)}` : ''}</span></td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const actorDisplay = r.actor
+                  ? `${r.actor.firstName} ${r.actor.lastName}`.trim() || r.actor.email
+                  : r.actorName || r.actorEmail || 'System';
+                const orgDisplay = r.organization?.name ?? r.organizationName ?? '—';
+                const entityName = r.entity ?? r.entityType ?? '';
+                return (
+                  <tr key={r.id}>
+                    <td>{formatDateTime(r.createdAt)}</td>
+                    <td><strong className="num">{r.action}</strong></td>
+                    <td>
+                      {actorDisplay}
+                      {r.ip ? <span className="ad__sub num">{r.ip}</span> : null}
+                    </td>
+                    <td>{orgDisplay}</td>
+                    <td><span className="num">{entityName}{r.entityId ? `:${r.entityId.slice(0, 8)}` : ''}</span></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
