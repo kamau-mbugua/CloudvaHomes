@@ -142,7 +142,7 @@ function OrganizationForm({ org }: { org: Organization }) {
             <div className="fld">
               <label htmlFor="org-kind">Type</label>
               <input id="org-kind" value={KIND_LABEL[org.kind] ?? org.kind} disabled readOnly />
-              <span className="hint">Set when Hodi created the organisation.</span>
+              <span className="hint">Set when KodiHub created the organisation.</span>
             </div>
           </div>
         </section>

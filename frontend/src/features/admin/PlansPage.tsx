@@ -92,7 +92,7 @@ export function PlansPage() {
                       {!plan.isDefault ? (
                         <ConfirmDelete what={`the “${plan.name}” plan`} busy={remove.isPending} onConfirm={() => remove.mutate(plan)}
                           consequence={plan.organizationCount > 0
-                            ? `${plan.organizationCount} ${plan.organizationCount === 1 ? 'organisation is' : 'organisations are'} on it, so Hodi will refuse. Move them first, or mark the plan inactive.`
+                            ? `${plan.organizationCount} ${plan.organizationCount === 1 ? 'organisation is' : 'organisations are'} on it, so KodiHub will refuse. Move them first, or mark the plan inactive.`
                             : 'No organisation is on it. This cannot be undone.'} />
                       ) : null}
                     </div>

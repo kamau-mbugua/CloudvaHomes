@@ -110,7 +110,7 @@ export function AcceptInvitationPage() {
           <p className="au__lede">
             {invite.firstName ? `Hi ${invite.firstName}. ` : ''}
             {invite.inviterName ? `${invite.inviterName} invited you` : 'You have been invited'} to
-            manage {invite.organizationName} on Hodi
+            manage {invite.organizationName} on KodiHub
             {invite.email || invite.phone ? ` as ${invite.email ?? invite.phone}` : ''}.
           </p>
 
@@ -148,7 +148,7 @@ export function AcceptInvitationPage() {
               </AuthField>
             </>
           ) : (
-            <p className="au__ok">You already have a Hodi account, so there is no password to choose.</p>
+            <p className="au__ok">You already have a KodiHub account, so there is no password to choose.</p>
           )}
         </div>
 

@@ -279,7 +279,7 @@ function PreviewCounts({ parsed, checking }: { parsed: NonNullable<StatementPrev
       <ul className="bk__tally">
         <li><strong className="num">{credits}</strong> credit{credits === 1 ? '' : 's'} to import</li>
         <li><strong className="num">{skipped}</strong> row{skipped === 1 ? '' : 's'} skipped (money paid out, blanks)</li>
-        <li className={errors.length ? 'bk__bad' : undefined}><strong className="num">{errors.length}</strong> row{errors.length === 1 ? '' : 's'} Hodi can’t read</li>
+        <li className={errors.length ? 'bk__bad' : undefined}><strong className="num">{errors.length}</strong> row{errors.length === 1 ? '' : 's'} KodiHub can’t read</li>
       </ul>
       {errors.length > 0 ? (
         <>
@@ -287,7 +287,7 @@ function PreviewCounts({ parsed, checking }: { parsed: NonNullable<StatementPrev
             {errors.slice(0, SHOWN_ERRORS).map((e) => <li key={`${e.row}-${e.message}`}><span className="num">Row {e.row}</span>: {e.message}</li>)}
           </ul>
           {errors.length > SHOWN_ERRORS ? <p className="hint">And {errors.length - SHOWN_ERRORS} more.</p> : null}
-          <p className="hint">Rows Hodi can’t read are left out. Check the date format and amount columns, or fix them in the file.</p>
+          <p className="hint">Rows KodiHub can’t read are left out. Check the date format and amount columns, or fix them in the file.</p>
         </>
       ) : null}
       {credits === 0 && errors.length === 0 ? <p className="hint">There’s nothing to import with this mapping. Check the amount columns.</p> : null}

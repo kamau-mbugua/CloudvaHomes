@@ -82,7 +82,7 @@ export function RecordHodiPaymentSheet({ org, onClose }: {
     >
       <form id="hodi-record" className="sheet-form" onSubmit={submit} noValidate>
         <p className="ad__muted">
-          For money that reached Hodi outside M-Pesa matching, e.g. a bank transfer quoting <span className="num">{org.billingRef}</span>.
+          For money that reached KodiHub outside M-Pesa matching, e.g. a bank transfer quoting <span className="num">{org.billingRef}</span>.
           It pays the oldest invoices first; anything extra is held as credit.
           {typeof org.balance === 'number' && org.balance > 0 ? ` ${org.name} owes ${formatKES(org.balance)}.` : ''}
         </p>

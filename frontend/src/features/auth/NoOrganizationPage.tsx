@@ -65,7 +65,7 @@ export function NoOrganizationPage({ session }: { session: Session }) {
           <>
             <h1>Your account isn’t linked to an organisation yet</h1>
             <p className="au__lede">
-              Signed in as {displayName(session.user)}. Ask the organisation that uses Hodi to invite
+              Signed in as {displayName(session.user)}. Ask the organisation that uses KodiHub to invite
               you — the invitation link signs you straight in.
             </p>
 

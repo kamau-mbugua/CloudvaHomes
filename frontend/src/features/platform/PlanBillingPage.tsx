@@ -48,7 +48,7 @@ function PlanBilling({ summary }: { summary: BillingSummary }) {
         <section className={`ag__card hb__owed ${summary.status === 'SUSPENDED' ? 'hb__owed--alert' : summary.status === 'GRACE' ? 'hb__owed--warn' : ''}`}
           aria-labelledby="hb-owed">
           <div className="hb__cardhead">
-            <h3 id="hb-owed">Owed to Hodi</h3>
+            <h3 id="hb-owed">Owed to KodiHub</h3>
             <OrgStatusBadge status={summary.status} />
           </div>
           <p className="hb__amount num">{formatKES(Math.max(0, summary.balance))}</p>
@@ -58,7 +58,7 @@ function PlanBilling({ summary }: { summary: BillingSummary }) {
           {summary.credit > 0 ? <p className="ad__muted">{formatKES(summary.credit)} credit, used by the next invoice.</p> : null}
           <p className="ad__muted">{ORG_STATUS_MEANING[summary.status]}</p>
           {summary.noSuspendUntil ? (
-            <p className="ad__muted">Hodi won’t suspend this account before {formatDayish(summary.noSuspendUntil)}.</p>
+            <p className="ad__muted">KodiHub won’t suspend this account before {formatDayish(summary.noSuspendUntil)}.</p>
           ) : null}
           {summary.status !== 'CLOSED' ? (
             canPay && summary.canPayInApp ? (
@@ -101,11 +101,11 @@ function PlanBilling({ summary }: { summary: BillingSummary }) {
               <ol className="tp__steps">
                 <li>On M-Pesa choose Lipa na M-Pesa, then Pay Bill.</li>
                 <li>Business number {summary.payTo.paybill}, account number {summary.payTo.accountRef}.</li>
-                <li>Enter the amount and your PIN. It shows here once Hodi receives it.</li>
+                <li>Enter the amount and your PIN. It shows here once KodiHub receives it.</li>
               </ol>
             </>
           ) : (
-            <p className="ad__muted">Contact Hodi for bank details. Quote your billing account number, <span className="num">{summary.billingRef}</span>.</p>
+            <p className="ad__muted">Contact KodiHub for bank details. Quote your billing account number, <span className="num">{summary.billingRef}</span>.</p>
           )}
           {!summary.canPayInApp && summary.status !== 'CLOSED' ? (
             <p className="hint">Paying from this page isn’t available right now; use the paybill.</p>
@@ -146,10 +146,10 @@ function InvoicesSection() {
 
   return (
     <section className="ad__section" aria-labelledby="hb-invoices">
-      <div className="pf__sectionhead"><h2 id="hb-invoices">Hodi invoices</h2></div>
+      <div className="pf__sectionhead"><h2 id="hb-invoices">KodiHub invoices</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
       {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
-        <div className="ad__tablewrap"><EmptyState title="No Hodi invoices yet" detail="Your first one comes on the 1st after your trial ends." /></div>
+        <div className="ad__tablewrap"><EmptyState title="No KodiHub invoices yet" detail="Your first one comes on the 1st after your trial ends." /></div>
       ) : (
         <HodiInvoicesTable
           rows={rows}
@@ -228,10 +228,10 @@ function PaymentsSection() {
 
   return (
     <section className="ad__section" aria-labelledby="hb-payments">
-      <div className="pf__sectionhead"><h2 id="hb-payments">Payments to Hodi</h2></div>
+      <div className="pf__sectionhead"><h2 id="hb-payments">Payments to KodiHub</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
       {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
-        <div className="ad__tablewrap"><EmptyState title="No payments yet" detail="Payments by M-Pesa or bank show here once Hodi receives them." /></div>
+        <div className="ad__tablewrap"><EmptyState title="No payments yet" detail="Payments by M-Pesa or bank show here once KodiHub receives them." /></div>
       ) : <PlatformPaymentsTable rows={rows} />}
       <Pager meta={list.data?.meta} onPage={setPage} />
     </section>

@@ -69,7 +69,7 @@ export function AdminOperatorsPage() {
         <p className="ad__muted" role="status">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="ad__tablewrap">
-          <EmptyState title="No operators in this view" detail="Add a Superadmin or Salesperson to manage Hodi." />
+          <EmptyState title="No operators in this view" detail="Add a Superadmin or Salesperson to manage KodiHub." />
         </div>
       ) : (
         <div className="ad__tablewrap">

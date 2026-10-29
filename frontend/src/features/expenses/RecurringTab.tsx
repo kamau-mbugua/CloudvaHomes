@@ -105,7 +105,7 @@ export function RecurringTab() {
           ) : (
             <EmptyState
               title="No recurring expenses"
-              detail="Set up costs that repeat — a night guard every month, insurance every year — and Hodi records each one on its day."
+              detail="Set up costs that repeat — a night guard every month, insurance every year — and KodiHub records each one on its day."
               action={canCreate ? <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => setEditing('new')}>Add recurring</button> : undefined}
             />
           )}

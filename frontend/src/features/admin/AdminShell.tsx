@@ -49,7 +49,7 @@ export function AdminShell() {
       : 'There is nothing at this address.';
 
   useEffect(() => {
-    document.title = `${title} · Hodi admin`;
+    document.title = `${title} · KodiHub admin`;
   }, [title]);
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export function AdminShell() {
     <div className={`ms adm ${drawerOpen ? 'is-drawer-open' : ''}`}>
       <Sidebar
         groups={navGroups}
-        orgName="Hodi admin"
+        orgName="KodiHub admin"
         label="Platform admin"
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}

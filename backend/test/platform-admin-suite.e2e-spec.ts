@@ -197,7 +197,7 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
         m.channel === 'email' && m.to === 'owner@kilimani.test',
     );
     expect(welcomeEmail).toBeDefined();
-    expect(welcomeEmail!.subject).toContain('Welcome to Hodi — Set up Kilimani Estates');
+    expect(welcomeEmail!.subject).toContain('Welcome to KodiHub — Set up Kilimani Estates');
     expect(welcomeEmail!.text).toContain(
       'Sign-in identifier: owner@kilimani.test or +254711222333',
     );

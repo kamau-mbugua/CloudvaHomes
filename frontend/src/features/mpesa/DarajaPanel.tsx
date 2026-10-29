@@ -34,7 +34,7 @@ export function DarajaPanel({ channels, canManage }: { channels: PaymentChannel[
       <p className="ad__muted mp__lead">
         Connect a paybill or till to your own Safaricom Daraja app and M-Pesa payments are recorded and receipted
         automatically — and you can send payment prompts to tenants’ phones. The money goes straight to your
-        paybill or till, never through Hodi.
+        paybill or till, never through KodiHub.
       </p>
       <div className="mp__cards">
         {channels.map((c) => <DarajaCard key={c.id} channel={c} canManage={canManage} onSetUp={() => setSettingUp(c)} />)}
@@ -56,7 +56,7 @@ function DarajaCard({ channel, canManage, onSetUp }: { channel: PaymentChannel; 
   const register = useMutation({
     mutationFn: () => api.post<unknown>(`/payment-channels/${channel.id}/daraja/register-c2b`),
     onSuccess: async () => {
-      toast.saved(`Safaricom will now send ${channel.name}’s payments to Hodi.`);
+      toast.saved(`Safaricom will now send ${channel.name}’s payments to KodiHub.`);
       await refresh();
     },
     onError: (error) => toast.failed(mpesaErrorMessage(error)),
@@ -126,8 +126,8 @@ function DarajaCard({ channel, canManage, onSetUp }: { channel: PaymentChannel; 
             </dl>
           ) : null}
           <p className="hint mp__hint">
-            Safaricom sends results to these addresses. Hodi gives them to Safaricom for you; copy them only if Safaricom
-            support asks. Keep them private — anyone with them could send fake notices (Hodi double-checks prompts with Safaricom).
+            Safaricom sends results to these addresses. KodiHub gives them to Safaricom for you; copy them only if Safaricom
+            support asks. Keep them private — anyone with them could send fake notices (KodiHub double-checks prompts with Safaricom).
           </p>
         </>
       )}
@@ -140,14 +140,14 @@ function DarajaCard({ channel, canManage, onSetUp }: { channel: PaymentChannel; 
           {configured ? (
             <>
               <button type="button" className="nx-btn nx-btn--sm" disabled={busy} onClick={() => register.mutate()}
-                title={`Tell Safaricom to send every payment to this ${noun} to Hodi`}>
+                title={`Tell Safaricom to send every payment to this ${noun} to KodiHub`}>
                 {register.isPending ? 'Registering…' : `Register ${noun} URLs`}
               </button>
               <ConfirmDelete size="sm" label="Rotate URLs" verb="Rotate the URLs of" what={channel.name} busy={rotate.isPending}
-                consequence={`Gives this channel new callback URLs and the old ones stop working at once. Money still reaches your ${noun}, but Hodi isn’t told about it — so register the ${noun} URLs again straight after. Do this if the URLs may have leaked. In production Safaricom may only accept a ${noun}’s URLs once; changing them can need a request to Safaricom support.`}
+                consequence={`Gives this channel new callback URLs and the old ones stop working at once. Money still reaches your ${noun}, but KodiHub isn’t told about it — so register the ${noun} URLs again straight after. Do this if the URLs may have leaked. In production Safaricom may only accept a ${noun}’s URLs once; changing them can need a request to Safaricom support.`}
                 onConfirm={() => rotate.mutate()} />
               <ConfirmDelete size="sm" label="Remove" verb="Disconnect" what={`${channel.name} from M-Pesa`} busy={remove.isPending}
-                consequence={`Deletes the saved Daraja keys. Payment prompts can’t be sent from this ${noun} and Hodi can no longer check payments with Safaricom; enter M-Pesa payments by hand instead. Payments already recorded stay as they are. You can set it up again at any time.`}
+                consequence={`Deletes the saved Daraja keys. Payment prompts can’t be sent from this ${noun} and KodiHub can no longer check payments with Safaricom; enter M-Pesa payments by hand instead. Payments already recorded stay as they are. You can set it up again at any time.`}
                 onConfirm={() => remove.mutate()} />
             </>
           ) : null}
@@ -155,7 +155,7 @@ function DarajaCard({ channel, canManage, onSetUp }: { channel: PaymentChannel; 
       ) : null}
       {canManage && configured ? (
         <ul className="hint mp__explain">
-          <li><strong>Register {noun} URLs</strong>: tells Safaricom to send every payment to this {noun} to Hodi. Do it after setting up, after rotating, and after moving to production.</li>
+          <li><strong>Register {noun} URLs</strong>: tells Safaricom to send every payment to this {noun} to KodiHub. Do it after setting up, after rotating, and after moving to production.</li>
           <li><strong>Rotate URLs</strong>: old links stop working; register the {noun} URLs again.</li>
           <li><strong>Remove</strong>: deletes the keys; payments go back to being entered by hand.</li>
         </ul>

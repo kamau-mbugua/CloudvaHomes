@@ -231,7 +231,7 @@ export function UsersPage() {
                             label="Remove"
                             verb="Remove"
                             what={`${displayName(member)} from this organisation`}
-                            consequence="They will no longer be able to sign in here. Their Hodi account and the history of what they did stay."
+                            consequence="They will no longer be able to sign in here. Their KodiHub account and the history of what they did stay."
                             busy={busy}
                             onConfirm={() => remove.mutate(member)}
                           />

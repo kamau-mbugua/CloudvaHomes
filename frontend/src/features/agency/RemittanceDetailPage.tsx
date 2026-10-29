@@ -224,7 +224,7 @@ function PayoutStatus({ remittance: r, inFlight, gaveUp, canResolve, onCheckAgai
       )}
       {inFlight && gaveUp ? (
         <p className="hint">
-          Still no answer from M-Pesa. It can take a few minutes; if there’s none within 30 minutes Hodi marks it not confirmed.{' '}
+          Still no answer from M-Pesa. It can take a few minutes; if there’s none within 30 minutes KodiHub marks it not confirmed.{' '}
           <button type="button" className="nx-btn nx-btn--sm" onClick={onCheckAgain}>Check again</button>
         </p>
       ) : null}
@@ -287,7 +287,7 @@ function SendSheet({ remittance: r, payout, onClose, onSent }: {
         </p>
         {!whole ? (
           <p className="ad__callout ad__callout--note ag__warnnote" role="note">
-            M-Pesa can only send whole shillings, and this amount has cents. Pay it outside Hodi and mark it paid instead.
+            M-Pesa can only send whole shillings, and this amount has cents. Pay it outside KodiHub and mark it paid instead.
           </p>
         ) : (
           <p className="hint">Sending asks for a verification code. The page then follows the payout until M-Pesa confirms it.</p>

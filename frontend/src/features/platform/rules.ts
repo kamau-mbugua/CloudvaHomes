@@ -58,8 +58,8 @@ export function bannerFor(
       return {
         tone: 'warn',
         message: overdue
-          ? `Your Hodi bill of ${formatKES(overdue.amount)} was due on ${formatDayish(overdue.since)}.`
-          : 'Your Hodi bill is overdue.',
+          ? `Your KodiHub bill of ${formatKES(overdue.amount)} was due on ${formatDayish(overdue.since)}.`
+          : 'Your KodiHub bill is overdue.',
         payable: true,
       };
     }
@@ -67,14 +67,14 @@ export function bannerFor(
       const owed = summary && summary.balance > 0 ? ` ${formatKES(summary.balance)} is owed.` : '';
       return {
         tone: 'alert',
-        message: `Your account is read-only until the Hodi bill is paid. Tenants can still pay rent.${owed}`,
+        message: `Your account is read-only until the KodiHub bill is paid. Tenants can still pay rent.${owed}`,
         payable: true,
       };
     }
     case 'CLOSED':
       return {
         tone: 'off',
-        message: 'This organisation’s Hodi account is closed. Contact Hodi to reopen it.',
+        message: 'This organisation’s KodiHub account is closed. Contact KodiHub to reopen it.',
         payable: false,
       };
     default:

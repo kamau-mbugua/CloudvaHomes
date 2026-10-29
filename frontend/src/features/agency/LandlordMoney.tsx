@@ -179,7 +179,7 @@ export function PortalCard({ landlord, account }: { landlord: LandlordBasics; ac
           )}
         >
           <p>
-            Hodi sends a message to <span className="num">{contact || 'their contact'}</span> explaining how to sign in with a one-time
+            KodiHub sends a message to <span className="num">{contact || 'their contact'}</span> explaining how to sign in with a one-time
             code — no password. They’ll see only this landlord’s properties, statements and payouts, and can’t change anything.
           </p>
         </Sheet>

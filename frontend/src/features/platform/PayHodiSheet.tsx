@@ -90,7 +90,7 @@ export function PayHodiSheet({ owed, ownPhone, onClose }: {
 
   return (
     <Sheet
-      title="Pay your Hodi bill"
+      title="Pay your KodiHub bill"
       busy={send.isPending}
       onClose={onClose}
       footer={(
@@ -104,7 +104,7 @@ export function PayHodiSheet({ owed, ownPhone, onClose }: {
     >
       <form id="hodi-pay" className="sheet-form" onSubmit={submit} noValidate>
         <p className="ad__muted">
-          An M-Pesa prompt goes to the phone below. Enter the M-Pesa PIN to pay Hodi. The payment pays the oldest Hodi
+          An M-Pesa prompt goes to the phone below. Enter the M-Pesa PIN to pay KodiHub. The payment pays the oldest KodiHub
           invoice first; anything extra is kept as credit for the next one.
         </p>
         <div className="fm__grid sheet-grid">
@@ -148,7 +148,7 @@ function PayProgress({ first, startedAt, onAgain, onClose }: {
 
   return (
     <Sheet
-      title="M-Pesa payment to Hodi"
+      title="M-Pesa payment to KodiHub"
       onClose={onClose}
       footer={(
         <>

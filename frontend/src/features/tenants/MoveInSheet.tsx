@@ -319,7 +319,7 @@ export function MoveInSheet({
               inputMode="decimal" autoComplete="off" aria-invalid={Boolean(errors.rentAmount)} />
           </Field>
           <Field id="mi-depositHeld" label="Deposit already held" error={errors.depositHeld} optional
-            hint="Only for a deposit paid before Hodi. Leave blank for a new let.">
+            hint="Only for a deposit paid before KodiHub. Leave blank for a new let.">
             <input id="mi-depositHeld" value={values.depositHeld} onChange={(e) => set('depositHeld', e.target.value)}
               inputMode="decimal" autoComplete="off" aria-invalid={Boolean(errors.depositHeld)} />
           </Field>

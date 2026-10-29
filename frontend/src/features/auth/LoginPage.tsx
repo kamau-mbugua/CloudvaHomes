@@ -222,7 +222,7 @@ export function LoginPage() {
           <div className="au__step">
             <h1>Enter your code</h1>
             <p className="au__lede">
-              If {phone.trim()} has a Hodi account, a 6-digit code is on its way. It works for 5 minutes.
+              If {phone.trim()} has a KodiHub account, a 6-digit code is on its way. It works for 5 minutes.
             </p>
 
             <div className="au__field">

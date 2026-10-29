@@ -154,7 +154,7 @@ export function describeImport(r: Pick<StatementImportResult, 'rows' | 'credits'
   const lines = [
     `${plural(r.rows, 'row', 'rows')} read, ${plural(r.credits, 'credit', 'credits')} (money paid in).`,
     r.created === 0
-      ? 'Nothing new: every credit was already in Hodi.'
+      ? 'Nothing new: every credit was already in KodiHub.'
       : `${plural(r.created, 'new credit', 'new credits')}: ${r.matched} matched to tenants and recorded as payments${unmatched ? `, ${unmatched} waiting on Reconciliation` : ''}.`,
   ];
   if (r.duplicates > 0) lines.push(`${plural(r.duplicates, 'credit was', 'credits were')} imported before, so ${r.duplicates === 1 ? 'it was' : 'they were'} left alone.`);

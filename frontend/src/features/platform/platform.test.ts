@@ -69,16 +69,16 @@ describe('bannerFor', () => {
 
   it('gives the amount and due date in grace when known', () => {
     expect(bannerFor('GRACE', { balance: 300_000, overdue: { amount: 250_000, since: '2026-11-10' } })).toEqual({
-      tone: 'warn', message: 'Your Hodi bill of KES 2,500.00 was due on 10 Nov 2026.', payable: true,
+      tone: 'warn', message: 'Your KodiHub bill of KES 2,500.00 was due on 10 Nov 2026.', payable: true,
     });
-    expect(bannerFor('GRACE')?.message).toBe('Your Hodi bill is overdue.');
+    expect(bannerFor('GRACE')?.message).toBe('Your KodiHub bill is overdue.');
   });
 
   it('says read-only and that tenants can still pay when suspended', () => {
     const banner = bannerFor('SUSPENDED', { balance: 250_000, overdue: null });
     expect(banner?.tone).toBe('alert');
-    expect(banner?.message).toBe('Your account is read-only until the Hodi bill is paid. Tenants can still pay rent. KES 2,500.00 is owed.');
-    expect(bannerFor('SUSPENDED')?.message).toBe('Your account is read-only until the Hodi bill is paid. Tenants can still pay rent.');
+    expect(banner?.message).toBe('Your account is read-only until the KodiHub bill is paid. Tenants can still pay rent. KES 2,500.00 is owed.');
+    expect(bannerFor('SUSPENDED')?.message).toBe('Your account is read-only until the KodiHub bill is paid. Tenants can still pay rent.');
   });
 
   it('offers no payment for a closed account', () => {

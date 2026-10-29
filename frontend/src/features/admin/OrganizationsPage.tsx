@@ -49,7 +49,7 @@ export function OrganizationsPage() {
         <div className="ad__tablewrap">
           {filtered
             ? <EmptyState title="No organisations match" detail="Try a different search, or clear the filters." onClear={() => filters.clear()} />
-            : <EmptyState title="No organisations yet" detail="Organisations appear here once Hodi creates them." />}
+            : <EmptyState title="No organisations yet" detail="Organisations appear here once KodiHub creates them." />}
         </div>
       ) : (
         <div className="ad__tablewrap">

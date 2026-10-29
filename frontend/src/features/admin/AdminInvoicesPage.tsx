@@ -73,7 +73,7 @@ export function AdminInvoicesPage() {
         <div className="ad__tablewrap">
           {filtered
             ? <EmptyState title="No invoices match" detail="Try a different month or status." onClear={() => filters.clear()} />
-            : <EmptyState title="No Hodi invoices yet" detail="They are issued on the 1st for the month before. Run a finished month to issue them now." />}
+            : <EmptyState title="No KodiHub invoices yet" detail="They are issued on the 1st for the month before. Run a finished month to issue them now." />}
         </div>
       ) : (
         <HodiInvoicesTable rows={rows} showOrg actions={(inv) => <AdminInvoiceActions invoice={inv} onVoid={superAdmin ? setVoiding : undefined} />} />

@@ -103,7 +103,7 @@ describe('describeImport', () => {
   it('says plainly when a re-import added nothing', () => {
     const { lines, unmatched } = describeImport({ rows: 5, credits: 5, created: 0, duplicates: 5, matched: 0 });
     expect(unmatched).toBe(0);
-    expect(lines[1]).toBe('Nothing new: every credit was already in Hodi.');
+    expect(lines[1]).toBe('Nothing new: every credit was already in KodiHub.');
   });
 });
 
@@ -142,7 +142,7 @@ describe('banksErrorMessage', () => {
   it('words the bank codes', () => {
     expect(banksErrorMessage(err('NOT_BANK_CHANNEL'))).toMatch(/Only bank account/);
     expect(banksErrorMessage(err('NO_PAYOUT_ACCOUNT'))).toMatch(/Settings → Payouts/);
-    expect(banksErrorMessage(err('CSV_INVALID', 'No header row.'))).toBe('Hodi couldn’t read this file: No header row.');
+    expect(banksErrorMessage(err('CSV_INVALID', 'No header row.'))).toBe('KodiHub couldn’t read this file: No header row.');
     expect(banksErrorMessage(err('CSV_INVALID'))).toMatch(/Export the statement/);
   });
   it('falls through to the M-Pesa and payment messages', () => {

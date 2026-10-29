@@ -170,11 +170,11 @@ function SmtpForm({ settings }: { settings: PlatformEmailSettings }) {
         <Field id="em-from" label="From address" hint="e.g. noreply@hodi.co.ke">
           <input id="em-from" type="email" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} />
         </Field>
-        <Field id="em-name" label="From name" optional hint="e.g. Hodi">
+        <Field id="em-name" label="From name" optional hint="e.g. KodiHub">
           <input id="em-name" value={fromName} onChange={(e) => setFromName(e.target.value)} />
         </Field>
         <Field id="em-allow" label="Recipient allowlist" optional wide
-          hint="Optional comma- or newline-separated emails or @domains. When set, Hodi only sends to matching addresses (useful on staging).">
+          hint="Optional comma- or newline-separated emails or @domains. When set, KodiHub only sends to matching addresses (useful on staging).">
           <textarea id="em-allow" rows={2} value={allowlist} onChange={(e) => setAllowlist(e.target.value)} placeholder="e.g. @hodi.co.ke, qa@example.com" />
         </Field>
       </div>
@@ -227,7 +227,7 @@ function TestEmailSection({ configured }: { configured: boolean }) {
   return (
     <form className="fm__section" onSubmit={submit} noValidate>
       <h2>Send a test email</h2>
-      <p>Verify that Hodi can deliver mail with the current SMTP settings. Every attempt is recorded under “What was sent”.</p>
+      <p>Verify that KodiHub can deliver mail with the current SMTP settings. Every attempt is recorded under “What was sent”.</p>
       <div className="fm__grid">
         <Field id="em-test" label="Recipient email" wide>
           <input id="em-test" type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="you@example.com" />
@@ -347,7 +347,7 @@ function EmailLogsTab() {
         <p className="ad__muted" role="status">Loading…</p>
       ) : rows.length === 0 ? (
         <div className="ad__tablewrap">
-          <EmptyState title="No emails logged yet" detail="Every email Hodi sends or attempts to send appears here." />
+          <EmptyState title="No emails logged yet" detail="Every email KodiHub sends or attempts to send appears here." />
         </div>
       ) : (
         <div className="ad__tablewrap">

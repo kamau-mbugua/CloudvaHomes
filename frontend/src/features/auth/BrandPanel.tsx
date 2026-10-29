@@ -13,7 +13,7 @@ export function BrandPanel() {
     <div className="au__brand">
       <div className="au__brandmark">
         <img className="au__logo" src="/favicon.svg" alt="" aria-hidden="true" />
-        <span className="au__wordmark">Hodi</span>
+        <span className="au__wordmark">KodiHub</span>
       </div>
 
       <div className="au__pitch">

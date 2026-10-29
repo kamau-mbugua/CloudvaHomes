@@ -30,7 +30,7 @@ export function BillingBanner() {
   const inApp = canPay && summary.data?.canPayInApp;
 
   return (
-    <div className={`hb__banner hb__banner--${banner.tone}`} role="region" aria-label="Hodi bill">
+    <div className={`hb__banner hb__banner--${banner.tone}`} role="region" aria-label="KodiHub bill">
       <p className="hb__bannertext">
         <strong>{banner.message}</strong>
         {banner.payable && !canView ? ' Ask your organisation’s owner to pay it.' : null}

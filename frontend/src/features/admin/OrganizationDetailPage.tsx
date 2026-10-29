@@ -90,7 +90,7 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
       </div>
 
       <dl className="pf__facts adm__facts">
-        <Fact label="Owes Hodi"><span className={`num ${org.balance > 0 ? 'ad__owed' : ''}`}>{formatKES(org.balance ?? 0)}</span></Fact>
+        <Fact label="Owes KodiHub"><span className={`num ${org.balance > 0 ? 'ad__owed' : ''}`}>{formatKES(org.balance ?? 0)}</span></Fact>
         {typeof org.credit === 'number' && org.credit > 0 ? <Fact label="Credit"><span className="num">{formatKES(org.credit)}</span></Fact> : null}
         <Fact label="Units let now"><span className="num">{org.occupiedUnits ?? '—'}</span></Fact>
         <Fact label="A month now comes to">
@@ -252,7 +252,7 @@ function OrgInvoices({ orgId, superAdmin }: { orgId: string; superAdmin: boolean
 
   return (
     <section className="ad__section" aria-labelledby="oi-title">
-      <div className="pf__sectionhead"><h2 id="oi-title">Hodi invoices</h2></div>
+      <div className="pf__sectionhead"><h2 id="oi-title">KodiHub invoices</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
       {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap"><EmptyState title="No invoices yet" detail="Months in the trial aren’t billed. Run a month from Invoices." /></div>

@@ -112,7 +112,7 @@ export const ORG_SUSPENDED = 'ORG_SUSPENDED';
  * the error's message — shows it without knowing the code.
  */
 export const ORG_SUSPENDED_MESSAGE =
-  'Your organisation is read-only until its Hodi bill is paid, so this change wasn’t saved. '
+  'Your organisation is read-only until its KodiHub bill is paid, so this change wasn’t saved. '
   + 'Tenants can still pay rent, and rent payments can still be recorded. '
   + 'Pay the bill under Settings → Plan & billing.';
 

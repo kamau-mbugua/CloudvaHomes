@@ -575,7 +575,7 @@ export class PlatformAdminService {
       encryption: (s.smtpEncryption ?? 'tls') as 'tls' | 'ssl' | 'none',
       passwordSet: Boolean(s.smtpPassEnc),
       fromEmail: parsedEmail,
-      fromName: s.smtpFromName ?? parsedName ?? 'Hodi',
+      fromName: s.smtpFromName ?? parsedName ?? 'KodiHub',
       allowlist: s.smtpAllowlist ?? '',
       source: dbConfigured
         ? ('database' as const)
@@ -639,8 +639,8 @@ export class PlatformAdminService {
     try {
       await this.notifications.sendRawEmail({
         to: email,
-        subject: 'Hodi test email',
-        text: `This is a test email from Hodi platform administration.\n\nSent at: ${new Date().toISOString()}`,
+        subject: 'KodiHub test email',
+        text: `This is a test email from KodiHub platform administration.\n\nSent at: ${new Date().toISOString()}`,
         kind: 'test',
       });
     } catch (e) {

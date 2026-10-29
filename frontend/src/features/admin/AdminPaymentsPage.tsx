@@ -39,7 +39,7 @@ export function AdminPaymentsPage() {
       {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           <EmptyState
-            title="No Hodi payments yet"
+            title="No KodiHub payments yet"
             detail="Payments appear here when organisations pay via M-Pesa or when you record a payment on an organisation’s page."
           />
         </div>

@@ -85,7 +85,7 @@ export function PayoutSheet({ landlord, current, onClose }: {
       <form id="payout-form" className="sheet-form" onSubmit={submit} noValidate>
         <p className="ad__callout ad__callout--note ag__warnnote">
           {current ? <>On file now: <strong className="num">{current.masked}</strong> ({PAYOUT_METHOD[current.method] ?? current.method}). </> : null}
-          You’ll be asked for a verification code, and Hodi will tell {landlord.name} about this change by SMS and e-mail — so
+          You’ll be asked for a verification code, and KodiHub will tell {landlord.name} about this change by SMS and e-mail — so
           if someone changes these details without their knowledge, they can raise the alarm before a payout goes out.
         </p>
 

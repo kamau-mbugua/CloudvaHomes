@@ -115,7 +115,7 @@ const envSchema = z
     SMTP_PORT: z.coerce.number().int().default(587),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
-    EMAIL_FROM: z.string().default('Hodi <noreply@example.invalid>'),
+    EMAIL_FROM: z.string().default('KodiHub <noreply@example.invalid>'),
   })
   .superRefine((env, ctx) => {
     const need = (cond: boolean, keys: (keyof typeof env)[], why: string) => {

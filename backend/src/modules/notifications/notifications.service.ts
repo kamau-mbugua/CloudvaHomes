@@ -122,10 +122,10 @@ export class NotificationsService {
       'step-up': 'step_up',
       'admin-2fa': 'admin_2fa',
     }[purpose];
-    const text = `Your Hodi ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
+    const text = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
     if (to.phone) await this.dispatchSms(to.phone, text);
     else if (to.email)
-      await this.dispatchEmail({ to: to.email, subject: `Your Hodi ${what}`, text }, kind);
+      await this.dispatchEmail({ to: to.email, subject: `Your KodiHub ${what}`, text }, kind);
   }
 
   async sendInvitation(
@@ -166,10 +166,10 @@ export class NotificationsService {
           {
             to: to.email,
             subject: ob
-              ? `Welcome to Hodi — Set up ${p.organizationName}`
-              : `Join ${p.organizationName} on Hodi`,
+              ? `Welcome to KodiHub — Set up ${p.organizationName}`
+              : `Join ${p.organizationName} on KodiHub`,
             text:
-              `Hi ${p.firstName},\n\n${by} to join ${p.organizationName} on Hodi.\n\n` +
+              `Hi ${p.firstName},\n\n${by} to join ${p.organizationName} on KodiHub.\n\n` +
               `Accept the invitation: ${link}\n\nThe link expires in 7 days.` +
               billingBlock,
           },
@@ -179,7 +179,7 @@ export class NotificationsService {
     }
     if (to.phone) {
       tasks.push(
-        this.dispatchSms(to.phone, `${by} to ${p.organizationName} on Hodi. Accept: ${link}`),
+        this.dispatchSms(to.phone, `${by} to ${p.organizationName} on KodiHub. Accept: ${link}`),
       );
     }
     // One channel failing shouldn't hide the other's success; report but don't throw if any worked.
@@ -194,18 +194,18 @@ export class NotificationsService {
     }
   }
 
-  /** Monthly Hodi platform invoice notification to the organisation owner. */
+  /** Monthly KodiHub platform invoice notification to the organisation owner. */
   async sendPlatformInvoiceIssued(to: Recipient, p: PlatformInvoiceEmailPayload): Promise<void> {
     if (!to.email) return;
     const appUrl = this.env.APP_URL.replace(/\/$/, '');
     const greeting = p.ownerFirstName ? `Hi ${p.ownerFirstName},` : `Hello ${p.organizationName},`;
     const payInstructions =
       p.paybill && p.billingRef
-        ? `Pay via M-Pesa Paybill ${p.paybill}, Account ${p.billingRef}, or in Hodi under Settings -> Plan & billing (${appUrl}/settings/billing).`
-        : `Pay in Hodi under Settings -> Plan & billing (${appUrl}/settings/billing).`;
+        ? `Pay via M-Pesa Paybill ${p.paybill}, Account ${p.billingRef}, or in KodiHub under Settings -> Plan & billing (${appUrl}/settings/billing).`
+        : `Pay in KodiHub under Settings -> Plan & billing (${appUrl}/settings/billing).`;
     const text =
       `${greeting}\n\n` +
-      `Your Hodi subscription invoice ${p.invoiceNumber} for ${p.organizationName} (period ${p.period}) has been issued.\n\n` +
+      `Your KodiHub subscription invoice ${p.invoiceNumber} for ${p.organizationName} (period ${p.period}) has been issued.\n\n` +
       `--- Invoice Summary ---\n` +
       `Invoice number: ${p.invoiceNumber}\n` +
       `Billing period: ${p.period}\n` +
@@ -218,7 +218,7 @@ export class NotificationsService {
     await this.dispatchEmail(
       {
         to: to.email,
-        subject: `Hodi Invoice ${p.invoiceNumber} (${p.period}) — ${p.organizationName}`,
+        subject: `KodiHub Invoice ${p.invoiceNumber} (${p.period}) — ${p.organizationName}`,
         text,
       },
       'platform_invoice',
@@ -239,7 +239,7 @@ export class NotificationsService {
   /** A landlord was given owner-portal access. */
   async sendOwnerPortalAccess(to: Recipient, p: { organizationName: string }): Promise<void> {
     const link = `${this.env.APP_URL.replace(/\/$/, '')}/owner`;
-    const text = `${p.organizationName} has given you access to your property statements on Hodi: ${link} - sign in with a code sent to this phone or email.`;
+    const text = `${p.organizationName} has given you access to your property statements on KodiHub: ${link} - sign in with a code sent to this phone or email.`;
     await this.deliver(to, `Your statements from ${p.organizationName}`, text, 'portal_access');
   }
 

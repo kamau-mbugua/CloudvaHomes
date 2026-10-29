@@ -18,12 +18,12 @@ export interface PlatformInvoicePdf {
   paybill: string | null;
 }
 
-/** Hodi's monthly bill to an organisation. */
+/** KodiHub's monthly bill to an organisation. */
 export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformInvoicePdf) {
-  const { doc, bytes, left, right } = a4(i.number, 'Hodi');
+  const { doc, bytes, left, right } = a4(i.number, 'KodiHub');
   header(
     doc,
-    { name: 'Hodi', phone: '', email: '', kraPin: null },
+    { name: 'KodiHub', phone: '', email: '', kraPin: null },
     i.status === 'VOID' ? 'Invoice (void)' : 'Invoice',
     [
       ['Number', i.number],
@@ -46,7 +46,7 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
     doc.text(value, { align: 'right' });
   };
   line(
-    `Hodi for ${i.period}: ${i.occupiedUnits} let units x KES ${money(i.rate)}`,
+    `KodiHub for ${i.period}: ${i.occupiedUnits} let units x KES ${money(i.rate)}`,
     money(BigInt(i.occupiedUnits) * i.rate),
   );
   if (i.total > BigInt(i.occupiedUnits) * i.rate)

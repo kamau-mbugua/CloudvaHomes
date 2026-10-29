@@ -15,9 +15,9 @@ export const ORG_STATUS: Record<OrgStatus, Label> = {
 export const ORG_STATUS_MEANING: Record<OrgStatus, string> = {
   TRIAL: 'Free trial: months that end during the trial aren’t billed.',
   ACTIVE: 'Your account is in good standing.',
-  GRACE: 'A Hodi bill is overdue. Everything still works; pay it to avoid your account becoming read-only.',
-  SUSPENDED: 'Read-only until the Hodi bill is paid. Tenants can still pay rent, and rent payments can still be recorded.',
-  CLOSED: 'This organisation’s Hodi account is closed. Contact Hodi to reopen it.',
+  GRACE: 'A KodiHub bill is overdue. Everything still works; pay it to avoid your account becoming read-only.',
+  SUSPENDED: 'Read-only until the KodiHub bill is paid. Tenants can still pay rent, and rent payments can still be recorded.',
+  CLOSED: 'This organisation’s KodiHub account is closed. Contact KodiHub to reopen it.',
 };
 
 export const PLATFORM_METHOD: Record<PlatformPaymentMethod, Label> = {
@@ -30,7 +30,7 @@ export const PLATFORM_METHOD: Record<PlatformPaymentMethod, Label> = {
 export const PLATFORM_SOURCE: Record<PlatformPaymentSource, string> = {
   STK: 'Paid in the app',
   C2B: 'Paid to the paybill',
-  MANUAL: 'Recorded by Hodi',
+  MANUAL: 'Recorded by KodiHub',
 };
 
 /** Methods a platform admin can record by hand. */

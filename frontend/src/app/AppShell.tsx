@@ -63,7 +63,7 @@ export function AppShell() {
     : onAccount ? ACCOUNT_ENTRY.hint : 'There is nothing at this address.';
 
   useEffect(() => {
-    document.title = `${title} · Hodi`;
+    document.title = `${title} · KodiHub`;
   }, [title]);
 
   // A change refused as `ORG_SUSPENDED` means the session's status is out of date (the
@@ -129,7 +129,7 @@ export function AppShell() {
     <div className={`ms ${drawerOpen ? 'is-drawer-open' : ''}`}>
       <Sidebar
         groups={groups}
-        orgName={org?.name ?? 'Hodi'}
+        orgName={org?.name ?? 'KodiHub'}
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
         // Following a link on a phone must close the overlay, or the page loads behind it.

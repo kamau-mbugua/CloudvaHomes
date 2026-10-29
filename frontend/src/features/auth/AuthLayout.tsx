@@ -12,7 +12,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           {/* Stands in for the brand panel once it is hidden on narrow screens. */}
           <span className="au__mobilebrand">
             <img src="/favicon.svg" alt="" aria-hidden="true" />
-            Hodi
+            KodiHub
           </span>
         </div>
 

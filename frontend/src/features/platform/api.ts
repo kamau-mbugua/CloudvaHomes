@@ -131,11 +131,11 @@ export function platformErrorMessage(error: unknown, overrides: Record<string, s
       case 'PLAN_IN_USE':
         return 'Organisations are on this plan, so it can’t be deleted. Move them to another plan first, or mark it inactive so no new organisation gets it.';
       case 'NO_MPESA':
-        return 'Paying in the app isn’t available right now. Pay with M-Pesa to Hodi’s paybill using the account number shown under “How to pay”.';
+        return 'Paying in the app isn’t available right now. Pay with M-Pesa to KodiHub’s paybill using the account number shown under “How to pay”.';
       case 'DUPLICATE_REFERENCE':
         return 'A payment with this reference is already recorded, so it may already be in. Check the payments list before entering it again.';
       case 'NOTHING_DUE':
-        return 'Nothing is owed to Hodi right now.';
+        return 'Nothing is owed to KodiHub right now.';
       case 'INVOICE_SETTLED':
         return 'Something has already been paid on this invoice, so it can’t be voided.';
       case 'INVOICE_VOID':
@@ -144,7 +144,7 @@ export function platformErrorMessage(error: unknown, overrides: Record<string, s
         return 'Another plan already has this name. Choose a different one.';
       case 'PERMISSION_DENIED':
       case 'FORBIDDEN':
-        return 'Only Hodi’s platform admins can do this.';
+        return 'Only KodiHub’s platform admins can do this.';
       case STEP_UP_REQUIRED:
         return 'This change needs the verification code we send you. Nothing was changed.';
       default:

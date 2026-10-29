@@ -57,7 +57,7 @@ export function PortalShell({
   const places = portalsOf(session);
 
   useEffect(() => {
-    document.title = `${accountName || label} · Hodi`;
+    document.title = `${accountName || label} · KodiHub`;
   }, [accountName, label]);
 
   const signOut = async () => {

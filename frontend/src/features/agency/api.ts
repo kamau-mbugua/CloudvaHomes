@@ -169,11 +169,11 @@ export function agencyErrorMessage(error: unknown, overrides: Record<string, str
       case 'STEP_UP_REQUIRED':
         return 'This change needs a verification code. Try again and enter the code when asked.';
       case 'NO_PAYOUT_ACCOUNT':
-        return 'M-Pesa payouts aren’t set up yet. Add the B2C account under Settings → Payouts, or pay outside Hodi and mark it paid.';
+        return 'M-Pesa payouts aren’t set up yet. Add the B2C account under Settings → Payouts, or pay outside KodiHub and mark it paid.';
       case 'PAYOUT_NOT_MPESA':
         return 'This landlord isn’t paid by M-Pesa. Pay them by their payout method and mark it paid, or change their payout details first.';
       case 'WHOLE_SHILLINGS':
-        return 'M-Pesa can only send whole shillings, and this amount has cents. Pay it outside Hodi and mark it paid, or adjust the remittance.';
+        return 'M-Pesa can only send whole shillings, and this amount has cents. Pay it outside KodiHub and mark it paid, or adjust the remittance.';
       default:
         return paymentsErrorMessage(error);
     }

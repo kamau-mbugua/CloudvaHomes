@@ -40,7 +40,7 @@ const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; use
   },
   'aged-receivables': {
     title: 'Aged receivables',
-    subtitle: 'Unpaid and overdue Hodi platform invoices grouped by organisation and aging bucket (Current, 1–30, 31–60, 61–90, 90+ days).',
+    subtitle: 'Unpaid and overdue KodiHub platform invoices grouped by organisation and aging bucket (Current, 1–30, 31–60, 61–90, 90+ days).',
     usesDateRange: false,
   },
   activity: {
@@ -55,12 +55,12 @@ const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; use
   },
   onboarding: {
     title: 'Onboarding funnel',
-    subtitle: 'Conversion from organisation signup to owner activation, property setup, let units, rent collection, and first Hodi payment.',
+    subtitle: 'Conversion from organisation signup to owner activation, property setup, let units, rent collection, and first KodiHub payment.',
     usesDateRange: true,
   },
   invoices: {
     title: 'Invoices report',
-    subtitle: 'Summary of Hodi platform invoices billed, collected, and outstanding over the period.',
+    subtitle: 'Summary of KodiHub platform invoices billed, collected, and outstanding over the period.',
     usesDateRange: true,
   },
   plans: {
@@ -382,7 +382,7 @@ function AgedReceivablesView({ data }: { data: Record<string, unknown> }) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="ad__tablewrap"><EmptyState title="No unpaid Hodi invoices" detail="Every issued invoice is settled." /></div>
+        <div className="ad__tablewrap"><EmptyState title="No unpaid KodiHub invoices" detail="Every issued invoice is settled." /></div>
       ) : (
         <div className="ad__tablewrap">
           <table className="ad__table">
@@ -608,7 +608,7 @@ function OnboardingView({ data }: { data: Record<string, unknown> }) {
     { label: 'Added units', count: totals.addedUnits ?? 0 },
     { label: 'Added tenants', count: totals.addedTenants ?? 0 },
     { label: 'Collected rent', count: totals.collectedRent ?? 0 },
-    { label: 'Paid Hodi subscription', count: totals.paidHodi ?? 0 },
+    { label: 'Paid KodiHub subscription', count: totals.paidHodi ?? 0 },
   ];
 
   return (

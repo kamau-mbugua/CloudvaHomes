@@ -114,7 +114,7 @@ export function ReconciliationPage() {
             <EmptyState title="No transactions match" detail="Try a different search, or clear the filters." onClear={() => filters.clear(['status'])} />
           ) : status === 'UNMATCHED' ? (
             <EmptyState title="Nothing to match"
-              detail="Every M-Pesa payment Hodi has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number." />
+              detail="Every M-Pesa payment KodiHub has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number." />
           ) : status === 'MATCHED' ? (
             <EmptyState title="No matched transactions yet"
               detail="M-Pesa payments that were recorded — automatically or by hand — show here once a paybill or till is connected under Payment channels." />

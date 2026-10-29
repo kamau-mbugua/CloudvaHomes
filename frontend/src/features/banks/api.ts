@@ -44,8 +44,8 @@ export function banksErrorMessage(error: unknown, overrides: Record<string, stri
       case 'CSV_INVALID': {
         const said = error.message.trim();
         return said
-          ? `Hodi couldn’t read this file: ${said}`
-          : 'Hodi couldn’t read this file. Export the statement from your bank again as CSV and try once more.';
+          ? `KodiHub couldn’t read this file: ${said}`
+          : 'KodiHub couldn’t read this file. Export the statement from your bank again as CSV and try once more.';
       }
       case 'NOT_BANK_CHANNEL':
         return 'Only bank account channels take bank statements and bank notifications.';

@@ -136,7 +136,7 @@ function SettingsForm({ settings }: { settings: PlatformSettings }) {
             {offered.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
-        <Field id="ps-paybill" label="Hodi’s paybill" optional error={errors.paybill}
+        <Field id="ps-paybill" label="KodiHub’s paybill" optional error={errors.paybill}
           hint="Organisations pay to it with their billing account number (H00001).">
           <input id="ps-paybill" inputMode="numeric" autoComplete="off" maxLength={7} value={draft.paybill} aria-invalid={Boolean(errors.paybill)}
             onChange={(e) => set('paybill', e.target.value)} />
@@ -161,7 +161,7 @@ function DarajaSection({ settings }: { settings: PlatformSettings }) {
   return (
     <section className="fm__section" aria-labelledby="ps-daraja">
       <div className="mp__cardhead">
-        <h2 id="ps-daraja">Hodi’s M-Pesa connection</h2>
+        <h2 id="ps-daraja">KodiHub’s M-Pesa connection</h2>
         <div className="mp__badges">
           {daraja?.configured ? <span className="ad__badge ad__badge--ok">Connected</span> : <span className="ad__badge ad__badge--off">Not connected</span>}
           {daraja?.configured && daraja.environment ? <Badge table={DARAJA_ENV} value={daraja.environment} /> : null}
@@ -173,7 +173,7 @@ function DarajaSection({ settings }: { settings: PlatformSettings }) {
         </div>
       </div>
       <p>
-        Hodi’s own Daraja app for its paybill: organisations’ “Pay now” prompts go out through it, and payments to the paybill
+        KodiHub’s own Daraja app for its paybill: organisations’ “Pay now” prompts go out through it, and payments to the paybill
         with a billing account number are matched automatically. Without it, organisations pay to the paybill and you record the payment.
       </p>
       {daraja?.configured && daraja.passkey === false ? (
@@ -186,7 +186,7 @@ function DarajaSection({ settings }: { settings: PlatformSettings }) {
             <CallbackUrl label="Paybill confirmation" url={urls.c2bConfirm} />
             <CallbackUrl label="Paybill validation" url={urls.c2bValidate} />
           </dl>
-          <p className="hint mp__hint">Register the confirmation and validation URLs for Hodi’s paybill with Safaricom. Keep them private.</p>
+          <p className="hint mp__hint">Register the confirmation and validation URLs for KodiHub’s paybill with Safaricom. Keep them private.</p>
         </>
       ) : null}
       {settings.updatedAt ? <p className="hint">Settings last changed {formatDateTime(settings.updatedAt)}.</p> : null}
@@ -214,7 +214,7 @@ function DarajaKeysSheet({ settings, onClose }: { settings: PlatformSettings; on
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.put<unknown>('/platform/settings', body),
     onSuccess: async () => {
-      toast.saved(configured ? 'Hodi’s M-Pesa keys were changed.' : 'Hodi’s paybill is connected to M-Pesa.');
+      toast.saved(configured ? 'KodiHub’s M-Pesa keys were changed.' : 'KodiHub’s paybill is connected to M-Pesa.');
       await queryClient.invalidateQueries({ queryKey: keys.platform });
       onClose();
     },
@@ -241,7 +241,7 @@ function DarajaKeysSheet({ settings, onClose }: { settings: PlatformSettings; on
 
   return (
     <Sheet
-      title={configured ? 'Change Hodi’s M-Pesa keys' : 'Connect Hodi’s paybill to M-Pesa'}
+      title={configured ? 'Change KodiHub’s M-Pesa keys' : 'Connect KodiHub’s paybill to M-Pesa'}
       wide
       busy={save.isPending}
       onClose={onClose}
@@ -254,7 +254,7 @@ function DarajaKeysSheet({ settings, onClose }: { settings: PlatformSettings; on
     >
       <form id="hodi-daraja" className="sheet-form" onSubmit={submit} noValidate autoComplete="off">
         <p className="ad__muted">
-          From Hodi’s app on the Safaricom Daraja portal. The keys are stored encrypted and never shown again —
+          From KodiHub’s app on the Safaricom Daraja portal. The keys are stored encrypted and never shown again —
           {configured ? ' enter all of them again to change any one.' : ' keep your own copy.'} Saving asks for a verification code.
         </p>
         <div className={`fld ${errors.environment ? 'is-bad' : ''}`}>
@@ -562,7 +562,7 @@ function AppAndMaintenanceForm({ settings }: { settings: PlatformSettings }) {
         <div className="fld fld--wide">
           <label className="fld__check">
             <input type="checkbox" checked={maintenanceMode} onChange={(e) => setMaintenanceMode(e.target.checked)} />
-            Enable maintenance mode banner across Hodi
+            Enable maintenance mode banner across KodiHub
           </label>
         </div>
         <Field id="am-maint" label="Maintenance message" optional wide>
