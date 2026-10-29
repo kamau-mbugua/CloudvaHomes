@@ -24,9 +24,12 @@ export type GroupId =
   | 'expenses'
   | 'reports'
   | 'settings'
-  // The platform admin area (`/admin`, phase 8).
+  // The platform admin area (`/admin`, phase 8 & 11).
   | 'admin-overview'
   | 'admin-organizations'
+  | 'admin-billing'
+  | 'admin-reports'
+  | 'admin-platform'
   | 'admin-plans'
   | 'admin-invoices'
   | 'admin-settings';
@@ -169,6 +172,19 @@ export function matchScore(entry: Pick<NavEntry, 'to' | 'exact'>, path: string):
     if (want[i] !== have[i]) return -1;
   }
 
+  const qIdx = entry.to.indexOf('?');
+  if (qIdx >= 0) {
+    if (want.length !== have.length) return -1;
+    const pIdx = path.indexOf('?');
+    if (pIdx < 0) return -1;
+    const wantParams = new URLSearchParams(entry.to.slice(qIdx + 1));
+    const haveParams = new URLSearchParams(path.slice(pIdx + 1).split('#')[0]);
+    for (const [k, v] of wantParams.entries()) {
+      if (haveParams.get(k) !== v) return -1;
+    }
+    return want.length + 0.5;
+  }
+
   return want.length;
 }
 
@@ -287,28 +303,72 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     id: 'admin-organizations',
     label: 'Organisations',
-    entry: { label: 'Organisations', to: '/admin/organizations', phase: '8', hint: 'Every organisation on Hodi: status, plan and price' },
-    children: [],
+    children: [
+      { label: 'All organisations', to: '/admin/organizations', phase: '8', hint: 'Every organisation on Hodi: status, plan and price' },
+      { label: 'Active', to: '/admin/organizations?status=ACTIVE', phase: '8', hint: 'Organisations in good standing' },
+      { label: 'Trial', to: '/admin/organizations?status=TRIAL', phase: '8', hint: 'Organisations currently in their free trial' },
+      { label: 'Suspended', to: '/admin/organizations?status=SUSPENDED', phase: '8', hint: 'Organisations in read-only mode for unpaid Hodi bills' },
+      { label: 'Add an organisation', to: '/admin/organizations/new', phase: '11', hint: 'Onboard a landlord or agency and invite its owner' },
+    ],
   },
   {
-    id: 'admin-plans',
-    label: 'Plans',
-    entry: { label: 'Plans', to: '/admin/plans', phase: '8', hint: 'Prices per let unit, minimums and trial days' },
-    children: [],
+    id: 'admin-billing',
+    label: 'Billing',
+    children: [
+      { label: 'Plans', to: '/admin/plans', phase: '8', hint: 'Prices per let unit, minimums and trial days' },
+      { label: 'Invoices', to: '/admin/invoices', phase: '8', hint: 'Hodi’s monthly invoices to organisations' },
+      { label: 'Overdue invoices', to: '/admin/invoices?status=OVERDUE', phase: '11', hint: 'Unpaid Hodi invoices past their due date' },
+      { label: 'Payments', to: '/admin/payments', phase: '11', hint: 'Payments received from organisations and manual receipts' },
+    ],
   },
   {
-    id: 'admin-invoices',
-    label: 'Invoices',
-    entry: { label: 'Invoices', to: '/admin/invoices', phase: '8', hint: 'Hodi’s monthly invoices to organisations' },
-    children: [],
+    id: 'admin-reports',
+    label: 'Reports',
+    children: [
+      { label: 'Collections', to: '/admin/reports/collections', phase: '11', hint: 'Every Hodi payment received in the selected period' },
+      { label: 'Aged receivables', to: '/admin/reports/aged-receivables', phase: '11', hint: 'Unpaid Hodi invoices grouped by 30/60/90+ day aging buckets' },
+      { label: 'Organisation activity', to: '/admin/reports/activity', phase: '11', hint: 'Properties, units, tenants and recent activity per organisation' },
+      { label: 'Status & plan changes', to: '/admin/reports/subscription-changes', phase: '11', hint: 'Status transitions, plan changes and price overrides' },
+      { label: 'Onboarding funnel', to: '/admin/reports/onboarding', phase: '11', hint: 'New organisations and setup milestones completed' },
+      { label: 'Invoices report', to: '/admin/reports/invoices', phase: '11', hint: 'All Hodi invoices issued in the period with status totals' },
+      { label: 'Plan performance', to: '/admin/reports/plans', phase: '11', hint: 'Organisations, let units, MRR and collections per plan' },
+      { label: 'Reconciliation', to: '/admin/reports/reconciliation', phase: '11', hint: 'Unallocated payment credits and M-Pesa STK requests' },
+      { label: 'Price vs plan', to: '/admin/reports/price-variance', phase: '11', hint: 'Custom organisation pricing compared against standard plan rates' },
+      { label: 'Salesperson performance', to: '/admin/reports/salespeople', phase: '11', hint: 'Book size, MRR, collections and overdue balance per salesperson' },
+      { label: 'Audit log', to: '/admin/reports/audit', phase: '11', hint: 'Platform-wide audit trail of administrative and organisation actions' },
+    ],
   },
   {
-    id: 'admin-settings',
-    label: 'Settings',
-    entry: { label: 'Settings', to: '/admin/settings', phase: '8', hint: 'Due and suspension days, default plan, Hodi’s paybill' },
-    children: [],
+    id: 'admin-platform',
+    label: 'Platform',
+    children: [
+      { label: 'Administrators & salespeople', to: '/admin/admins', phase: '11', hint: 'Manage superadmins, salespeople and organisation assignments' },
+      { label: 'Email', to: '/admin/email', phase: '11', hint: 'SMTP setup, owner broadcasts and outbound email logs' },
+      { label: 'Settings', to: '/admin/settings', phase: '8', hint: 'Billing rules, Admin 2FA, M-Pesa, SMS, signup and app version floor' },
+      { label: 'My account', to: '/admin/account', phase: '8', hint: 'Your name and password' },
+    ],
   },
 ];
+
+export const SUPERADMIN_ONLY_PATHS = new Set<string>([
+  '/admin/plans',
+  '/admin/admins',
+  '/admin/email',
+  '/admin/settings',
+]);
+
+/** Filters `ADMIN_NAV` for a salesperson vs superadmin. */
+export function filterAdminNav(groups: NavGroup[], superAdmin: boolean): NavGroup[] {
+  if (superAdmin) return groups;
+  return groups.flatMap((group) => {
+    if (group.id === 'admin-reports') return [];
+    const children = group.children.filter(
+      (c) => !SUPERADMIN_ONLY_PATHS.has(c.to) && !c.to.startsWith('/admin/reports/'),
+    );
+    if (!group.entry && children.length === 0) return [];
+    return [{ ...group, children }];
+  });
+}
 
 /** The account page inside the admin area, for admins with no organisation. */
 export const ADMIN_ACCOUNT_ENTRY: NavEntry = {

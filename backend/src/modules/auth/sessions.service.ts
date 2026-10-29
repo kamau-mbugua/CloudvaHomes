@@ -29,6 +29,7 @@ export interface SessionPayload {
     email: string | null;
     phone: string | null;
     isPlatformAdmin: boolean;
+    platformRole: 'SUPERADMIN' | 'SALESPERSON' | null;
   };
   organizations: { id: string; name: string; kind: string; roleName: string; isOwner: boolean }[];
   activeOrganization: { id: string; name: string; kind: string; status: string } | null;
@@ -194,11 +195,13 @@ export class SessionsService {
       },
       orderBy: { createdAt: 'asc' },
     });
+    const platformRole = user.platformRole ?? (user.isPlatformAdmin ? 'SUPERADMIN' : null);
+    const isPlatformAdmin = platformRole === 'SUPERADMIN';
     const access = await this.tokens.signAccess({
       userId,
       orgId: active?.orgId ?? null,
       sessionId,
-      isPlatformAdmin: user.isPlatformAdmin,
+      isPlatformAdmin,
     });
     return {
       accessToken: access.token,
@@ -209,7 +212,8 @@ export class SessionsService {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
-        isPlatformAdmin: user.isPlatformAdmin,
+        isPlatformAdmin,
+        platformRole,
       },
       organizations: user.memberships.map((m) => ({
         id: m.orgId,

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ok } from '../../common/http/response.js';
-import { PlatformAdminOnly, RequirePermission } from '../auth/decorators.js';
+import { PlatformOperatorOnly, RequirePermission } from '../auth/decorators.js';
 import { CreateOrganizationDto, UpdateOrganizationDto } from './organizations.dto.js';
 import { OrganizationsService } from './organizations.service.js';
 
@@ -26,7 +26,7 @@ export class OrganizationController {
 
 @ApiTags('Platform')
 @ApiBearerAuth()
-@PlatformAdminOnly()
+@PlatformOperatorOnly()
 @Controller('platform/organizations')
 export class PlatformOrganizationsController {
   constructor(private readonly orgs: OrganizationsService) {}

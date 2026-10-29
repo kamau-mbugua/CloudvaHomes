@@ -20,6 +20,9 @@ function toOrg(o: Organization) {
     email: o.email,
     kraPin: o.kraPin,
     status: o.status,
+    billingRef: o.billingRef,
+    planId: o.planId,
+    onboardedById: o.onboardedById,
     settings: o.settings,
     invoiceDueDays: o.invoiceDueDays,
     reminders: readReminders(o.settings),
@@ -107,10 +110,24 @@ export class OrganizationsService {
           { n: bigint }[]
         >`SELECT nextval('"billing_ref_seq"') AS n`;
         const settings = await tx.platformSettings.findUnique({ where: { id: 1 } });
-        const plan =
-          (settings?.defaultPlanId
-            ? await tx.plan.findFirst({ where: { id: settings.defaultPlanId, active: true } })
-            : null) ?? (await tx.plan.findFirst({ where: { isDefault: true, active: true } }));
+        let plan = null;
+        if (dto.planId) {
+          plan = await tx.plan.findFirst({ where: { id: dto.planId, active: true } });
+          if (!plan) throw AppError.fieldInvalid('planId', 'Choose an active plan');
+        } else {
+          plan =
+            (settings?.defaultPlanId
+              ? await tx.plan.findFirst({ where: { id: settings.defaultPlanId, active: true } })
+              : null) ?? (await tx.plan.findFirst({ where: { isDefault: true, active: true } }));
+        }
+        const onboardedById =
+          ctx.platformRole === 'SALESPERSON' ? ctx.userId : (dto.onboardedById ?? null);
+        if (onboardedById && onboardedById !== ctx.userId) {
+          const op = await tx.user.findUnique({ where: { id: onboardedById } });
+          if (!op || (!op.isPlatformAdmin && !op.platformRole)) {
+            throw AppError.fieldInvalid('onboardedById', 'Choose a valid platform operator');
+          }
+        }
         const trialEndsAt = plan ? new Date(Date.now() + plan.trialDays * 86_400_000) : null;
         const org = await tx.organization.create({
           data: {
@@ -122,6 +139,7 @@ export class OrganizationsService {
             billingRef: `H${String(n).padStart(5, '0')}`,
             planId: plan?.id ?? null,
             trialEndsAt: trialEndsAt ? new Date(trialEndsAt.toISOString().slice(0, 10)) : null,
+            onboardedById,
           },
         });
         const roles = await RolesService.seedSystemRoles(tx, org.id);

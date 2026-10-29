@@ -2,6 +2,8 @@
  * Identity shapes from the phase 1 API contract (docs/plans/2026-10-27-phase-1-identity.md).
  */
 
+export type PlatformRole = 'SUPERADMIN' | 'SALESPERSON';
+
 export interface SessionUser {
   id: string;
   firstName: string;
@@ -9,6 +11,15 @@ export interface SessionUser {
   email: string | null;
   phone: string | null;
   isPlatformAdmin: boolean;
+  platformRole?: PlatformRole | null;
+}
+
+export interface AdminTwoFactorChallenge {
+  requiresTwoFactor: true;
+  challengeToken: string;
+  expiresAt: string;
+  channel: 'EMAIL' | 'SMS';
+  destinationMasked: string;
 }
 
 export type OrgKind = 'LANDLORD' | 'AGENCY';

@@ -75,14 +75,18 @@ $c ps; $c logs -f api; $c exec db psql -U hodi hodi
 
 ## First admin (once per environment)
 
-A new environment has an empty database. The password is typed, never put on a command line:
+A new environment has an empty database. The password is typed and passed on stdin, so it
+never appears on a command line (`ps`) or in shell history:
 
 ```bash
 read -rs -p 'Admin password: ' P; echo
-sudo docker exec -e HODI_ADMIN_PASSWORD="$P" hodi-prod-api-1 \
-  node dist/scripts/create-platform-admin.js --email you@yourdomain --phone 07XXXXXXXX --first Jane --last Doe
+printf '%s\n' "$P" | sudo docker exec -i hodi-prod-api-1 sh -c \
+  'IFS= read -r HODI_ADMIN_PASSWORD; export HODI_ADMIN_PASSWORD; exec node dist/scripts/create-platform-admin.js "$@"' _ \
+  --email you@yourdomain --phone 07XXXXXXXX --first Jane --last Doe
 unset P
 ```
+
+Running it again for an existing email or phone promotes that user and resets the password.
 
 (On the dev server the container is `hodi-dev-api-1`.)
 

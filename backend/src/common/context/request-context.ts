@@ -17,6 +17,7 @@ export interface RequestContext {
   /** Refresh-token family of the caller's session. */
   sessionId: string | null;
   isPlatformAdmin: boolean;
+  platformRole: 'SUPERADMIN' | 'SALESPERSON' | null;
   isOwner: boolean;
   permissions: ReadonlySet<string>;
   /**
@@ -40,6 +41,7 @@ export function emptyContext(partial: Partial<RequestContext> = {}): RequestCont
     orgStatus: null,
     sessionId: null,
     isPlatformAdmin: false,
+    platformRole: null,
     isOwner: false,
     permissions: new Set(),
     propertyIds: null,

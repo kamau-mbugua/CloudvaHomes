@@ -11,6 +11,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -141,6 +142,16 @@ export class CreateOrganizationDto {
   @IsOptional()
   @Matches(KRA_PIN, { message: 'kraPin must look like A123456789Z' })
   kraPin?: string;
+
+  @ApiPropertyOptional({ description: 'Initial billing plan; defaults to the platform default plan' })
+  @IsOptional()
+  @IsUUID()
+  planId?: string;
+
+  @ApiPropertyOptional({ description: 'Salesperson/operator assigned to this organisation' })
+  @IsOptional()
+  @IsUUID()
+  onboardedById?: string;
 
   @ApiProperty({ type: OwnerDto })
   @ValidateNested()

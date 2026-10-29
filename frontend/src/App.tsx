@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { queryClient } from './lib/api/queryClient';
 import { ToastProvider } from './components/Toast';
 import { AppShell } from './app/AppShell';
-import { RequireAdmin, RequireAuth, RequireOwner, RequirePermission, RequireTenant } from './app/guards';
+import { RequireAdmin, RequireAuth, RequireOwner, RequirePermission, RequireSuperAdmin, RequireTenant } from './app/guards';
 import { NotFoundPage, PlaceholderPage } from './app/PlaceholderPage';
 import { ORG_NAV, destinations } from './app/navigation';
 import { LoginPage } from './features/auth/LoginPage';
@@ -50,9 +50,14 @@ import { PayoutsPage } from './features/banks/PayoutsPage';
 import { AdminShell } from './features/admin/AdminShell';
 import { OverviewPage as AdminOverviewPage } from './features/admin/OverviewPage';
 import { OrganizationsPage as AdminOrganizationsPage } from './features/admin/OrganizationsPage';
+import { CreateOrganizationPage } from './features/admin/CreateOrganizationPage';
 import { OrganizationDetailPage as AdminOrganizationDetailPage } from './features/admin/OrganizationDetailPage';
 import { PlansPage as AdminPlansPage } from './features/admin/PlansPage';
 import { AdminInvoicesPage } from './features/admin/AdminInvoicesPage';
+import { AdminPaymentsPage } from './features/admin/AdminPaymentsPage';
+import { AdminOperatorsPage } from './features/admin/AdminOperatorsPage';
+import { AdminEmailPage } from './features/admin/AdminEmailPage';
+import { AdminReportsPage } from './features/admin/AdminReportsPage';
 import { AdminSettingsPage } from './features/admin/AdminSettingsPage';
 import {
   OwnerOverviewPage, OwnerPayoutsPage, OwnerShell, OwnerStatementsPage as OwnerPortalStatementsPage,
@@ -149,14 +154,20 @@ export default function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
-              {/* The platform admin area: Hodi's own staff, its own shell (phase 8). */}
+              {/* The platform admin area: Hodi's own staff, its own shell (phase 8 & phase 11). */}
               <Route path="/admin" element={<RequireAdmin><AdminShell /></RequireAdmin>}>
                 <Route index element={<AdminOverviewPage />} />
                 <Route path="organizations" element={<AdminOrganizationsPage />} />
+                <Route path="organizations/new" element={<CreateOrganizationPage />} />
                 <Route path="organizations/:organizationId" element={<AdminOrganizationDetailPage />} />
-                <Route path="plans" element={<AdminPlansPage />} />
+                <Route path="plans" element={<RequireSuperAdmin><AdminPlansPage /></RequireSuperAdmin>} />
                 <Route path="invoices" element={<AdminInvoicesPage />} />
-                <Route path="settings" element={<AdminSettingsPage />} />
+                <Route path="payments" element={<AdminPaymentsPage />} />
+                <Route path="reports" element={<Navigate to="/admin/reports/collections" replace />} />
+                <Route path="reports/:report" element={<RequireSuperAdmin><AdminReportsPage /></RequireSuperAdmin>} />
+                <Route path="admins" element={<RequireSuperAdmin><AdminOperatorsPage /></RequireSuperAdmin>} />
+                <Route path="email" element={<RequireSuperAdmin><AdminEmailPage /></RequireSuperAdmin>} />
+                <Route path="settings" element={<RequireSuperAdmin><AdminSettingsPage /></RequireSuperAdmin>} />
                 <Route path="account" element={<AccountPage />} />
                 <Route path="*" element={<Navigate to="/admin" replace />} />
               </Route>

@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../../app/Sidebar';
 import { AccountMenu } from '../../app/AccountMenu';
 import { MenuIcon, MoonIcon, SunIcon } from '../../app/icons';
-import { ADMIN_ACCOUNT_ENTRY, ADMIN_NAV, bestEntry, matchScore } from '../../app/navigation';
+import { ADMIN_ACCOUNT_ENTRY, ADMIN_NAV, bestEntry, filterAdminNav, matchScore } from '../../app/navigation';
 import { errorMessage } from '../../lib/api/client';
 import { displayName } from '../../lib/auth/permissions';
-import { portalsOf } from '../../lib/auth/portals';
+import { isSuperAdmin, portalsOf } from '../../lib/auth/portals';
 import { logout, switchOrganization } from '../../lib/auth/session';
 import { useSession } from '../../lib/auth/useAuth';
 import { readStored, writeStored } from '../../lib/storage';
@@ -34,11 +34,19 @@ export function AdminShell() {
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) === '1');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const places = portalsOf(session);
+  const superAdmin = isSuperAdmin(session.user);
+  const navGroups = useMemo(() => filterAdminNav(ADMIN_NAV, superAdmin), [superAdmin]);
+  const roleLabel = superAdmin ? 'Platform admin' : 'Salesperson';
 
-  const here = bestEntry(ADMIN_NAV, location.pathname);
+  const fullPath = `${location.pathname}${location.search}`;
+  const here = bestEntry(ADMIN_NAV, fullPath);
   const onAccount = matchScore(ADMIN_ACCOUNT_ENTRY, location.pathname) >= 0;
   const title = onAccount ? ADMIN_ACCOUNT_ENTRY.label : here?.entry.label ?? 'Page not found';
-  const subtitle = onAccount ? ADMIN_ACCOUNT_ENTRY.hint : here?.entry.hint ?? 'There is nothing at this address.';
+  const subtitle = onAccount
+    ? ADMIN_ACCOUNT_ENTRY.hint
+    : here
+      ? (here.group.children.length > 0 ? `${here.group.label} · ${here.entry.hint}` : here.entry.hint)
+      : 'There is nothing at this address.';
 
   useEffect(() => {
     document.title = `${title} · Hodi admin`;
@@ -83,7 +91,7 @@ export function AdminShell() {
   return (
     <div className={`ms adm ${drawerOpen ? 'is-drawer-open' : ''}`}>
       <Sidebar
-        groups={ADMIN_NAV}
+        groups={navGroups}
         orgName="Hodi admin"
         label="Platform admin"
         collapsed={collapsed}
@@ -107,7 +115,7 @@ export function AdminShell() {
           </div>
 
           <div className="ms__right">
-            <span className="ad__badge ad__badge--info adm__tag">Platform admin</span>
+            <span className="ad__badge ad__badge--info adm__tag">{roleLabel}</span>
             <button type="button" className="sh__icon" onClick={() => setTheme(nextTheme)}
               aria-label={`Switch to ${nextTheme} theme`} title={`Switch to ${nextTheme} theme`}>
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
@@ -116,7 +124,7 @@ export function AdminShell() {
             <AccountMenu
               name={displayName(session.user)}
               contact={session.user.email ?? session.user.phone}
-              role="Platform admin"
+              role={roleLabel}
               organizations={session.organizations}
               activeOrganizationId={session.activeOrganization?.id ?? null}
               switchingTo={switchingTo}

@@ -18,23 +18,30 @@ datasource db {
 // ───────────────────────────── Identity ─────────────────────────────
 
 model User {
-  id              String     @id @default(uuid(7)) @db.Uuid
-  email           String?    @unique // lower-cased
-  phone           String?    @unique // E.164, e.g. +254712345678
+  id              String        @id @default(uuid(7)) @db.Uuid
+  email           String?       @unique // lower-cased
+  phone           String?       @unique // E.164, e.g. +254712345678
   passwordHash    String?
   firstName       String
   lastName        String
-  isPlatformAdmin Boolean    @default(false)
-  status          UserStatus @default(ACTIVE)
+  isPlatformAdmin Boolean       @default(false)
+  platformRole    PlatformRole?
+  status          UserStatus    @default(ACTIVE)
   lastLoginAt     DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  memberships     Membership[]
-  refreshTokens   RefreshToken[]
-  invitationsSent Invitation[]   @relation("InvitedBy")
+  memberships            Membership[]
+  refreshTokens          RefreshToken[]
+  invitationsSent        Invitation[]   @relation("InvitedBy")
+  onboardedOrganizations Organization[] @relation("OnboardedBy")
 
   @@map("users")
+}
+
+enum PlatformRole {
+  SUPERADMIN
+  SALESPERSON
 }
 
 enum UserStatus {
@@ -61,15 +68,18 @@ model Organization {
   trialEndsAt     DateTime? @db.Date
   noSuspendUntil  DateTime? @db.Date
   platformCredit  BigInt    @default(0)
+  onboardedById   String?   @db.Uuid
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  onboardedBy User?        @relation("OnboardedBy", fields: [onboardedById], references: [id], onDelete: SetNull)
   memberships Membership[]
   roles       Role[]
   landlords   Landlord[]
   properties  Property[]
   tenants     Tenant[]
 
+  @@index([onboardedById])
   @@map("organizations")
 }
 
@@ -199,6 +209,7 @@ enum OtpPurpose {
   LOGIN
   PASSWORD_RESET
   STEP_UP
+  ADMIN_2FA
 }
 
 // ───────────────────────────── Portfolio ─────────────────────────────
@@ -1322,19 +1333,59 @@ model PlatformStkRequest {
   @@map("platform_stk_requests")
 }
 
-/// The single row of Hodi's own billing settings (id = 1).
+/// The single row of Hodi's own billing and platform settings (id = 1).
 model PlatformSettings {
-  id               Int        @id @default(1)
-  dueDays          Int        @default(10)
-  suspendAfterDays Int        @default(21)
-  defaultPlanId    String?    @db.Uuid
-  paybill          String?
-  darajaEnv        DarajaEnv?
-  secretsEnc       Bytes?
-  callbackToken    String?    @unique
-  updatedAt        DateTime   @updatedAt
+  id                    Int            @id @default(1)
+  dueDays               Int            @default(10)
+  suspendAfterDays      Int            @default(21)
+  defaultPlanId         String?        @db.Uuid
+  paybill               String?
+  darajaEnv             DarajaEnv?
+  secretsEnc            Bytes?
+  callbackToken         String?        @unique
+  // ── Security & Admin 2FA (phase 11) ──
+  requireAdminTwoFactor Boolean        @default(false)
+  adminTwoFactorChannel MessageChannel @default(EMAIL)
+  // ── Email SMTP (phase 11) ──
+  smtpHost              String?
+  smtpPort              Int?           @default(587)
+  smtpUser              String?
+  smtpEncryption        String?        @default("tls")
+  smtpPassEnc           Bytes?
+  smtpFromEmail         String?
+  smtpFromName          String?
+  smtpAllowlist         String?
+  // ── SMS Africa's Talking (phase 11) ──
+  atUsername            String?
+  atSenderId            String?
+  atApiKeyEnc           Bytes?
+  // ── Signup, Mobile App & Maintenance (phase 11) ──
+  allowPublicSignup     Boolean        @default(false)
+  minAppVersionCode     Int            @default(1)
+  minAppVersionName     String?        @default("1.0.0")
+  appUpdateMessage      String?
+  appStoreUrl           String?
+  maintenanceMode       Boolean        @default(false)
+  maintenanceMessage    String?
+  updatedAt             DateTime       @updatedAt
 
   @@map("platform_settings")
+}
+
+/// Every platform email sent or failed (invitations, OTPs, broadcasts, tests).
+model PlatformEmailLog {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  to            String
+  subject       String
+  kind          String        @default("other")
+  status        MessageStatus
+  error         String?
+  triggeredById String?       @db.Uuid
+  createdAt     DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@map("platform_email_logs")
 }
 
 // ───────────────────────────── Cross-cutting ─────────────────────────────

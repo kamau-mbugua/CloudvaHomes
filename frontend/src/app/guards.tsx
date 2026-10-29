@@ -5,7 +5,7 @@ import { Splash } from '../components/Splash';
 import { NoOrganizationPage } from '../features/auth/NoOrganizationPage';
 import { PortalChooserPage } from '../features/auth/PortalChooserPage';
 import { loginPath } from '../lib/auth/next';
-import { landingFor } from '../lib/auth/portals';
+import { isPlatformOperator, isSuperAdmin, landingFor } from '../lib/auth/portals';
 import { hasPermission } from '../lib/auth/permissions';
 import type { OrgKind } from '../lib/auth/types';
 import { useAuthState } from '../lib/auth/useAuth';
@@ -85,8 +85,23 @@ export function RequireAdmin({ children }: { children?: ReactNode }) {
   if (status === 'signedOut' || !session) {
     return <Navigate to={loginPath(`${location.pathname}${location.search}`)} replace />;
   }
-  if (!session.user.isPlatformAdmin) return <Navigate to="/app" replace />;
+  if (!isPlatformOperator(session.user)) return <Navigate to="/app" replace />;
 
+  return children ? <>{children}</> : <Outlet />;
+}
+
+export function RequireSuperAdmin({ children }: { children?: ReactNode }) {
+  const { session } = useAuthState();
+  if (!isSuperAdmin(session?.user)) {
+    return (
+      <div className="ph">
+        <EmptyState
+          title="Superadmin access required"
+          detail="This area is only available to Hodi superadministrators."
+        />
+      </div>
+    );
+  }
   return children ? <>{children}</> : <Outlet />;
 }
 

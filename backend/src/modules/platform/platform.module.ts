@@ -8,13 +8,14 @@ import { PlatformAdminService } from './platform-admin.service.js';
 import { PlatformBillingService } from './platform-billing.service.js';
 import { PlatformHooksController } from './platform-hooks.controller.js';
 import { PlatformPayService } from './platform-pay.service.js';
+import { PlatformReportsService } from './platform-reports.service.js';
 import {
   BillingController,
   PlatformController,
   PlatformJobsController,
 } from './platform.controller.js';
 
-/** Hodi billing organisations (phase 8): plans, monthly invoices, payments, suspension. */
+/** Hodi billing organisations (phase 8) and platform admin suite (phase 11). */
 @Module({
   imports: [MpesaModule],
   controllers: [
@@ -27,6 +28,7 @@ import {
     PlatformBillingService,
     PlatformAdminService,
     PlatformPayService,
+    PlatformReportsService,
     JobTokenVerifier,
     JobsGuard,
   ],

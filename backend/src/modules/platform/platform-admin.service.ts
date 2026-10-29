@@ -1,27 +1,46 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { withoutOrgScope } from '../../common/context/request-context.js';
+import { currentContext, withoutOrgScope } from '../../common/context/request-context.js';
+import { FieldCipher } from '../../common/crypto/field-cipher.js';
 import { formatDateOnlyOrNull, parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
-import type { Organization, Plan, Prisma } from '../../generated/prisma/client.js';
+import { ENV } from '../../config/config.module.js';
+import type { Env } from '../../config/env.js';
+import type { Organization, Plan, Prisma, User } from '../../generated/prisma/client.js';
 import { violatesUnique } from '../../prisma/errors.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { hashPassword } from '../auth/crypto.js';
+import { authContext } from '../auth/decorators.js';
+import { normalizeEmail, normalizePhone, passwordProblem } from '../auth/identifiers.js';
 import { todayInNairobi } from '../billing/billing-math.js';
+import {
+  NotificationsService,
+  SMTP_PASS_CONTEXT,
+} from '../notifications/notifications.service.js';
 import { PlatformBillingService } from './platform-billing.service.js';
 import type {
+  AssignOrganizationsDto,
+  CreateOperatorDto,
   CreatePlanDto,
+  ListEmailLogsQueryDto,
   ListOrgsQueryDto,
+  SendBroadcastEmailDto,
+  UpdateEmailSettingsDto,
+  UpdateOperatorDto,
   UpdateOrgBillingDto,
   UpdatePlanDto,
 } from './platform.dto.js';
 
-/** Plans and per-organisation billing terms, managed by platform admins. */
+/** Plans, organisations, operators, email and security managed by platform admins. */
 @Injectable()
 export class PlatformAdminService {
   constructor(
     @Inject(DB) private readonly db: Db,
+    @Inject(ENV) private readonly env: Env,
+    private readonly cipher: FieldCipher,
+    private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
     private readonly billing: PlatformBillingService,
   ) {}
@@ -163,7 +182,7 @@ export class PlatformAdminService {
   private async toOrg(o: Organization, plans: Map<string, Plan>) {
     const plan = o.planId ? (plans.get(o.planId) ?? null) : null;
     const today = parseDateOnly(todayInNairobi());
-    const [owner, balance, occupiedUnits] = await Promise.all([
+    const [owner, onboardedBy, balance, occupiedUnits] = await Promise.all([
       this.db.membership.findFirst({
         where: { orgId: o.id, role: { systemKey: 'OWNER' } },
         orderBy: { createdAt: 'asc' },
@@ -171,6 +190,12 @@ export class PlatformAdminService {
           user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
         },
       }),
+      o.onboardedById
+        ? this.db.user.findUnique({
+            where: { id: o.onboardedById },
+            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+          })
+        : Promise.resolve(null),
       this.billing.balance(o.id),
       this.billing.occupiedUnits(this.db, o.id, today),
     ]);
@@ -193,6 +218,8 @@ export class PlatformAdminService {
       credit: o.platformCredit,
       occupiedUnits,
       owner: owner?.user ?? null,
+      onboardedById: o.onboardedById,
+      onboardedBy,
       createdAt: o.createdAt,
     };
   }
@@ -202,9 +229,13 @@ export class PlatformAdminService {
   }
 
   organizations(q: ListOrgsQueryDto) {
+    const ctx = currentContext();
+    const salespersonFilter =
+      ctx?.platformRole === 'SALESPERSON' && ctx.userId ? { onboardedById: ctx.userId } : {};
     return withoutOrgScope(async () => {
       const term = q.q?.trim();
       const where: Prisma.OrganizationWhereInput = {
+        ...salespersonFilter,
         ...(q.status ? { status: q.status } : {}),
         ...(term
           ? {
@@ -226,9 +257,13 @@ export class PlatformAdminService {
   }
 
   organization(id: string) {
+    const ctx = currentContext();
+    const salespersonId = ctx?.platformRole === 'SALESPERSON' ? ctx.userId : null;
     return withoutOrgScope(async () => {
       const o = await this.db.organization.findUnique({ where: { id } });
-      if (!o) throw AppError.notFound('Organisation');
+      if (!o || (salespersonId && o.onboardedById !== salespersonId)) {
+        throw AppError.notFound('Organisation');
+      }
       return this.toOrg(o, await this.planMap());
     });
   }
@@ -241,8 +276,14 @@ export class PlatformAdminService {
         const plan = await this.db.plan.findUnique({ where: { id: dto.planId } });
         if (!plan?.active) throw AppError.fieldInvalid('planId', 'Choose an active plan');
       }
+      if (dto.onboardedById) {
+        const op = await this.db.user.findUnique({ where: { id: dto.onboardedById } });
+        if (!op || (!op.isPlatformAdmin && !op.platformRole)) {
+          throw AppError.fieldInvalid('onboardedById', 'Choose a valid platform operator');
+        }
+      }
       const date = (v: string | null) => (v === null ? null : parseDateOnly(v));
-      const data: Prisma.OrganizationUpdateInput = {
+      const data: Prisma.OrganizationUncheckedUpdateInput = {
         ...(dto.planId !== undefined ? { planId: dto.planId } : {}),
         ...(dto.priceOverride !== undefined
           ? { priceOverride: dto.priceOverride === null ? null : BigInt(dto.priceOverride) }
@@ -253,6 +294,7 @@ export class PlatformAdminService {
         ...(dto.trialEndsAt !== undefined ? { trialEndsAt: date(dto.trialEndsAt) } : {}),
         ...(dto.noSuspendUntil !== undefined ? { noSuspendUntil: date(dto.noSuspendUntil) } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
+        ...(dto.onboardedById !== undefined ? { onboardedById: dto.onboardedById } : {}),
       };
       const terms = (o: Organization) => ({
         planId: o.planId,
@@ -261,6 +303,7 @@ export class PlatformAdminService {
         trialEndsAt: formatDateOnlyOrNull(o.trialEndsAt),
         noSuspendUntil: formatDateOnlyOrNull(o.noSuspendUntil),
         status: o.status,
+        onboardedById: o.onboardedById,
       });
       await this.db.$transaction(async (tx) => {
         const after = await tx.organization.update({ where: { id }, data });
@@ -279,6 +322,441 @@ export class PlatformAdminService {
       // Reopening, a new trial end or a no-suspension date can change the status at once.
       if (dto.status !== 'CLOSED') await this.billing.refreshStatus(id);
       return this.organization(id);
+    });
+  }
+
+  // ── Platform Operators (Superadmins & Salespeople) ──
+
+  private async toOperator(u: User) {
+    const role = u.platformRole ?? (u.isPlatformAdmin ? 'SUPERADMIN' : 'SALESPERSON');
+    const [organizationsCount, activeOrganizationsCount] = await Promise.all([
+      this.db.organization.count({ where: { onboardedById: u.id } }),
+      this.db.organization.count({
+        where: { onboardedById: u.id, status: { in: ['TRIAL', 'ACTIVE', 'GRACE'] } },
+      }),
+    ]);
+    return {
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+      phone: u.phone,
+      status: u.status,
+      role,
+      lastLoginAt: u.lastLoginAt,
+      createdAt: u.createdAt,
+      organizationsCount,
+      activeOrganizationsCount,
+    };
+  }
+
+  operators() {
+    return withoutOrgScope(async () => {
+      const [users, unassignedOrganizationsCount] = await Promise.all([
+        this.db.user.findMany({
+          where: { OR: [{ isPlatformAdmin: true }, { platformRole: { not: null } }] },
+          orderBy: [{ createdAt: 'asc' }],
+        }),
+        this.db.organization.count({ where: { onboardedById: null } }),
+      ]);
+      return {
+        operators: await Promise.all(users.map((u) => this.toOperator(u))),
+        unassignedOrganizationsCount,
+      };
+    });
+  }
+
+  createOperator(dto: CreateOperatorDto) {
+    return withoutOrgScope(async () => {
+      const email = dto.email ? normalizeEmail(dto.email) : null;
+      const phone = dto.phone ? normalizePhone(dto.phone) : null;
+      if (dto.email && !email) {
+        throw AppError.fieldInvalid('email', 'Enter a valid email address');
+      }
+      if (dto.phone && !phone) {
+        throw AppError.fieldInvalid('phone', 'Enter a valid phone number, e.g. 0712 345 678');
+      }
+      if (!email && !phone) {
+        throw AppError.fieldInvalid('email', 'Enter an email address or a phone number');
+      }
+      if (dto.password) {
+        const problem = passwordProblem(dto.password, [email, phone]);
+        if (problem) throw AppError.fieldInvalid('password', problem);
+      }
+
+      const passwordHash = dto.password ? await hashPassword(dto.password) : undefined;
+      const existingByEmail = email
+        ? await this.db.user.findUnique({ where: { email } })
+        : null;
+      const existingByPhone = phone
+        ? await this.db.user.findUnique({ where: { phone } })
+        : null;
+      if (existingByEmail && existingByPhone && existingByEmail.id !== existingByPhone.id) {
+        throw AppError.conflict(
+          'That email and phone belong to two different accounts',
+          'CONFLICT',
+        );
+      }
+      const existing = existingByEmail ?? existingByPhone;
+
+      const user = await this.db.$transaction(async (tx) => {
+        const row = existing
+          ? await tx.user.update({
+              where: { id: existing.id },
+              data: {
+                firstName: dto.firstName.trim(),
+                lastName: dto.lastName.trim(),
+                ...(email && !existing.email ? { email } : {}),
+                ...(phone && !existing.phone ? { phone } : {}),
+                ...(passwordHash ? { passwordHash } : {}),
+                platformRole: dto.role,
+                isPlatformAdmin: dto.role === 'SUPERADMIN',
+                status: 'ACTIVE',
+              },
+            })
+          : await tx.user.create({
+              data: {
+                firstName: dto.firstName.trim(),
+                lastName: dto.lastName.trim(),
+                email,
+                phone,
+                passwordHash: passwordHash ?? null,
+                platformRole: dto.role,
+                isPlatformAdmin: dto.role === 'SUPERADMIN',
+                status: 'ACTIVE',
+              },
+            });
+        await this.audit.record(
+          {
+            action: existing ? 'platform.operator_promote' : 'platform.operator_create',
+            entity: 'user',
+            entityId: row.id,
+            orgId: null,
+            after: {
+              email: row.email,
+              phone: row.phone,
+              role: dto.role,
+            },
+          },
+          tx,
+        );
+        return row;
+      });
+      return this.toOperator(user);
+    });
+  }
+
+  updateOperator(id: string, dto: UpdateOperatorDto) {
+    const ctx = authContext();
+    return withoutOrgScope(async () => {
+      const before = await this.db.user.findUnique({ where: { id } });
+      if (!before || (!before.isPlatformAdmin && !before.platformRole)) {
+        throw AppError.notFound('Operator');
+      }
+      if (id === ctx.userId && (dto.role !== undefined && dto.role !== 'SUPERADMIN' || dto.status === 'DISABLED')) {
+        throw AppError.conflict('You cannot remove or disable your own superadmin access', 'CANNOT_DEMOTE_SELF');
+      }
+      const wasSuperadmin =
+        (before.platformRole ?? (before.isPlatformAdmin ? 'SUPERADMIN' : null)) === 'SUPERADMIN';
+      const nextRole =
+        dto.role !== undefined
+          ? dto.role
+          : (before.platformRole ?? (before.isPlatformAdmin ? 'SUPERADMIN' : null));
+      const nextStatus = dto.status ?? before.status;
+      if (wasSuperadmin && (nextRole !== 'SUPERADMIN' || nextStatus !== 'ACTIVE')) {
+        const remaining = await this.db.user.count({
+          where: {
+            id: { not: id },
+            status: 'ACTIVE',
+            OR: [{ platformRole: 'SUPERADMIN' }, { platformRole: null, isPlatformAdmin: true }],
+          },
+        });
+        if (remaining === 0) {
+          throw AppError.conflict('At least one active superadmin is required', 'LAST_SUPERADMIN');
+        }
+      }
+
+      const after = await this.db.$transaction(async (tx) => {
+        const row = await tx.user.update({
+          where: { id },
+          data: {
+            ...(dto.role !== undefined
+              ? { platformRole: dto.role, isPlatformAdmin: dto.role === 'SUPERADMIN' }
+              : {}),
+            ...(dto.status !== undefined ? { status: dto.status } : {}),
+          },
+        });
+        await this.audit.record(
+          {
+            action: 'platform.operator_update',
+            entity: 'user',
+            entityId: id,
+            orgId: null,
+            before: {
+              role: before.platformRole ?? (before.isPlatformAdmin ? 'SUPERADMIN' : null),
+              status: before.status,
+            },
+            after: {
+              role: row.platformRole,
+              status: row.status,
+            },
+          },
+          tx,
+        );
+        return row;
+      });
+      return this.toOperator(after);
+    });
+  }
+
+  unassignedOrganizations() {
+    return withoutOrgScope(async () => {
+      const rows = await this.db.organization.findMany({
+        where: { onboardedById: null },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          kind: true,
+          status: true,
+          billingRef: true,
+          email: true,
+          phone: true,
+          createdAt: true,
+        },
+      });
+      return rows;
+    });
+  }
+
+  assignOrganizations(operatorId: string, dto: AssignOrganizationsDto) {
+    return withoutOrgScope(async () => {
+      const op = await this.db.user.findUnique({ where: { id: operatorId } });
+      if (!op || (!op.isPlatformAdmin && !op.platformRole)) {
+        throw AppError.notFound('Operator');
+      }
+      const { count } = await this.db.$transaction(async (tx) => {
+        const res = await tx.organization.updateMany({
+          where: { id: { in: dto.organizationIds } },
+          data: { onboardedById: operatorId },
+        });
+        await this.audit.record(
+          {
+            action: 'platform.organizations_assign',
+            entity: 'user',
+            entityId: operatorId,
+            orgId: null,
+            after: { organizationIds: dto.organizationIds, count: res.count },
+          },
+          tx,
+        );
+        return res;
+      });
+      return { assigned: count };
+    });
+  }
+
+  // ── Email SMTP, Broadcast & Logs ──
+
+  async getEmailSettings() {
+    const s = await this.billing.settings();
+    const dbConfigured = Boolean(s.smtpHost);
+    return {
+      host: s.smtpHost ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_HOST ?? null) : null),
+      port: s.smtpPort ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_PORT ?? 587) : 587),
+      username:
+        s.smtpUser ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_USER ?? null) : null),
+      encryption: (s.smtpEncryption ?? 'tls') as 'tls' | 'ssl' | 'none',
+      passwordSet: Boolean(s.smtpPassEnc),
+      fromEmail: s.smtpFromEmail ?? this.env.EMAIL_FROM ?? null,
+      fromName: s.smtpFromName ?? 'Hodi',
+      allowlist: s.smtpAllowlist ?? '',
+      source: dbConfigured
+        ? ('database' as const)
+        : this.env.EMAIL_PROVIDER === 'smtp'
+          ? ('env' as const)
+          : ('log' as const),
+      updatedAt: s.updatedAt,
+    };
+  }
+
+  updateEmailSettings(dto: UpdateEmailSettingsDto) {
+    return withoutOrgScope(async () => {
+      const before = await this.getEmailSettings();
+      const data: Prisma.PlatformSettingsUpdateInput = {
+        ...(dto.host !== undefined ? { smtpHost: dto.host?.trim() || null } : {}),
+        ...(dto.port !== undefined ? { smtpPort: dto.port } : {}),
+        ...(dto.username !== undefined ? { smtpUser: dto.username?.trim() || null } : {}),
+        ...(dto.encryption !== undefined ? { smtpEncryption: dto.encryption } : {}),
+        ...(dto.fromEmail !== undefined ? { smtpFromEmail: dto.fromEmail?.trim() || null } : {}),
+        ...(dto.fromName !== undefined ? { smtpFromName: dto.fromName?.trim() || null } : {}),
+        ...(dto.allowlist !== undefined ? { smtpAllowlist: dto.allowlist?.trim() || null } : {}),
+      };
+      if (dto.clearPassword) {
+        data.smtpPassEnc = null;
+      } else if (dto.password?.trim()) {
+        data.smtpPassEnc = this.cipher.encrypt(dto.password.trim(), SMTP_PASS_CONTEXT);
+      }
+      await this.db.$transaction(async (tx) => {
+        await tx.platformSettings.upsert({
+          where: { id: 1 },
+          create: { id: 1, ...(data as Prisma.PlatformSettingsCreateInput) },
+          update: data,
+        });
+        await this.audit.record(
+          {
+            action: 'platform.email_settings_update',
+            entity: 'platform_settings',
+            entityId: '1',
+            orgId: null,
+            before,
+            after: {
+              host: dto.host ?? before.host,
+              port: dto.port ?? before.port,
+              username: dto.username ?? before.username,
+              encryption: dto.encryption ?? before.encryption,
+              fromEmail: dto.fromEmail ?? before.fromEmail,
+              fromName: dto.fromName ?? before.fromName,
+              passwordChanged: Boolean(dto.password?.trim() || dto.clearPassword),
+            },
+          },
+          tx,
+        );
+      });
+      return this.getEmailSettings();
+    });
+  }
+
+  async sendTestEmail(to: string) {
+    const email = normalizeEmail(to);
+    if (!email) throw AppError.fieldInvalid('to', 'Enter a valid email address');
+    await this.notifications.sendRawEmail({
+      to: email,
+      subject: 'Hodi test email',
+      text: `This is a test email from Hodi platform administration.\n\nSent at: ${new Date().toISOString()}`,
+      kind: 'test',
+    });
+    return { sent: true, to: email };
+  }
+
+  sendBroadcastEmail(dto: SendBroadcastEmailDto) {
+    return withoutOrgScope(async () => {
+      const owners = await this.db.membership.findMany({
+        where: {
+          status: 'ACTIVE',
+          role: { systemKey: 'OWNER' },
+          organization: { status: { in: ['TRIAL', 'ACTIVE', 'GRACE'] } },
+          user: { status: 'ACTIVE', email: { not: null } },
+        },
+        select: { user: { select: { email: true } } },
+      });
+      const recipients = [
+        ...new Set(owners.map((m) => m.user.email).filter((e): e is string => Boolean(e))),
+      ];
+      let sent = 0;
+      let failed = 0;
+      for (const to of recipients) {
+        try {
+          await this.notifications.sendRawEmail({
+            to,
+            subject: dto.subject.trim(),
+            text: dto.body.trim(),
+            kind: 'broadcast',
+          });
+          sent++;
+        } catch {
+          failed++;
+        }
+      }
+      await this.audit.record({
+        action: 'platform.email_broadcast',
+        entity: 'platform_email_log',
+        entityId: null,
+        orgId: null,
+        after: { subject: dto.subject.trim(), total: recipients.length, sent, failed },
+      });
+      return { total: recipients.length, sent, failed };
+    });
+  }
+
+  emailLogs(q: ListEmailLogsQueryDto) {
+    return withoutOrgScope(async () => {
+      const term = q.q?.trim();
+      const where: Prisma.PlatformEmailLogWhereInput = {
+        ...(q.status ? { status: q.status } : {}),
+        ...(term
+          ? {
+              OR: [
+                { to: { contains: term, mode: 'insensitive' } },
+                { subject: { contains: term, mode: 'insensitive' } },
+                { kind: { contains: term, mode: 'insensitive' } },
+                { error: { contains: term, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      };
+      const [rows, total] = await Promise.all([
+        this.db.platformEmailLog.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          ...toSkipTake(q),
+        }),
+        this.db.platformEmailLog.count({ where }),
+      ]);
+      const actorIds = [
+        ...new Set(rows.map((r) => r.triggeredById).filter((id): id is string => Boolean(id))),
+      ];
+      const actors = actorIds.length
+        ? await this.db.user.findMany({
+            where: { id: { in: actorIds } },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          })
+        : [];
+      const actorById = new Map(actors.map((a) => [a.id, a]));
+      return paginated(
+        rows.map((r) => ({
+          id: r.id,
+          to: r.to,
+          subject: r.subject,
+          kind: r.kind,
+          status: r.status,
+          error: r.error,
+          triggeredBy: r.triggeredById ? (actorById.get(r.triggeredById) ?? null) : null,
+          createdAt: r.createdAt,
+        })),
+        total,
+        q,
+      );
+    });
+  }
+
+  // ── Security / Rate-Limit Locks ──
+
+  locks() {
+    return withoutOrgScope(async () => {
+      const rows = await this.db.rateLimitBucket.findMany({
+        where: { expiresAt: { gt: new Date() } },
+        orderBy: { windowStart: 'desc' },
+        take: 100,
+      });
+      return rows;
+    });
+  }
+
+  clearLocks(key?: string) {
+    return withoutOrgScope(async () => {
+      const trimmed = key?.trim();
+      const { count } = await this.db.rateLimitBucket.deleteMany({
+        where: trimmed ? { key: { contains: trimmed } } : {},
+      });
+      await this.audit.record({
+        action: 'platform.locks_clear',
+        entity: 'rate_limit_bucket',
+        entityId: trimmed ?? null,
+        orgId: null,
+        after: { key: trimmed ?? 'ALL', cleared: count },
+      });
+      return { cleared: count };
     });
   }
 }

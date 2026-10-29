@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { ApiError, STEP_UP_REQUIRED, api } from '../../lib/api/client';
 import { mpesaErrorMessage } from '../mpesa/api';
 import { unwrap, unwrapList } from '../payments/rules';
-import type { BillingSummary, Plan, PlatformSettings, PlatformStats } from './types';
+import type {
+  BillingSummary, Plan, PlatformEmailSettings, PlatformOperator, PlatformSettings, PlatformStats, RateLimitLock, UnassignedOrganization,
+} from './types';
 
 /**
  * Query keys, shared reads, the invoice PDF and error messages for platform billing: the
@@ -23,6 +25,11 @@ export const keys = {
   invoices: ['platform', 'invoices'] as const,
   payments: ['platform', 'payments'] as const,
   settings: ['platform', 'settings'] as const,
+  operators: ['platform', 'operators'] as const,
+  emailSettings: ['platform', 'email-settings'] as const,
+  emailLogs: ['platform', 'email-logs'] as const,
+  locks: ['platform', 'locks'] as const,
+  reports: ['platform', 'reports'] as const,
 };
 
 export const PAGE_SIZE = 25;
@@ -57,6 +64,38 @@ export function usePlatformSettings() {
   return useQuery({
     queryKey: keys.settings,
     queryFn: () => api.get<unknown>('/platform/settings').then((body) => unwrap<PlatformSettings>(body)),
+  });
+}
+
+export function usePlatformOperators(enabled = true) {
+  return useQuery({
+    queryKey: keys.operators,
+    queryFn: () => api.get<unknown>('/platform/operators').then((body) => unwrapList<PlatformOperator>(body)),
+    enabled,
+  });
+}
+
+export function useUnassignedOrganizations(enabled = true) {
+  return useQuery({
+    queryKey: [...keys.organizations, 'unassigned'],
+    queryFn: () => api.get<unknown>('/platform/organizations/unassigned').then((body) => unwrapList<UnassignedOrganization>(body)),
+    enabled,
+  });
+}
+
+export function usePlatformEmailSettings(enabled = true) {
+  return useQuery({
+    queryKey: keys.emailSettings,
+    queryFn: () => api.get<unknown>('/platform/email/settings').then((body) => unwrap<PlatformEmailSettings>(body)),
+    enabled,
+  });
+}
+
+export function usePlatformLocks(enabled = true) {
+  return useQuery({
+    queryKey: keys.locks,
+    queryFn: () => api.get<unknown>('/platform/security/locks').then((body) => unwrapList<RateLimitLock>(body)),
+    enabled,
   });
 }
 

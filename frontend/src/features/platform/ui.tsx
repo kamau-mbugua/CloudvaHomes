@@ -130,7 +130,16 @@ export function PlatformPaymentsTable({ rows, showOrg = false }: { rows: Platfor
           {rows.map((p) => (
             <tr key={p.id}>
               <td>{formatDayish(p.receivedAt)}</td>
-              {showOrg ? <td>{p.organization?.name ?? '—'}</td> : null}
+              {showOrg ? (
+                <td>
+                  {p.organization ? (
+                    <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(p.organization.id)}`}>
+                      <strong>{p.organization.name}</strong>
+                    </Link>
+                  ) : '—'}
+                  {p.organization?.billingRef ? <span className="ad__sub num">{p.organization.billingRef}</span> : null}
+                </td>
+              ) : null}
               <td>
                 <span className="num">{p.reference}</span>
                 {p.payerName ? <span className="ad__sub">{p.payerName}</span> : null}

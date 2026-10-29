@@ -10,6 +10,7 @@ import {
   ANY_PERMISSION,
   IS_PUBLIC,
   PLATFORM_ADMIN_ONLY,
+  PLATFORM_OPERATOR_ONLY,
   REQUIRED_PERMISSIONS,
   REQUIRES_ORG,
 } from './decorators.js';
@@ -50,7 +51,7 @@ export class AuthGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: claims.userId },
-      select: { id: true, status: true, isPlatformAdmin: true },
+      select: { id: true, status: true, isPlatformAdmin: true, platformRole: true },
     });
     if (
       !user ||
@@ -59,9 +60,11 @@ export class AuthGuard implements CanActivate {
     ) {
       throw AppError.unauthenticated('SESSION_REVOKED', 'Please sign in again');
     }
+    const effectiveRole = user.platformRole ?? (user.isPlatformAdmin ? 'SUPERADMIN' : null);
     ctx.userId = user.id;
     ctx.sessionId = claims.sessionId;
-    ctx.isPlatformAdmin = user.isPlatformAdmin;
+    ctx.platformRole = effectiveRole;
+    ctx.isPlatformAdmin = effectiveRole === 'SUPERADMIN';
 
     if (claims.orgId) {
       const membership = await this.prisma.membership.findFirst({
@@ -96,6 +99,12 @@ export class AuthGuard implements CanActivate {
     if (
       this.reflector.getAllAndOverride<boolean>(PLATFORM_ADMIN_ONLY, targets) &&
       !ctx.isPlatformAdmin
+    ) {
+      throw AppError.forbidden();
+    }
+    if (
+      this.reflector.getAllAndOverride<boolean>(PLATFORM_OPERATOR_ONLY, targets) &&
+      !ctx.platformRole
     ) {
       throw AppError.forbidden();
     }

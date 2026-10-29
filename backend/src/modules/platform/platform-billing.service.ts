@@ -354,10 +354,41 @@ export class PlatformBillingService {
     };
   }
 
+  private salespersonOrgFilter(): { onboardedById: string } | null {
+    const ctx = currentContext();
+    if (ctx?.platformRole === 'SALESPERSON' && ctx.userId) {
+      return { onboardedById: ctx.userId };
+    }
+    return null;
+  }
+
   async invoices(q: ListPlatformInvoicesDto) {
+    const sp = this.salespersonOrgFilter();
+    let allowedOrgIds: string[] | null = null;
+    if (sp) {
+      const myOrgs = await this.prisma.organization.findMany({
+        where: { onboardedById: sp.onboardedById, ...(q.orgId ? { id: q.orgId } : {}) },
+        select: { id: true },
+      });
+      allowedOrgIds = myOrgs.map((o) => o.id);
+    }
+    const today = todayInNairobi();
+    const statusFilter: Prisma.PlatformInvoiceWhereInput =
+      q.status === 'OVERDUE'
+        ? {
+            status: { in: ['ISSUED', 'PARTIALLY_PAID'] },
+            dueDate: { lt: parseDateOnly(today) },
+          }
+        : q.status
+          ? { status: q.status }
+          : {};
     const where: Prisma.PlatformInvoiceWhereInput = {
-      ...(q.orgId ? { orgId: q.orgId } : {}),
-      ...(q.status ? { status: q.status } : {}),
+      ...(allowedOrgIds !== null
+        ? { orgId: { in: allowedOrgIds } }
+        : q.orgId
+          ? { orgId: q.orgId }
+          : {}),
+      ...statusFilter,
       ...(q.period ? { period: q.period } : {}),
     };
     const [rows, total] = await Promise.all([
@@ -374,18 +405,26 @@ export class PlatformBillingService {
     });
     const byId = new Map(orgs.map((o) => [o.id, o]));
     return paginated(
-      rows.map((r) => ({ ...this.toInvoice(r), organization: byId.get(r.orgId) ?? null })),
+      rows.map((r) => ({ ...this.toInvoice(r, today), organization: byId.get(r.orgId) ?? null })),
       total,
       q,
     );
   }
 
   async invoice(id: string, orgId?: string) {
+    const sp = this.salespersonOrgFilter();
     const i = await this.prisma.platformInvoice.findFirst({
       where: { id, ...(orgId ? { orgId } : {}) },
       include: { allocations: { include: { payment: true }, orderBy: { createdAt: 'asc' } } },
     });
     if (!i) throw AppError.notFound('Invoice');
+    if (sp) {
+      const org = await this.prisma.organization.findFirst({
+        where: { id: i.orgId, onboardedById: sp.onboardedById },
+        select: { id: true },
+      });
+      if (!org) throw AppError.notFound('Invoice');
+    }
     return {
       ...this.toInvoice(i),
       payments: i.allocations.map((a) => ({
@@ -399,7 +438,21 @@ export class PlatformBillingService {
   }
 
   async payments(q: ListPlatformPaymentsDto) {
-    const where: Prisma.PlatformPaymentWhereInput = q.orgId ? { orgId: q.orgId } : {};
+    const sp = this.salespersonOrgFilter();
+    let allowedOrgIds: string[] | null = null;
+    if (sp) {
+      const myOrgs = await this.prisma.organization.findMany({
+        where: { onboardedById: sp.onboardedById, ...(q.orgId ? { id: q.orgId } : {}) },
+        select: { id: true },
+      });
+      allowedOrgIds = myOrgs.map((o) => o.id);
+    }
+    const where: Prisma.PlatformPaymentWhereInput =
+      allowedOrgIds !== null
+        ? { orgId: { in: allowedOrgIds } }
+        : q.orgId
+          ? { orgId: q.orgId }
+          : {};
     const [rows, total] = await Promise.all([
       this.prisma.platformPayment.findMany({
         where,
@@ -408,8 +461,13 @@ export class PlatformBillingService {
       }),
       this.prisma.platformPayment.count({ where }),
     ]);
+    const orgs = await this.prisma.organization.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.orgId))] } },
+      select: { id: true, name: true, billingRef: true },
+    });
+    const byId = new Map(orgs.map((o) => [o.id, o]));
     return paginated(
-      rows.map((p) => this.toPayment(p)),
+      rows.map((p) => ({ ...this.toPayment(p), organization: byId.get(p.orgId) ?? null })),
       total,
       q,
     );
@@ -460,22 +518,35 @@ export class PlatformBillingService {
   async stats() {
     const today = todayInNairobi();
     const lastMonth = previousPeriod(today);
+    const sp = this.salespersonOrgFilter();
+    const orgFilter: Prisma.OrganizationWhereInput = sp ? { onboardedById: sp.onboardedById } : {};
+    let orgIdsFilter: { orgId: { in: string[] } } | Record<string, never> = {};
+    if (sp) {
+      const myOrgs = await this.prisma.organization.findMany({
+        where: orgFilter,
+        select: { id: true },
+      });
+      orgIdsFilter = { orgId: { in: myOrgs.map((o) => o.id) } };
+    }
     const [byStatus, billed, outstanding, collected, orgs] = await Promise.all([
-      this.prisma.organization.groupBy({ by: ['status'], _count: { _all: true } }),
+      this.prisma.organization.groupBy({ where: orgFilter, by: ['status'], _count: { _all: true } }),
       this.prisma.platformInvoice.aggregate({
-        where: { period: lastMonth, status: { not: 'VOID' } },
+        where: { ...orgIdsFilter, period: lastMonth, status: { not: 'VOID' } },
         _sum: { total: true },
       }),
       this.prisma.platformInvoice.findMany({
-        where: { status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
+        where: { ...orgIdsFilter, status: { in: ['ISSUED', 'PARTIALLY_PAID'] } },
         select: { total: true, amountPaid: true },
       }),
       this.prisma.platformPayment.aggregate({
-        where: { receivedAt: { gte: parseDateOnly(`${today.slice(0, 7)}-01`) } },
+        where: {
+          ...orgIdsFilter,
+          receivedAt: { gte: parseDateOnly(`${today.slice(0, 7)}-01`) },
+        },
         _sum: { amount: true },
       }),
       this.prisma.organization.findMany({
-        where: { status: { not: 'CLOSED' } },
+        where: { ...orgFilter, status: { not: 'CLOSED' } },
         select: { id: true },
       }),
     ]);

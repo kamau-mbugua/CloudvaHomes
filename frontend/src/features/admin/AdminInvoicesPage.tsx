@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
+import { isSuperAdmin } from '../../lib/auth/portals';
+import { useSession } from '../../lib/auth/useAuth';
 import { currentPeriod, formatPeriod, shiftPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
@@ -25,6 +27,8 @@ import { AdminInvoiceActions, VoidHodiInvoiceSheet } from './sheets';
  * month twice never bills an organisation twice.
  */
 export function AdminInvoicesPage() {
+  const { user } = useSession();
+  const superAdmin = isSuperAdmin(user);
   const filters = useListFilters();
   const { page } = filters;
   const status = filters.get('status');
@@ -47,6 +51,7 @@ export function AdminInvoicesPage() {
       <div className="ad__filters">
         <select className="ad__select" aria-label="Status" value={status} onChange={(e) => filters.setFilter({ status: e.target.value })}>
           <option value="">All statuses</option>
+          <option value="OVERDUE">Overdue</option>
           {optionsOf(INVOICE_STATUS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <select className="ad__select" aria-label="Month" value={period} onChange={(e) => filters.setFilter({ period: e.target.value })}>
@@ -57,7 +62,9 @@ export function AdminInvoicesPage() {
         {orgId ? (
           <button type="button" className="nx-btn nx-btn--sm" onClick={() => filters.setFilter({ orgId: '' })}>One organisation · show all</button>
         ) : null}
-        <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setRunning(true)}>Run a month</button>
+        {superAdmin ? (
+          <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setRunning(true)}>Run a month</button>
+        ) : null}
       </div>
 
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
@@ -69,7 +76,7 @@ export function AdminInvoicesPage() {
             : <EmptyState title="No Hodi invoices yet" detail="They are issued on the 1st for the month before. Run a finished month to issue them now." />}
         </div>
       ) : (
-        <HodiInvoicesTable rows={rows} showOrg actions={(inv) => <AdminInvoiceActions invoice={inv} onVoid={setVoiding} />} />
+        <HodiInvoicesTable rows={rows} showOrg actions={(inv) => <AdminInvoiceActions invoice={inv} onVoid={superAdmin ? setVoiding : undefined} />} />
       )}
 
       <Pager meta={list.data?.meta} onPage={(next) => filters.setFilter({ page: String(next) })} />

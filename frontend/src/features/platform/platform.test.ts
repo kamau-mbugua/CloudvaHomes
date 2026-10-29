@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { matchRoutes } from 'react-router-dom';
 import { ApiError, ORG_SUSPENDED_MESSAGE, toApiError } from '../../lib/api/client';
-import { landingFor } from '../../lib/auth/portals';
-import { ADMIN_NAV, bestEntry, destinations } from '../../app/navigation';
+import { isPlatformOperator, isSuperAdmin, landingFor } from '../../lib/auth/portals';
+import { ADMIN_NAV, bestEntry, destinations, filterAdminNav } from '../../app/navigation';
 import { platformErrorMessage } from './api';
 import {
   bannerFor, checkDays, checkPlan, checkPlatformPayment, checkSettings, checkTerms, darajaSettingsBody, dayOf, formatDayish,
@@ -261,9 +261,13 @@ describe('admin area routing', () => {
     user: { isPlatformAdmin: true }, activeOrganization: null, organizations: [], ownerOf: [], tenantOf: [], ...over,
   });
 
-  it('sends a platform admin with no organisation to /admin', () => {
+  it('sends a platform admin or salesperson with no organisation to /admin', () => {
     expect(landingFor(session())).toBe('/admin');
+    expect(landingFor(session({ user: { isPlatformAdmin: false, platformRole: 'SALESPERSON' } }))).toBe('/admin');
     expect(landingFor(session({ tenantOf: [{ tenantId: 't', name: 'T', organization: { id: 'o', name: 'O' } }] }))).toBe('/admin');
+    expect(isPlatformOperator({ isPlatformAdmin: false, platformRole: 'SALESPERSON' })).toBe(true);
+    expect(isSuperAdmin({ isPlatformAdmin: false, platformRole: 'SALESPERSON' })).toBe(false);
+    expect(isSuperAdmin({ isPlatformAdmin: true, platformRole: 'SUPERADMIN' })).toBe(true);
   });
 
   it('leaves admins with an organisation in the staff app, and others as before', () => {
@@ -271,21 +275,57 @@ describe('admin area routing', () => {
     expect(landingFor(session({ user: { isPlatformAdmin: false } }))).toBeNull();
   });
 
-  it('lights one admin menu entry per page', () => {
+  it('lights one admin menu entry per page and matches query parameters', () => {
     expect(bestEntry(ADMIN_NAV, '/admin')?.entry.label).toBe('Overview');
-    expect(bestEntry(ADMIN_NAV, '/admin/organizations/0b9c7d6e')?.entry.label).toBe('Organisations');
+    expect(bestEntry(ADMIN_NAV, '/admin/organizations')?.entry.label).toBe('All organisations');
+    expect(bestEntry(ADMIN_NAV, '/admin/organizations?status=ACTIVE')?.entry.label).toBe('Active');
+    expect(bestEntry(ADMIN_NAV, '/admin/organizations/new')?.entry.label).toBe('Add an organisation');
+    expect(bestEntry(ADMIN_NAV, '/admin/organizations/0b9c7d6e')?.entry.label).toBe('All organisations');
     expect(bestEntry(ADMIN_NAV, '/admin/plans')?.entry.label).toBe('Plans');
-    expect(destinations(ADMIN_NAV).map((d) => d.to)).toEqual(['/admin', '/admin/organizations', '/admin/plans', '/admin/invoices', '/admin/settings']);
+    expect(bestEntry(ADMIN_NAV, '/admin/invoices?status=OVERDUE')?.entry.label).toBe('Overdue invoices');
+    expect(bestEntry(ADMIN_NAV, '/admin/payments')?.entry.label).toBe('Payments');
+    expect(bestEntry(ADMIN_NAV, '/admin/reports/collections')?.entry.label).toBe('Collections');
+    expect(bestEntry(ADMIN_NAV, '/admin/reports/salespeople')?.entry.label).toBe('Salesperson performance');
+    expect(bestEntry(ADMIN_NAV, '/admin/admins')?.entry.label).toBe('Administrators & salespeople');
+    expect(bestEntry(ADMIN_NAV, '/admin/email')?.entry.label).toBe('Email');
+    expect(bestEntry(ADMIN_NAV, '/admin/settings')?.entry.label).toBe('Settings');
+    expect(destinations(ADMIN_NAV).length).toBeGreaterThanOrEqual(24);
   });
 
-  it('sends an organisation id to its page and keeps the list', () => {
+  it('filters out superadmin-only groups and entries for salespeople', () => {
+    const salesNav = filterAdminNav(ADMIN_NAV, false);
+    const groupIds = salesNav.map((g) => g.id);
+    expect(groupIds).toEqual(['admin-overview', 'admin-organizations', 'admin-billing', 'admin-platform']);
+    const links = destinations(salesNav).map((e) => e.to);
+    expect(links).not.toContain('/admin/plans');
+    expect(links).not.toContain('/admin/admins');
+    expect(links).not.toContain('/admin/email');
+    expect(links).not.toContain('/admin/settings');
+    expect(links).toContain('/admin/invoices');
+    expect(links).toContain('/admin/payments');
+    expect(links).toContain('/admin/account');
+  });
+
+  it('sends an organisation id to its page and keeps the list and /new route distinct', () => {
     const routes = [
-      { path: '/admin' }, { path: '/admin/organizations' }, { path: '/admin/organizations/:organizationId' },
-      { path: '/admin/plans' }, { path: '/admin/invoices' }, { path: '/admin/settings' }, { path: '/admin/*' },
+      { path: '/admin' },
+      { path: '/admin/organizations' },
+      { path: '/admin/organizations/new' },
+      { path: '/admin/organizations/:organizationId' },
+      { path: '/admin/plans' },
+      { path: '/admin/invoices' },
+      { path: '/admin/payments' },
+      { path: '/admin/reports/:report' },
+      { path: '/admin/admins' },
+      { path: '/admin/email' },
+      { path: '/admin/settings' },
+      { path: '/admin/*' },
     ];
     const winner = (p: string) => matchRoutes(routes, p)?.at(-1)?.route.path;
     expect(winner('/admin/organizations/0b9c7d6e-1111-4222-8333-444455556666')).toBe('/admin/organizations/:organizationId');
+    expect(winner('/admin/organizations/new')).toBe('/admin/organizations/new');
     expect(winner('/admin/organizations')).toBe('/admin/organizations');
+    expect(winner('/admin/reports/collections')).toBe('/admin/reports/:report');
     expect(winner('/admin/nowhere')).toBe('/admin/*');
   });
 });

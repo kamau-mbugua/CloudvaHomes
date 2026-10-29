@@ -11,6 +11,7 @@ export const OTP_TTL_MINUTES: Record<OtpPurpose, number> = {
   LOGIN: 5,
   STEP_UP: 5,
   PASSWORD_RESET: 15,
+  ADMIN_2FA: 15,
 };
 
 /**

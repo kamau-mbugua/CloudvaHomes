@@ -106,6 +106,19 @@ export class StepUpVerifyDto {
   code!: string;
 }
 
+export class AdminTwoFactorVerifyDto extends ClientDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(1024)
+  challengeToken!: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
+  code!: string;
+}
+
 export class UpdateMeDto {
   @ApiPropertyOptional()
   @IsOptional()

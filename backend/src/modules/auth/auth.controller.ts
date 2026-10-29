@@ -21,6 +21,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { InvitationsService } from '../users/invitations.service.js';
 import {
   AcceptInvitationDto,
+  AdminTwoFactorVerifyDto,
   ChangePasswordDto,
   type ClientKind,
   ForgotPasswordDto,
@@ -70,7 +71,25 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    return this.respond(res, await this.auth.login(dto.identifier, dto.password), dto.client);
+    const result = await this.auth.login(dto.identifier, dto.password);
+    if (result.kind === 'two_factor') {
+      return ok(result.challenge);
+    }
+    return this.respond(res, result.session, dto.client);
+  }
+
+  @Public()
+  @Post('login/2fa')
+  @HttpCode(200)
+  async verifyAdminTwoFactor(
+    @Body() dto: AdminTwoFactorVerifyDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.respond(
+      res,
+      await this.auth.verifyAdminTwoFactor(dto.challengeToken, dto.code),
+      dto.client,
+    );
   }
 
   @Public()

@@ -8,7 +8,7 @@ import { acceptSession } from '../../lib/auth/session';
 import { safeNext } from '../../lib/auth/next';
 import { isOtpCode } from '../../lib/auth/passwordPolicy';
 import { useAuthState } from '../../lib/auth/useAuth';
-import type { SessionPayload } from '../../lib/auth/types';
+import type { AdminTwoFactorChallenge, SessionPayload } from '../../lib/auth/types';
 import { Splash } from '../../components/Splash';
 import { EyeIcon } from './EyeIcon';
 import { AuthLayout } from './AuthLayout';
@@ -27,7 +27,7 @@ import { useCountdown } from './useCountdown';
  * `/app`. An account without an organisation is explained by RequireAuth there.
  */
 
-type Mode = 'password' | 'otp-phone' | 'otp-code';
+type Mode = 'password' | 'otp-phone' | 'otp-code' | 'admin-2fa';
 
 const RESEND_SECONDS = 60;
 
@@ -51,6 +51,7 @@ export function LoginPage() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [twoFactor, setTwoFactor] = useState<AdminTwoFactorChallenge | null>(null);
   const countdown = useCountdown(RESEND_SECONDS);
 
   const finish = (payload: SessionPayload) => {
@@ -60,7 +61,22 @@ export function LoginPage() {
 
   const login = useMutation({
     mutationFn: (body: { identifier: string; password: string }) =>
-      api.post<DataEnvelope<SessionPayload>>('/auth/login', body, { skipAuthRetry: true }),
+      api.post<DataEnvelope<SessionPayload | AdminTwoFactorChallenge>>('/auth/login', body, { skipAuthRetry: true }),
+    onSuccess: (result) => {
+      if ('requiresTwoFactor' in result.data) {
+        setTwoFactor(result.data);
+        setCode('');
+        setCodeError(null);
+        setMode('admin-2fa');
+        return;
+      }
+      finish(result.data);
+    },
+  });
+
+  const verifyAdminTwoFactor = useMutation({
+    mutationFn: (body: { challengeToken: string; code: string }) =>
+      api.post<DataEnvelope<SessionPayload>>('/auth/login/2fa', body, { skipAuthRetry: true }),
     onSuccess: (result) => finish(result.data),
   });
 
@@ -107,9 +123,55 @@ export function LoginPage() {
     login.reset();
     requestOtp.reset();
     verifyOtp.reset();
+    verifyAdminTwoFactor.reset();
     setCodeError(null);
     setMode(to);
   };
+
+  if (mode === 'admin-2fa' && twoFactor) {
+    const error = codeError ?? (verifyAdminTwoFactor.isError ? authErrorMessage(verifyAdminTwoFactor.error) : null);
+
+    const submitAdminTwoFactor = (event: FormEvent) => {
+      event.preventDefault();
+      if (!isOtpCode(code)) {
+        setCodeError('Enter the 6-digit verification code.');
+        return;
+      }
+      setCodeError(null);
+      verifyAdminTwoFactor.mutate({
+        challengeToken: twoFactor.challengeToken,
+        code: code.replace(/\s/g, ''),
+      });
+    };
+
+    return (
+      <AuthLayout>
+        <form className="au__form" onSubmit={submitAdminTwoFactor} key="admin-2fa">
+          <div className="au__step">
+            <h1>Confirm admin sign-in</h1>
+            <p className="au__lede">
+              Enter the 6-digit verification code sent via {twoFactor.channel === 'SMS' ? 'SMS' : 'email'} to{' '}
+              <strong>{twoFactor.destinationMasked}</strong>.
+            </p>
+
+            <div className="au__field">
+              <div className="au__labelrow">
+                <label htmlFor="admin-2fa-code">Verification code</label>
+                <button type="button" className="au__link" onClick={() => switchTo('password')}>Back to sign in</button>
+              </div>
+              <CodeInput id="admin-2fa-code" value={code} onChange={setCode} autoFocus />
+            </div>
+          </div>
+
+          {error ? <p className="au__error" role="alert">{error}</p> : null}
+
+          <button className="au__submit" type="submit" disabled={verifyAdminTwoFactor.isPending}>
+            {verifyAdminTwoFactor.isPending ? 'Verifying…' : 'Verify & sign in'}
+          </button>
+        </form>
+      </AuthLayout>
+    );
+  }
 
   if (mode === 'otp-phone') {
     return (

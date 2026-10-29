@@ -7,6 +7,7 @@ export const REQUIRED_PERMISSIONS = 'hodi:permissions';
 export const ANY_PERMISSION = 'hodi:anyPermission';
 export const REQUIRES_ORG = 'hodi:requiresOrg';
 export const PLATFORM_ADMIN_ONLY = 'hodi:platformAdmin';
+export const PLATFORM_OPERATOR_ONLY = 'hodi:platformOperator';
 export const ALLOW_WHEN_SUSPENDED = 'hodi:allowWhenSuspended';
 
 /** No sign-in needed. */
@@ -24,6 +25,9 @@ export const RequireAnyPermission = (...permissions: string[]) =>
 export const RequireOrg = () => SetMetadata(REQUIRES_ORG, true);
 
 export const PlatformAdminOnly = () => SetMetadata(PLATFORM_ADMIN_ONLY, true);
+
+/** Caller must be a platform operator (`SUPERADMIN` or `SALESPERSON`). */
+export const PlatformOperatorOnly = () => SetMetadata(PLATFORM_OPERATOR_ONLY, true);
 
 /**
  * Still allowed while the organisation is SUSPENDED for an unpaid Hodi bill (design §5.4):

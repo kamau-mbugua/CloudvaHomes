@@ -1,4 +1,16 @@
-import type { Session, TenantOf } from './types';
+import type { Session, SessionUser, TenantOf } from './types';
+
+export function isPlatformOperator(
+  user?: Pick<SessionUser, 'isPlatformAdmin' | 'platformRole'> | null,
+): boolean {
+  return Boolean(user?.isPlatformAdmin || user?.platformRole);
+}
+
+export function isSuperAdmin(
+  user?: Pick<SessionUser, 'isPlatformAdmin' | 'platformRole'> | null,
+): boolean {
+  return Boolean(user?.isPlatformAdmin || user?.platformRole === 'SUPERADMIN');
+}
 
 /**
  * Where someone without an organisation of their own belongs. Staff land in the org app;
@@ -13,16 +25,16 @@ export type Landing = '/admin' | '/owner' | '/tenant' | 'choose' | null;
 
 type PortalSession = Pick<Session, 'activeOrganization' | 'organizations' | 'ownerOf'> & {
   tenantOf?: Session['tenantOf'];
-  user?: Pick<Session['user'], 'isPlatformAdmin'>;
+  user?: Pick<Session['user'], 'isPlatformAdmin' | 'platformRole'>;
 };
 
 /**
- * Platform admins (phase 8) without an organisation of their own land in the admin area
+ * Platform operators (phase 8 & 11) without an organisation of their own land in the admin area
  * (`/admin`); its account menu links to any portal they also have.
  */
 export function landingFor(session: PortalSession): Landing {
   if (session.activeOrganization || session.organizations.length > 0) return null;
-  if (session.user?.isPlatformAdmin) return '/admin';
+  if (isPlatformOperator(session.user)) return '/admin';
   const owner = (session.ownerOf?.length ?? 0) > 0;
   const tenant = (session.tenantOf?.length ?? 0) > 0;
   if (owner && tenant) return 'choose';

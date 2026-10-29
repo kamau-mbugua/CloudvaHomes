@@ -12,6 +12,27 @@ import { OTP_TTL_MINUTES, OtpService } from './otp.service.js';
 import { type IssuedSession, SessionsService } from './sessions.service.js';
 import { TokensService } from './tokens.service.js';
 
+export interface AdminTwoFactorChallenge {
+  requiresTwoFactor: true;
+  challengeToken: string;
+  expiresAt: string;
+  channel: 'EMAIL' | 'SMS';
+  destinationMasked: string;
+}
+
+export type LoginResult =
+  | { kind: 'session'; session: IssuedSession }
+  | { kind: 'two_factor'; challenge: AdminTwoFactorChallenge };
+
+function maskContact(value: string): string {
+  if (value.includes('@')) {
+    const [local = '', domain = ''] = value.split('@');
+    const head = local.slice(0, 2);
+    return `${head}${'•'.repeat(Math.max(2, local.length - 2))}@${domain}`;
+  }
+  return value.length > 6 ? `${value.slice(0, 6)}••••${value.slice(-2)}` : '••••';
+}
+
 const MIN = 60;
 const HOUR = 3600;
 
@@ -34,7 +55,7 @@ export class AuthService {
     private readonly audit: AuditService,
   ) {}
 
-  async login(identifier: string, password: string): Promise<IssuedSession> {
+  async login(identifier: string, password: string): Promise<LoginResult> {
     const invalid = AppError.unauthenticated(
       'INVALID_CREDENTIALS',
       'Wrong email/phone or password',
@@ -59,6 +80,41 @@ export class AuthService {
     if (!user || !ok || user.status !== 'ACTIVE') throw invalid;
 
     await this.rateLimit.reset(`login:id:${id.value}`);
+
+    const isOperator = user.isPlatformAdmin || user.platformRole !== null;
+    if (isOperator) {
+      const settings = await this.prisma.platformSettings.findUnique({ where: { id: 1 } });
+      if (settings?.requireAdminTwoFactor) {
+        const preferSms = settings.adminTwoFactorChannel === 'SMS';
+        const useSms = (preferSms && !!user.phone) || (!user.email && !!user.phone);
+        const destination = useSms ? user.phone : user.email;
+        if (!destination) {
+          throw AppError.conflict(
+            'Add an email address or phone number to this admin account before using 2FA',
+            'NO_CONTACT',
+          );
+        }
+        const code = await this.otp.issue(user.id, 'ADMIN_2FA', user.id);
+        await this.deliverCode(
+          useSms ? { phone: destination } : { email: destination },
+          'admin-2fa',
+          code,
+          OTP_TTL_MINUTES.ADMIN_2FA,
+        );
+        const { token, expiresAt } = await this.tokens.signAdminTwoFactorChallenge(user.id);
+        return {
+          kind: 'two_factor',
+          challenge: {
+            requiresTwoFactor: true,
+            challengeToken: token,
+            expiresAt: expiresAt.toISOString(),
+            channel: useSms ? 'SMS' : 'EMAIL',
+            destinationMasked: maskContact(destination),
+          },
+        };
+      }
+    }
+
     const session = await this.sessions.start(user.id, null);
     await this.audit.record({
       action: 'auth.login',
@@ -67,6 +123,33 @@ export class AuthService {
       actorId: user.id,
       orgId: null,
       after: { method: 'password' },
+    });
+    return { kind: 'session', session };
+  }
+
+  async verifyAdminTwoFactor(challengeToken: string, code: string): Promise<IssuedSession> {
+    await this.rateLimit.hit({
+      key: `admin-2fa-verify:ip:${this.ip()}`,
+      limit: 20,
+      windowSeconds: 15 * MIN,
+    });
+    const userId = await this.tokens.verifyAdminTwoFactorChallenge(challengeToken);
+    await this.otp.verify(userId, 'ADMIN_2FA', code);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.status !== 'ACTIVE' || (!user.isPlatformAdmin && !user.platformRole)) {
+      throw AppError.unauthenticated(
+        'INVALID_CODE',
+        'That code is wrong or has expired. Please sign in again.',
+      );
+    }
+    const session = await this.sessions.start(user.id, null);
+    await this.audit.record({
+      action: 'auth.login',
+      entity: 'user',
+      entityId: user.id,
+      actorId: user.id,
+      orgId: null,
+      after: { method: 'password+2fa' },
     });
     return session;
   }
@@ -242,7 +325,7 @@ export class AuthService {
 
   private async deliverCode(
     to: { phone?: string | null; email?: string | null },
-    purpose: 'login' | 'reset' | 'step-up',
+    purpose: 'login' | 'reset' | 'step-up' | 'admin-2fa',
     code: string,
     minutes: number,
     opts: { silent?: boolean } = {},

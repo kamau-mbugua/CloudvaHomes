@@ -4,6 +4,8 @@ import { useParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
+import { isSuperAdmin } from '../../lib/auth/portals';
+import { useSession } from '../../lib/auth/useAuth';
 import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
@@ -11,7 +13,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Pager } from '../../components/Pager';
 import { unwrap } from '../payments/rules';
 import { Breadcrumbs, Fact, Field } from '../portfolio/ui';
-import { PAGE_SIZE, keys, platformErrorMessage, usePlans } from '../platform/api';
+import { PAGE_SIZE, keys, platformErrorMessage, usePlans, usePlatformOperators } from '../platform/api';
 import { checkTerms, formatDayish, monthlyTotal, overridesOf, ownerText, priceText, termsDraft } from '../platform/rules';
 import type { TermsDraft } from '../platform/rules';
 import type { PlatformInvoice, PlatformOrganization, PlatformPayment } from '../platform/types';
@@ -43,6 +45,8 @@ export function OrganizationDetailPage() {
 }
 
 function OrganizationDetail({ org }: { org: PlatformOrganization }) {
+  const { user } = useSession();
+  const superAdmin = isSuperAdmin(user);
   const queryClient = useQueryClient();
   const toast = useToast();
   const [recording, setRecording] = useState(false);
@@ -67,20 +71,22 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
           <span className="ad__muted"><span className="num">{org.billingRef}</span> · {org.kind === 'AGENCY' ? 'Agency' : 'Landlord'}</span>
         </div>
         <OrgStatusBadge status={org.status} />
-        <div className="pg-actions pg-push">
-          {!closed ? (
-            <button type="button" className="nx-btn nx-btn--primary" onClick={() => setRecording(true)}>Record payment</button>
-          ) : null}
-          {closed ? (
-            <button type="button" className="nx-btn" disabled={setStatus.isPending} onClick={() => setStatus.mutate('ACTIVE')}>
-              {setStatus.isPending ? 'Reopening…' : 'Reopen'}
-            </button>
-          ) : (
-            <ConfirmDelete size="md" label="Close organisation" verb="Close" what={org.name} busy={setStatus.isPending}
-              consequence="Its staff can no longer change anything and it is no longer billed. The daily status check leaves a closed organisation alone; you can reopen it at any time."
-              onConfirm={() => setStatus.mutate('CLOSED')} />
-          )}
-        </div>
+        {superAdmin ? (
+          <div className="pg-actions pg-push">
+            {!closed ? (
+              <button type="button" className="nx-btn nx-btn--primary" onClick={() => setRecording(true)}>Record payment</button>
+            ) : null}
+            {closed ? (
+              <button type="button" className="nx-btn" disabled={setStatus.isPending} onClick={() => setStatus.mutate('ACTIVE')}>
+                {setStatus.isPending ? 'Reopening…' : 'Reopen'}
+              </button>
+            ) : (
+              <ConfirmDelete size="md" label="Close organisation" verb="Close" what={org.name} busy={setStatus.isPending}
+                consequence="Its staff can no longer change anything and it is no longer billed. The daily status check leaves a closed organisation alone; you can reopen it at any time."
+                onConfirm={() => setStatus.mutate('CLOSED')} />
+            )}
+          </div>
+        ) : null}
       </div>
 
       <dl className="pf__facts adm__facts">
@@ -94,12 +100,18 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
           {ownerText(org.owner)}
           {org.owner?.phone || org.owner?.email ? <span className="ad__sub">{[org.owner?.phone, org.owner?.email].filter(Boolean).join(' · ')}</span> : null}
         </Fact>
+        <Fact label="Salesperson">
+          {org.onboardedBy ? `${org.onboardedBy.firstName} ${org.onboardedBy.lastName}`.trim() : null}
+          {org.onboardedBy?.email ? <span className="ad__sub">{org.onboardedBy.email}</span> : null}
+        </Fact>
         <Fact label="Trial ends">{org.trialEndsAt ? formatDayish(org.trialEndsAt) : null}</Fact>
         <Fact label="No suspension until">{org.noSuspendUntil ? formatDayish(org.noSuspendUntil) : null}</Fact>
       </dl>
 
-      <TermsForm key={`${org.id}-${org.plan?.id ?? ''}-${org.priceOverride ?? ''}-${org.minimumOverride ?? ''}-${org.trialEndsAt ?? ''}-${org.noSuspendUntil ?? ''}-${org.price?.pricePerUnit}-${org.price?.minimumMonthly}`} org={org} />
-      <OrgInvoices orgId={org.id} />
+      {superAdmin ? (
+        <TermsForm key={`${org.id}-${org.plan?.id ?? ''}-${org.priceOverride ?? ''}-${org.minimumOverride ?? ''}-${org.trialEndsAt ?? ''}-${org.noSuspendUntil ?? ''}-${org.price?.pricePerUnit}-${org.price?.minimumMonthly}-${org.onboardedById ?? ''}`} org={org} />
+      ) : null}
+      <OrgInvoices orgId={org.id} superAdmin={superAdmin} />
       <OrgPayments orgId={org.id} />
 
       {recording ? <RecordHodiPaymentSheet org={org} onClose={() => setRecording(false)} /> : null}
@@ -111,8 +123,11 @@ function TermsForm({ org }: { org: PlatformOrganization }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const plans = usePlans();
+  const operators = usePlatformOperators();
   const initial = termsDraft(org);
+  const initialSalespersonId = org.onboardedById ?? org.onboardedBy?.id ?? '';
   const [draft, setDraft] = useState<TermsDraft>(initial);
+  const [salespersonId, setSalespersonId] = useState(initialSalespersonId);
   const [errors, setErrors] = useState<Partial<Record<keyof TermsDraft, string>>>({});
   const [general, setGeneral] = useState<string | null>(null);
   const set = (field: keyof TermsDraft, value: string) => setDraft((d) => ({ ...d, [field]: value }));
@@ -122,7 +137,7 @@ function TermsForm({ org }: { org: PlatformOrganization }) {
   const chosenPlan = allPlans.find((p) => p.id === draft.planId) ?? null;
   // Inactive plans are offered only if it is the organisation's current one.
   const offered = allPlans.filter((p) => p.active || p.id === org.plan?.id);
-  const dirty = (Object.keys(initial) as (keyof TermsDraft)[]).some((k) => draft[k].trim() !== initial[k]);
+  const dirty = (Object.keys(initial) as (keyof TermsDraft)[]).some((k) => draft[k].trim() !== initial[k]) || salespersonId !== initialSalespersonId;
 
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.patch<unknown>(`/platform/organizations/${encodeURIComponent(org.id)}`, body),
@@ -146,12 +161,17 @@ function TermsForm({ org }: { org: PlatformOrganization }) {
     const checked = checkTerms(org, draft);
     if (!checked.ok) { setErrors(checked.errors); return; }
     setErrors({});
-    if (Object.keys(checked.body).length === 0) return;
-    save.mutate({ ...checked.body });
+    const payload: Record<string, unknown> = { ...checked.body };
+    if (salespersonId !== initialSalespersonId) {
+      payload.onboardedById = salespersonId || null;
+    }
+    if (Object.keys(payload).length === 0) return;
+    save.mutate(payload);
   };
 
   const planPrice = chosenPlan ? formatKES(chosenPlan.pricePerUnit) : null;
   const planMinimum = chosenPlan ? formatKES(chosenPlan.minimumMonthly) : null;
+  const allOperators = (operators.data ?? []).filter((op) => op.status === 'ACTIVE' || op.id === initialSalespersonId);
 
   return (
     <form className="fm__section adm__terms" onSubmit={submit} noValidate>
@@ -169,7 +189,14 @@ function TermsForm({ org }: { org: PlatformOrganization }) {
             {org.plan?.id && !offered.some((p) => p.id === org.plan?.id) ? <option value={org.plan.id}>{org.plan.name}</option> : null}
           </select>
         </Field>
-        <div />
+        <Field id="ot-salesperson" label="Salesperson / account owner" optional>
+          <select id="ot-salesperson" value={salespersonId} onChange={(e) => setSalespersonId(e.target.value)} disabled={operators.isPending}>
+            <option value="">Unassigned</option>
+            {allOperators.map((op) => (
+              <option key={op.id} value={op.id}>{op.firstName} {op.lastName} ({op.email})</option>
+            ))}
+          </select>
+        </Field>
         <Field id="ot-price" label="Price per let unit (KES)" optional error={errors.priceOverride}
           hint={draft.priceOverride.trim() ? 'This organisation’s own price. Empty it to use the plan’s.' : planPrice ? `Empty: the plan’s ${planPrice}.` : 'Empty: the plan’s price.'}>
           <span className="adm__override">
@@ -204,7 +231,7 @@ function TermsForm({ org }: { org: PlatformOrganization }) {
       {general ? <p className="ad__error" role="alert">{general}</p> : null}
       <div className="pg-actions">
         <button type="button" className="nx-btn" disabled={!dirty || save.isPending}
-          onClick={() => { setDraft(initial); setErrors({}); setGeneral(null); }}>Discard changes</button>
+          onClick={() => { setDraft(initial); setSalespersonId(initialSalespersonId); setErrors({}); setGeneral(null); }}>Discard changes</button>
         <button type="submit" className="nx-btn nx-btn--primary" disabled={!dirty || save.isPending}>
           {save.isPending ? 'Saving…' : 'Save terms'}
         </button>
@@ -213,7 +240,7 @@ function TermsForm({ org }: { org: PlatformOrganization }) {
   );
 }
 
-function OrgInvoices({ orgId }: { orgId: string }) {
+function OrgInvoices({ orgId, superAdmin }: { orgId: string; superAdmin: boolean }) {
   const [page, setPage] = useState(1);
   const [voiding, setVoiding] = useState<PlatformInvoice | null>(null);
   const list = useQuery({
@@ -230,7 +257,7 @@ function OrgInvoices({ orgId }: { orgId: string }) {
       {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap"><EmptyState title="No invoices yet" detail="Months in the trial aren’t billed. Run a month from Invoices." /></div>
       ) : (
-        <HodiInvoicesTable rows={rows} actions={(inv) => <AdminInvoiceActions invoice={inv} onVoid={setVoiding} />} />
+        <HodiInvoicesTable rows={rows} actions={(inv) => <AdminInvoiceActions invoice={inv} onVoid={superAdmin ? setVoiding : undefined} />} />
       )}
       <Pager meta={list.data?.meta} onPage={setPage} />
       {voiding ? <VoidHodiInvoiceSheet invoice={voiding} onClose={() => setVoiding(null)} /> : null}

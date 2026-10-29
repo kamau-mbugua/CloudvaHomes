@@ -168,6 +168,13 @@ export interface PlatformOrganization {
   credit?: number;
   occupiedUnits: number;
   owner: PlatformOwner | null;
+  onboardedById?: string | null;
+  onboardedBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
   createdAt?: string;
 }
 
@@ -184,5 +191,77 @@ export interface PlatformSettings {
     passkey?: boolean;
     callbackUrls: { stk: string; c2bConfirm: string; c2bValidate: string } | null;
   };
+  requireAdminTwoFactor?: boolean;
+  adminTwoFactorChannel?: 'EMAIL' | 'SMS';
+  sms?: {
+    configured: boolean;
+    username: string | null;
+    senderId: string | null;
+    apiKey: boolean;
+  };
+  allowPublicSignup?: boolean;
+  minAppVersionCode?: number;
+  minAppVersionName?: string;
+  appUpdateMessage?: string | null;
+  appStoreUrl?: string | null;
+  maintenanceMode?: boolean;
+  maintenanceMessage?: string | null;
   updatedAt?: string;
+}
+
+export interface PlatformOperator {
+  id: string;
+  email: string;
+  phone: string | null;
+  firstName: string;
+  lastName: string;
+  status: 'ACTIVE' | 'DISABLED' | 'LOCKED' | 'INVITED';
+  isPlatformAdmin: boolean;
+  platformRole: 'SUPERADMIN' | 'SALESPERSON';
+  organizationCount: number;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface UnassignedOrganization {
+  id: string;
+  name: string;
+  billingRef: string;
+  status: OrgStatus;
+  createdAt: string;
+}
+
+export interface PlatformEmailSettings {
+  configured: boolean;
+  source: 'database' | 'environment' | 'none';
+  host: string | null;
+  port: number;
+  user: string | null;
+  passwordSet: boolean;
+  encryption: 'tls' | 'ssl' | 'none';
+  fromEmail: string | null;
+  fromName: string | null;
+  allowlist: string | null;
+}
+
+export interface PlatformEmailLog {
+  id: string;
+  recipient: string;
+  subject: string;
+  body: string | null;
+  template: string | null;
+  status: 'SENT' | 'FAILED';
+  error: string | null;
+  sentByUserId: string | null;
+  orgId: string | null;
+  createdAt: string;
+}
+
+export interface RateLimitLock {
+  key: string;
+  scope: string;
+  identifier: string;
+  count: number;
+  ttlSeconds: number;
+  locked: boolean;
 }

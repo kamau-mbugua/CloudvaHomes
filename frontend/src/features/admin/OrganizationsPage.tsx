@@ -40,6 +40,7 @@ export function OrganizationsPage() {
           <option value="">All statuses</option>
           {optionsOf(ORG_STATUS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
+        <Link className="nx-btn nx-btn--primary pg-push" to="/admin/organizations/new">+ New organisation</Link>
       </div>
 
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
@@ -58,6 +59,7 @@ export function OrganizationsPage() {
                 <th>Organisation</th>
                 <th>Status</th>
                 <th>Plan and price</th>
+                <th>Salesperson</th>
                 <th className="num">Let units</th>
                 <th className="num">Owes</th>
                 <th>Trial ends</th>
@@ -74,6 +76,11 @@ export function OrganizationsPage() {
                   <td>
                     <span className="hb__price">{org.plan?.name ?? 'No plan'}{org.price?.custom ? <CustomBadge /> : null}</span>
                     {org.price ? <span className="ad__sub num">{formatKES(org.price.pricePerUnit)} / unit · min {formatKES(org.price.minimumMonthly)}</span> : null}
+                  </td>
+                  <td>
+                    {org.onboardedBy
+                      ? `${org.onboardedBy.firstName} ${org.onboardedBy.lastName}`.trim()
+                      : <span className="ad__muted">—</span>}
                   </td>
                   <td className="num">{org.occupiedUnits ?? '—'}</td>
                   <td className={`num ${org.balance > 0 && (org.status === 'GRACE' || org.status === 'SUSPENDED') ? 'ad__owed' : ''}`}>{formatKES(org.balance ?? 0)}</td>

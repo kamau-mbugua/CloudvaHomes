@@ -25,6 +25,7 @@ import {
   stkStateFor,
   toMsisdn,
 } from '../mpesa/daraja.js';
+import { AT_API_KEY_CONTEXT } from '../notifications/notifications.service.js';
 import { requiredPhone } from '../portfolio/fields.js';
 import { PlatformBillingService } from './platform-billing.service.js';
 import type { BillingPayDto, PlatformSettingsDto } from './platform.dto.js';
@@ -63,6 +64,7 @@ export class PlatformPayService {
 
   view(s: PlatformSettings) {
     const creds = this.credentials(s);
+    const smsDbConfigured = Boolean(s.atUsername && s.atApiKeyEnc);
     return {
       dueDays: s.dueDays,
       suspendAfterDays: s.suspendAfterDays,
@@ -74,6 +76,26 @@ export class PlatformPayService {
         passkey: !!creds?.passkey,
         callbackUrls: s.callbackToken ? this.urls(s.callbackToken) : null,
       },
+      requireAdminTwoFactor: s.requireAdminTwoFactor,
+      adminTwoFactorChannel: s.adminTwoFactorChannel,
+      sms: {
+        configured: smsDbConfigured || this.env.SMS_PROVIDER === 'africastalking',
+        username: s.atUsername ?? (this.env.SMS_PROVIDER === 'africastalking' ? this.env.AT_USERNAME ?? null : null),
+        senderId: s.atSenderId ?? this.env.AT_SENDER_ID ?? null,
+        apiKeySet: Boolean(s.atApiKeyEnc),
+        source: smsDbConfigured
+          ? ('database' as const)
+          : this.env.SMS_PROVIDER === 'africastalking'
+            ? ('env' as const)
+            : ('log' as const),
+      },
+      allowPublicSignup: s.allowPublicSignup,
+      minAppVersionCode: s.minAppVersionCode,
+      minAppVersionName: s.minAppVersionName,
+      appUpdateMessage: s.appUpdateMessage,
+      appStoreUrl: s.appStoreUrl,
+      maintenanceMode: s.maintenanceMode,
+      maintenanceMessage: s.maintenanceMessage,
       updatedAt: s.updatedAt,
     };
   }
@@ -100,7 +122,37 @@ export class PlatformPayService {
         ...(dto.defaultPlanId !== undefined ? { defaultPlanId: dto.defaultPlanId } : {}),
         ...(dto.paybill !== undefined ? { paybill: dto.paybill } : {}),
         ...(dto.darajaEnvironment !== undefined ? { darajaEnv: dto.darajaEnvironment } : {}),
+        ...(dto.requireAdminTwoFactor !== undefined
+          ? { requireAdminTwoFactor: dto.requireAdminTwoFactor }
+          : {}),
+        ...(dto.adminTwoFactorChannel !== undefined
+          ? { adminTwoFactorChannel: dto.adminTwoFactorChannel }
+          : {}),
+        ...(dto.atUsername !== undefined ? { atUsername: dto.atUsername?.trim() || null } : {}),
+        ...(dto.atSenderId !== undefined ? { atSenderId: dto.atSenderId?.trim() || null } : {}),
+        ...(dto.allowPublicSignup !== undefined
+          ? { allowPublicSignup: dto.allowPublicSignup }
+          : {}),
+        ...(dto.minAppVersionCode !== undefined
+          ? { minAppVersionCode: dto.minAppVersionCode }
+          : {}),
+        ...(dto.minAppVersionName !== undefined
+          ? { minAppVersionName: dto.minAppVersionName?.trim() || null }
+          : {}),
+        ...(dto.appUpdateMessage !== undefined
+          ? { appUpdateMessage: dto.appUpdateMessage?.trim() || null }
+          : {}),
+        ...(dto.appStoreUrl !== undefined ? { appStoreUrl: dto.appStoreUrl?.trim() || null } : {}),
+        ...(dto.maintenanceMode !== undefined ? { maintenanceMode: dto.maintenanceMode } : {}),
+        ...(dto.maintenanceMessage !== undefined
+          ? { maintenanceMessage: dto.maintenanceMessage?.trim() || null }
+          : {}),
       };
+      if (dto.clearAtApiKey) {
+        data.atApiKeyEnc = null;
+      } else if (dto.atApiKey?.trim()) {
+        data.atApiKeyEnc = this.cipher.encrypt(dto.atApiKey.trim(), AT_API_KEY_CONTEXT);
+      }
       if (keysChange) {
         const previous = this.credentials(before);
         const consumerKey = dto.consumerKey?.trim() || previous?.consumerKey;

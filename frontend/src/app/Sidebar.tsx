@@ -34,6 +34,9 @@ const ICONS: Record<GroupId, ReactNode> = {
   settings: <CogIcon />,
   'admin-overview': <HomeIcon />,
   'admin-organizations': <BuildingIcon />,
+  'admin-billing': <InvoiceIcon />,
+  'admin-reports': <ChartIcon />,
+  'admin-platform': <CogIcon />,
   'admin-plans': <ReceiptIcon />,
   'admin-invoices': <InvoiceIcon />,
   'admin-settings': <CogIcon />,
@@ -60,7 +63,7 @@ export function Sidebar({
   counts?: Partial<Record<NavBadge, number>>;
 }) {
   const location = useLocation();
-  const here = bestEntry(groups, location.pathname);
+  const here = bestEntry(groups, `${location.pathname}${location.search}`);
   const current = here?.group.id ?? null;
 
   /**

@@ -10,6 +10,7 @@ import { readStored, writeStored } from '../lib/storage';
 import { useTheme } from '../lib/theme';
 import { ApiError, ORG_SUSPENDED, errorMessage } from '../lib/api/client';
 import { displayName } from '../lib/auth/permissions';
+import { isPlatformOperator } from '../lib/auth/portals';
 import { logout, reloadSessionDetails, switchOrganization } from '../lib/auth/session';
 import { useSession } from '../lib/auth/useAuth';
 import { useToast } from '../lib/useToast';
@@ -190,7 +191,7 @@ export function AppShell() {
               onSignOut={signOut}
               ownerPortal={session.ownerOf.length > 0}
               tenantPortal={session.tenantOf.length > 0}
-              platformAdmin={session.user.isPlatformAdmin}
+              platformAdmin={isPlatformOperator(session.user)}
             />
           </div>
         </header>

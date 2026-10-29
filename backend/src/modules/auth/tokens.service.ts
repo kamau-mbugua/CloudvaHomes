@@ -6,6 +6,7 @@ import { AppError } from '../../common/errors/app-error.js';
 
 export const ACCESS_TTL_SECONDS = 15 * 60;
 export const STEP_UP_TTL_SECONDS = 5 * 60;
+export const ADMIN_2FA_TTL_SECONDS = 15 * 60;
 const ISSUER = 'hodi';
 const AUDIENCE = 'hodi-api';
 
@@ -74,6 +75,31 @@ export class TokensService {
       return payload.sub === userId && payload.sid === sessionId;
     } catch {
       return false;
+    }
+  }
+
+  async signAdminTwoFactorChallenge(userId: string): Promise<{ token: string; expiresAt: Date }> {
+    const expiresAt = new Date(Date.now() + ADMIN_2FA_TTL_SECONDS * 1000);
+    const token = await new SignJWT({ typ: 'admin_2fa' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(userId)
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
+      .sign(this.key);
+    return { token, expiresAt };
+  }
+
+  async verifyAdminTwoFactorChallenge(token: string): Promise<string> {
+    try {
+      const payload = await this.verify(token, 'admin_2fa');
+      return payload.sub!;
+    } catch {
+      throw AppError.unauthenticated(
+        'INVALID_CODE',
+        'That verification session has expired. Please sign in again.',
+      );
     }
   }
 

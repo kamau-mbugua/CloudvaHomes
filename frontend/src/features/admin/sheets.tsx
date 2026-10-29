@@ -170,7 +170,7 @@ export function VoidHodiInvoiceSheet({ invoice, onClose }: { invoice: PlatformIn
 }
 
 /** A row's PDF and Void buttons in the admin invoice tables. Paid-on invoices can't be voided. */
-export function AdminInvoiceActions({ invoice, onVoid }: { invoice: PlatformInvoice; onVoid: (invoice: PlatformInvoice) => void }) {
+export function AdminInvoiceActions({ invoice, onVoid }: { invoice: PlatformInvoice; onVoid?: (invoice: PlatformInvoice) => void }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const pdf = async () => {
@@ -186,7 +186,7 @@ export function AdminInvoiceActions({ invoice, onVoid }: { invoice: PlatformInvo
   return (
     <>
       <button type="button" className="nx-btn nx-btn--sm" onClick={pdf} disabled={busy}>{busy ? 'Getting…' : 'PDF'}</button>
-      {invoice.status !== 'VOID' ? (
+      {onVoid && invoice.status !== 'VOID' ? (
         <button type="button" className="nx-btn nx-btn--sm nx-btn--danger" onClick={() => onVoid(invoice)}
           disabled={invoice.amountPaid > 0} title={invoice.amountPaid > 0 ? 'Something has been paid on it, so it can’t be voided' : undefined}>
           Void
