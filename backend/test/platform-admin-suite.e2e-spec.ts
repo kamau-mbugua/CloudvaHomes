@@ -228,6 +228,9 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     expect(invoiceEmail!.text).toContain('Total billed: KES 1,000.00');
     expect(invoiceEmail!.text).toContain('Balance due: KES 1,000.00');
     expect(invoiceEmail!.text).toMatch(/Pay via M-Pesa Paybill 4091234, Account H\d{5}/);
+    expect(invoiceEmail!.attachments?.length).toBe(1);
+    expect(invoiceEmail!.attachments![0]!.filename).toMatch(/\.pdf$/);
+    expect(invoiceEmail!.attachments![0]!.content.subarray(0, 5).toString()).toBe('%PDF-');
 
     // Save SMTP settings
     const smtp = (

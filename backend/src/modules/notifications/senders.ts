@@ -2,11 +2,18 @@ import { Logger } from '@nestjs/common';
 import nodemailer, { type Transporter } from 'nodemailer';
 import type { Env } from '../../config/env.js';
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface SmsSender {
@@ -19,7 +26,15 @@ export interface EmailSender {
 
 export type OutboxEntry =
   | { channel: 'sms'; to: string; text: string; at: Date }
-  | { channel: 'email'; to: string; subject: string; text: string; at: Date };
+  | {
+      channel: 'email';
+      to: string;
+      subject: string;
+      text: string;
+      html?: string;
+      attachments?: EmailAttachment[];
+      at: Date;
+    };
 
 /** Messages "sent" by the log adapters. Tests read OTP codes and invitation links from here. */
 export const outbox: OutboxEntry[] = [];
@@ -120,6 +135,7 @@ export class SmtpEmailSender implements EmailSender {
       subject: m.subject,
       text: m.text,
       ...(m.html ? { html: m.html } : {}),
+      ...(m.attachments?.length ? { attachments: m.attachments } : {}),
     });
   }
 }

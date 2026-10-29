@@ -173,11 +173,11 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     name: 'Monthly Subscription Invoice Issued',
     category: 'Platform Billing',
     description:
-      'Sent to the organisation owner when a monthly KodiHub platform invoice is generated after their free trial.',
+      'Sent to the organisation owner when a monthly KodiHub platform invoice is generated after their free trial (with the PDF invoice attached).',
     defaultSubject: 'KodiHub Invoice {{invoiceNumber}} ({{period}}) — {{organizationName}}',
     defaultBody:
       '{{greeting}}\n\n' +
-      'Your KodiHub subscription invoice {{invoiceNumber}} for {{organizationName}} (period {{period}}) has been issued.\n\n' +
+      'Your KodiHub subscription invoice {{invoiceNumber}} for {{organizationName}} (period {{period}}) has been issued. A copy of the PDF invoice is attached to this email.\n\n' +
       '--- Invoice Summary ---\n' +
       'Invoice number: {{invoiceNumber}}\n' +
       'Billing period: {{period}}\n' +
@@ -438,12 +438,12 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     name: 'Tenant Invoice Issued',
     category: 'Tenant Communications',
     description:
-      'Sent to the tenant whenever a Move-In, Monthly, or Ad-hoc invoice is issued for any of their units.',
+      'Sent to the tenant whenever a Move-In, Monthly, or Ad-hoc invoice is issued for any of their units (with the PDF invoice attached).',
     defaultSubject:
       'Invoice {{invoiceNumber}} ({{period}}) for {{propertyName}} ({{unitNumber}}) — KES {{balanceKes}}',
     defaultBody:
       'Hi {{firstName}},\n\n' +
-      'A new {{invoiceKind}} invoice {{invoiceNumber}} has been issued for Unit {{unitNumber}} at {{propertyName}} ({{organizationName}}).\n\n' +
+      'A new {{invoiceKind}} invoice {{invoiceNumber}} has been issued for Unit {{unitNumber}} at {{propertyName}} ({{organizationName}}). A copy of the official PDF invoice is attached to this email.\n\n' +
       '--- Invoice Summary ---\n' +
       'Invoice number: {{invoiceNumber}}\n' +
       'Property & Unit: {{propertyName}} — Unit {{unitNumber}}\n' +

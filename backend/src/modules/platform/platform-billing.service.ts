@@ -24,6 +24,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { monthBounds } from '../reports/report-math.js';
 import { platformTotal, previousPeriod, statusFor, type OrgStatus } from './platform-math.js';
 import type { ListPlatformInvoicesDto, ListPlatformPaymentsDto } from './platform.dto.js';
+import { renderPlatformInvoicePdf } from './platform-pdf.js';
 
 /**
  * Hodi billing organisations (design §5.4). Platform data spans organisations, so this uses
@@ -153,6 +154,11 @@ export class PlatformBillingService {
         if (recipientEmail) {
           const { inv, org } = created;
           const balance = inv.total - inv.amountPaid;
+          const pdfBuffer = await renderPlatformInvoicePdf({
+            invoice: this.toInvoice(inv),
+            org: { name: org.name, billingRef: org.billingRef },
+            paybill: settings.paybill ?? null,
+          });
           await this.notifications.sendPlatformInvoiceIssued(
             { email: recipientEmail },
             {
@@ -169,6 +175,7 @@ export class PlatformBillingService {
               balanceKes: money(balance > 0n ? balance : 0n),
               dueDate: formatDateOnly(inv.dueDate),
               paybill: settings.paybill ?? null,
+              pdfBuffer,
             },
           );
         }

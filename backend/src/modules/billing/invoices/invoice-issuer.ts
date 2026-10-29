@@ -8,6 +8,7 @@ import { formatKesMinor, NotificationsService } from '../../notifications/notifi
 import { nextCode } from '../../portfolio/codes.js';
 import { addDays, balanceOf } from '../billing-math.js';
 import type { DraftLine } from './invoice-builder.js';
+import { renderInvoicePdf } from './invoice-pdf.js';
 
 export interface IssueRequest {
   orgId: string;
@@ -138,10 +139,13 @@ export class InvoiceIssuer {
         tx.invoice.findUnique({
           where: { id: invoiceId },
           include: {
+            lines: { orderBy: { position: 'asc' } },
             tenancy: {
               select: {
+                id: true,
                 tenant: {
                   select: {
+                    id: true,
                     firstName: true,
                     lastName: true,
                     email: true,
@@ -151,8 +155,9 @@ export class InvoiceIssuer {
                 },
                 unit: {
                   select: {
+                    id: true,
                     number: true,
-                    property: { select: { name: true, code: true } },
+                    property: { select: { id: true, name: true, code: true } },
                   },
                 },
               },
@@ -161,7 +166,7 @@ export class InvoiceIssuer {
         }),
         tx.organization.findUnique({
           where: { id: r.orgId },
-          select: { name: true },
+          select: { name: true, phone: true, email: true, kraPin: true },
         }),
         tx.paymentChannel.findMany({
           where: {
@@ -209,6 +214,67 @@ export class InvoiceIssuer {
           ? `Pay via ${payLines.join(' or ')}.`
           : `Use your tenant account code ${tenant.code} when paying.`;
 
+      const issueDateStr = formatDateOnly(fullInvoice.issueDate);
+      const dueDateStr = formatDateOnly(fullInvoice.dueDate);
+      const pdfBuffer = await renderInvoicePdf({
+        invoice: {
+          id: fullInvoice.id,
+          number: fullInvoice.number,
+          kind: fullInvoice.kind,
+          status: fullInvoice.status,
+          period: fullInvoice.period,
+          issueDate: issueDateStr,
+          dueDate: dueDateStr,
+          overdue: false,
+          total: fullInvoice.total,
+          amountPaid: fullInvoice.amountPaid,
+          creditedAmount: fullInvoice.creditedAmount,
+          balance: bal,
+          voidedAt: fullInvoice.voidedAt,
+          voidReason: fullInvoice.voidReason,
+          tenancyId: fullInvoice.tenancy.id,
+          tenant: {
+            id: tenant.id,
+            code: tenant.code,
+            firstName: tenant.firstName,
+            lastName: tenant.lastName,
+            phone: tenant.phone,
+          },
+          unit: { id: unit.id, number: unit.number },
+          property: {
+            id: unit.property.id,
+            code: unit.property.code,
+            name: unit.property.name,
+          },
+          createdAt: fullInvoice.createdAt,
+          lines: fullInvoice.lines.map((l) => ({
+            id: l.id,
+            kind: l.kind,
+            description: l.description,
+            quantity: l.quantity.toFixed(3),
+            unitAmount: l.unitAmount,
+            amount: l.amount,
+            refundable: l.refundable,
+          })),
+          creditNotes: [],
+          payments: [],
+        },
+        org: {
+          name: orgName,
+          phone: org?.phone ?? '',
+          email: org?.email ?? '',
+          kraPin: org?.kraPin ?? null,
+        },
+        channels: channels.map((c) => ({
+          name: c.name,
+          kind: c.kind,
+          shortcode: c.shortcode,
+          bankName: c.bankName,
+          accountNumber: c.accountNumber,
+          accountName: c.accountName,
+        })),
+      });
+
       await this.notifications.sendTenantInvoiceIssued(
         { email: tenant.email, phone: tenant.phone },
         {
@@ -221,13 +287,14 @@ export class InvoiceIssuer {
           period: fullInvoice.period,
           propertyName: unit.property.name,
           unitNumber: unit.number,
-          issueDate: formatDateOnly(fullInvoice.issueDate),
-          dueDate: formatDateOnly(fullInvoice.dueDate),
+          issueDate: issueDateStr,
+          dueDate: dueDateStr,
           linesSummary,
           totalKes: formatKesMinor(fullInvoice.total),
           amountPaidKes: formatKesMinor(paidAndCredited),
           balanceKes: formatKesMinor(bal > 0n ? bal : 0n),
           paymentInstructions,
+          pdfBuffer,
         },
       );
     } catch (err) {

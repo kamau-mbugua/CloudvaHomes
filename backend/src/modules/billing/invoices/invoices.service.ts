@@ -170,11 +170,33 @@ export class InvoicesService {
   /** The invoice with everything the PDF needs. */
   async forPdf(id: string) {
     const i = await this.find(id);
-    const org = await this.db.organization.findUniqueOrThrow({
-      where: { id: i.orgId },
-      select: { name: true, phone: true, email: true, kraPin: true },
-    });
-    return { invoice: await this.toDetail(i), org };
+    const [org, channels] = await Promise.all([
+      this.db.organization.findUniqueOrThrow({
+        where: { id: i.orgId },
+        select: { name: true, phone: true, email: true, kraPin: true },
+      }),
+      this.db.paymentChannel.findMany({
+        where: {
+          orgId: i.orgId,
+          status: 'ACTIVE',
+          kind: { in: ['MPESA_PAYBILL', 'MPESA_TILL', 'BANK_ACCOUNT'] },
+          OR: [
+            { propertyIds: { isEmpty: true } },
+            { propertyIds: { has: i.tenancy.unit.property.id } },
+          ],
+        },
+        select: {
+          name: true,
+          kind: true,
+          shortcode: true,
+          bankName: true,
+          accountNumber: true,
+          accountName: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    return { invoice: await this.toDetail(i), org, channels };
   }
 
   private async toDetail(i: DetailRow) {

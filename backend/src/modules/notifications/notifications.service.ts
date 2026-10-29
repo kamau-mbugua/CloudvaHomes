@@ -54,6 +54,7 @@ export interface PlatformInvoiceEmailPayload {
   balanceKes: string;
   dueDate: string;
   paybill: string | null;
+  pdfBuffer?: Buffer;
 }
 
 export interface TenantUnitAssignedEmailPayload {
@@ -89,6 +90,7 @@ export interface TenantInvoiceEmailPayload {
   amountPaidKes: string;
   balanceKes: string;
   paymentInstructions: string;
+  pdfBuffer?: Buffer;
 }
 
 export function formatKesMinor(minor: bigint | number): string {
@@ -306,6 +308,17 @@ export class NotificationsService {
         to: to.email,
         subject: rendered.subject,
         text: rendered.text,
+        ...(p.pdfBuffer
+          ? {
+              attachments: [
+                {
+                  filename: `${p.invoiceNumber}.pdf`,
+                  content: p.pdfBuffer,
+                  contentType: 'application/pdf',
+                },
+              ],
+            }
+          : {}),
       },
       'platform_invoice',
     );
@@ -425,12 +438,28 @@ export class NotificationsService {
   async sendTenantInvoiceIssued(to: Recipient, p: TenantInvoiceEmailPayload): Promise<void> {
     if (!to.email) return;
     const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
+    const { pdfBuffer, ...vars } = p;
     const rendered = await this.renderSystemEmailTemplate('tenant_invoice', {
-      ...p,
+      ...vars,
       portalLink,
     });
     await this.dispatchEmail(
-      { to: to.email, subject: rendered.subject, text: rendered.text },
+      {
+        to: to.email,
+        subject: rendered.subject,
+        text: rendered.text,
+        ...(pdfBuffer
+          ? {
+              attachments: [
+                {
+                  filename: `${p.invoiceNumber}.pdf`,
+                  content: pdfBuffer,
+                  contentType: 'application/pdf',
+                },
+              ],
+            }
+          : {}),
+      },
       'tenant_invoice',
     );
   }
@@ -542,7 +571,14 @@ export class NotificationsService {
             text: m.text,
             brandName: fromName || 'KodiHub',
           });
-        await transport.sendMail({ from, to: m.to, subject: m.subject, text: m.text, html });
+        await transport.sendMail({
+          from,
+          to: m.to,
+          subject: m.subject,
+          text: m.text,
+          html,
+          ...(m.attachments?.length ? { attachments: m.attachments } : {}),
+        });
       } else {
         await this.email.send(m);
       }
