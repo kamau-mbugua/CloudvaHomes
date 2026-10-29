@@ -80,7 +80,9 @@ export class PlatformPayService {
       adminTwoFactorChannel: s.adminTwoFactorChannel,
       sms: {
         configured: smsDbConfigured || this.env.SMS_PROVIDER === 'africastalking',
-        username: s.atUsername ?? (this.env.SMS_PROVIDER === 'africastalking' ? this.env.AT_USERNAME ?? null : null),
+        username:
+          s.atUsername ??
+          (this.env.SMS_PROVIDER === 'africastalking' ? (this.env.AT_USERNAME ?? null) : null),
         senderId: s.atSenderId ?? this.env.AT_SENDER_ID ?? null,
         apiKeySet: Boolean(s.atApiKeyEnc),
         source: smsDbConfigured

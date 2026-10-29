@@ -15,10 +15,7 @@ import { hashPassword } from '../auth/crypto.js';
 import { authContext } from '../auth/decorators.js';
 import { normalizeEmail, normalizePhone, passwordProblem } from '../auth/identifiers.js';
 import { todayInNairobi } from '../billing/billing-math.js';
-import {
-  NotificationsService,
-  SMTP_PASS_CONTEXT,
-} from '../notifications/notifications.service.js';
+import { NotificationsService, SMTP_PASS_CONTEXT } from '../notifications/notifications.service.js';
 import { PlatformBillingService } from './platform-billing.service.js';
 import type {
   AssignOrganizationsDto,
@@ -385,12 +382,8 @@ export class PlatformAdminService {
       }
 
       const passwordHash = dto.password ? await hashPassword(dto.password) : undefined;
-      const existingByEmail = email
-        ? await this.db.user.findUnique({ where: { email } })
-        : null;
-      const existingByPhone = phone
-        ? await this.db.user.findUnique({ where: { phone } })
-        : null;
+      const existingByEmail = email ? await this.db.user.findUnique({ where: { email } }) : null;
+      const existingByPhone = phone ? await this.db.user.findUnique({ where: { phone } }) : null;
       if (existingByEmail && existingByPhone && existingByEmail.id !== existingByPhone.id) {
         throw AppError.conflict(
           'That email and phone belong to two different accounts',
@@ -453,8 +446,14 @@ export class PlatformAdminService {
       if (!before || (!before.isPlatformAdmin && !before.platformRole)) {
         throw AppError.notFound('Operator');
       }
-      if (id === ctx.userId && (dto.role !== undefined && dto.role !== 'SUPERADMIN' || dto.status === 'DISABLED')) {
-        throw AppError.conflict('You cannot remove or disable your own superadmin access', 'CANNOT_DEMOTE_SELF');
+      if (
+        id === ctx.userId &&
+        ((dto.role !== undefined && dto.role !== 'SUPERADMIN') || dto.status === 'DISABLED')
+      ) {
+        throw AppError.conflict(
+          'You cannot remove or disable your own superadmin access',
+          'CANNOT_DEMOTE_SELF',
+        );
       }
       const wasSuperadmin =
         (before.platformRole ?? (before.isPlatformAdmin ? 'SUPERADMIN' : null)) === 'SUPERADMIN';
@@ -562,7 +561,8 @@ export class PlatformAdminService {
     const s = await this.billing.settings();
     const dbConfigured = Boolean(s.smtpHost);
     return {
-      host: s.smtpHost ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_HOST ?? null) : null),
+      host:
+        s.smtpHost ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_HOST ?? null) : null),
       port: s.smtpPort ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_PORT ?? 587) : 587),
       username:
         s.smtpUser ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_USER ?? null) : null),

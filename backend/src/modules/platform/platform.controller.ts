@@ -332,10 +332,7 @@ export class PlatformController {
 
   @Patch('operators/:id')
   @PlatformAdminOnly()
-  async updateOperator(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateOperatorDto,
-  ) {
+  async updateOperator(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateOperatorDto) {
     return ok(await this.admin.updateOperator(id, dto));
   }
 

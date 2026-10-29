@@ -448,11 +448,7 @@ export class PlatformBillingService {
       allowedOrgIds = myOrgs.map((o) => o.id);
     }
     const where: Prisma.PlatformPaymentWhereInput =
-      allowedOrgIds !== null
-        ? { orgId: { in: allowedOrgIds } }
-        : q.orgId
-          ? { orgId: q.orgId }
-          : {};
+      allowedOrgIds !== null ? { orgId: { in: allowedOrgIds } } : q.orgId ? { orgId: q.orgId } : {};
     const [rows, total] = await Promise.all([
       this.prisma.platformPayment.findMany({
         where,
@@ -529,7 +525,11 @@ export class PlatformBillingService {
       orgIdsFilter = { orgId: { in: myOrgs.map((o) => o.id) } };
     }
     const [byStatus, billed, outstanding, collected, orgs] = await Promise.all([
-      this.prisma.organization.groupBy({ where: orgFilter, by: ['status'], _count: { _all: true } }),
+      this.prisma.organization.groupBy({
+        where: orgFilter,
+        by: ['status'],
+        _count: { _all: true },
+      }),
       this.prisma.platformInvoice.aggregate({
         where: { ...orgIdsFilter, period: lastMonth, status: { not: 'VOID' } },
         _sum: { total: true },

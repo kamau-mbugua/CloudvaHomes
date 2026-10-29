@@ -360,13 +360,9 @@ export class PlatformReportsService {
           beforeStatus: (beforeObj.status as string | undefined) ?? null,
           afterStatus: (afterObj.status as string | undefined) ?? null,
           beforePlan:
-            typeof beforeObj.planId === 'string'
-              ? (planById.get(beforeObj.planId) ?? null)
-              : null,
+            typeof beforeObj.planId === 'string' ? (planById.get(beforeObj.planId) ?? null) : null,
           afterPlan:
-            typeof afterObj.planId === 'string'
-              ? (planById.get(afterObj.planId) ?? null)
-              : null,
+            typeof afterObj.planId === 'string' ? (planById.get(afterObj.planId) ?? null) : null,
           before: l.before,
           after: l.after,
         };
@@ -818,17 +814,14 @@ export class PlatformReportsService {
           mrr,
           collected,
           overdue,
-          suspendedCount: bookOrgs.filter(
-            (o) => o.status === 'SUSPENDED' || o.status === 'CLOSED',
-          ).length,
+          suspendedCount: bookOrgs.filter((o) => o.status === 'SUSPENDED' || o.status === 'CLOSED')
+            .length,
         };
       };
 
       const rows = operators
         .filter(
-          (op) =>
-            op.platformRole === 'SALESPERSON' ||
-            orgs.some((o) => o.onboardedById === op.id),
+          (op) => op.platformRole === 'SALESPERSON' || orgs.some((o) => o.onboardedById === op.id),
         )
         .map((op) => {
           const book = orgs.filter((o) => o.onboardedById === op.id);

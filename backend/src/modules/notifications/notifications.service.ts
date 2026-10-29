@@ -22,7 +22,10 @@ export interface Recipient {
   phone?: string | null;
 }
 
-export function isAllowedByAllowlist(email: string, allowlistRaw: string | null | undefined): boolean {
+export function isAllowedByAllowlist(
+  email: string,
+  allowlistRaw: string | null | undefined,
+): boolean {
   const trimmed = allowlistRaw?.trim();
   if (!trimmed) return true;
   const entries = trimmed
@@ -77,7 +80,8 @@ export class NotificationsService {
     }[purpose];
     const text = `Your Hodi ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
     if (to.phone) await this.dispatchSms(to.phone, text);
-    else if (to.email) await this.dispatchEmail({ to: to.email, subject: `Your Hodi ${what}`, text }, kind);
+    else if (to.email)
+      await this.dispatchEmail({ to: to.email, subject: `Your Hodi ${what}`, text }, kind);
   }
 
   async sendInvitation(
@@ -157,7 +161,12 @@ export class NotificationsService {
   }
 
   /** SMS and email where available; succeeds if at least one went out. */
-  private async deliver(to: Recipient, subject: string, text: string, kind = 'other'): Promise<void> {
+  private async deliver(
+    to: Recipient,
+    subject: string,
+    text: string,
+    kind = 'other',
+  ): Promise<void> {
     const tasks: Promise<void>[] = [];
     if (to.phone) tasks.push(this.dispatchSms(to.phone, text));
     if (to.email) tasks.push(this.dispatchEmail({ to: to.email, subject, text }, kind));
@@ -215,9 +224,7 @@ export class NotificationsService {
           port,
           secure: enc === 'ssl' || port === 465,
           ignoreTLS: enc === 'none',
-          ...(settings.smtpUser && pass
-            ? { auth: { user: settings.smtpUser, pass } }
-            : {}),
+          ...(settings.smtpUser && pass ? { auth: { user: settings.smtpUser, pass } } : {}),
         });
         const fromAddr = settings.smtpFromEmail || this.env.EMAIL_FROM;
         const from = settings.smtpFromName ? `"${settings.smtpFromName}" <${fromAddr}>` : fromAddr;
