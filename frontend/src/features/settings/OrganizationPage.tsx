@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent, InputHTMLAttributes } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
@@ -38,10 +39,27 @@ export function OrganizationPage() {
   return <OrganizationForm key={query.data.id} org={query.data} />;
 }
 
+type OrgTab = 'details' | 'billing' | 'reminders';
+
 function OrganizationForm({ org }: { org: Organization }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const canEdit = useCan('settings:update');
+  const [params, setParams] = useSearchParams();
+  const rawTab = params.get('tab');
+  const tab: OrgTab = rawTab === 'billing' || rawTab === 'reminders' ? rawTab : 'details';
+
+  const setTab = (next: OrgTab) => {
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'details') p.delete('tab');
+        else p.set('tab', next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
 
   const savedReminders = readReminders(org.reminders);
   const initial: Record<Field, string> = {
@@ -84,6 +102,9 @@ function OrganizationForm({ org }: { org: Organization }) {
           if (!(key in found)) found[key] = message;
         }
         setErrors(found);
+        if (found.name || found.phone || found.email || found.kraPin) setTab('details');
+        else if (found.invoiceDueDays) setTab('billing');
+        else if (found.daysBefore || found.overdueDays) setTab('reminders');
       }
     },
   });
@@ -96,7 +117,12 @@ function OrganizationForm({ org }: { org: Organization }) {
     if (!dueDays.ok) found.invoiceDueDays = dueDays.error;
     if (!checkedReminders.ok) Object.assign(found, checkedReminders.errors);
     setErrors(found);
-    if (Object.keys(found).length > 0 || !dueDays.ok || !checkedReminders.ok) return;
+    if (Object.keys(found).length > 0 || !dueDays.ok || !checkedReminders.ok) {
+      if (found.name || found.phone || found.email || found.kraPin) setTab('details');
+      else if (found.invoiceDueDays) setTab('billing');
+      else if (found.daysBefore || found.overdueDays) setTab('reminders');
+      return;
+    }
 
     save.mutate({
       name: values.name.trim(),
@@ -130,56 +156,94 @@ function OrganizationForm({ org }: { org: Organization }) {
   return (
     <form className="fm fm--single pg-narrow" onSubmit={submit} noValidate>
       <div className="fm__main">
-        <section className="fm__section">
-          <h2>Organisation details</h2>
-          <p>Shown on invoices, receipts and messages to tenants.</p>
-
-          <div className="fm__grid">
-            <div className="fm__wide">{field('name', 'Name', { autoComplete: 'organization', required: true })}</div>
-            {field('phone', 'Phone', { type: 'tel', inputMode: 'tel', autoComplete: 'tel', placeholder: '0712 345 678' })}
-            {field('email', 'Email', { type: 'email', autoComplete: 'email', placeholder: 'office@example.com' })}
-            {field('kraPin', 'KRA PIN', { placeholder: 'P051234567X', autoCapitalize: 'characters', spellCheck: false })}
-            <div className="fld">
-              <label htmlFor="org-kind">Type</label>
-              <input id="org-kind" value={KIND_LABEL[org.kind] ?? org.kind} disabled readOnly />
-              <span className="hint">Set when KodiHub created the organisation.</span>
-            </div>
+        <div className="pf__tabsrow">
+          <div className="pf__tabs" role="tablist" aria-label="Organisation settings sections">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'details'}
+              className="pf__tab"
+              onClick={() => setTab('details')}
+            >
+              Organisation details
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'billing'}
+              className="pf__tab"
+              onClick={() => setTab('billing')}
+            >
+              Billing
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'reminders'}
+              className="pf__tab"
+              onClick={() => setTab('reminders')}
+            >
+              Rent reminders
+            </button>
           </div>
-        </section>
+        </div>
 
-        <section className="fm__section">
-          <h2>Billing</h2>
-          <p>Applies to invoices issued from now on; invoices already issued keep their due date.</p>
-          <div className="fm__grid">
-            <div className="fld-days">
-              {field('invoiceDueDays', 'Invoice due after (days)', { inputMode: 'numeric', autoComplete: 'off', maxLength: 2 })}
-              <span className="hint">0 to 60. 0 means due on the day it is issued.</span>
-            </div>
-          </div>
-        </section>
+        {tab === 'details' ? (
+          <section className="fm__section">
+            <h2>Organisation details</h2>
+            <p>Shown on invoices, receipts and messages to tenants.</p>
 
-        <section className="fm__section">
-          <h2>Rent reminders</h2>
-          <p>An SMS to tenants who owe, before rent is due and when it is overdue. Each message costs an SMS; tenants who asked not to get them are skipped (untick it on their page).</p>
-          <label className="tm__toggle">
-            <input type="checkbox" checked={remindersOn} disabled={!canEdit || save.isPending} onChange={(e) => setRemindersOn(e.target.checked)} />
-            <span>
-              <strong>Send automatic reminders</strong>
-              <span className="ad__muted">{checkedReminders.ok ? describeReminders(checkedReminders.reminders) : 'Fix the days below.'}</span>
-            </span>
-          </label>
-          <div className="fm__grid">
-            <div className="fld-days">
-              {field('daysBefore', 'Days before the due date', { inputMode: 'numeric', autoComplete: 'off', maxLength: 2 })}
-              <span className="hint">0 to 14. 0 means no reminder before the due date.</span>
+            <div className="fm__grid">
+              <div className="fm__wide">{field('name', 'Name', { autoComplete: 'organization', required: true })}</div>
+              {field('phone', 'Phone', { type: 'tel', inputMode: 'tel', autoComplete: 'tel', placeholder: '0712 345 678' })}
+              {field('email', 'Email', { type: 'email', autoComplete: 'email', placeholder: 'office@example.com' })}
+              {field('kraPin', 'KRA PIN', { placeholder: 'P051234567X', autoCapitalize: 'characters', spellCheck: false })}
+              <div className="fld">
+                <label htmlFor="org-kind">Type</label>
+                <input id="org-kind" value={KIND_LABEL[org.kind] ?? org.kind} disabled readOnly />
+                <span className="hint">Set when KodiHub created the organisation.</span>
+              </div>
             </div>
-            <div>
-              {field('overdueDays', 'Days after the due date', { inputMode: 'numeric', autoComplete: 'off', placeholder: '3, 10' })}
-              <span className="hint">Up to five, separated by commas, each 1 to 90. Blank means no overdue reminders.</span>
+          </section>
+        ) : null}
+
+        {tab === 'billing' ? (
+          <section className="fm__section">
+            <h2>Billing</h2>
+            <p>Applies to invoices issued from now on; invoices already issued keep their due date.</p>
+            <div className="fm__grid">
+              <div className="fld-days">
+                {field('invoiceDueDays', 'Invoice due after (days)', { inputMode: 'numeric', autoComplete: 'off', maxLength: 2 })}
+                <span className="hint">0 to 60. 0 means due on the day it is issued.</span>
+              </div>
             </div>
-          </div>
-          <p className="hint">Sent at 9:00, at most one message per tenant a day, adding up everything due or overdue. e.g. “Hi Tom, KES 20,500.00 is due on 5 Nov 2026. Pay to paybill 522522, account T00001.”</p>
-        </section>
+          </section>
+        ) : null}
+
+        {tab === 'reminders' ? (
+          <section className="fm__section">
+            <h2>Rent reminders</h2>
+            <p>An SMS to tenants who owe, before rent is due and when it is overdue. Each message costs an SMS; tenants who asked not to get them are skipped (untick it on their page).</p>
+            <label className="tm__toggle">
+              <input type="checkbox" checked={remindersOn} disabled={!canEdit || save.isPending} onChange={(e) => setRemindersOn(e.target.checked)} />
+              <span>
+                <strong>Send automatic reminders</strong>
+                <span className="ad__muted">{checkedReminders.ok ? describeReminders(checkedReminders.reminders) : 'Fix the days below.'}</span>
+              </span>
+            </label>
+            <div className="fm__grid">
+              <div className="fld-days">
+                {field('daysBefore', 'Days before the due date', { inputMode: 'numeric', autoComplete: 'off', maxLength: 2 })}
+                <span className="hint">0 to 14. 0 means no reminder before the due date.</span>
+              </div>
+              <div>
+                {field('overdueDays', 'Days after the due date', { inputMode: 'numeric', autoComplete: 'off', placeholder: '3, 10' })}
+                <span className="hint">Up to five, separated by commas, each 1 to 90. Blank means no overdue reminders.</span>
+              </div>
+            </div>
+            <p className="hint">Sent at 9:00, at most one message per tenant a day, adding up everything due or overdue. e.g. “Hi Tom, KES 20,500.00 is due on 5 Nov 2026. Pay to paybill 522522, account T00001.”</p>
+          </section>
+        ) : null}
 
         {showServerError ? <p className="ad__error" role="alert">{settingsErrorMessage(save.error)}</p> : null}
 

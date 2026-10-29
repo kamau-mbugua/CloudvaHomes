@@ -49,6 +49,7 @@ export function CreateOrganizationPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState<string | null>(null);
+  const [tab, setTab] = useState<'org' | 'owner'>('org');
 
   const create = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -68,6 +69,8 @@ export function CreateOrganizationPage() {
     onError: (error) => {
       if (error instanceof ApiError && error.status === 422 && Object.keys(error.fieldErrors).length > 0) {
         setErrors(error.fieldErrors);
+        const hasOrgErr = ['name', 'kind', 'phone', 'email', 'kraPin', 'planId', 'onboardedById'].some((k) => k in error.fieldErrors);
+        setTab(hasOrgErr ? 'org' : 'owner');
         return;
       }
       setGeneral(platformErrorMessage(error));
@@ -88,6 +91,8 @@ export function CreateOrganizationPage() {
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
+      const hasOrgErr = ['name', 'kind', 'phone', 'email', 'kraPin', 'planId', 'onboardedById'].some((k) => k in nextErrors);
+      setTab(hasOrgErr ? 'org' : 'owner');
       return;
     }
     setErrors({});
@@ -116,94 +121,134 @@ export function CreateOrganizationPage() {
     <div className="pg pg-narrow">
       <Breadcrumbs trail={[{ label: 'Organisations', to: '/admin/organizations' }, { label: 'New organisation' }]} />
 
-      <form className="fm__section" onSubmit={submit} noValidate>
-        <h2>Organisation details</h2>
-        <p>Create a Landlord or Property Agency account on KodiHub. Its billing reference (e.g. H00001) and built-in roles are set up automatically.</p>
-
-        <div className="fm__grid">
-          <Field id="co-name" label="Organisation name" error={errors.name}>
-            <input id="co-name" value={name} aria-invalid={Boolean(errors.name)} onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Kilimani Heights Ltd" />
-          </Field>
-
-          <Field id="co-kind" label="Account type" error={errors.kind}>
-            <select id="co-kind" value={kind} onChange={(e) => setKind(e.target.value as OrgKind)}>
-              <option value="LANDLORD">Landlord (manages own properties)</option>
-              <option value="AGENCY">Agency (manages properties for landlords)</option>
-            </select>
-          </Field>
-
-          <Field id="co-phone" label="Organisation phone" error={errors.phone} hint="Kenyan number, e.g. 0712345678 or +254712345678.">
-            <input id="co-phone" type="tel" value={phone} aria-invalid={Boolean(errors.phone)} onChange={(e) => setPhone(e.target.value)} />
-          </Field>
-
-          <Field id="co-email" label="Organisation email" error={errors.email}>
-            <input id="co-email" type="email" value={email} aria-invalid={Boolean(errors.email)} onChange={(e) => setEmail(e.target.value)} />
-          </Field>
-
-          <Field id="co-kra" label="KRA PIN" optional error={errors.kraPin} hint="Format: A000000000B">
-            <input id="co-kra" value={kraPin} aria-invalid={Boolean(errors.kraPin)} onChange={(e) => setKraPin(e.target.value)} maxLength={11} />
-          </Field>
-
-          {superAdmin ? (
-            <Field id="co-plan" label="Initial plan" optional error={errors.planId} hint="Leave on default to use KodiHub’s default plan and trial.">
-              <select id="co-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={plans.isPending}>
-                <option value="">Default plan</option>
-                {activePlans.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.trialDays}d trial)</option>
-                ))}
-              </select>
-            </Field>
-          ) : null}
-
-          {superAdmin ? (
-            <Field id="co-sales" label="Salesperson / account owner" optional wide error={errors.onboardedById}
-              hint="Assigns this organisation to a salesperson’s book of business.">
-              <select id="co-sales" value={onboardedById} onChange={(e) => setOnboardedById(e.target.value)} disabled={operators.isPending}>
-                <option value="">Unassigned</option>
-                {allOperators.map((op) => (
-                  <option key={op.id} value={op.id}>
-                    {op.firstName} {op.lastName} ({op.email}) — {(op.role ?? op.platformRole) === 'SALESPERSON' ? 'Salesperson' : 'Superadmin'}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          ) : null}
-        </div>
-
-        <h2 style={{ marginTop: '1.5rem' }}>Primary owner</h2>
-        <p>We will send an invitation link to this person to set their password and sign in as the organisation’s Owner.</p>
-
-        <div className="fm__grid">
-          <Field id="co-ofirst" label="First name" error={errors['owner.firstName']}>
-            <input id="co-ofirst" value={ownerFirstName} aria-invalid={Boolean(errors['owner.firstName'])}
-              onChange={(e) => setOwnerFirstName(e.target.value)} />
-          </Field>
-
-          <Field id="co-olast" label="Last name" error={errors['owner.lastName']}>
-            <input id="co-olast" value={ownerLastName} aria-invalid={Boolean(errors['owner.lastName'])}
-              onChange={(e) => setOwnerLastName(e.target.value)} />
-          </Field>
-
-          <Field id="co-oemail" label="Owner email" error={errors['owner.email']}>
-            <input id="co-oemail" type="email" value={ownerEmail} aria-invalid={Boolean(errors['owner.email'])}
-              onChange={(e) => setOwnerEmail(e.target.value)} />
-          </Field>
-
-          <Field id="co-ophone" label="Owner phone" error={errors['owner.phone']}>
-            <input id="co-ophone" type="tel" value={ownerPhone} aria-invalid={Boolean(errors['owner.phone'])}
-              onChange={(e) => setOwnerPhone(e.target.value)} />
-          </Field>
-        </div>
-
-        {general ? <p className="ad__error" role="alert">{general}</p> : null}
-
-        <div className="pg-actions">
-          <Link className="nx-btn" to="/admin/organizations">Cancel</Link>
-          <button type="submit" className="nx-btn nx-btn--primary" disabled={create.isPending}>
-            {create.isPending ? 'Creating…' : 'Create organisation & invite owner'}
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="New organisation steps">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'org'}
+            className="pf__tab"
+            onClick={() => setTab('org')}
+          >
+            1. Organisation details
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'owner'}
+            className="pf__tab"
+            onClick={() => setTab('owner')}
+          >
+            2. Primary owner
           </button>
         </div>
+      </div>
+
+      <form className="fm__section" onSubmit={submit} noValidate>
+        {tab === 'org' ? (
+          <>
+            <h2>Organisation details</h2>
+            <p>Create a Landlord or Property Agency account on KodiHub. Its billing reference (e.g. H00001) and built-in roles are set up automatically.</p>
+
+            <div className="fm__grid">
+              <Field id="co-name" label="Organisation name" error={errors.name}>
+                <input id="co-name" value={name} aria-invalid={Boolean(errors.name)} onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Kilimani Heights Ltd" />
+              </Field>
+
+              <Field id="co-kind" label="Account type" error={errors.kind}>
+                <select id="co-kind" value={kind} onChange={(e) => setKind(e.target.value as OrgKind)}>
+                  <option value="LANDLORD">Landlord (manages own properties)</option>
+                  <option value="AGENCY">Agency (manages properties for landlords)</option>
+                </select>
+              </Field>
+
+              <Field id="co-phone" label="Organisation phone" error={errors.phone} hint="Kenyan number, e.g. 0712345678 or +254712345678.">
+                <input id="co-phone" type="tel" value={phone} aria-invalid={Boolean(errors.phone)} onChange={(e) => setPhone(e.target.value)} />
+              </Field>
+
+              <Field id="co-email" label="Organisation email" error={errors.email}>
+                <input id="co-email" type="email" value={email} aria-invalid={Boolean(errors.email)} onChange={(e) => setEmail(e.target.value)} />
+              </Field>
+
+              <Field id="co-kra" label="KRA PIN" optional error={errors.kraPin} hint="Format: A000000000B">
+                <input id="co-kra" value={kraPin} aria-invalid={Boolean(errors.kraPin)} onChange={(e) => setKraPin(e.target.value)} maxLength={11} />
+              </Field>
+
+              {superAdmin ? (
+                <Field id="co-plan" label="Initial plan" optional error={errors.planId} hint="Leave on default to use KodiHub’s default plan and trial.">
+                  <select id="co-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={plans.isPending}>
+                    <option value="">Default plan</option>
+                    {activePlans.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.trialDays}d trial)</option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {superAdmin ? (
+                <Field id="co-sales" label="Salesperson / account owner" optional wide error={errors.onboardedById}
+                  hint="Assigns this organisation to a salesperson’s book of business.">
+                  <select id="co-sales" value={onboardedById} onChange={(e) => setOnboardedById(e.target.value)} disabled={operators.isPending}>
+                    <option value="">Unassigned</option>
+                    {allOperators.map((op) => (
+                      <option key={op.id} value={op.id}>
+                        {op.firstName} {op.lastName} ({op.email}) — {(op.role ?? op.platformRole) === 'SALESPERSON' ? 'Salesperson' : 'Superadmin'}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+            </div>
+
+            {general ? <p className="ad__error" role="alert">{general}</p> : null}
+
+            <div className="pg-actions">
+              <Link className="nx-btn" to="/admin/organizations">Cancel</Link>
+              <button type="button" className="nx-btn nx-btn--primary" onClick={() => setTab('owner')}>
+                Next: Primary owner
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2>Primary owner</h2>
+            <p>We will send an invitation link to this person to set their password and sign in as the organisation’s Owner.</p>
+
+            <div className="fm__grid">
+              <Field id="co-ofirst" label="First name" error={errors['owner.firstName']}>
+                <input id="co-ofirst" value={ownerFirstName} aria-invalid={Boolean(errors['owner.firstName'])}
+                  onChange={(e) => setOwnerFirstName(e.target.value)} />
+              </Field>
+
+              <Field id="co-olast" label="Last name" error={errors['owner.lastName']}>
+                <input id="co-olast" value={ownerLastName} aria-invalid={Boolean(errors['owner.lastName'])}
+                  onChange={(e) => setOwnerLastName(e.target.value)} />
+              </Field>
+
+              <Field id="co-oemail" label="Owner email" error={errors['owner.email']}>
+                <input id="co-oemail" type="email" value={ownerEmail} aria-invalid={Boolean(errors['owner.email'])}
+                  onChange={(e) => setOwnerEmail(e.target.value)} />
+              </Field>
+
+              <Field id="co-ophone" label="Owner phone" error={errors['owner.phone']}>
+                <input id="co-ophone" type="tel" value={ownerPhone} aria-invalid={Boolean(errors['owner.phone'])}
+                  onChange={(e) => setOwnerPhone(e.target.value)} />
+              </Field>
+            </div>
+
+            {general ? <p className="ad__error" role="alert">{general}</p> : null}
+
+            <div className="pg-actions">
+              <button type="button" className="nx-btn" onClick={() => setTab('org')}>
+                Back
+              </button>
+              <button type="submit" className="nx-btn nx-btn--primary" disabled={create.isPending}>
+                {create.isPending ? 'Creating…' : 'Create organisation & invite owner'}
+              </button>
+            </div>
+          </>
+        )}
       </form>
     </div>
   );

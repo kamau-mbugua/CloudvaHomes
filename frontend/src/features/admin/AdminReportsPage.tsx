@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import { formatDateTime, todayInNairobi } from '../../lib/dates';
@@ -112,11 +113,26 @@ function downloadCsvFile(filename: string, headers: string[], rows: (string | nu
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+const REPORT_KEYS: AdminReportKey[] = [
+  'collections',
+  'aged-receivables',
+  'invoices',
+  'plans',
+  'price-variance',
+  'reconciliation',
+  'activity',
+  'onboarding',
+  'subscription-changes',
+  'salespeople',
+  'audit',
+];
+
 /**
  * Admin → Reports (`/admin/reports/:report`): all 11 Superadmin platform reports.
  */
 export function AdminReportsPage() {
   const { report: rawKey = 'collections' } = useParams();
+  const navigate = useNavigate();
   const reportKey: AdminReportKey = (rawKey in REPORT_META ? rawKey : 'collections') as AdminReportKey;
   const meta = REPORT_META[reportKey];
   const filters = useListFilters();
@@ -139,6 +155,23 @@ export function AdminReportsPage() {
 
   return (
     <div className="pg">
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Platform reports" style={{ flexWrap: 'wrap' }}>
+          {REPORT_KEYS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={reportKey === key}
+              className="pf__tab"
+              onClick={() => navigate(`/admin/reports/${encodeURIComponent(key)}`)}
+            >
+              {REPORT_META[key].title}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="adm__head">
         <div>
           <h1 className="adm__h1">{meta.title}</h1>
@@ -833,6 +866,7 @@ function PlansReportView({ data }: { data: Record<string, unknown> }) {
 }
 
 function ReconciliationView({ data }: { data: Record<string, unknown> }) {
+  const [subTab, setSubTab] = useState<'unallocated' | 'stk'>('unallocated');
   const totals = (data.totals as {
     unallocatedCount?: number;
     unallocatedAmount?: number;
@@ -885,43 +919,64 @@ function ReconciliationView({ data }: { data: Record<string, unknown> }) {
         </div>
       </div>
 
-      <h2 className="ad__h2">Payments with unallocated credit</h2>
-      {unallocatedRows.length === 0 ? (
-        <div className="ad__tablewrap"><EmptyState title="No unallocated payment credits" /></div>
-      ) : (
-        <div className="ad__tablewrap">
-          <table className="ad__table">
-            <thead>
-              <tr>
-                <th>Received</th>
-                <th>Organisation</th>
-                <th>Reference</th>
-                <th>Method</th>
-                <th className="num">Amount</th>
-                <th className="num">Unallocated credit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {unallocatedRows.map((r) => (
-                <tr key={r.id}>
-                  <td>{formatDayish(r.receivedAt)}</td>
-                  <td>
-                    <strong>{r.organizationName}</strong>
-                    {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
-                  </td>
-                  <td className="num">{r.reference}</td>
-                  <td>{r.method} · {r.source}</td>
-                  <td className="num">{kes(r.amount)}</td>
-                  <td className="num">{kes(r.unallocated)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Reconciliation sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={subTab === 'unallocated'}
+            className="pf__tab"
+            onClick={() => setSubTab('unallocated')}
+          >
+            Unallocated credit ({unallocatedRows.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={subTab === 'stk'}
+            className="pf__tab"
+            onClick={() => setSubTab('stk')}
+          >
+            M-Pesa STK requests ({stkRows.length})
+          </button>
         </div>
-      )}
+      </div>
 
-      <h2 className="ad__h2" style={{ marginTop: '1.5rem' }}>Recent M-Pesa STK payment requests</h2>
-      {stkRows.length === 0 ? (
+      {subTab === 'unallocated' ? (
+        unallocatedRows.length === 0 ? (
+          <div className="ad__tablewrap"><EmptyState title="No unallocated payment credits" /></div>
+        ) : (
+          <div className="ad__tablewrap">
+            <table className="ad__table">
+              <thead>
+                <tr>
+                  <th>Received</th>
+                  <th>Organisation</th>
+                  <th>Reference</th>
+                  <th>Method</th>
+                  <th className="num">Amount</th>
+                  <th className="num">Unallocated credit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unallocatedRows.map((r) => (
+                  <tr key={r.id}>
+                    <td>{formatDayish(r.receivedAt)}</td>
+                    <td>
+                      <strong>{r.organizationName}</strong>
+                      {r.billingRef ? <span className="ad__sub num">{r.billingRef}</span> : null}
+                    </td>
+                    <td className="num">{r.reference}</td>
+                    <td>{r.method} · {r.source}</td>
+                    <td className="num">{kes(r.amount)}</td>
+                    <td className="num">{kes(r.unallocated)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : stkRows.length === 0 ? (
         <div className="ad__tablewrap"><EmptyState title="No M-Pesa STK payment requests yet" /></div>
       ) : (
         <div className="ad__tablewrap">

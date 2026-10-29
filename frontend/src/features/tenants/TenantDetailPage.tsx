@@ -38,7 +38,18 @@ export function TenantDetailPage() {
   const canSeeTenancies = useCan('tenancies:view');
   const canSeePayments = useCan('payments:view');
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') === 'statement' && canSeePayments ? 'statement' : 'overview';
+  const rawTab = params.get('tab');
+  type TenantTab = 'overview' | 'invoices' | 'payments' | 'statement' | 'portal';
+  const tab: TenantTab =
+    rawTab === 'invoices'
+      ? 'invoices'
+      : rawTab === 'payments' && canSeePayments
+        ? 'payments'
+        : rawTab === 'statement' && canSeePayments
+          ? 'statement'
+          : rawTab === 'portal'
+            ? 'portal'
+            : 'overview';
   const [editing, setEditing] = useState(false);
   const [movingIn, setMovingIn] = useState(false);
 
@@ -97,18 +108,49 @@ export function TenantDetailPage() {
         </div>
       </div>
 
-      {canSeePayments ? (
+      <div className="pf__tabsrow">
         <div className="pf__tabs" role="tablist" aria-label="Tenant">
-          {(['overview', 'statement'] as const).map((id) => (
-            <button key={id} type="button" role="tab" aria-selected={tab === id} className="pf__tab"
-              onClick={() => setParams((p) => { const next = new URLSearchParams(p); if (id === 'overview') next.delete('tab'); else next.set('tab', id); return next; }, { replace: true })}>
-              {id === 'overview' ? 'Overview' : 'Statement'}
-            </button>
-          ))}
+          {(
+            [
+              { id: 'overview', label: 'Overview', show: true },
+              { id: 'invoices', label: 'Invoices', show: true },
+              { id: 'payments', label: 'Payments', show: canSeePayments },
+              { id: 'statement', label: 'Statement', show: canSeePayments },
+              { id: 'portal', label: 'Portal & reminders', show: true },
+            ] as const
+          )
+            .filter((item) => item.show)
+            .map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.id}
+                className="pf__tab"
+                onClick={() =>
+                  setParams(
+                    (p) => {
+                      const next = new URLSearchParams(p);
+                      if (item.id === 'overview') next.delete('tab');
+                      else next.set('tab', item.id);
+                      return next;
+                    },
+                    { replace: true },
+                  )
+                }
+              >
+                {item.label}
+              </button>
+            ))}
         </div>
-      ) : null}
+      </div>
 
-      {tab === 'statement' ? <TenantStatement tenant={t} /> : (
+      {tab === 'statement' ? <TenantStatement tenant={t} /> : null}
+      {tab === 'invoices' ? <TenantInvoices tenantId={t.id} currentTenancy={rows.find((r) => r.status === 'ACTIVE' || r.status === 'NOTICE')} /> : null}
+      {tab === 'payments' ? <TenantPayments tenantId={t.id} /> : null}
+      {tab === 'portal' ? <TenantPortalPanel tenant={t} /> : null}
+
+      {tab === 'overview' ? (
         <>
           <TenantMoneyTiles tenant={t} tenancies={canSeeTenancies && tenancies.isSuccess ? rows : undefined} />
 
@@ -153,12 +195,8 @@ export function TenantDetailPage() {
               </div>
             </section>
           ) : null}
-
-          <TenantInvoices tenantId={t.id} currentTenancy={rows.find((r) => r.status === 'ACTIVE' || r.status === 'NOTICE')} />
-          <TenantPayments tenantId={t.id} />
-          <TenantPortalPanel tenant={t} />
         </>
-      )}
+      ) : null}
 
       {editing ? <TenantSheet tenant={t} onClose={() => setEditing(false)} /> : null}
       {movingIn ? <MoveInSheet tenant={t} onClose={() => setMovingIn(false)} /> : null}

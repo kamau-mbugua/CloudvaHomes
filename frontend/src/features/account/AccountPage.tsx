@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
@@ -15,11 +16,48 @@ import { settingsErrorMessage } from '../settings/api';
  * they are shown but changed by an organisation owner (or support), not here.
  */
 export function AccountPage() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'password' ? 'password' : 'profile';
+
+  const setTab = (next: 'profile' | 'password') => {
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'profile') p.delete('tab');
+        else p.set('tab', next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
+
   return (
     <div className="fm fm--single pg-narrow">
       <div className="fm__main">
-        <ProfileSection />
-        <PasswordSection />
+        <div className="pf__tabsrow">
+          <div className="pf__tabs" role="tablist" aria-label="Account sections">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'profile'}
+              className="pf__tab"
+              onClick={() => setTab('profile')}
+            >
+              Your details
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'password'}
+              className="pf__tab"
+              onClick={() => setTab('password')}
+            >
+              Password
+            </button>
+          </div>
+        </div>
+
+        {tab === 'profile' ? <ProfileSection /> : <PasswordSection />}
       </div>
     </div>
   );

@@ -52,6 +52,13 @@ export function PaymentChannelsPage() {
   const rows = [...(channels.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
   const mpesaRows = rows.filter((c) => isMpesaKind(c.kind));
   const bankRows = rows.filter((c) => c.kind === 'BANK_ACCOUNT');
+  const rawTab = filters.get('tab');
+  const tab: 'channels' | 'mpesa' | 'banks' =
+    rawTab === 'mpesa' && mpesaRows.length > 0 && !channels.isError
+      ? 'mpesa'
+      : rawTab === 'banks' && bankRows.length > 0 && !channels.isError
+        ? 'banks'
+        : 'channels';
   const propertyName = (id: string) => properties.data?.data.find((p) => p.id === id)?.name;
   const scope = (c: PaymentChannel) => {
     if (c.propertyIds.length === 0) return 'All properties';
@@ -62,76 +69,116 @@ export function PaymentChannelsPage() {
 
   return (
     <div className="pg">
-      <div className="ad__filters">
-        <select className="ad__select" aria-label="Status" value={status} onChange={(e) => filters.setFilter({ status: e.target.value })}>
-          <option value="">Active and inactive</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
-        </select>
-        {canManage ? (
-          <div className="bl__headbtns pg-push">
-            <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Add channel</button>
-          </div>
-        ) : null}
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Payment channel sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'channels'}
+            className="pf__tab"
+            onClick={() => filters.setFilter({ tab: '' })}
+          >
+            Channels ({rows.length})
+          </button>
+          {mpesaRows.length > 0 && !channels.isError ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'mpesa'}
+              className="pf__tab"
+              onClick={() => filters.setFilter({ tab: 'mpesa' })}
+            >
+              M-Pesa connection ({mpesaRows.length})
+            </button>
+          ) : null}
+          {bankRows.length > 0 && !channels.isError ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'banks'}
+              className="pf__tab"
+              onClick={() => filters.setFilter({ tab: 'banks' })}
+            >
+              Bank accounts ({bankRows.length})
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      {channels.isError ? <p className="ad__error" role="alert">{paymentsErrorMessage(channels.error)}</p>
-        : channels.isPending ? <p className="ad__muted" role="status">Loading…</p>
-          : rows.length === 0 ? (
-            <div className="ad__tablewrap">
-              {status ? (
-                <EmptyState title="No channels match" onClear={() => filters.clear()} />
-              ) : (
-                <EmptyState title="No payment channels yet"
-                  detail="Add each way tenants pay you — an M-Pesa paybill or till, a bank account, cash or cheque. Payments are recorded against a channel."
-                  action={canManage ? <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => setEditing('new')}>Add channel</button> : undefined} />
-              )}
-            </div>
-          ) : (
-            <div className="ad__tablewrap">
-              <table className="ad__table">
-                <thead>
-                  <tr>
-                    <th>Channel</th>
-                    <th>Kind</th>
-                    <th>Details</th>
-                    <th>Properties</th>
-                    <th>Status</th>
-                    {canManage ? <th className="ad__rowactions"><span className="nx-sr">Actions</span></th> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((c) => (
-                    <tr key={c.id}>
-                      <td><strong>{c.name}</strong>{c.accountName && c.kind !== 'CHEQUE' ? <span className="ad__sub">{c.accountName}</span> : null}</td>
-                      <td>
-                        <Badge table={CHANNEL_KIND} value={c.kind} />
-                        {isMpesaKind(c.kind) ? (
-                          <span className="ad__sub">{c.daraja?.configured ? 'Connected to M-Pesa' : 'Entered by hand'}</span>
-                        ) : null}
-                      </td>
-                      <td className="num">{channelDetails(c) || <span className="nx-muted">—</span>}</td>
-                      <td>{scope(c)}</td>
-                      <td><Badge table={RECORD_STATUS} value={c.status} /></td>
-                      {canManage ? (
-                        <td className="ad__rowactions">
-                          <div>
-                            <button type="button" className="nx-btn nx-btn--sm" onClick={() => setEditing(c)}>Edit</button>
-                            <ConfirmDelete what={c.name}
-                              consequence="A channel with payments recorded on it can’t be deleted — mark it inactive instead."
-                              busy={remove.isPending && remove.variables?.id === c.id} onConfirm={() => remove.mutate(c)} />
-                          </div>
-                        </td>
-                      ) : null}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {tab === 'channels' ? (
+        <>
+          <div className="ad__filters">
+            <select className="ad__select" aria-label="Status" value={status} onChange={(e) => filters.setFilter({ status: e.target.value })}>
+              <option value="">Active and inactive</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+            {canManage ? (
+              <div className="bl__headbtns pg-push">
+                <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Add channel</button>
+              </div>
+            ) : null}
+          </div>
 
-      {mpesaRows.length > 0 && !channels.isError ? <DarajaPanel channels={mpesaRows} canManage={canManage} /> : null}
-      {bankRows.length > 0 && !channels.isError ? <BankPanel channels={bankRows} canManage={canManage} /> : null}
+          {channels.isError ? <p className="ad__error" role="alert">{paymentsErrorMessage(channels.error)}</p>
+            : channels.isPending ? <p className="ad__muted" role="status">Loading…</p>
+              : rows.length === 0 ? (
+                <div className="ad__tablewrap">
+                  {status ? (
+                    <EmptyState title="No channels match" onClear={() => filters.clear()} />
+                  ) : (
+                    <EmptyState title="No payment channels yet"
+                      detail="Add each way tenants pay you — an M-Pesa paybill or till, a bank account, cash or cheque. Payments are recorded against a channel."
+                      action={canManage ? <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => setEditing('new')}>Add channel</button> : undefined} />
+                  )}
+                </div>
+              ) : (
+                <div className="ad__tablewrap">
+                  <table className="ad__table">
+                    <thead>
+                      <tr>
+                        <th>Channel</th>
+                        <th>Kind</th>
+                        <th>Details</th>
+                        <th>Properties</th>
+                        <th>Status</th>
+                        {canManage ? <th className="ad__rowactions"><span className="nx-sr">Actions</span></th> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((c) => (
+                        <tr key={c.id}>
+                          <td><strong>{c.name}</strong>{c.accountName && c.kind !== 'CHEQUE' ? <span className="ad__sub">{c.accountName}</span> : null}</td>
+                          <td>
+                            <Badge table={CHANNEL_KIND} value={c.kind} />
+                            {isMpesaKind(c.kind) ? (
+                              <span className="ad__sub">{c.daraja?.configured ? 'Connected to M-Pesa' : 'Entered by hand'}</span>
+                            ) : null}
+                          </td>
+                          <td className="num">{channelDetails(c) || <span className="nx-muted">—</span>}</td>
+                          <td>{scope(c)}</td>
+                          <td><Badge table={RECORD_STATUS} value={c.status} /></td>
+                          {canManage ? (
+                            <td className="ad__rowactions">
+                              <div>
+                                <button type="button" className="nx-btn nx-btn--sm" onClick={() => setEditing(c)}>Edit</button>
+                                <ConfirmDelete what={c.name}
+                                  consequence="A channel with payments recorded on it can’t be deleted — mark it inactive instead."
+                                  busy={remove.isPending && remove.variables?.id === c.id} onConfirm={() => remove.mutate(c)} />
+                              </div>
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+        </>
+      ) : null}
+
+      {tab === 'mpesa' ? <DarajaPanel channels={mpesaRows} canManage={canManage} /> : null}
+      {tab === 'banks' ? <BankPanel channels={bankRows} canManage={canManage} /> : null}
 
       {editing ? <ChannelSheet channel={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /> : null}
     </div>

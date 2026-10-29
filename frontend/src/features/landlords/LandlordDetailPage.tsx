@@ -17,9 +17,11 @@ import { agencyErrorMessage, useLandlordAccount } from '../agency/api';
 import { AgreementNotice, LedgerTab, PayoutCard, PortalCard, StatementTab } from '../agency/LandlordMoney';
 import { BalanceTiles } from '../agency/ui';
 
-type Tab = 'overview' | 'ledger' | 'statement';
+type Tab = 'overview' | 'payout' | 'properties' | 'ledger' | 'statement';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'payout', label: 'Payout & portal' },
+  { id: 'properties', label: 'Properties' },
   { id: 'ledger', label: 'Ledger' },
   { id: 'statement', label: 'Statement' },
 ];
@@ -103,41 +105,32 @@ export function LandlordDetailPage() {
       <BalanceTiles payable={account.data?.balances.payable ?? null} depositHeld={account.data?.balances.depositHeld ?? null} />
       {account.isError ? <p className="ad__error" role="alert">{agencyErrorMessage(account.error)}</p> : null}
 
-      <div className="pf__tabs" role="tablist" aria-label="Landlord">
-        {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="pf__tab"
-            onClick={() => setParams((p) => { const next = new URLSearchParams(p); if (t.id === 'overview') next.delete('tab'); else next.set('tab', t.id); return next; }, { replace: true })}>
-            {t.label}
-          </button>
-        ))}
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Landlord">
+          {TABS.filter((t) => t.id !== 'properties' || canSeeProperties).map((t) => (
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="pf__tab"
+              onClick={() => setParams((p) => { const next = new URLSearchParams(p); if (t.id === 'overview') next.delete('tab'); else next.set('tab', t.id); return next; }, { replace: true })}>
+              {t.id === 'properties' ? `Properties (${rows.length})` : t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'ledger' ? <LedgerTab landlord={l} account={account.data} /> : null}
       {tab === 'statement' ? <StatementTab landlord={l} /> : null}
 
-      {tab === 'overview' ? <>
-      <AgreementNotice landlordId={l.id} hasActiveAgreement={account.data?.hasActiveAgreement} />
-
-      <section className="fm__section">
-        <h2>Details</h2>
-        <dl className="pf__facts">
-          <Fact label="Phone"><span className="num">{l.phone}</span></Fact>
-          <Fact label="Email">{l.email}</Fact>
-          <Fact label={l.kind === 'COMPANY' ? 'Registration number' : 'ID number'}>
-            <RevealId masked={l.idNumberMasked} load={() => fetchIdNumber('landlords', l.id)} />
-          </Fact>
-          <Fact label="KRA PIN">{l.kraPin}</Fact>
-        </dl>
-      </section>
-
-      {account.data ? (
-        <div className="ag__cards">
-          <PayoutCard landlord={l} account={account.data} />
-          <PortalCard landlord={l} account={account.data} />
-        </div>
+      {tab === 'payout' ? (
+        account.data ? (
+          <div className="ag__cards">
+            <PayoutCard landlord={l} account={account.data} />
+            <PortalCard landlord={l} account={account.data} />
+          </div>
+        ) : (
+          <p className="ad__muted" role="status">Loading payout and portal settings…</p>
+        )
       ) : null}
 
-      {canSeeProperties ? (
+      {tab === 'properties' && canSeeProperties ? (
         <section className="fm__section">
           <div className="pf__sectionhead"><h2>Properties</h2></div>
           {properties.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(properties.error)}</p>
@@ -176,7 +169,24 @@ export function LandlordDetailPage() {
                 )}
         </section>
       ) : null}
-      </> : null}
+
+      {tab === 'overview' ? (
+        <>
+          <AgreementNotice landlordId={l.id} hasActiveAgreement={account.data?.hasActiveAgreement} />
+
+          <section className="fm__section">
+            <h2>Details</h2>
+            <dl className="pf__facts">
+              <Fact label="Phone"><span className="num">{l.phone}</span></Fact>
+              <Fact label="Email">{l.email}</Fact>
+              <Fact label={l.kind === 'COMPANY' ? 'Registration number' : 'ID number'}>
+                <RevealId masked={l.idNumberMasked} load={() => fetchIdNumber('landlords', l.id)} />
+              </Fact>
+              <Fact label="KRA PIN">{l.kraPin}</Fact>
+            </dl>
+          </section>
+        </>
+      ) : null}
 
       {editing ? <LandlordSheet landlord={l} onClose={() => setEditing(false)} /> : null}
       {addingProperty ? <PropertySheet landlordId={l.id} onClose={() => setAddingProperty(false)} /> : null}

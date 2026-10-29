@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { DataEnvelope, PageEnvelope } from '../../lib/api/types';
@@ -36,6 +36,7 @@ export function UnitDetailPage() {
   const canSeeTenants = useCan('tenants:view');
   const [editing, setEditing] = useState(false);
   const [movingIn, setMovingIn] = useState(false);
+  const [params, setParams] = useSearchParams();
 
   const unit = useQuery({
     queryKey: [...keys.units, unitId],
@@ -73,6 +74,21 @@ export function UnitDetailPage() {
   // The full current tenancy (with rent and deposit) comes from the history list.
   const currentFull = current ? history.data?.data.find((t) => t.id === current.id) : undefined;
   const rows = history.data?.data ?? [];
+  const rawTab = params.get('tab');
+  const tab: 'overview' | 'invoices' | 'history' =
+    rawTab === 'invoices' ? 'invoices' : rawTab === 'history' && canSeeTenancies ? 'history' : 'overview';
+
+  const setTab = (next: 'overview' | 'invoices' | 'history') => {
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'overview') p.delete('tab');
+        else p.set('tab', next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
 
   return (
     <div className="pg pf__page">
@@ -104,58 +120,98 @@ export function UnitDetailPage() {
         </div>
       </div>
 
-      <section className="fm__section">
-        <h2>Details</h2>
-        <dl className="pf__facts">
-          <Fact label="Type">{u.unitType?.name}</Fact>
-          <Fact label="Category">{u.category?.name}</Fact>
-          <Fact label="Floor">{u.floor != null ? String(u.floor) : null}</Fact>
-          <Fact label="Size">{u.sizeSqft != null ? `${u.sizeSqft} sq ft` : null}</Fact>
-          <Fact label="Rent"><span className="num">{formatKES(u.rentAmount)}</span></Fact>
-          <Fact label="Features">{u.features.map((f) => f.name).join(', ')}</Fact>
-          {u.description ? <Fact label="Description" wide>{u.description}</Fact> : null}
-        </dl>
-      </section>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Unit sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'overview'}
+            className="pf__tab"
+            onClick={() => setTab('overview')}
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'invoices'}
+            className="pf__tab"
+            onClick={() => setTab('invoices')}
+          >
+            Invoices
+          </button>
+          {canSeeTenancies ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'history'}
+              className="pf__tab"
+              onClick={() => setTab('history')}
+            >
+              Tenancy history ({rows.length})
+            </button>
+          ) : null}
+        </div>
+      </div>
 
-      <section className="fm__section">
-        <div className="pf__sectionhead"><h2>Current tenancy</h2></div>
-        {current ? (
-          <div className="pf__current">
-            <div>
-              <strong>
-                {canSeeTenants
-                  ? <Link className="ad__link" to={`/app/tenants/${current.tenant.id}`}>{personName(current.tenant)}</Link>
-                  : personName(current.tenant)}
-              </strong>{' '}
-              <Badge table={TENANCY_STATUS} value={current.status} />
-              <span className="ad__sub num">{current.tenant.code} · {current.tenant.phone}</span>
-              <span className="ad__sub">
-                Since {formatDay(current.startDate)}
-                {current.status === 'NOTICE' && current.endDate ? ` · leaving ${formatDay(current.endDate)}` : ''}
-                {currentFull ? ` · ${formatKES(currentFull.rentAmount)} due on day ${currentFull.billingDay}` : ''}
-              </span>
-            </div>
-            <div className="ad__rowactions">
-              <div>
-                <TenancyActions
-                  tenancy={{ ...current, unit: { number: u.number }, propertyId: u.property.id, rentAmount: currentFull?.rentAmount }}
-                  size="md"
-                />
+      {tab === 'overview' ? (
+        <>
+          <section className="fm__section">
+            <h2>Details</h2>
+            <dl className="pf__facts">
+              <Fact label="Type">{u.unitType?.name}</Fact>
+              <Fact label="Category">{u.category?.name}</Fact>
+              <Fact label="Floor">{u.floor != null ? String(u.floor) : null}</Fact>
+              <Fact label="Size">{u.sizeSqft != null ? `${u.sizeSqft} sq ft` : null}</Fact>
+              <Fact label="Rent"><span className="num">{formatKES(u.rentAmount)}</span></Fact>
+              <Fact label="Features">{u.features.map((f) => f.name).join(', ')}</Fact>
+              {u.description ? <Fact label="Description" wide>{u.description}</Fact> : null}
+            </dl>
+          </section>
+
+          <section className="fm__section">
+            <div className="pf__sectionhead"><h2>Current tenancy</h2></div>
+            {current ? (
+              <div className="pf__current">
+                <div>
+                  <strong>
+                    {canSeeTenants
+                      ? <Link className="ad__link" to={`/app/tenants/${current.tenant.id}`}>{personName(current.tenant)}</Link>
+                      : personName(current.tenant)}
+                  </strong>{' '}
+                  <Badge table={TENANCY_STATUS} value={current.status} />
+                  <span className="ad__sub num">{current.tenant.code} · {current.tenant.phone}</span>
+                  <span className="ad__sub">
+                    Since {formatDay(current.startDate)}
+                    {current.status === 'NOTICE' && current.endDate ? ` · leaving ${formatDay(current.endDate)}` : ''}
+                    {currentFull ? ` · ${formatKES(currentFull.rentAmount)} due on day ${currentFull.billingDay}` : ''}
+                  </span>
+                </div>
+                <div className="ad__rowactions">
+                  <div>
+                    <TenancyActions
+                      tenancy={{ ...current, unit: { number: u.number }, propertyId: u.property.id, rentAmount: currentFull?.rentAmount }}
+                      size="md"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        ) : (
-          <p className="ad__muted">
-            {u.status === 'INACTIVE' ? 'Vacant. The unit is inactive, so no one can move in until it is made active.' : 'Vacant.'}
-          </p>
-        )}
-      </section>
+            ) : (
+              <p className="ad__muted">
+                {u.status === 'INACTIVE' ? 'Vacant. The unit is inactive, so no one can move in until it is made active.' : 'Vacant.'}
+              </p>
+            )}
+          </section>
 
-      {current ? (
-        <DepositSection tenancyId={current.id} status={current.status} who={personName(current.tenant)} />
+          {current ? (
+            <DepositSection tenancyId={current.id} status={current.status} who={personName(current.tenant)} />
+          ) : null}
+        </>
       ) : null}
 
-      {canSeeTenancies ? (
+      {tab === 'invoices' ? <UnitInvoices unitId={u.id} /> : null}
+
+      {canSeeTenancies && tab === 'history' ? (
         <section className="fm__section">
           <div className="pf__sectionhead"><h2>History</h2></div>
           {history.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(history.error)}</p>
@@ -164,8 +220,6 @@ export function UnitDetailPage() {
                 : <TenancyTable rows={rows} showUnit={false} />}
         </section>
       ) : null}
-
-      <UnitInvoices unitId={u.id} />
 
       {editing ? <UnitSheet unit={u} onClose={() => setEditing(false)} /> : null}
       {movingIn ? <MoveInSheet unit={u} onClose={() => setMovingIn(false)} /> : null}

@@ -17,19 +17,24 @@ import { checkSettings, darajaSettingsBody, settingsDraft } from '../platform/ru
 import type { SettingsBody, SettingsDraft } from '../platform/rules';
 import type { PlatformSettings } from '../platform/types';
 
-type SettingsTab = 'billing' | 'security' | 'sms' | 'app';
+type SettingsTab = 'billing' | 'mpesa' | 'security' | 'locks' | 'sms' | 'app';
 
 /**
  * Admin → Settings (`/admin/settings`):
- * - Billing & M-Pesa: due days, grace days, default plan, Hodi's paybill & Daraja keys.
- * - Security & 2FA: require 2FA for platform operators, channel (Email/SMS), and rate-limit lockouts.
+ * - Billing rules: due days, grace days, default plan, KodiHub's paybill.
+ * - M-Pesa (Daraja): KodiHub's Daraja keys & callback URLs.
+ * - Admin 2FA: require 2FA for platform operators & channel (Email/SMS).
+ * - Rate-limit locks: active OTP & login rate-limit lockouts.
  * - SMS (Africa's Talking): username, sender ID, API key (write-only).
  * - App & Maintenance: public signup toggle, mobile app minimum version floor, maintenance mode.
  */
 export function AdminSettingsPage() {
   const filters = useListFilters();
   const rawTab = filters.get('tab');
-  const tab: SettingsTab = rawTab === 'security' || rawTab === 'sms' || rawTab === 'app' ? rawTab : 'billing';
+  const tab: SettingsTab =
+    rawTab === 'mpesa' || rawTab === 'security' || rawTab === 'locks' || rawTab === 'sms' || rawTab === 'app'
+      ? rawTab
+      : 'billing';
   const settings = usePlatformSettings();
 
   if (settings.isPending) return <p className="ad__muted" role="status">Loading…</p>;
@@ -42,10 +47,16 @@ export function AdminSettingsPage() {
       <div className="pf__tabsrow">
         <div className="pf__tabs" role="tablist" aria-label="Platform settings">
           <button type="button" role="tab" aria-selected={tab === 'billing'} className="pf__tab" onClick={() => filters.setFilter({ tab: '' })}>
-            Billing & M-Pesa
+            Billing rules
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'mpesa'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'mpesa' })}>
+            M-Pesa (Daraja)
           </button>
           <button type="button" role="tab" aria-selected={tab === 'security'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'security' })}>
-            Security & 2FA
+            Admin 2FA
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'locks'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'locks' })}>
+            Rate-limit locks
           </button>
           <button type="button" role="tab" aria-selected={tab === 'sms'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'sms' })}>
             SMS (Africa’s Talking)
@@ -58,15 +69,13 @@ export function AdminSettingsPage() {
 
       <div className="pg-narrow">
         {tab === 'billing' ? (
-          <>
-            <SettingsForm key={s.updatedAt ?? JSON.stringify(settingsDraft(s))} settings={s} />
-            <DarajaSection settings={s} />
-          </>
+          <SettingsForm key={s.updatedAt ?? JSON.stringify(settingsDraft(s))} settings={s} />
+        ) : tab === 'mpesa' ? (
+          <DarajaSection settings={s} />
         ) : tab === 'security' ? (
-          <>
-            <SecurityTwoFactorForm key={`${s.requireAdminTwoFactor}-${s.adminTwoFactorChannel}`} settings={s} />
-            <SecurityLocksSection />
-          </>
+          <SecurityTwoFactorForm key={`${s.requireAdminTwoFactor}-${s.adminTwoFactorChannel}`} settings={s} />
+        ) : tab === 'locks' ? (
+          <SecurityLocksSection />
         ) : tab === 'sms' ? (
           <SmsSettingsForm key={`${s.sms?.username ?? ''}-${s.sms?.senderId ?? ''}-${s.sms?.apiKey}`} settings={s} />
         ) : (

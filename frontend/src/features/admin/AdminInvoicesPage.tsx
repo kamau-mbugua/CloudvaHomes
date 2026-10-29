@@ -48,12 +48,45 @@ export function AdminInvoicesPage() {
 
   return (
     <div className="pg">
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Invoice status">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!status}
+            className="pf__tab"
+            onClick={() => filters.setFilter({ status: '' })}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={status === 'OVERDUE'}
+            className="pf__tab"
+            onClick={() => filters.setFilter({ status: 'OVERDUE' })}
+          >
+            Overdue
+          </button>
+          {optionsOf(INVOICE_STATUS).map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="tab"
+              aria-selected={status === o.value}
+              className="pf__tab"
+              onClick={() => filters.setFilter({ status: o.value })}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        {superAdmin ? (
+          <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setRunning(true)}>Run a month</button>
+        ) : null}
+      </div>
+
       <div className="ad__filters">
-        <select className="ad__select" aria-label="Status" value={status} onChange={(e) => filters.setFilter({ status: e.target.value })}>
-          <option value="">All statuses</option>
-          <option value="OVERDUE">Overdue</option>
-          {optionsOf(INVOICE_STATUS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
         <select className="ad__select" aria-label="Month" value={period} onChange={(e) => filters.setFilter({ period: e.target.value })}>
           <option value="">Any month</option>
           {period && !months.includes(period) ? <option value={period}>{formatPeriod(period)}</option> : null}
@@ -61,9 +94,6 @@ export function AdminInvoicesPage() {
         </select>
         {orgId ? (
           <button type="button" className="nx-btn nx-btn--sm" onClick={() => filters.setFilter({ orgId: '' })}>One organisation · show all</button>
-        ) : null}
-        {superAdmin ? (
-          <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setRunning(true)}>Run a month</button>
         ) : null}
       </div>
 

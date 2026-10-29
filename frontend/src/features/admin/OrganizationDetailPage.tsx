@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
@@ -44,12 +44,35 @@ export function OrganizationDetailPage() {
   return <OrganizationDetail org={org.data} />;
 }
 
+type OrgDetailTab = 'terms' | 'invoices' | 'payments';
+
 function OrganizationDetail({ org }: { org: PlatformOrganization }) {
   const { user } = useSession();
   const superAdmin = isSuperAdmin(user);
   const queryClient = useQueryClient();
   const toast = useToast();
   const [recording, setRecording] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const rawTab = params.get('tab');
+  const defaultTab: OrgDetailTab = superAdmin ? 'terms' : 'invoices';
+  const tab: OrgDetailTab =
+    rawTab === 'invoices' || rawTab === 'payments'
+      ? rawTab
+      : rawTab === 'terms' && superAdmin
+        ? 'terms'
+        : defaultTab;
+
+  const selectTab = (nextTab: OrgDetailTab) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextTab === defaultTab) next.delete('tab');
+        else next.set('tab', nextTab);
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const setStatus = useMutation({
     mutationFn: (status: 'ACTIVE' | 'CLOSED') => api.patch<unknown>(`/platform/organizations/${encodeURIComponent(org.id)}`, { status }),
@@ -108,11 +131,47 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
         <Fact label="No suspension until">{org.noSuspendUntil ? formatDayish(org.noSuspendUntil) : null}</Fact>
       </dl>
 
-      {superAdmin ? (
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Organisation sections">
+          {superAdmin ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'terms'}
+              className="pf__tab"
+              onClick={() => selectTab('terms')}
+            >
+              Billing terms
+            </button>
+          ) : null}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'invoices'}
+            className="pf__tab"
+            onClick={() => selectTab('invoices')}
+          >
+            KodiHub invoices
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'payments'}
+            className="pf__tab"
+            onClick={() => selectTab('payments')}
+          >
+            Payments
+          </button>
+        </div>
+      </div>
+
+      {tab === 'terms' && superAdmin ? (
         <TermsForm key={`${org.id}-${org.plan?.id ?? ''}-${org.priceOverride ?? ''}-${org.minimumOverride ?? ''}-${org.trialEndsAt ?? ''}-${org.noSuspendUntil ?? ''}-${org.price?.pricePerUnit}-${org.price?.minimumMonthly}-${org.onboardedById ?? ''}`} org={org} />
-      ) : null}
-      <OrgInvoices orgId={org.id} superAdmin={superAdmin} />
-      <OrgPayments orgId={org.id} />
+      ) : tab === 'invoices' ? (
+        <OrgInvoices orgId={org.id} superAdmin={superAdmin} />
+      ) : (
+        <OrgPayments orgId={org.id} />
+      )}
 
       {recording ? <RecordHodiPaymentSheet org={org} onClose={() => setRecording(false)} /> : null}
     </div>

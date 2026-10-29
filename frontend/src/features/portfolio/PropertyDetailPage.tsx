@@ -78,6 +78,8 @@ export function PropertyDetailPage() {
   const p = property.data;
   const rows = units.data?.data ?? [];
   const where = [p.location, p.county].filter(Boolean).join(', ');
+  const rawTab = filters.get('tab');
+  const tab: 'units' | 'details' = !canSeeUnits || rawTab === 'details' ? 'details' : 'units';
 
   return (
     <div className="pg pf__page">
@@ -117,17 +119,44 @@ export function PropertyDetailPage() {
         <div className="ad__stat"><span className="ad__stat__label">Vacant</span><span className="ad__stat__value num">{p.vacantCount}</span></div>
       </div>
 
-      <section className="fm__section">
-        <h2>Details</h2>
-        <dl className="pf__facts">
-          <Fact label="Code"><span className="num">{p.code}</span></Fact>
-          <Fact label="Floors">{p.floors != null ? String(p.floors) : null}</Fact>
-          <Fact label="Location">{p.location}</Fact>
-          <Fact label="County">{p.county}</Fact>
-        </dl>
-      </section>
-
       {canSeeUnits ? (
+        <div className="pf__tabsrow">
+          <div className="pf__tabs" role="tablist" aria-label="Property sections">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'units'}
+              className="pf__tab"
+              onClick={() => filters.setFilter({ tab: '' })}
+            >
+              Units ({p.unitCount})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'details'}
+              className="pf__tab"
+              onClick={() => filters.setFilter({ tab: 'details' })}
+            >
+              Property details
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {tab === 'details' ? (
+        <section className="fm__section">
+          <h2>Details</h2>
+          <dl className="pf__facts">
+            <Fact label="Code"><span className="num">{p.code}</span></Fact>
+            <Fact label="Floors">{p.floors != null ? String(p.floors) : null}</Fact>
+            <Fact label="Location">{p.location}</Fact>
+            <Fact label="County">{p.county}</Fact>
+          </dl>
+        </section>
+      ) : null}
+
+      {canSeeUnits && tab === 'units' ? (
         <section className="fm__section">
           <div className="pf__sectionhead">
             <h2>Units</h2>

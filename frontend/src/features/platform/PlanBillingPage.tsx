@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
@@ -35,86 +36,137 @@ export function PlanBillingPage() {
   return <PlanBilling summary={summary.data} />;
 }
 
+type PlanBillingTab = 'overview' | 'invoices' | 'payments';
+
 function PlanBilling({ summary }: { summary: BillingSummary }) {
   const session = useSession();
   const canPay = useCan('settings:update');
   const [paying, setPaying] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const rawTab = params.get('tab');
+  const tab: PlanBillingTab = rawTab === 'invoices' || rawTab === 'payments' ? rawTab : 'overview';
   const owed = suggestedPayment(summary);
   const inTrial = summary.status === 'TRIAL' || (dayOf(summary.trialEndsAt) ?? '') >= todayInNairobi();
 
+  const setTab = (next: PlanBillingTab) => {
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'overview') p.delete('tab');
+        else p.set('tab', next);
+        return p;
+      },
+      { replace: true },
+    );
+  };
+
   return (
     <div className="pg hb">
-      <div className="hb__top">
-        <section className={`ag__card hb__owed ${summary.status === 'SUSPENDED' ? 'hb__owed--alert' : summary.status === 'GRACE' ? 'hb__owed--warn' : ''}`}
-          aria-labelledby="hb-owed">
-          <div className="hb__cardhead">
-            <h3 id="hb-owed">Owed to KodiHub</h3>
-            <OrgStatusBadge status={summary.status} />
-          </div>
-          <p className="hb__amount num">{formatKES(Math.max(0, summary.balance))}</p>
-          {summary.overdue ? (
-            <p className="hb__overdue">{formatKES(summary.overdue.amount)} overdue since {formatDayish(summary.overdue.since)}.</p>
-          ) : null}
-          {summary.credit > 0 ? <p className="ad__muted">{formatKES(summary.credit)} credit, used by the next invoice.</p> : null}
-          <p className="ad__muted">{ORG_STATUS_MEANING[summary.status]}</p>
-          {summary.noSuspendUntil ? (
-            <p className="ad__muted">KodiHub won’t suspend this account before {formatDayish(summary.noSuspendUntil)}.</p>
-          ) : null}
-          {summary.status !== 'CLOSED' ? (
-            canPay && summary.canPayInApp ? (
-              <button type="button" className="nx-btn nx-btn--primary hb__paybtn" onClick={() => setPaying(true)}>
-                {owed > 0 ? `Pay ${formatKES(Math.ceil(owed / 100) * 100)} now` : 'Pay now'}
-              </button>
-            ) : !canPay ? (
-              <p className="hint">Your role can see the bill but not pay it. Ask your organisation’s owner.</p>
-            ) : null
-          ) : null}
-        </section>
-
-        <section className="ag__card" aria-labelledby="hb-plan">
-          <h3 id="hb-plan">Your plan</h3>
-          <dl className="pf__facts hb__facts">
-            <Fact label="Plan">{summary.plan?.name ?? 'No plan yet'}</Fact>
-            <Fact label="Price">
-              <span className="hb__price">
-                {priceText(summary.price)}
-                {summary.price.custom ? <CustomBadge title="A price agreed for your organisation, not the plan’s" /> : null}
-              </span>
-            </Fact>
-            {summary.price.custom && summary.plan ? <Fact label="Plan’s own price">{priceText(summary.plan)}</Fact> : null}
-            {summary.trialEndsAt ? (
-              <Fact label={inTrial ? 'Free trial ends' : 'Free trial ended'}>{formatDayish(summary.trialEndsAt)}</Fact>
-            ) : null}
-            <Fact label="Billing account number"><span className="num">{summary.billingRef}</span></Fact>
-          </dl>
-          <p className="hint">
-            Billed on the 1st for the month before: the units let on its last day × the price, never less than the monthly minimum.
-          </p>
-        </section>
-
-        <section className="ag__card" aria-labelledby="hb-how">
-          <h3 id="hb-how">How to pay</h3>
-          {summary.payTo ? (
-            <>
-              <CopyRow label="Paybill (business number)" value={summary.payTo.paybill} />
-              <CopyRow label="Account number" value={summary.payTo.accountRef} />
-              <ol className="tp__steps">
-                <li>On M-Pesa choose Lipa na M-Pesa, then Pay Bill.</li>
-                <li>Business number {summary.payTo.paybill}, account number {summary.payTo.accountRef}.</li>
-                <li>Enter the amount and your PIN. It shows here once KodiHub receives it.</li>
-              </ol>
-            </>
-          ) : (
-            <p className="ad__muted">Contact KodiHub for bank details. Quote your billing account number, <span className="num">{summary.billingRef}</span>.</p>
-          )}
-          {!summary.canPayInApp && summary.status !== 'CLOSED' ? (
-            <p className="hint">Paying from this page isn’t available right now; use the paybill.</p>
-          ) : null}
-        </section>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Plan & billing sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'overview'}
+            className="pf__tab"
+            onClick={() => setTab('overview')}
+          >
+            Overview &amp; how to pay
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'invoices'}
+            className="pf__tab"
+            onClick={() => setTab('invoices')}
+          >
+            KodiHub invoices
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'payments'}
+            className="pf__tab"
+            onClick={() => setTab('payments')}
+          >
+            Payments to KodiHub
+          </button>
+        </div>
       </div>
 
-      <InvoicesSection />
-      <PaymentsSection />
+      {tab === 'overview' ? (
+        <div className="hb__top">
+          <section className={`ag__card hb__owed ${summary.status === 'SUSPENDED' ? 'hb__owed--alert' : summary.status === 'GRACE' ? 'hb__owed--warn' : ''}`}
+            aria-labelledby="hb-owed">
+            <div className="hb__cardhead">
+              <h3 id="hb-owed">Owed to KodiHub</h3>
+              <OrgStatusBadge status={summary.status} />
+            </div>
+            <p className="hb__amount num">{formatKES(Math.max(0, summary.balance))}</p>
+            {summary.overdue ? (
+              <p className="hb__overdue">{formatKES(summary.overdue.amount)} overdue since {formatDayish(summary.overdue.since)}.</p>
+            ) : null}
+            {summary.credit > 0 ? <p className="ad__muted">{formatKES(summary.credit)} credit, used by the next invoice.</p> : null}
+            <p className="ad__muted">{ORG_STATUS_MEANING[summary.status]}</p>
+            {summary.noSuspendUntil ? (
+              <p className="ad__muted">KodiHub won’t suspend this account before {formatDayish(summary.noSuspendUntil)}.</p>
+            ) : null}
+            {summary.status !== 'CLOSED' ? (
+              canPay && summary.canPayInApp ? (
+                <button type="button" className="nx-btn nx-btn--primary hb__paybtn" onClick={() => setPaying(true)}>
+                  {owed > 0 ? `Pay ${formatKES(Math.ceil(owed / 100) * 100)} now` : 'Pay now'}
+                </button>
+              ) : !canPay ? (
+                <p className="hint">Your role can see the bill but not pay it. Ask your organisation’s owner.</p>
+              ) : null
+            ) : null}
+          </section>
+
+          <section className="ag__card" aria-labelledby="hb-plan">
+            <h3 id="hb-plan">Your plan</h3>
+            <dl className="pf__facts hb__facts">
+              <Fact label="Plan">{summary.plan?.name ?? 'No plan yet'}</Fact>
+              <Fact label="Price">
+                <span className="hb__price">
+                  {priceText(summary.price)}
+                  {summary.price.custom ? <CustomBadge title="A price agreed for your organisation, not the plan’s" /> : null}
+                </span>
+              </Fact>
+              {summary.price.custom && summary.plan ? <Fact label="Plan’s own price">{priceText(summary.plan)}</Fact> : null}
+              {summary.trialEndsAt ? (
+                <Fact label={inTrial ? 'Free trial ends' : 'Free trial ended'}>{formatDayish(summary.trialEndsAt)}</Fact>
+              ) : null}
+              <Fact label="Billing account number"><span className="num">{summary.billingRef}</span></Fact>
+            </dl>
+            <p className="hint">
+              Billed on the 1st for the month before: the units let on its last day × the price, never less than the monthly minimum.
+            </p>
+          </section>
+
+          <section className="ag__card" aria-labelledby="hb-how">
+            <h3 id="hb-how">How to pay</h3>
+            {summary.payTo ? (
+              <>
+                <CopyRow label="Paybill (business number)" value={summary.payTo.paybill} />
+                <CopyRow label="Account number" value={summary.payTo.accountRef} />
+                <ol className="tp__steps">
+                  <li>On M-Pesa choose Lipa na M-Pesa, then Pay Bill.</li>
+                  <li>Business number {summary.payTo.paybill}, account number {summary.payTo.accountRef}.</li>
+                  <li>Enter the amount and your PIN. It shows here once KodiHub receives it.</li>
+                </ol>
+              </>
+            ) : (
+              <p className="ad__muted">Contact KodiHub for bank details. Quote your billing account number, <span className="num">{summary.billingRef}</span>.</p>
+            )}
+            {!summary.canPayInApp && summary.status !== 'CLOSED' ? (
+              <p className="hint">Paying from this page isn’t available right now; use the paybill.</p>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
+
+      {tab === 'invoices' ? <InvoicesSection /> : null}
+      {tab === 'payments' ? <PaymentsSection /> : null}
 
       {paying ? <PayHodiSheet owed={owed} ownPhone={session.user.phone} onClose={() => setPaying(false)} /> : null}
     </div>

@@ -33,14 +33,36 @@ export function OrganizationsPage() {
 
   return (
     <div className="pg">
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Organisation status">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!status}
+            className="pf__tab"
+            onClick={() => filters.setFilter({ status: '' })}
+          >
+            All
+          </button>
+          {optionsOf(ORG_STATUS).map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="tab"
+              aria-selected={status === o.value}
+              className="pf__tab"
+              onClick={() => filters.setFilter({ status: o.value })}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <Link className="nx-btn nx-btn--primary pg-push" to="/admin/organizations/new">+ New organisation</Link>
+      </div>
+
       <div className="ad__filters">
         <input className="ad__search" type="search" placeholder="Search by name or billing account (H00001)" aria-label="Search organisations"
           value={filters.search} onChange={(e) => filters.setSearch(e.target.value)} />
-        <select className="ad__select" aria-label="Status" value={status} onChange={(e) => filters.setFilter({ status: e.target.value })}>
-          <option value="">All statuses</option>
-          {optionsOf(ORG_STATUS).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <Link className="nx-btn nx-btn--primary pg-push" to="/admin/organizations/new">+ New organisation</Link>
       </div>
 
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
