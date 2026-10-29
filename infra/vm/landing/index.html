@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hodi — rent, made simple</title>
+<meta name="description" content="Hodi helps Kenyan landlords and letting agents bill tenants, collect rent by M-Pesa and bank, and see every shilling.">
+<style>
+  :root { color-scheme: light dark; --bg:#fafaf7; --fg:#0a2540; --muted:#52647e; --accent:#4d6b10; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#06121f; --fg:#f2f5f9; --muted:#9eaec4; --accent:#9dd000; } }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--fg);
+    font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding:0 16px; }
+  main { max-width:560px; }
+  h1 { font-size:2.4rem; margin:0 0 .5rem; letter-spacing:-.02em; }
+  h1 span { color:var(--accent); }
+  p { color:var(--muted); margin:.5rem 0 1.5rem; }
+  a { display:inline-block; background:var(--accent); color:var(--bg); padding:.7rem 1.2rem; border-radius:10px;
+    text-decoration:none; font-weight:600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>hodi<span>.</span></h1>
+  <p>Rent, invoices and payments for Kenyan landlords and letting agents. The full site is coming soon.</p>
+  <a id="signin" href="/">Sign in</a>
+</main>
+<script>
+  // Sign-in goes to the production app on the same domain family.
+  document.getElementById('signin').href = 'https://app.' + location.hostname.replace(/^www\./, '') + '/login';
+</script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+name: Deploy
+
+# One workflow for both servers, chosen by the branch that was pushed (same design as
+# UltimatePOS):
+#
+#   main        -> production   (hodi-server)
+#   dev         -> development  (hodi-dev-server)
+#
+# Deliberately ONE file rather than two near-identical ones: two pipelines drift, and the
+# drift only shows the day a fix reached one server and not the other.
+#
+# The two targets use DIFFERENT secret names, which is load-bearing:
+#
+#   production  : GCP_VM_HOST / GCP_VM_USER / GCP_SSH_PRIVATE_KEY / GCP_VM_KNOWN_HOSTS
+#   dev         : DEV_VM_HOST / DEV_VM_USER / DEV_SSH_PRIVATE_KEY / DEV_VM_KNOWN_HOSTS
+#
+# An environment secret falls back to the repository secret of the same name when it isn't
+# defined, so one name per target could quietly deploy test code to the live server.
+# Distinct names remove that path: an unset DEV_VM_HOST is empty and the guard stops the run.
+# Unlike UltimatePOS, each server has its OWN key, and the host keys are pinned (no
+# ssh-keyscan trust-on-first-use).
+#
+# Third-party actions are pinned to full commit SHAs (version in the comment); bump them
+# deliberately (Dependabot can).
+#
+# Images are built here, never on the servers: a broken build fails before anything on a
+# server changes, and the VMs keep their memory for the app.
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+# Per BRANCH, not one global lock: a development deploy must never hold a production hotfix.
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write # push images to ghcr.io; the server pulls them with this run's token
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Named so protection rules apply: add a required reviewer on `production` in the repo
+    # settings without touching this file.
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+
+    # Resolved once, so no step can read the wrong target's values. Passed through `env`
+    # rather than interpolated into `run:`, the safe pattern for any context value.
+    env:
+      DEPLOY_ENV: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+      VM_HOST: ${{ github.ref_name == 'main' && secrets.GCP_VM_HOST || secrets.DEV_VM_HOST }}
+      VM_USER: ${{ github.ref_name == 'main' && secrets.GCP_VM_USER || secrets.DEV_VM_USER }}
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Fails loudly on an unconfigured target, before anything is built or sent.
+      - name: Check the target is configured
+        env:
+          HAS_KEY: ${{ (github.ref_name == 'main' && secrets.GCP_SSH_PRIVATE_KEY || secrets.DEV_SSH_PRIVATE_KEY) != '' }}
+          HAS_KNOWN_HOSTS: ${{ (github.ref_name == 'main' && secrets.GCP_VM_KNOWN_HOSTS || secrets.DEV_VM_KNOWN_HOSTS) != '' }}
+        run: |
+          if [ -z "$VM_HOST" ] || [ -z "$VM_USER" ] || [ "$HAS_KEY" != true ] || [ "$HAS_KNOWN_HOSTS" != true ]; then
+            echo "::error::No host/user/key/known_hosts configured for '$GITHUB_REF_NAME'."
+            echo "::error::main needs GCP_VM_*; dev needs DEV_VM_* (see infra/vm/README.md)."
+            exit 1
+          fi
+          echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "Deploying '$GITHUB_REF_NAME' ($DEPLOY_ENV) to $VM_HOST"
+
+      # ── Build (on the runner) ────────────────────────────────────────────────
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the API image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          target: runtime
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/hodi-api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build the migrations image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          target: migrate
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/hodi-migrate:${{ github.sha }}
+          cache-from: type=gha,scope=api
+
+      - name: Build the web app image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: frontend
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/hodi-web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Build the cron image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: infra/vm/cron
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/hodi-cron:${{ github.sha }}
+
+      # The marketing site (phase 11) is built when it exists; until then the static
+      # placeholder in infra/vm/landing is published. Detected rather than assumed, so this
+      # workflow needs no edit when landing/ lands.
+      - name: Build the landing site
+        if: env.DEPLOY_ENV == 'prod'
+        run: |
+          if [ -f landing/package.json ]; then
+            (cd landing && npm ci && npm run build)
+            echo "LANDING_DIR=landing/dist" >> "$GITHUB_ENV"
+          else
+            echo "No landing/ yet — publishing infra/vm/landing."
+            echo "LANDING_DIR=infra/vm/landing" >> "$GITHUB_ENV"
+          fi
+
+      # ── Ship (to the server) ─────────────────────────────────────────────────
+      # The deploy key and pinned host keys are given to this step only, so the build steps
+      # (and the third-party actions in them) never see them.
+      - name: Set up SSH
+        env:
+          VM_KEY: ${{ github.ref_name == 'main' && secrets.GCP_SSH_PRIVATE_KEY || secrets.DEV_SSH_PRIVATE_KEY }}
+          VM_KNOWN_HOSTS: ${{ github.ref_name == 'main' && secrets.GCP_VM_KNOWN_HOSTS || secrets.DEV_VM_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VM_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CFG
+          Host hodi
+            HostName $VM_HOST
+            User $VM_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          CFG
+
+      # --omit-dir-times with --no-owner --no-group: the server decides ownership.
+      - name: Upload the server bundle
+        run: |
+          rsync -az --no-owner --no-group --omit-dir-times --delete \
+            infra/vm/ hodi:/opt/hodi/infra.new/
+
+      - name: Upload the landing site
+        if: env.DEPLOY_ENV == 'prod'
+        run: |
+          rsync -az --no-owner --no-group --omit-dir-times --delete \
+            "$LANDING_DIR/" "hodi:/opt/hodi/landing-releases/$GITHUB_SHA/"
+
+      # The server pulls the images with THIS run's short-lived token, then logs out. The
+      # commit goes along so the server runs exactly what was built.
+      - name: Deploy
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | ssh hodi "docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin" >/dev/null
+          set +e
+          ssh hodi "bash /opt/hodi/infra.new/scripts/deploy.sh '$DEPLOY_ENV' '$GITHUB_SHA' '$IMAGE_PREFIX' 2>&1"
+          code=$?
+          ssh hodi "docker logout ghcr.io" >/dev/null 2>&1
+          exit $code
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Deploy of '$GITHUB_REF_NAME' failed. If the site is broken: ssh to the VM and run"
+          echo "::error::bash /opt/hodi/infra/scripts/rollback.sh $DEPLOY_ENV   (add --restore-db to undo a bad migration)"

@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
@@ -30,8 +31,9 @@ export class JobTokenVerifier {
 }
 
 /**
- * Guards /internal/jobs/*: only Cloud Scheduler's service account, with a token minted for
- * this API. When jobs aren't configured the routes don't exist (404).
+ * Guards /internal/jobs/*: cron on the server with the shared secret (VM), or Cloud
+ * Scheduler's service account with a token minted for this API. When neither is configured
+ * the routes don't exist (404).
  */
 @Injectable()
 export class JobsGuard implements CanActivate {
@@ -41,11 +43,21 @@ export class JobsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const { JOBS_OIDC_AUDIENCE: audience, JOBS_INVOKER_EMAIL: invoker } = this.env;
-    if (!audience || !invoker) throw new NotFoundException();
+    const {
+      JOBS_OIDC_AUDIENCE: audience,
+      JOBS_INVOKER_EMAIL: invoker,
+      JOBS_SHARED_SECRET: secret,
+    } = this.env;
+    if (!secret && (!audience || !invoker)) throw new NotFoundException();
     const header = context.switchToHttp().getRequest<Request>().get('authorization');
     const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : '';
     if (!token) throw AppError.unauthenticated();
+    if (secret) {
+      const a = Buffer.from(token);
+      const b = Buffer.from(secret);
+      if (a.length === b.length && timingSafeEqual(a, b)) return true;
+    }
+    if (!audience || !invoker) throw AppError.unauthenticated();
     let email: string;
     try {
       email = await this.verifier.verify(token, audience);

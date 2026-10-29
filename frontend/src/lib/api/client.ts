@@ -241,10 +241,47 @@ export interface RequestOptions {
    */
   skipAuthRetry?: boolean;
   /**
-   * `blob` resolves with the raw body (a PDF) instead of parsed JSON. Errors are still
+   * Treat a read like a write for step-up: send a still-valid step-up token, and on
+   * `STEP_UP_REQUIRED` prompt and ask again once. For the few reads that decrypt
+   * something (a bulk-payment file with bank details). Reads never prompt otherwise.
+   */
+  stepUp?: boolean;
+  /**
+   * `blob` resolves with the raw body (a PDF) instead of parsed JSON; `file` resolves with
+   * the body and the file name the server gave (`Content-Disposition`). Errors are still
    * read as the usual JSON envelope.
    */
-  responseType?: 'json' | 'blob';
+  responseType?: 'json' | 'blob' | 'file';
+}
+
+/** A downloaded file: the body and the name the server suggested, if any. */
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string | null;
+}
+
+/**
+ * The file name in a `Content-Disposition` header: the RFC 5987 `filename*=UTF-8''…` form
+ * first, then plain `filename="…"`. Any path is stripped. Null when there is none.
+ */
+export function filenameFromDisposition(header: string | null | undefined): string | null {
+  if (!header) return null;
+  let name: string | null = null;
+  const extended = /filename\*\s*=\s*(?:[\w-]+)?'[^']*'([^;]+)/i.exec(header);
+  if (extended) {
+    try {
+      name = decodeURIComponent(extended[1].trim().replace(/^"|"$/g, ''));
+    } catch {
+      name = null;
+    }
+  }
+  if (!name) {
+    const plain = /filename\s*=\s*("([^"]*)"|[^;]+)/i.exec(header);
+    if (plain) name = (plain[2] ?? plain[1]).trim();
+  }
+  if (!name) return null;
+  const base = name.split(/[\\/]/).pop()?.trim() ?? '';
+  return base || null;
 }
 
 export function buildUrl(path: string, query?: Query): string {
@@ -278,7 +315,8 @@ async function readJson(response: Response): Promise<unknown> {
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
-  const isWrite = method !== 'GET';
+  // A GET marked `stepUp` gets the write treatment for step-up (and only for step-up).
+  const isWrite = method !== 'GET' || options.stepUp === true;
 
   let refreshed = false;
   let steppedUp = false;
@@ -330,7 +368,7 @@ async function send<T>(path: string, options: RequestOptions, stepUpToken: strin
   const { method = 'GET', body, query, signal, headers: extra, responseType = 'json' } = options;
 
   const headers: Record<string, string> = {
-    Accept: responseType === 'blob' ? '*/*' : 'application/json',
+    Accept: responseType === 'json' ? 'application/json' : '*/*',
     ...extra,
   };
   // FormData sets its own Content-Type with the multipart boundary; setting it here
@@ -364,6 +402,13 @@ async function send<T>(path: string, options: RequestOptions, stepUpToken: strin
   if (response.status === 204) return undefined as T;
 
   if (responseType === 'blob' && response.ok) return (await response.blob()) as T;
+  if (responseType === 'file' && response.ok) {
+    const file: DownloadedFile = {
+      blob: await response.blob(),
+      filename: filenameFromDisposition(response.headers.get('content-disposition')),
+    };
+    return file as T;
+  }
 
   const payload = await readJson(response);
   const requestId = response.headers.get('x-request-id');
@@ -398,6 +443,12 @@ export const api = {
   /** A file (an invoice PDF) fetched with the same auth header, refresh and error handling. */
   blob: (path: string, query?: Query, signal?: AbortSignal) =>
     request<Blob>(path, { method: 'GET', query, signal, responseType: 'blob' }),
+  /**
+   * A file with the name the server gave it. `stepUp` for a download that needs a
+   * verification code (it decrypts something); see `RequestOptions.stepUp`.
+   */
+  download: (path: string, query?: Query, opts: { stepUp?: boolean; signal?: AbortSignal } = {}) =>
+    request<DownloadedFile>(path, { method: 'GET', query, signal: opts.signal, stepUp: opts.stepUp, responseType: 'file' }),
   /**
    * A multipart POST (a receipt or meter photo). Each field becomes a form part; a Blob or
    * File is sent as a file part with its name. Same auth header, refresh, step-up and

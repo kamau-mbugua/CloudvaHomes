@@ -142,6 +142,7 @@ export const ORG_NAV: NavGroup[] = [
       { label: 'Roles', to: '/app/settings/roles', permission: 'roles:view', phase: '1', hint: 'Named sets of permissions' },
       { label: 'Audit log', to: '/app/settings/audit', permission: 'audit:view', phase: '1', hint: 'Who changed what, and when' },
       { label: 'Plan & billing', to: '/app/settings/plan', permission: 'settings:view', phase: '8', hint: 'Your Hodi plan and invoices' },
+      { label: 'Payouts', to: '/app/settings/payouts', permission: 'settings:view', phase: '10', hint: 'The M-Pesa B2C account that pays landlords' },
     ],
   },
 ];

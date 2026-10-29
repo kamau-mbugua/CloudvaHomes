@@ -653,27 +653,31 @@ model CreditNote {
 
 /// Where money arrives (design §5.2). Daraja / bank credentials arrive in phase 5.
 model PaymentChannel {
-  id              String       @id @default(uuid(7)) @db.Uuid
-  orgId           String       @db.Uuid
-  kind            ChannelKind
-  name            String
-  shortcode       String? // paybill / till number
-  bankName        String?
-  accountNumber   String?
-  accountName     String?
-  propertyIds     String[]     @db.Uuid // empty = all properties
-  status          RecordStatus @default(ACTIVE)
+  id               String       @id @default(uuid(7)) @db.Uuid
+  orgId            String       @db.Uuid
+  kind             ChannelKind
+  name             String
+  shortcode        String? // paybill / till number
+  bankName         String?
+  accountNumber    String?
+  accountName      String?
+  propertyIds      String[]     @db.Uuid // empty = all properties
+  status           RecordStatus @default(ACTIVE)
   // ── Daraja (M-Pesa channels) ──
-  darajaEnv       DarajaEnv?
-  secretsEnc      Bytes? // consumer key/secret + passkey, field-encrypted; never returned
-  callbackToken   String?      @unique // unguessable webhook path segment
-  c2bRegisteredAt DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  darajaEnv        DarajaEnv?
+  secretsEnc       Bytes? // consumer key/secret + passkey, field-encrypted; never returned
+  callbackToken    String?      @unique // unguessable webhook path segment
+  c2bRegisteredAt  DateTime?
+  // ── Banks (phase 10) ──
+  bankAdapter      String? // webhook format, e.g. "HODI_JSON"; secret in secretsEnc
+  statementMapping Json? // last CSV column mapping used for this account
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   payments Payment[]
   inbound  InboundTransaction[]
   stk      StkRequest[]
+  imports  StatementImport[]
 
   @@unique([orgId, name])
   @@map("payment_channels")
@@ -817,6 +821,8 @@ model InboundTransaction {
 enum InboundSource {
   MPESA_STK
   MPESA_C2B
+  BANK_IPN
+  BANK_STATEMENT
 }
 
 enum MatchStatus {
@@ -1081,8 +1087,90 @@ enum RemittanceDirection {
 enum RemittanceStatus {
   DRAFT
   APPROVED
+  SENDING // an M-Pesa B2C payout is in flight (phase 10)
   PAID
   CANCELLED
+}
+
+// ───────────────────────────── Banks & payouts (phase 10) ─────────────────────────────
+
+/// One CSV bank statement imported into a bank channel.
+model StatementImport {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  orgId       String   @db.Uuid
+  channelId   String   @db.Uuid
+  filename    String
+  rows        Int
+  credits     Int
+  created     Int
+  duplicates  Int
+  matched     Int
+  createdById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  channel PaymentChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
+
+  @@index([orgId, channelId, createdAt])
+  @@map("statement_imports")
+}
+
+enum PayoutAccountKind {
+  MPESA_B2C
+}
+
+/// Where an organisation sends money from (M-Pesa B2C shortcode). Keys encrypted, write-only.
+model PayoutAccount {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  orgId         String            @db.Uuid
+  kind          PayoutAccountKind
+  name          String
+  shortcode     String
+  darajaEnv     DarajaEnv
+  initiatorName String
+  secretsEnc    Bytes // consumer key/secret + security credential
+  callbackToken String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  payouts Payout[]
+
+  @@unique([orgId, kind])
+  @@map("payout_accounts")
+}
+
+enum PayoutState {
+  PENDING
+  SUCCESS
+  FAILED
+  UNCERTAIN
+}
+
+/// One attempt to send a remittance by M-Pesa B2C. Never retried automatically.
+model Payout {
+  id                       String      @id @default(uuid(7)) @db.Uuid
+  orgId                    String      @db.Uuid
+  remittanceId             String      @db.Uuid
+  accountId                String      @db.Uuid
+  amount                   BigInt
+  phone                    String
+  state                    PayoutState @default(PENDING)
+  originatorConversationId String      @unique
+  conversationId           String?
+  receipt                  String?
+  resultCode               String?
+  resultDesc               String?
+  idempotencyKey           String?     @unique
+  requestedById            String      @db.Uuid
+  resolvedById             String?     @db.Uuid
+  resolvedNote             String?
+  createdAt                DateTime    @default(now())
+  completedAt              DateTime?
+
+  account PayoutAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([orgId, remittanceId])
+  @@index([state, createdAt])
+  @@map("payouts")
 }
 
 // ───────────────────────────── Messages ─────────────────────────────

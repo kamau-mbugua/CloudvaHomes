@@ -1,0 +1,54 @@
+# Hosts come from /opt/hodi/edge/edge.env (APP_HOST, APP_STACK, LANDING_HOST).
+# Let's Encrypt account e-mail (expiry notices) is optional; to add one, put
+#   { email you@yourdomain }
+# at the top of this file.
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+	encode zstd gzip
+}
+
+{$APP_HOST} {
+	import security
+
+	# Job endpoints are for cron inside the server only. handle blocks are exclusive and
+	# tried in order: this one must come first.
+	handle /api/v1/internal/* {
+		respond 404
+	}
+
+	# During a deploy's migration window (scripts/deploy.sh creates the flag). Payment
+	# callbacks keep flowing: M-Pesa and banks don't reliably retry.
+	@maintenance {
+		file {
+			root /srv/maintenance
+			try_files /on
+		}
+		not path /api/v1/hooks/*
+	}
+	handle @maintenance {
+		header Retry-After 60
+		header Cache-Control no-store
+		root * /srv/maintenance
+		rewrite * /index.html
+		file_server {
+			status 503
+		}
+	}
+
+	handle /api/* {
+		reverse_proxy {$APP_STACK}-api:8080
+	}
+	handle {
+		reverse_proxy {$APP_STACK}-web:8080
+	}
+}
+
+# Per-VM extras (production: the landing page).
+import sites/*.caddy

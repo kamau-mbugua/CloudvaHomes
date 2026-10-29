@@ -102,8 +102,8 @@ describe('the model', () => {
 
   it('searches by label, group and hint', () => {
     expect(searchDestinations(all, 'remit').map((d) => d.label)).toContain('Remittances');
-    expect(searchDestinations(all, 'SETTINGS').length).toBe(5);
-    expect(searchDestinations(all, 'm-pesa').map((d) => d.label)).toEqual(['Reconciliation']);
+    expect(searchDestinations(all, 'SETTINGS').length).toBe(6);
+    expect(searchDestinations(all, 'm-pesa').map((d) => d.label)).toEqual(['Reconciliation', 'Payouts']);
     expect(searchDestinations(all, '   ')).toHaveLength(all.length);
   });
 });
@@ -146,7 +146,7 @@ describe('filterNav', () => {
 
   it('does not mutate the model', () => {
     filterNav(ORG_NAV, []);
-    expect(ORG_NAV.find((g) => g.id === 'settings')?.children.length).toBe(5);
+    expect(ORG_NAV.find((g) => g.id === 'settings')?.children.length).toBe(6);
   });
 
   it('gives every page except the dashboard a resource:action permission', () => {

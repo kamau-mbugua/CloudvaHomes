@@ -40,6 +40,9 @@ export const ORG_SCOPED_MODELS = new Set<string>([
   'LandlordLedgerEntry',
   'Remittance',
   'Message',
+  'StatementImport',
+  'PayoutAccount',
+  'Payout',
 ]);
 
 const WHERE_AND = new Set([

@@ -6,7 +6,8 @@
 import type { ChannelKind } from '../payments/types';
 
 export type StkState = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'TIMEOUT';
-export type InboundSource = 'MPESA_STK' | 'MPESA_C2B';
+/** Phase 10 adds bank money: a bank's notification (`BANK_IPN`) or an imported statement line. */
+export type InboundSource = 'MPESA_STK' | 'MPESA_C2B' | 'BANK_IPN' | 'BANK_STATEMENT';
 export type MatchStatus = 'UNMATCHED' | 'MATCHED' | 'IGNORED';
 export type MatchedBy = 'AUTO_STK' | 'AUTO_ACCOUNT' | 'AUTO_PHONE' | 'MANUAL' | 'EXISTING';
 

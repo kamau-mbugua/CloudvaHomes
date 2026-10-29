@@ -31,7 +31,7 @@ import { StkService } from './stk.service.js';
     JobTokenVerifier,
     JobsGuard,
   ],
-  exports: [DarajaConfigService, StkService, DarajaClient],
+  exports: [DarajaConfigService, StkService, DarajaClient, InboundService],
 })
 export class MpesaModule implements OnModuleInit {
   constructor(private readonly moduleRef: ModuleRef) {}

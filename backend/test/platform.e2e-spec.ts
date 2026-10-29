@@ -303,7 +303,7 @@ describe('Platform billing (e2e)', () => {
 
     // Suspended: reads fine, changes refused, money in still recorded.
     const session = await login(t, 'owner1@example.invalid');
-    expect(session.body.activeOrganization.status).toBe('SUSPENDED');
+    expect(session.body.activeOrganization?.status).toBe('SUSPENDED');
     await get(session, '/properties');
     const refused = await patch(session, '/organization', { name: 'Renamed' }, 403);
     expect(refused.error.code).toBe('ORG_SUSPENDED');

@@ -29,6 +29,11 @@ export interface PaymentChannel {
    * server) on channels that are not M-Pesa. Secrets are never returned.
    */
   daraja?: DarajaInfo | null;
+  /**
+   * Phase 10: bank notifications (a signed webhook) on a `BANK_ACCOUNT` channel — the
+   * adapter and the address to post to. `null` when off. The secret is never returned.
+   */
+  bankWebhook?: { adapter: 'HODI_JSON'; url: string } | null;
   createdAt: string;
   updatedAt: string;
 }

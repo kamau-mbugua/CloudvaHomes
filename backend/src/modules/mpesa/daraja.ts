@@ -131,3 +131,33 @@ export function stkStateFor(resultCode: string): 'SUCCESS' | 'CANCELLED' | 'TIME
   if (resultCode === '1037') return 'TIMEOUT';
   return 'FAILED';
 }
+
+export interface B2cResult {
+  originatorConversationId: string;
+  conversationId: string;
+  resultCode: string;
+  resultDesc: string;
+  receipt: string | null;
+  amount: bigint | null;
+}
+
+/** Body.Result of a B2C result (or queue-timeout) callback, or null if it isn't one. */
+export function parseB2cResult(body: unknown): B2cResult | null {
+  const r = (body as { Result?: Record<string, unknown> })?.Result;
+  if (!r || typeof r.OriginatorConversationID !== 'string') return null;
+  const params = (
+    (r.ResultParameters as { ResultParameter?: { Key: string; Value?: unknown }[] })
+      ?.ResultParameter ?? []
+  ).reduce<Record<string, unknown>>((acc, p) => ({ ...acc, [p.Key]: p.Value }), {});
+  const receipt =
+    text(params.TransactionReceipt) || (typeof r.TransactionID === 'string' ? r.TransactionID : '');
+  return {
+    originatorConversationId: r.OriginatorConversationID,
+    conversationId: text(r.ConversationID),
+    resultCode: text(r.ResultCode),
+    resultDesc: text(r.ResultDesc),
+    receipt: receipt || null,
+    amount:
+      params.TransactionAmount !== undefined ? kesToCents(text(params.TransactionAmount)) : null,
+  };
+}

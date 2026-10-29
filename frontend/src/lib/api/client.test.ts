@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  ApiError, NETWORK_ERROR, api, buildUrl, configureAuth, currentStepUpToken, errorMessage, setAccessToken,
-  setStepUpGrant, toApiError,
+  ApiError, NETWORK_ERROR, api, buildUrl, configureAuth, currentStepUpToken, errorMessage, filenameFromDisposition,
+  setAccessToken, setStepUpGrant, toApiError,
 } from './client';
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {
@@ -414,5 +414,50 @@ describe('step-up on STEP_UP_REQUIRED', () => {
 
     await expect(api.delete('/users/4')).resolves.toEqual({ data: 'both' });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('filenameFromDisposition', () => {
+  it.each([
+    ['attachment; filename="bulk-payments-2026-10-28.csv"', 'bulk-payments-2026-10-28.csv'],
+    ['attachment; filename=plain.csv', 'plain.csv'],
+    ["attachment; filename=\"fallback.csv\"; filename*=UTF-8''bulk%20payments.csv", 'bulk payments.csv'],
+    ['attachment; filename="../../etc/evil.csv"', 'evil.csv'],
+  ])('reads %s', (header, name) => {
+    expect(filenameFromDisposition(header)).toBe(name);
+  });
+  it.each([null, '', 'attachment', 'attachment; filename=""'])('is null for %s', (header) => {
+    expect(filenameFromDisposition(header)).toBeNull();
+  });
+});
+
+describe('api.download', () => {
+  const csv = (headers: Record<string, string> = {}) => new Response('a,b\n1,2\n', { status: 200, headers: { 'Content-Type': 'text/csv', ...headers } });
+
+  it('returns the body and the server’s file name', async () => {
+    serverWith(() => csv({ 'Content-Disposition': 'attachment; filename="bulk-payments-2026-10-28.csv"' }));
+    const file = await api.download('/remittances/bulk-file', { ids: 'a,b' });
+    expect(file.filename).toBe('bulk-payments-2026-10-28.csv');
+    expect(await file.blob.text()).toBe('a,b\n1,2\n');
+  });
+
+  it('with stepUp, prompts on STEP_UP_REQUIRED and asks again once with X-Step-Up', async () => {
+    const fetchMock = serverWith((_url, init) => (init.headers['X-Step-Up'] === 'su-1' ? csv() : stepUpNeeded()));
+    const stepUp = vi.fn(async () => ({ stepUpToken: 'su-1', expiresAt: inAnHour() }));
+    configureAuth({ stepUp });
+
+    const file = await api.download('/remittances/bulk-file', { ids: 'a' }, { stepUp: true });
+    expect(file.filename).toBeNull();
+    expect(stepUp).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].method).toBe('GET');
+  });
+
+  it('without stepUp, a read never prompts', async () => {
+    serverWith(() => stepUpNeeded());
+    const stepUp = vi.fn(async () => ({ stepUpToken: 'su-1', expiresAt: inAnHour() }));
+    configureAuth({ stepUp });
+    await expect(api.download('/remittances/bulk-file')).rejects.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+    expect(stepUp).not.toHaveBeenCalled();
   });
 });

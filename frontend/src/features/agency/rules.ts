@@ -4,7 +4,7 @@ import { formatPeriod } from '../../lib/periods';
 import { normaliseKenyanPhone } from '../mpesa/rules';
 import type {
   Agreement, CollectionMode, CommissionBasis, CommissionableLine, LedgerBucket, LedgerEntry, PayoutMethod, PersonRef,
-  Remittance,
+  Remittance, RemittancePayout,
 } from './types';
 
 /**
@@ -368,6 +368,106 @@ export function checkPaid(d: PaidDraft, today: string): CheckedPaid {
   else if (d.paidAt > today) errors.paidAt = 'It can’t have been paid in the future.';
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return { ok: true, body: { method: d.method, reference, paidAt: d.paidAt } };
+}
+
+// ---------------------------------------------------------------- M-Pesa payouts (phase 10)
+
+/**
+ * Whether "Send by M-Pesa" is offered: an approved payout to the landlord, whose payout
+ * method on file is M-Pesa, by someone who can pay remittances. The server also refuses
+ * the person who approved it (`SAME_PERSON`) and amounts with cents (`WHOLE_SHILLINGS`).
+ */
+export function canSendByMpesa(
+  r: Pick<Remittance, 'status' | 'direction'>,
+  landlordMethod: PayoutMethod | null | undefined,
+  permissions: readonly string[],
+): boolean {
+  return r.status === 'APPROVED' && r.direction === 'TO_LANDLORD' && landlordMethod === 'MPESA' && permissions.includes('remittances:pay');
+}
+
+/** M-Pesa sends whole shillings only. */
+export function isWholeShillings(minor: number): boolean {
+  return Number.isSafeInteger(minor) && minor % 100 === 0;
+}
+
+/** While M-Pesa hasn't answered: the remittance is SENDING, or its payout still PENDING. */
+export function payoutInFlight(r: Pick<Remittance, 'status' | 'payout'>): boolean {
+  return r.status === 'SENDING' || r.payout?.state === 'PENDING';
+}
+
+export const PAYOUT_POLL_MS = 3_000;
+/** Stop asking after about three minutes; the server's sweep settles it (UNCERTAIN after 30). */
+export const PAYOUT_WAIT_MS = 3 * 60_000;
+
+/** When to fetch the remittance again: every 3 s while a payout is in flight, never after ~3 min. */
+export function payoutPollDelay(r: Pick<Remittance, 'status' | 'payout'> | undefined, startedAt: number, now: number): number | false {
+  if (!r || !payoutInFlight(r)) return false;
+  if (now - startedAt >= PAYOUT_WAIT_MS) return false;
+  return PAYOUT_POLL_MS;
+}
+
+/** One line on where an M-Pesa payout stands. */
+export function describePayout(p: Pick<RemittancePayout, 'state' | 'amount' | 'phone' | 'receipt' | 'resultDesc'>): string {
+  const to = p.phone ? ` to ${p.phone}` : '';
+  switch (p.state) {
+    case 'PENDING':
+      return `Sending ${formatKES(p.amount)}${to} — waiting for M-Pesa to confirm.`;
+    case 'SUCCESS':
+      return `Sent ${formatKES(p.amount)}${to}${p.receipt ? `. M-Pesa receipt ${p.receipt}` : ''}.`;
+    case 'FAILED':
+      return `M-Pesa didn’t send it${p.resultDesc ? `: “${p.resultDesc.trim()}”` : ''}. Nothing left the account, and the remittance is back to approved.`;
+    case 'UNCERTAIN':
+      return 'M-Pesa didn’t confirm. Check the B2C account’s M-Pesa statement before doing anything.';
+    default:
+      return '';
+  }
+}
+
+export interface ResolveDraft {
+  outcome: 'PAID' | 'NOT_PAID' | '';
+  receipt: string;
+  note: string;
+}
+
+export type CheckedResolve =
+  | { ok: true; body: { outcome: 'PAID' | 'NOT_PAID'; receipt?: string; note: string } }
+  | { ok: false; errors: Partial<Record<keyof ResolveDraft, string>> };
+
+/**
+ * Settling an UNCERTAIN payout after checking the M-Pesa statement: paid (with the
+ * receipt from the statement) or not paid, and a note on what was checked.
+ */
+export function checkResolve(d: ResolveDraft): CheckedResolve {
+  const errors: Partial<Record<keyof ResolveDraft, string>> = {};
+  const receipt = d.receipt.replace(/\s+/g, '').toUpperCase();
+  const note = d.note.trim();
+  if (d.outcome !== 'PAID' && d.outcome !== 'NOT_PAID') errors.outcome = 'Say whether the money left the account.';
+  if (d.outcome === 'PAID') {
+    if (!receipt) errors.receipt = 'Enter the M-Pesa receipt from the statement.';
+    else if (!/^[A-Z0-9]{8,12}$/.test(receipt)) errors.receipt = 'An M-Pesa receipt is 8 to 12 letters and digits, e.g. SJR4XK2L9P.';
+  }
+  if (note.length < 3) errors.note = 'Say what you checked, e.g. “Seen on the B2C statement for 28 Oct”.';
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  const outcome = d.outcome as 'PAID' | 'NOT_PAID';
+  return { ok: true, body: outcome === 'PAID' ? { outcome, receipt, note } : { outcome, note } };
+}
+
+// ---------------------------------------------------------------- bulk bank payouts (phase 10)
+
+/**
+ * Whether a remittance can go in the bulk-payment file: approved, to the landlord, and
+ * paid by bank. When the list doesn't say how the landlord is paid (`payoutTo`
+ * absent), it is offered and the server decides.
+ */
+export function bulkSelectable(r: Pick<Remittance, 'status' | 'direction' | 'payoutTo'>): boolean {
+  if (r.status !== 'APPROVED' || r.direction !== 'TO_LANDLORD') return false;
+  if (r.payoutTo === undefined) return true;
+  return r.payoutTo?.method === 'BANK';
+}
+
+/** The server's file name, else `bulk-payments-YYYY-MM-DD.csv`. */
+export function bulkFilename(fromServer: string | null | undefined, today: string): string {
+  return fromServer?.trim() || `bulk-payments-${today}.csv`;
 }
 
 // ---------------------------------------------------------------- statements

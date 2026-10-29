@@ -44,7 +44,9 @@ export function ReconciliationPage() {
   const to = filters.get('to');
   const canSeeChannels = useCan('channels:view');
   const channels = useChannels({}, canSeeChannels);
-  const mpesaChannels = (channels.data ?? []).filter((c) => isMpesaKind(c.kind)).sort((a, b) => a.name.localeCompare(b.name));
+  // M-Pesa channels and (phase 10) bank accounts: the ones money is reported on.
+  const mpesaChannels = (channels.data ?? []).filter((c) => isMpesaKind(c.kind) || c.kind === 'BANK_ACCOUNT')
+    .sort((a, b) => a.name.localeCompare(b.name));
   const unmatched = useUnmatchedCount(true);
   const rangeError = checkStatementRange(from, to);
   const today = todayInNairobi();
@@ -81,7 +83,7 @@ export function ReconciliationPage() {
           value={filters.search} onChange={(e) => filters.setSearch(e.target.value)} />
         {canSeeChannels ? (
           <select className="ad__select" aria-label="Channel" value={channelId} onChange={(e) => filters.setFilter({ channelId: e.target.value })}>
-            <option value="">All M-Pesa channels</option>
+            <option value="">All channels</option>
             {mpesaChannels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         ) : null}
@@ -135,7 +137,7 @@ function InboundTable({ rows, status }: { rows: InboundTransaction[]; status: Ma
       <table className="ad__table mp__table">
         <thead>
           <tr>
-            <th>M-Pesa receipt</th>
+            <th>Receipt / ref.</th>
             <th>Paid</th>
             <th>Payer</th>
             <th>Account</th>

@@ -4,9 +4,9 @@ import { formatDateOnly, parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
-import type { Prisma, Remittance } from '../../generated/prisma/client.js';
+import type { Payout, PayoutMethod, Prisma, Remittance } from '../../generated/prisma/client.js';
 import { violatesUnique } from '../../prisma/errors.js';
-import { DB, type Db } from '../../prisma/prisma.module.js';
+import { DB, type Db, type Tx } from '../../prisma/prisma.module.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { orgContext } from '../auth/decorators.js';
@@ -23,8 +23,29 @@ import type {
 import { LandlordLedgerService } from './landlord-ledger.service.js';
 import { activeOrgId } from './org.js';
 
-const LANDLORD = { landlord: { select: { id: true, code: true, name: true } } } as const;
-type Row = Remittance & { landlord: { id: string; code: string; name: string } };
+const LANDLORD = {
+  landlord: {
+    select: { id: true, code: true, name: true, payoutMethod: true, payoutHint: true },
+  },
+} as const;
+type Row = Remittance & {
+  landlord: {
+    id: string;
+    code: string;
+    name: string;
+    payoutMethod: PayoutMethod | null;
+    payoutHint: string | null;
+  };
+};
+
+/** How a remittance was (or is being) paid, for `markPaid`. */
+export interface PaidWith {
+  method: PayoutMethod;
+  reference: string;
+  paidAt: string; // YYYY-MM-DD
+  userId: string | null;
+  masked: string | null;
+}
 
 const stateError = (message: string) => AppError.conflict(message, 'REMITTANCE_STATE');
 
@@ -58,6 +79,14 @@ export class RemittancesService {
         })
       : [];
     const u = new Map(users.map((x) => [x.id, { id: x.id, name: `${x.firstName} ${x.lastName}` }]));
+    const payouts = rows.length
+      ? await this.db.payout.findMany({
+          where: { remittanceId: { in: rows.map((r) => r.id) } },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+    const latest = new Map<string, Payout>();
+    for (const p of payouts) if (!latest.has(p.remittanceId)) latest.set(p.remittanceId, p);
     const who = (id: string | null) => (id ? (u.get(id) ?? { id, name: 'Unknown user' }) : null);
     return rows.map((r) => {
       const activity = r.collections - r.commission - r.expenses + r.adjustments;
@@ -65,7 +94,11 @@ export class RemittancesService {
       return {
         id: r.id,
         number: r.number,
-        landlord: r.landlord,
+        landlord: { id: r.landlord.id, code: r.landlord.code, name: r.landlord.name },
+        /** Where it would be paid now (the landlord's current payout details, masked). */
+        payoutTo: r.landlord.payoutMethod
+          ? { method: r.landlord.payoutMethod, masked: r.landlord.payoutHint }
+          : null,
         period: r.period,
         direction: r.direction,
         broughtForward: signedNet - activity,
@@ -84,6 +117,7 @@ export class RemittancesService {
         reference: r.reference,
         payoutMasked: r.payoutMasked,
         cancelledReason: r.cancelledReason,
+        payout: payoutView(latest.get(r.id)),
         createdAt: r.createdAt,
       };
     });
@@ -256,46 +290,61 @@ export class RemittancesService {
       throw AppError.fieldInvalid('paidAt', 'The date can’t be in the future');
     const landlord = await this.db.landlord.findUniqueOrThrow({ where: { id: r.landlordId } });
     const masked = landlord.payoutMethod === dto.method ? landlord.payoutHint : null;
-    await this.db.$transaction(async (tx) => {
-      const { count } = await tx.remittance.updateMany({
-        where: { id, status: 'APPROVED' },
-        data: {
-          status: 'PAID',
-          paidById: ctx.userId,
-          paidAt: parseDateOnly(paidAt),
-          method: dto.method,
-          reference: dto.reference.trim(),
-          payoutMasked: masked,
-        },
-      });
-      if (!count) throw stateError('Someone else just changed this remittance');
-      await this.ledger.write(tx, {
-        orgId: ctx.orgId,
-        landlordId: r.landlordId,
-        bucket: 'PAYABLE',
-        kind: 'REMITTANCE',
-        amount: r.direction === 'TO_LANDLORD' ? -r.net : r.net,
-        remittanceId: id,
-        occurredAt: paidAt,
-        memo: `${r.number} ${r.direction === 'TO_LANDLORD' ? 'paid to the landlord' : 'received from the landlord'}, ref ${dto.reference.trim()}`,
+    await this.db.$transaction((tx) =>
+      this.markPaid(tx, r, 'APPROVED', {
+        method: dto.method,
+        reference: dto.reference.trim(),
+        paidAt,
         userId: ctx.userId,
-      });
-      await this.audit.record(
-        {
-          action: 'remittance.pay',
-          entity: 'remittance',
-          entityId: id,
-          after: {
-            number: r.number,
-            net: r.net,
-            method: dto.method,
-            reference: dto.reference.trim(),
-          },
-        },
-        tx,
-      );
-    });
+        masked,
+      }),
+    );
     return this.get(id);
+  }
+
+  /**
+   * PAID + the REMITTANCE ledger entry, from `from` (APPROVED for a manual payment, SENDING
+   * for an M-Pesa payout). Throws if someone else changed it first.
+   */
+  async markPaid(
+    tx: Tx,
+    r: Pick<Remittance, 'id' | 'orgId' | 'number' | 'landlordId' | 'direction' | 'net'>,
+    from: 'APPROVED' | 'SENDING',
+    paid: PaidWith,
+  ) {
+    const { count } = await tx.remittance.updateMany({
+      where: { id: r.id, status: from },
+      data: {
+        status: 'PAID',
+        paidById: paid.userId,
+        paidAt: parseDateOnly(paid.paidAt),
+        method: paid.method,
+        reference: paid.reference,
+        payoutMasked: paid.masked,
+      },
+    });
+    if (!count) throw stateError('Someone else just changed this remittance');
+    await this.ledger.write(tx, {
+      orgId: r.orgId,
+      landlordId: r.landlordId,
+      bucket: 'PAYABLE',
+      kind: 'REMITTANCE',
+      amount: r.direction === 'TO_LANDLORD' ? -r.net : r.net,
+      remittanceId: r.id,
+      occurredAt: paid.paidAt,
+      memo: `${r.number} ${r.direction === 'TO_LANDLORD' ? 'paid to the landlord' : 'received from the landlord'}, ref ${paid.reference}`,
+      userId: paid.userId,
+    });
+    await this.audit.record(
+      {
+        action: 'remittance.pay',
+        entity: 'remittance',
+        entityId: r.id,
+        actorId: paid.userId,
+        after: { number: r.number, net: r.net, method: paid.method, reference: paid.reference },
+      },
+      tx,
+    );
   }
 
   async cancel(id: string, dto: CancelRemittanceDto) {
@@ -319,7 +368,7 @@ export class RemittancesService {
     return this.get(id);
   }
 
-  private async find(id: string): Promise<Row> {
+  async find(id: string): Promise<Row> {
     const r = await this.db.remittance.findFirst({
       where: { id, landlord: landlordScope() },
       include: LANDLORD,
@@ -362,4 +411,19 @@ export class RemittancesService {
     }
     return { period, drafted };
   }
+}
+
+function payoutView(p: Payout | undefined) {
+  if (!p) return null;
+  return {
+    id: p.id,
+    state: p.state,
+    amount: p.amount,
+    phone: `•••• ${p.phone.slice(-4)}`,
+    receipt: p.receipt,
+    resultDesc: p.resultDesc,
+    resolvedNote: p.resolvedNote,
+    createdAt: p.createdAt,
+    completedAt: p.completedAt,
+  };
 }

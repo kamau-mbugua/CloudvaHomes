@@ -1,7 +1,7 @@
 import type { Label } from '../portfolio/labels';
 import type {
   CollectionMode, CommissionBasis, CommissionableLine, LedgerBucket, LedgerKind, PayoutMethod, RemittanceDirection,
-  RemittanceStatus,
+  RemittancePayoutState, RemittanceStatus,
 } from './types';
 
 /** Words and badge tones for agency accounting, in one place. */
@@ -42,8 +42,16 @@ export const LEDGER_KIND: Record<LedgerKind, string> = {
 export const REMITTANCE_STATUS: Record<RemittanceStatus, Label> = {
   DRAFT: { label: 'Draft', tone: 'ad__badge--info' },
   APPROVED: { label: 'Approved', tone: 'ad__badge--warn' },
+  SENDING: { label: 'Sending', tone: 'ad__badge--info' },
   PAID: { label: 'Paid', tone: 'ad__badge--ok' },
   CANCELLED: { label: 'Cancelled', tone: 'ad__badge--off' },
+};
+
+export const PAYOUT_STATE: Record<RemittancePayoutState, Label> = {
+  PENDING: { label: 'Waiting for M-Pesa', tone: 'ad__badge--info' },
+  SUCCESS: { label: 'Sent', tone: 'ad__badge--ok' },
+  FAILED: { label: 'Failed', tone: 'ad__badge--alert' },
+  UNCERTAIN: { label: 'Not confirmed', tone: 'ad__badge--warn' },
 };
 
 export const REMITTANCE_DIRECTION: Record<RemittanceDirection, string> = {

@@ -30,6 +30,8 @@ export const MATCHED_BY: Record<MatchedBy, string> = {
 export const SOURCE: Record<InboundSource, Label> = {
   MPESA_STK: { label: 'Payment request', tone: 'ad__badge--info' },
   MPESA_C2B: { label: 'Paybill / till', tone: 'ad__badge--ok' },
+  BANK_IPN: { label: 'Bank notification', tone: 'ad__badge--info' },
+  BANK_STATEMENT: { label: 'Bank statement', tone: 'ad__badge--info' },
 };
 
 export const DARAJA_ENV: Record<DarajaEnvironment, Label> = {

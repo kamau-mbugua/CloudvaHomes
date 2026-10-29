@@ -101,4 +101,17 @@ describe('parseEnv', () => {
         .SMS_PROVIDER,
     ).toBe('africastalking');
   });
+
+  it('allows local file storage in production only on an absolute (persistent) path', () => {
+    const prod = { ...base, NODE_ENV: 'production', STORAGE_DRIVER: 'local' };
+    expect(() => parseEnv(prod)).toThrow(/STORAGE_DIR/);
+    expect(parseEnv({ ...prod, STORAGE_DIR: '/var/lib/hodi/files' }).STORAGE_DRIVER).toBe('local');
+  });
+
+  it('requires a long jobs secret when one is set', () => {
+    expect(() => parseEnv({ ...base, JOBS_SHARED_SECRET: 'short' })).toThrow(/JOBS_SHARED_SECRET/);
+    expect(
+      parseEnv({ ...base, JOBS_SHARED_SECRET: 's'.repeat(40) }).JOBS_SHARED_SECRET,
+    ).toHaveLength(40);
+  });
 });

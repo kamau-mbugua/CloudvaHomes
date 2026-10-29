@@ -26,6 +26,23 @@ function wrap(parser: RequestHandler): RequestHandler {
     parser(req, res, (err?: unknown) => (err ? next(toBodyParserError(err)) : next()));
 }
 
+/** Signed webhooks need the exact bytes that were signed; only these paths keep them. */
+const RAW_BODY_PATHS = ['/api/v1/hooks/bank/'];
+
+export type WithRawBody = { rawBody?: Buffer };
+
 export function bodyParsers(limit: string): RequestHandler[] {
-  return [wrap(express.json({ limit })), wrap(express.urlencoded({ limit, extended: false }))];
+  return [
+    wrap(
+      express.json({
+        limit,
+        verify: (req, _res, buf) => {
+          if (RAW_BODY_PATHS.some((p) => req.url?.startsWith(p))) {
+            (req as WithRawBody).rawBody = Buffer.from(buf);
+          }
+        },
+      }),
+    ),
+    wrap(express.urlencoded({ limit, extended: false })),
+  ];
 }

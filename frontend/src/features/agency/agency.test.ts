@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../lib/api/client';
-import { agencyErrorMessage, ownerErrorMessage } from './api';
+import { agencyErrorMessage, ownerErrorMessage, payoutErrorMessage } from './api';
 import {
   agreementState, agreementToDraft, bpsToPercent, checkAdjustment, checkAgreement, checkEndDate, checkPaid, checkPayout,
   describeNet, describePayable, describeRate, groupCollections, newAgreementDraft, ordinal, parsePercent, personLabel,
   rangeText, remittanceActions, statementFilename, withRunningBalance,
+  bulkFilename, bulkSelectable, canSendByMpesa, checkResolve, describePayout, isWholeShillings, payoutInFlight, payoutPollDelay,
+  PAYOUT_POLL_MS, PAYOUT_WAIT_MS,
 } from './rules';
 import type { AgreementDraft, PayoutDraft } from './rules';
-import type { Agreement, LedgerEntry } from './types';
+import type { Agreement, LedgerEntry, RemittancePayout } from './types';
 
 /** Synthetic data only: landlords L0001…, phones +2547000000xx. */
 
@@ -251,5 +253,108 @@ describe('agencyErrorMessage', () => {
   });
   it('reads a 404 in the owner portal as "not yours"', () => {
     expect(ownerErrorMessage(apiError('NOT_FOUND', 404))).toMatch(/couldn’t find this landlord account/);
+  });
+});
+
+// ---------------------------------------------------------------- phase 10: payouts
+
+describe('canSendByMpesa', () => {
+  const pay = ['remittances:pay'];
+  const approved = { status: 'APPROVED' as const, direction: 'TO_LANDLORD' as const };
+  it('offers it for an approved payout to a landlord paid by M-Pesa', () => {
+    expect(canSendByMpesa(approved, 'MPESA', pay)).toBe(true);
+  });
+  it('not by bank, not unknown, not from the landlord, not unapproved, not without the permission', () => {
+    expect(canSendByMpesa(approved, 'BANK', pay)).toBe(false);
+    expect(canSendByMpesa(approved, null, pay)).toBe(false);
+    expect(canSendByMpesa({ ...approved, direction: 'FROM_LANDLORD' }, 'MPESA', pay)).toBe(false);
+    expect(canSendByMpesa({ ...approved, status: 'SENDING' }, 'MPESA', pay)).toBe(false);
+    expect(canSendByMpesa(approved, 'MPESA', ['remittances:view'])).toBe(false);
+  });
+});
+
+describe('isWholeShillings', () => {
+  it.each([[150_000, true], [0, true], [150_050, false], [1.5, false]])('%s → %s', (minor, whole) => {
+    expect(isWholeShillings(minor)).toBe(whole);
+  });
+});
+
+const payout = (over: Partial<RemittancePayout> = {}): RemittancePayout => ({
+  id: 'po-1', state: 'PENDING', amount: 150_000, phone: '+254 7•• ••• 001', receipt: null, resultDesc: null,
+  createdAt: '2026-10-28T09:00:00Z', ...over,
+});
+
+describe('payout polling', () => {
+  it('is in flight while SENDING or PENDING', () => {
+    expect(payoutInFlight({ status: 'SENDING', payout: null })).toBe(true);
+    expect(payoutInFlight({ status: 'APPROVED', payout: payout() })).toBe(true);
+    expect(payoutInFlight({ status: 'PAID', payout: payout({ state: 'SUCCESS' }) })).toBe(false);
+    expect(payoutInFlight({ status: 'SENDING', payout: payout({ state: 'UNCERTAIN' }) })).toBe(true);
+  });
+  it('asks every 3 s for about three minutes, then stops', () => {
+    const r = { status: 'SENDING' as const, payout: payout() };
+    expect(payoutPollDelay(r, 0, 1_000)).toBe(PAYOUT_POLL_MS);
+    expect(payoutPollDelay(r, 0, PAYOUT_WAIT_MS)).toBe(false);
+    expect(payoutPollDelay({ status: 'PAID', payout: payout({ state: 'SUCCESS' }) }, 0, 1_000)).toBe(false);
+    expect(payoutPollDelay(undefined, 0, 1_000)).toBe(false);
+  });
+});
+
+describe('describePayout', () => {
+  it('words each state', () => {
+    expect(describePayout(payout())).toBe('Sending KES 1,500.00 to +254 7•• ••• 001 — waiting for M-Pesa to confirm.');
+    expect(describePayout(payout({ state: 'SUCCESS', receipt: 'TEST000001' }))).toBe('Sent KES 1,500.00 to +254 7•• ••• 001. M-Pesa receipt TEST000001.');
+    expect(describePayout(payout({ state: 'FAILED', resultDesc: 'Insufficient funds ' }))).toMatch(/“Insufficient funds”.*back to approved/);
+    expect(describePayout(payout({ state: 'UNCERTAIN' }))).toBe('M-Pesa didn’t confirm. Check the B2C account’s M-Pesa statement before doing anything.');
+  });
+});
+
+describe('checkResolve', () => {
+  it('needs an outcome and a note; a receipt only when paid', () => {
+    const empty = checkResolve({ outcome: '', receipt: '', note: '' });
+    expect(empty.ok).toBe(false);
+    if (!empty.ok) expect(Object.keys(empty.errors).sort()).toEqual(['note', 'outcome']);
+    const paid = checkResolve({ outcome: 'PAID', receipt: '', note: 'Seen on the statement' });
+    expect(paid.ok).toBe(false);
+    if (!paid.ok) expect(paid.errors.receipt).toMatch(/receipt/);
+  });
+  it('tidies the receipt and drops it when not paid', () => {
+    expect(checkResolve({ outcome: 'PAID', receipt: ' test 000001 ', note: ' Seen on the statement ' }))
+      .toEqual({ ok: true, body: { outcome: 'PAID', receipt: 'TEST000001', note: 'Seen on the statement' } });
+    expect(checkResolve({ outcome: 'NOT_PAID', receipt: 'TEST000001', note: 'Not on the statement' }))
+      .toEqual({ ok: true, body: { outcome: 'NOT_PAID', note: 'Not on the statement' } });
+  });
+  it('refuses a receipt that isn’t one', () => {
+    const r = checkResolve({ outcome: 'PAID', receipt: 'ABC', note: 'checked' });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe('bulk bank payouts', () => {
+  const approved = { status: 'APPROVED' as const, direction: 'TO_LANDLORD' as const };
+  it('offers approved bank payouts, and any approved payout when the method isn’t known', () => {
+    expect(bulkSelectable({ ...approved, payoutTo: { method: 'BANK', masked: 'Test Bank · •••• 0001' } })).toBe(true);
+    expect(bulkSelectable({ ...approved })).toBe(true);
+    expect(bulkSelectable({ ...approved, payoutTo: { method: 'MPESA', masked: '•••• 0001' } })).toBe(false);
+    expect(bulkSelectable({ ...approved, payoutTo: null })).toBe(false);
+    expect(bulkSelectable({ status: 'DRAFT', direction: 'TO_LANDLORD' })).toBe(false);
+    expect(bulkSelectable({ ...approved, direction: 'FROM_LANDLORD' })).toBe(false);
+  });
+  it('names the file as the server says, else by today', () => {
+    expect(bulkFilename('from-server.csv', '2026-10-28')).toBe('from-server.csv');
+    expect(bulkFilename(null, '2026-10-28')).toBe('bulk-payments-2026-10-28.csv');
+  });
+});
+
+describe('payout errors', () => {
+  it('shows the server’s words for SAME_PERSON (the approver can’t send)', () => {
+    const e = new ApiError({ status: 409, code: 'SAME_PERSON', message: 'You approved this remittance, so someone else has to send it.' });
+    expect(payoutErrorMessage(e)).toBe('You approved this remittance, so someone else has to send it.');
+  });
+  it('words the payout codes', () => {
+    expect(agencyErrorMessage(apiError('NO_PAYOUT_ACCOUNT'))).toMatch(/Settings → Payouts/);
+    expect(agencyErrorMessage(apiError('PAYOUT_NOT_MPESA'))).toMatch(/isn’t paid by M-Pesa/);
+    expect(agencyErrorMessage(apiError('WHOLE_SHILLINGS', 422))).toMatch(/whole shillings/);
+    expect(payoutErrorMessage(apiError('NO_PAYOUT_ACCOUNT'))).toMatch(/Settings → Payouts/);
   });
 });

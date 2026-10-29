@@ -5,7 +5,7 @@ import { saveBlob } from '../../lib/files';
 import { keys as portfolioKeys } from '../portfolio/api';
 import { paymentsErrorMessage } from '../payments/api';
 import { unwrap, unwrapList } from '../payments/rules';
-import { statementFilename } from './rules';
+import { bulkFilename, statementFilename } from './rules';
 import type { Agreement, LandlordAccount, LedgerBucket, LedgerEntry, OwnerLandlord, OwnerStatement, Remittance } from './types';
 
 /**
@@ -81,11 +81,27 @@ export function useRemittances(filter: Params, enabled = true) {
   });
 }
 
-export function useRemittance(id: string) {
+/**
+ * One remittance. `refetchInterval` follows an M-Pesa payout while it is in flight
+ * (see `payoutPollDelay`); it keeps going in a background tab.
+ */
+export function useRemittance(id: string, refetchInterval?: (r: Remittance | undefined) => number | false) {
   return useQuery({
     queryKey: [...agencyKeys.remittances, id],
     queryFn: () => api.get<unknown>(`/remittances/${id}`).then((body) => unwrap<Remittance>(body)),
+    refetchInterval: refetchInterval ? (query) => refetchInterval(query.state.data) : undefined,
+    refetchIntervalInBackground: Boolean(refetchInterval),
   });
+}
+
+/**
+ * The bulk-payment CSV for these approved bank remittances, saved under the server's
+ * name (else `bulk-payments-YYYY-MM-DD.csv`). It decrypts bank details, so it asks for a
+ * verification code like a change does.
+ */
+export async function downloadBulkPaymentFile(ids: readonly string[], today: string): Promise<void> {
+  const file = await api.download('/remittances/bulk-file', { ids: ids.join(',') }, { stepUp: true });
+  saveBlob(file.blob, bulkFilename(file.filename, today), 'text/csv');
 }
 
 /** The statement PDF for the same range as the screen. */
@@ -152,11 +168,31 @@ export function agencyErrorMessage(error: unknown, overrides: Record<string, str
         return 'Agreements, owner statements and remittances are only used by agencies. This organisation is a landlord’s own.';
       case 'STEP_UP_REQUIRED':
         return 'This change needs a verification code. Try again and enter the code when asked.';
+      case 'NO_PAYOUT_ACCOUNT':
+        return 'M-Pesa payouts aren’t set up yet. Add the B2C account under Settings → Payouts, or pay outside Hodi and mark it paid.';
+      case 'PAYOUT_NOT_MPESA':
+        return 'This landlord isn’t paid by M-Pesa. Pay them by their payout method and mark it paid, or change their payout details first.';
+      case 'WHOLE_SHILLINGS':
+        return 'M-Pesa can only send whole shillings, and this amount has cents. Pay it outside Hodi and mark it paid, or adjust the remittance.';
       default:
         return paymentsErrorMessage(error);
     }
   }
   return paymentsErrorMessage(error);
+}
+
+/**
+ * Errors from sending or resolving an M-Pesa payout. `SAME_PERSON` here means the person
+ * approved it, not drafted it, so the server's own words are shown.
+ */
+export function payoutErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.code === 'SAME_PERSON') {
+    return error.message.trim() || 'You approved this remittance, so someone else has to send it. Two people check every payout.';
+  }
+  if (error instanceof ApiError && error.code === 'REMITTANCE_STATE') {
+    return 'This remittance has moved on since you opened it (it may already be sending or paid). Close this and check the page before trying again.';
+  }
+  return agencyErrorMessage(error);
 }
 
 /** The owner portal's wording: a 404 means "not yours", not "deleted". */

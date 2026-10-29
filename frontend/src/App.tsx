@@ -46,6 +46,7 @@ import { OwnerStatementsPage } from './features/agency/OwnerStatementsPage';
 import { RemittancesPage } from './features/agency/RemittancesPage';
 import { RemittanceDetailPage } from './features/agency/RemittanceDetailPage';
 import { PlanBillingPage } from './features/platform/PlanBillingPage';
+import { PayoutsPage } from './features/banks/PayoutsPage';
 import { AdminShell } from './features/admin/AdminShell';
 import { OverviewPage as AdminOverviewPage } from './features/admin/OverviewPage';
 import { OrganizationsPage as AdminOrganizationsPage } from './features/admin/OrganizationsPage';
@@ -86,6 +87,7 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; ele
   },
   'settings/audit': { element: <AuditLogPage /> },
   'settings/plan': { element: <PlanBillingPage /> },
+  'settings/payouts': { element: <PayoutsPage /> },
   landlords: { element: <LandlordsPage />, children: [{ path: ':landlordId', element: <LandlordDetailPage /> }] },
   properties: { element: <PropertiesPage />, children: [{ path: ':propertyId', element: <PropertyDetailPage /> }] },
   units: { element: <UnitsPage />, children: [{ path: ':unitId', element: <UnitDetailPage /> }] },

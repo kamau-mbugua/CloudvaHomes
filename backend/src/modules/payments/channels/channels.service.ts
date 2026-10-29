@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AppError } from '../../../common/errors/app-error.js';
 import { ENV } from '../../../config/config.module.js';
 import type { Env } from '../../../config/env.js';
+import { bankHookUrl } from '../../banks/urls.js';
 import { callbackUrls } from '../../mpesa/urls.js';
 import type { PaymentChannel, Prisma } from '../../../generated/prisma/client.js';
 import { violatesUnique } from '../../../prisma/errors.js';
@@ -25,6 +26,12 @@ function darajaInfo(c: PaymentChannel, env: Env) {
   };
 }
 
+/** Bank notifications (phase 10): which format and where to post; the secret is never shown again. */
+function bankWebhookInfo(c: PaymentChannel, env: Env) {
+  if (c.kind !== 'BANK_ACCOUNT' || !c.bankAdapter || !c.callbackToken) return null;
+  return { adapter: c.bankAdapter, url: bankHookUrl(env, c.callbackToken) };
+}
+
 export function toChannel(c: PaymentChannel, env: Env) {
   return {
     id: c.id,
@@ -37,6 +44,7 @@ export function toChannel(c: PaymentChannel, env: Env) {
     propertyIds: c.propertyIds,
     status: c.status,
     daraja: darajaInfo(c, env),
+    bankWebhook: bankWebhookInfo(c, env),
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   };

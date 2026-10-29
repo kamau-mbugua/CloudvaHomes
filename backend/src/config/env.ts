@@ -19,6 +19,9 @@ const envSchema = z
       .min(1, 'DATABASE_URL is required')
       .refine((v) => /^postgres(ql)?:\/\//.test(v), 'DATABASE_URL must be a postgres:// URL'),
     LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
+    // pretty = one readable line per entry (needs the pino-pretty dev dependency); json = for
+    // servers and log collectors. Default: pretty in development, json in production.
+    LOG_FORMAT: z.enum(['json', 'pretty']).optional(),
     // Comma-separated origins allowed to call the API from a browser. In production the web
     // app is served from the same origin (Firebase Hosting rewrite), so this is usually empty.
     CORS_ORIGINS: z
@@ -68,6 +71,13 @@ const envSchema = z
     // account. Unset = the endpoints answer 404.
     JOBS_OIDC_AUDIENCE: z.string().min(1).optional(),
     JOBS_INVOKER_EMAIL: z.email().optional(),
+    // On a plain VM (no Cloud Scheduler): cron calls the jobs with this bearer secret instead.
+    // 32+ random characters; only reachable from inside the server (the proxy blocks
+    // /api/v1/internal/ from the internet).
+    JOBS_SHARED_SECRET: z
+      .string()
+      .min(32, 'JOBS_SHARED_SECRET must be at least 32 characters')
+      .optional(),
 
     // ── M-Pesa (Daraja) ──
     // "simulated" answers like Daraja without calling it (local dev, demos). Production must be live.
@@ -120,11 +130,18 @@ const envSchema = z
       ['AT_USERNAME', 'AT_API_KEY'],
       'SMS_PROVIDER=africastalking',
     );
-    if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER === 'local') {
+    // Production may keep files on local disk only on a persistent volume (an absolute path,
+    // e.g. a Docker volume on a VM) — never the container's own throwaway filesystem.
+    if (
+      env.NODE_ENV === 'production' &&
+      env.STORAGE_DRIVER === 'local' &&
+      !env.STORAGE_DIR.startsWith('/')
+    ) {
       ctx.addIssue({
         code: 'custom',
-        path: ['STORAGE_DRIVER'],
-        message: 'must be gcs in production',
+        path: ['STORAGE_DIR'],
+        message:
+          'must be an absolute path on a persistent volume when STORAGE_DRIVER=local in production',
       });
     }
     const driver = env.STORAGE_DRIVER ?? (env.NODE_ENV === 'production' ? 'gcs' : 'local');
@@ -145,6 +162,7 @@ const envSchema = z
 
 export type Env = z.infer<typeof envSchema> & {
   LOG_LEVEL: (typeof LOG_LEVELS)[number];
+  LOG_FORMAT: 'json' | 'pretty';
   DARAJA_MODE: 'live' | 'simulated';
   STORAGE_DRIVER: 'local' | 'gcs';
 };
@@ -172,6 +190,7 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   return {
     ...env,
     LOG_LEVEL: env.LOG_LEVEL ?? (env.NODE_ENV === 'production' ? 'info' : 'debug'),
+    LOG_FORMAT: env.LOG_FORMAT ?? (env.NODE_ENV === 'production' ? 'json' : 'pretty'),
     ENABLE_DOCS: env.NODE_ENV !== 'production' || env.ENABLE_DOCS,
     DARAJA_MODE: env.DARAJA_MODE ?? (env.NODE_ENV === 'production' ? 'live' : 'simulated'),
     STORAGE_DRIVER: env.STORAGE_DRIVER ?? (env.NODE_ENV === 'production' ? 'gcs' : 'local'),

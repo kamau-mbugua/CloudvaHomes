@@ -1,0 +1,34 @@
+# Front proxy on each Hodi server: TLS (Let's Encrypt), routing to this VM's app stack,
+# the maintenance page during deploys, and (production only) the landing page.
+# WebSockets pass through reverse_proxy as-is. Started and reloaded by scripts/deploy.sh.
+name: hodi-edge
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    env_file: /opt/hodi/edge/edge.env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
+      - /opt/hodi/maintenance:/srv/maintenance:ro
+      - /opt/hodi/landing-releases:/srv/landing:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  edge:
+    name: hodi-edge
+    external: true

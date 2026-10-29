@@ -86,7 +86,7 @@ export interface Session {
   token: string;
   refreshCookie: string | null;
   body: {
-    activeOrganization: { id: string } | null;
+    activeOrganization: { id: string; status?: string } | null;
     permissions: string[];
     user: { id: string };
     organizations: { id: string }[];

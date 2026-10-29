@@ -285,3 +285,44 @@ gcloud scheduler jobs create http hodi-platform-status --location "$REGION" \
 Hodi's own paybill and Daraja keys are entered in the admin area (`/admin` → Settings), not as
 environment variables. They are stored encrypted with the field keys. Register the C2B URLs shown
 there with Safaricom for Hodi's paybill (the per-organisation channels are separate).
+
+## 14. Banks & payouts (phase 10)
+
+M-Pesa B2C payouts that get no answer within 30 minutes are marked "uncertain" for a person to
+check. They are never resent automatically. This job does the marking:
+
+```bash
+gcloud scheduler jobs create http hodi-payout-sweep --location "$REGION" \
+  --schedule "*/5 * * * *" --time-zone "Africa/Nairobi" \
+  --uri "$API_URL/api/v1/internal/jobs/payout-sweep" --http-method POST \
+  --oidc-service-account-email "$SCHED_SA" --oidc-token-audience "$API_URL" --attempt-deadline 2m
+```
+
+Each agency sets up its own B2C account in Settings → Payouts. Bank notifications and CSV
+statement imports need no infrastructure. A bank that pushes notifications must be able to
+reach `$API_URL/api/v1/hooks/bank/<token>`. If it requires a fixed source address from us,
+that is the Cloud NAT address in §0.
+
+## 15. VMs (created 2026-10-28)
+
+Hodi's first server is a Compute Engine VM. It is not the Cloud Run setup in §1–§9; that remains
+the scale-up path.
+
+| What | Value |
+|---|---|
+| Project | `cloudvalabs-mdm` (Main Billing). It also hosts other CloudvaLabs servers |
+| Network | `hodi-net` (custom VPC, separate from `default`), subnet `hodi-africa-south1` 10.20.0.0/24 |
+| Firewall | `hodi-allow-web` tcp 80/443 from anywhere; `hodi-allow-iap-ssh` tcp 22 from Google IAP (35.235.240.0/20) only. Target tag `hodi-server` |
+| VM | `hodi-server`, `africa-south1-a`, e2-medium (2 vCPU, 4 GB), Ubuntu 24.04 LTS, 30 GB pd-balanced (kept if the VM is deleted), Shielded VM, deletion protection |
+| Address | static `hodi-ip` = 34.35.173.255 |
+| Access | OS Login, project SSH keys blocked. SSH only through IAP: `gcloud compute ssh hodi-server --project cloudvalabs-mdm --zone africa-south1-a --tunnel-through-iap` |
+| Identity | **no service account** (the VM can't call Google APIs). Add a logs/metrics-only one if needed |
+| Software | Docker Engine + Compose plugin (Docker's apt repo), 2 GB swap, unattended security upgrades |
+| Apps | production stack + landing page under Docker; deployed by GitHub Actions: see `infra/vm/README.md` |
+| Dev VM | `hodi-dev-server`, e2-small, 20 GB, static `hodi-dev-ip` = 34.35.37.207, same network, tag and settings; runs the dev stack |
+| Snapshots | `hodi-daily` schedule: disk snapshot every day 02:00 Nairobi, kept 14 days, stored in africa-south1 |
+
+Hodi is deliberately kept off the `default` network. There, `default-allow-ssh` and
+`default-allow-rdp` are open to the whole internet, and `default-allow-internal` lets every VM
+reach every port of the others. Those rules affect the other servers in this project; tighten
+them separately.

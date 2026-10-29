@@ -1,0 +1,21 @@
+# Serves the built web app. TLS and the API live in the front proxy (infra/vm/edge).
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	root * /srv
+	encode zstd gzip
+
+	# Hashed build assets never change: cache for a year. index.html always revalidates,
+	# so a deploy is picked up on the next load.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	@html path / /index.html
+	header @html Cache-Control "no-cache"
+
+	# Client-side routes (/app/…, /tenant/…) fall back to the app shell.
+	try_files {path} /index.html
+	file_server
+}

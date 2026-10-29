@@ -107,7 +107,7 @@ export function InboundDetailPage() {
         <h2>Details</h2>
         <dl className="pf__facts">
           <Fact label="Amount"><span className="num">{formatKES(t.amount)}</span></Fact>
-          <Fact label="M-Pesa receipt"><span className="num">{t.providerRef}</span></Fact>
+          <Fact label={t.source.startsWith('BANK') ? 'Bank reference' : 'M-Pesa receipt'}><span className="num">{t.providerRef}</span></Fact>
           <Fact label="Paid at">{formatDateTime(t.occurredAt)}</Fact>
           <Fact label="Source"><Badge table={SOURCE} value={t.source} /></Fact>
           <Fact label="Payer">{t.payerName}</Fact>

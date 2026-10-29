@@ -39,7 +39,6 @@ export function resolveRequestId(header: string | string[] | undefined): string 
 }
 
 export function buildLoggerOptions(env: Env): Params {
-  const isProd = env.NODE_ENV === 'production';
   return {
     pinoHttp: {
       level: env.LOG_LEVEL,
@@ -69,9 +68,10 @@ export function buildLoggerOptions(env: Env): Params {
       },
       // Health probes run every few seconds; logging them drowns everything else.
       autoLogging: { ignore: (req) => (req.url ?? '').startsWith('/api/v1/health') },
-      transport: isProd
-        ? undefined
-        : { target: 'pino-pretty', options: { singleLine: true, messageKey: 'message' } },
+      transport:
+        env.LOG_FORMAT === 'pretty'
+          ? { target: 'pino-pretty', options: { singleLine: true, messageKey: 'message' } }
+          : undefined,
     },
   };
 }

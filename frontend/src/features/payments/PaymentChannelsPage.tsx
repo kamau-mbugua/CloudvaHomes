@@ -15,6 +15,7 @@ import { RECORD_STATUS } from '../portfolio/labels';
 import { Badge, CheckList, Field } from '../portfolio/ui';
 import { keys, paymentsErrorMessage, useChannels } from './api';
 import { DarajaPanel } from '../mpesa/DarajaPanel';
+import { BankPanel } from '../banks/BankPanel';
 import { isMpesaKind } from '../mpesa/rules';
 import { CHANNEL_KIND } from './labels';
 import { CHANNEL_FIELDS, channelDetails, checkShortcode } from './rules';
@@ -26,7 +27,8 @@ import type { ChannelKind, PaymentChannel } from './types';
  * A channel can be limited to some properties. One with payments can't be deleted, only
  * made inactive (inactive channels can't take new payments). Changes need `channels:manage`.
  * M-Pesa channels also get an "M-Pesa connection" section (phase 5: Daraja keys,
- * callback URLs, registering the paybill URLs).
+ * callback URLs, registering the paybill URLs). Bank accounts get a "Bank accounts"
+ * section (phase 10: statement import, bank notifications).
  */
 export function PaymentChannelsPage() {
   const queryClient = useQueryClient();
@@ -49,6 +51,7 @@ export function PaymentChannelsPage() {
 
   const rows = [...(channels.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
   const mpesaRows = rows.filter((c) => isMpesaKind(c.kind));
+  const bankRows = rows.filter((c) => c.kind === 'BANK_ACCOUNT');
   const propertyName = (id: string) => properties.data?.data.find((p) => p.id === id)?.name;
   const scope = (c: PaymentChannel) => {
     if (c.propertyIds.length === 0) return 'All properties';
@@ -128,6 +131,7 @@ export function PaymentChannelsPage() {
           )}
 
       {mpesaRows.length > 0 && !channels.isError ? <DarajaPanel channels={mpesaRows} canManage={canManage} /> : null}
+      {bankRows.length > 0 && !channels.isError ? <BankPanel channels={bankRows} canManage={canManage} /> : null}
 
       {editing ? <ChannelSheet channel={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /> : null}
     </div>

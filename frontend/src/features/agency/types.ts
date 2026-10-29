@@ -16,7 +16,10 @@ export type CollectionMode = 'AGENCY_COLLECTS' | 'LANDLORD_COLLECTS';
 export type CommissionableLine = 'RENT' | 'CHARGE' | 'MOVE_IN' | 'ADJUSTMENT';
 export type LedgerBucket = 'PAYABLE' | 'DEPOSIT_HELD';
 export type LedgerKind = 'COLLECTION' | 'COMMISSION' | 'EXPENSE' | 'DEPOSIT' | 'REMITTANCE' | 'ADJUSTMENT' | 'REVERSAL';
-export type RemittanceStatus = 'DRAFT' | 'APPROVED' | 'PAID' | 'CANCELLED';
+/** `SENDING` (phase 10): an M-Pesa payout is on its way; it can't be paid or cancelled meanwhile. */
+export type RemittanceStatus = 'DRAFT' | 'APPROVED' | 'SENDING' | 'PAID' | 'CANCELLED';
+/** An M-Pesa B2C payout. `UNCERTAIN`: M-Pesa didn't confirm either way — a person must check. */
+export type RemittancePayoutState = 'PENDING' | 'SUCCESS' | 'FAILED' | 'UNCERTAIN';
 export type RemittanceDirection = 'TO_LANDLORD' | 'FROM_LANDLORD';
 export type PayoutMethod = 'BANK' | 'MPESA' | 'CHEQUE';
 
@@ -129,6 +132,31 @@ export interface Remittance {
   payoutMasked: string | null;
   cancelledReason: string | null;
   createdAt: string;
+  /** Phase 10: the latest M-Pesa payout for it, if one was sent. */
+  payout?: RemittancePayout | null;
+  /**
+   * Phase 10: where it would be paid now — the landlord's payout method and masked
+   * details on file (`null` = none). Absent from an older server; then the landlord
+   * account is asked.
+   */
+  payoutTo?: { method: PayoutMethod; masked: string | null } | null;
+}
+
+/** `payout` on a remittance (phase 10). */
+export interface RemittancePayout {
+  id: string;
+  state: RemittancePayoutState;
+  amount: number;
+  /** Masked, e.g. "+254 7•• ••• 012". */
+  phone: string | null;
+  /** The M-Pesa receipt once paid. */
+  receipt: string | null;
+  /** Safaricom's words on a failure. */
+  resultDesc: string | null;
+  /** What the person who resolved an UNCERTAIN payout wrote. */
+  resolvedNote?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
 }
 
 // ---------------------------------------------------------------- owner statement

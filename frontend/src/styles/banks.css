@@ -1,0 +1,86 @@
+/*
+ * Phase 10 (banks & payouts) pieces: the Bank accounts cards on Payment channels, the
+ * statement import sheet, Settings → Payouts, the remittance payout status and the
+ * bulk-payment selection. Reuses the M-Pesa card layout (mpesa.css) and is built only
+ * from existing tokens, so light and dark both follow. Everything stacks at 390px.
+ */
+
+/* ---- bank account cards --------------------------------------------------- */
+.bk__block { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.bk__h { margin: 0; font-size: 14px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.bk__details > summary {
+  cursor: pointer; font-weight: 500; font-size: 13.5px; color: var(--text-secondary);
+  min-height: var(--touch-min); display: flex; align-items: center;
+}
+.bk__history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bk__historyrow { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); min-width: 0; }
+.bk__historyhead { display: flex; flex-direction: column; min-width: 0; }
+.bk__filename { overflow-wrap: anywhere; font-size: 13.5px; }
+.bk__help { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.bk__help p, .bk__help ul { margin: 0; }
+.bk__help ul { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.bk__help code { font-family: var(--font-num); font-size: 12px; overflow-wrap: anywhere; }
+.bk__code {
+  margin: 0; overflow: auto;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--secondary); color: var(--foreground);
+  font-family: var(--font-num); font-size: 12px; line-height: 1.5; white-space: pre;
+}
+
+/* ---- statement import ----------------------------------------------------- */
+.bk__import { display: flex; flex-direction: column; gap: 16px; }
+.bk__file { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-width: 0; }
+.bk__file .ad__sub { margin-top: 0; overflow-wrap: anywhere; }
+.bk__mapping { margin: 0; padding: 0; border: 0; min-width: 0; }
+.bk__mapping > legend { padding: 0; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
+.bk__sample { margin-top: 8px; max-height: 320px; overflow: auto; }
+.bk__sample th, .bk__sample td { white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+.bk__role { margin-left: 6px; vertical-align: 1px; }
+.bk__mapped { background: var(--info-soft); }
+.bk__counts { display: flex; flex-direction: column; gap: 8px; }
+.bk__tally { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.bk__bad { color: var(--destructive); }
+.bk__errors {
+  margin: 0; padding: 8px 10px 8px 26px; max-height: 200px; overflow: auto;
+  border: 1px solid var(--border); border-left: 3px solid var(--destructive); border-radius: var(--radius);
+  background: var(--destructive-soft); color: var(--foreground); font-size: 13px;
+}
+.bk__result { display: flex; flex-direction: column; gap: 10px; }
+.bk__result p { margin: 0; }
+.bk__resulthead { font-size: 15px; }
+
+/* ---- Settings → Payouts --------------------------------------------------- */
+.bk__intro { margin-bottom: 14px; max-width: 88ch; display: flex; flex-direction: column; gap: 8px; }
+.bk__payout { max-width: 720px; }
+.bk__cardtitle { margin: 0; font-size: 16px; font-weight: 600; }
+.bk__payout .pf__facts { margin: 0; }
+
+/* ---- remittance payout ---------------------------------------------------- */
+.bk__payoutstate { margin-bottom: 14px; }
+.bk__payoutstate--warn { border-left: 3px solid var(--warning); }
+.bk__payoutstate--bad { border-left: 3px solid var(--destructive); }
+.bk__payouthead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bk__payouthead h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.bk__payoutstate .pf__facts { margin: 0; }
+.bk__live { display: flex; align-items: center; gap: 10px; margin: 0; }
+.bk__uncertain {
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  padding: 10px 12px; border-radius: var(--radius);
+  background: var(--warning-soft); color: var(--foreground);
+}
+.bk__uncertain p { margin: 0; }
+.bk__uncertain strong { color: var(--warning); }
+
+/* ---- bulk-payment selection ----------------------------------------------- */
+.bk__tick { width: 44px; text-align: center; }
+.bk__tick input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+.bk__bulkbar { position: sticky; top: 0; z-index: 2; }
+.bk__bulkdone { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.bk__bulkdone p { margin: 0; max-width: 72ch; }
+.bk__bulkhint { display: block; margin: 0 0 10px; }
+
+@media (max-width: 640px) {
+  .bk__sample th, .bk__sample td { max-width: 160px; }
+  .bk__bulkbar .bl__headbtns { width: 100%; }
+  .bk__bulkbar .bl__headbtns > .nx-btn { flex: 1 1 auto; justify-content: center; }
+}

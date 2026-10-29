@@ -1,0 +1,102 @@
+# One Hodi environment (one per VM): its own Postgres, API, web app and cron. Images are built
+# by GitHub Actions and pulled by tag (the commit SHA); nothing is built on the server.
+# Run by scripts/deploy.sh and scripts/rollback.sh, which set RELEASE and IMAGE_PREFIX:
+#
+#   RELEASE=<sha> IMAGE_PREFIX=ghcr.io/<owner>/<repo> \
+#     docker compose -p hodi-prod --env-file /opt/hodi/envs/prod/stack.env -f compose.yml up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hodi
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: hodi
+      TZ: Africa/Nairobi
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=50"]
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hodi -d hodi"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+    logging: &logs
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  migrate:
+    image: ${IMAGE_PREFIX:?}/hodi-migrate:${RELEASE:?}
+    environment:
+      DATABASE_URL: postgresql://hodi:${DB_PASSWORD}@db:5432/hodi
+    depends_on: { db: { condition: service_healthy } }
+    networks: [internal]
+    profiles: [tools]
+    logging: *logs
+
+  api:
+    image: ${IMAGE_PREFIX}/hodi-api:${RELEASE}
+    restart: unless-stopped
+    env_file: ${ENV_DIR:?}/api.env
+    environment:
+      DATABASE_URL: postgresql://hodi:${DB_PASSWORD}@db:5432/hodi
+      PORT: "8080"
+      TRUST_PROXY_HOPS: "1"
+      STORAGE_DRIVER: local
+      STORAGE_DIR: /var/lib/hodi/files
+      TZ: Africa/Nairobi
+    volumes:
+      - files:/var/lib/hodi/files
+    depends_on: { db: { condition: service_healthy } }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 768m
+    networks:
+      internal: {}
+      edge:
+        aliases: ["${STACK:?}-api"]
+    logging: *logs
+
+  web:
+    image: ${IMAGE_PREFIX}/hodi-web:${RELEASE}
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      edge:
+        aliases: ["${STACK}-web"]
+    logging: *logs
+
+  cron:
+    image: ${IMAGE_PREFIX}/hodi-cron:${RELEASE}
+    restart: unless-stopped
+    environment:
+      TZ: Africa/Nairobi
+      JOBS_URL: http://api:8080/api/v1/internal/jobs
+      JOBS_SHARED_SECRET: ${JOBS_SHARED_SECRET:?}
+      BACKUPS: ${BACKUPS:-0}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      PGHOST: db
+      PGUSER: hodi
+      PGPASSWORD: ${DB_PASSWORD}
+      PGDATABASE: hodi
+    volumes:
+      - ${BACKUP_DIR:?}:/backups
+    depends_on: [api]
+    mem_limit: 64m
+    networks: [internal]
+    logging: *logs
+
+volumes:
+  db:
+  files:
+
+networks:
+  internal: {}
+  edge:
+    name: hodi-edge
+    external: true

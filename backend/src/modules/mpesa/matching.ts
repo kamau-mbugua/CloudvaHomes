@@ -30,3 +30,19 @@ export function unitSplits(
     .sort((a, b) => b.length - a.length)
     .map((code) => ({ code, number: ref.slice(code.length) }));
 }
+
+/**
+ * The reference to match a bank credit on, from its free-text narrative: a tenant code
+ * ("T00001") or an invoice number ("INV-2026-000001"/"INV2026000001") anywhere in it, or the
+ * whole narrative when it is one token (a unit reference like "KLCA4"). Null otherwise: other
+ * words ("RENT", "OCTOBER") must never auto-match.
+ */
+export function narrativeRef(narrative: string | null | undefined): string | null {
+  const text = (narrative ?? '').toUpperCase();
+  const tenant = /(?:^|[^A-Z0-9])(T\d{5,7})(?![A-Z0-9])/.exec(text);
+  if (tenant) return tenant[1]!;
+  const invoice = /(?:^|[^A-Z0-9])INV[-\s]?(\d{4})[-\s]?(\d{6,})(?![A-Z0-9])/.exec(text);
+  if (invoice) return `INV${invoice[1]}${invoice[2]}`;
+  const single = text.trim();
+  return /^[A-Z0-9-]{3,30}$/.test(single) ? single : null;
+}

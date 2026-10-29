@@ -36,8 +36,33 @@ export interface StkQueryResult {
   resultDesc: string;
 }
 
+export interface B2cRequest {
+  initiatorName: string;
+  securityCredential: string;
+  shortcode: string; // the B2C (disbursement) shortcode paying out
+  phone: string; // 2547…
+  amountKes: number; // whole shillings
+  remarks: string; // ≤ 100 chars
+  occasion: string;
+  resultUrl: string;
+  timeoutUrl: string;
+}
+
+export interface B2cAccepted {
+  conversationId: string;
+  originatorConversationId: string;
+}
+
 /** What Hodi needs from Daraja. Real and simulated implementations; tests supply their own. */
 export abstract class DarajaClient {
+  /**
+   * Business-to-customer payment (phase 10: landlord remittances). Accepted only means queued:
+   * the outcome arrives on the result URL. Clients that don't support it refuse.
+   */
+  b2c(_t: DarajaTarget, _r: B2cRequest): Promise<B2cAccepted> {
+    return Promise.reject(darajaError('B2C payments aren’t available'));
+  }
+
   abstract stkPush(t: DarajaTarget, r: StkPushRequest): Promise<StkPushResult>;
   abstract stkQuery(
     t: DarajaTarget,
@@ -160,6 +185,27 @@ export class HttpDarajaClient extends DarajaClient {
     }
   }
 
+  /** Confirm the B2C API version and CommandID with Safaricom before go-live (security review). */
+  override async b2c(t: DarajaTarget, r: B2cRequest): Promise<B2cAccepted> {
+    const body = await this.post<Record<string, string>>(t, '/mpesa/b2c/v1/paymentrequest', {
+      InitiatorName: r.initiatorName,
+      SecurityCredential: r.securityCredential,
+      CommandID: 'BusinessPayment',
+      Amount: r.amountKes,
+      PartyA: r.shortcode,
+      PartyB: r.phone,
+      Remarks: r.remarks,
+      QueueTimeOutURL: r.timeoutUrl,
+      ResultURL: r.resultUrl,
+      Occasion: r.occasion,
+    });
+    if (body.ResponseCode !== '0') throw darajaError(body.ResponseDescription ?? 'request refused');
+    return {
+      conversationId: body.ConversationID!,
+      originatorConversationId: body.OriginatorConversationID!,
+    };
+  }
+
   async registerC2b(
     t: DarajaTarget,
     r: { shortCode: string; confirmationUrl: string; validationUrl: string },
@@ -183,7 +229,50 @@ export class SimulatedDarajaClient extends DarajaClient {
   private readonly log = new Logger(SimulatedDarajaClient.name);
   private readonly results = new Map<string, StkQueryResult>();
   onComplete?: (checkoutRequestId: string, payload: unknown) => Promise<void>;
+  /** B2C results, delivered the way Safaricom would post them to the result URL. */
+  onB2cResult?: (payload: unknown) => Promise<void>;
   delayMs = 4000;
+
+  /** Succeeds after `delayMs`; amounts ending in 1 shilling fail ("insufficient funds"). */
+  override b2c(_t: DarajaTarget, r: B2cRequest): Promise<B2cAccepted> {
+    const ids = {
+      conversationId: `AG_SIM_${randomBytes(6).toString('hex')}`,
+      originatorConversationId: `SIM-${randomBytes(6).toString('hex')}`,
+    };
+    const failed = r.amountKes % 10 === 1;
+    setTimeout(() => {
+      const payload = {
+        Result: {
+          ResultType: 0,
+          ResultCode: failed ? 2001 : 0,
+          ResultDesc: failed
+            ? 'The balance is insufficient for the transaction.'
+            : 'The service request is processed successfully.',
+          OriginatorConversationID: ids.originatorConversationId,
+          ConversationID: ids.conversationId,
+          TransactionID: failed ? '' : `SIMB2C${randomBytes(3).toString('hex').toUpperCase()}`,
+          ...(failed
+            ? {}
+            : {
+                ResultParameters: {
+                  ResultParameter: [
+                    { Key: 'TransactionAmount', Value: r.amountKes },
+                    {
+                      Key: 'TransactionReceipt',
+                      Value: `SIMB2C${randomBytes(3).toString('hex').toUpperCase()}`,
+                    },
+                    { Key: 'ReceiverPartyPublicName', Value: `${r.phone} - Simulated Recipient` },
+                  ],
+                },
+              }),
+        },
+      };
+      this.onB2cResult?.(payload).catch((e: unknown) =>
+        this.log.error({ err: e }, 'Simulated B2C result failed'),
+      );
+    }, this.delayMs).unref();
+    return Promise.resolve(ids);
+  }
 
   stkPush(_t: DarajaTarget, r: StkPushRequest): Promise<StkPushResult> {
     const checkoutRequestId = `ws_CO_SIM_${randomBytes(6).toString('hex')}`;
