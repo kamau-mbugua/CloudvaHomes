@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { formatDateOnly } from '../../../common/dates/date-only.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import type { InvoiceKind } from '../../../generated/prisma/client.js';
 import type { Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
+import {
+  formatKesMinor,
+  NotificationsService,
+} from '../../notifications/notifications.service.js';
 import { nextCode } from '../../portfolio/codes.js';
-import { addDays } from '../billing-math.js';
+import { addDays, balanceOf } from '../billing-math.js';
 import type { DraftLine } from './invoice-builder.js';
 
 export interface IssueRequest {
@@ -31,9 +35,13 @@ export type IssuedHook = (
  */
 @Injectable()
 export class InvoiceIssuer {
+  private readonly logger = new Logger(InvoiceIssuer.name);
   private readonly issuedHooks: IssuedHook[] = [];
 
-  constructor(private readonly audit: AuditService) {}
+  constructor(
+    private readonly audit: AuditService,
+    @Optional() private readonly notifications?: NotificationsService,
+  ) {}
 
   /** Lets later modules act in the issuing transaction (payments applies tenant credit). */
   onIssued(hook: IssuedHook): void {
@@ -122,7 +130,116 @@ export class InvoiceIssuer {
       tx,
     );
     for (const hook of this.issuedHooks) await hook(tx, invoice);
+    await this.notifyTenantInvoice(tx, invoice.id, r);
     return invoice.id;
+  }
+
+  private async notifyTenantInvoice(tx: Tx, invoiceId: string, r: IssueRequest): Promise<void> {
+    if (!this.notifications) return;
+    try {
+      const [fullInvoice, org, channels] = await Promise.all([
+        tx.invoice.findUnique({
+          where: { id: invoiceId },
+          include: {
+            tenancy: {
+              select: {
+                tenant: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                    code: true,
+                  },
+                },
+                unit: {
+                  select: {
+                    number: true,
+                    property: { select: { name: true, code: true } },
+                  },
+                },
+              },
+            },
+          },
+        }),
+        tx.organization.findUnique({
+          where: { id: r.orgId },
+          select: { name: true },
+        }),
+        tx.paymentChannel.findMany({
+          where: {
+            orgId: r.orgId,
+            status: 'ACTIVE',
+            kind: { in: ['MPESA_PAYBILL', 'MPESA_TILL', 'BANK_ACCOUNT'] },
+            OR: [
+              { propertyIds: { isEmpty: true } },
+              { propertyIds: { has: r.tenancy.unit.propertyId } },
+            ],
+          },
+          orderBy: { createdAt: 'asc' },
+        }),
+      ]);
+
+      const tenant = fullInvoice?.tenancy.tenant;
+      if (!fullInvoice || !tenant?.email) return;
+
+      const unit = fullInvoice.tenancy.unit;
+      const orgName = org?.name ?? 'KodiHub';
+      const kindLabel =
+        r.kind === 'MOVE_IN'
+          ? 'Move-in'
+          : r.kind === 'ADHOC'
+            ? 'Ad-hoc / Adjustment'
+            : 'Monthly';
+
+      const linesSummary = r.lines
+        .map((l) => `- ${l.description}: KES ${formatKesMinor(l.amount)}`)
+        .join('\n');
+
+      const paidAndCredited = fullInvoice.amountPaid + fullInvoice.creditedAmount;
+      const bal = balanceOf(fullInvoice);
+
+      const payLines: string[] = [];
+      for (const c of channels) {
+        if (c.kind === 'MPESA_PAYBILL' && c.shortcode) {
+          payLines.push(`M-Pesa Paybill ${c.shortcode}, Account ${tenant.code}`);
+        } else if (c.kind === 'MPESA_TILL' && c.shortcode) {
+          payLines.push(`M-Pesa Buy Goods Till ${c.shortcode}`);
+        } else if (c.kind === 'BANK_ACCOUNT' && c.accountNumber) {
+          payLines.push(
+            `${c.bankName || c.name} Acc ${c.accountNumber}${c.accountName ? ` (${c.accountName})` : ''}, Ref ${tenant.code}`,
+          );
+        }
+      }
+      const paymentInstructions =
+        payLines.length > 0
+          ? `Pay via ${payLines.join(' or ')}.`
+          : `Use your tenant account code ${tenant.code} when paying.`;
+
+      await this.notifications.sendTenantInvoiceIssued(
+        { email: tenant.email, phone: tenant.phone },
+        {
+          firstName: tenant.firstName,
+          lastName: tenant.lastName,
+          organizationName: orgName,
+          tenantCode: tenant.code,
+          invoiceNumber: fullInvoice.number,
+          invoiceKind: kindLabel,
+          period: fullInvoice.period,
+          propertyName: unit.property.name,
+          unitNumber: unit.number,
+          issueDate: formatDateOnly(fullInvoice.issueDate),
+          dueDate: formatDateOnly(fullInvoice.dueDate),
+          linesSummary,
+          totalKes: formatKesMinor(fullInvoice.total),
+          amountPaidKes: formatKesMinor(paidAndCredited),
+          balanceKes: formatKesMinor(bal > 0n ? bal : 0n),
+          paymentInstructions,
+        },
+      );
+    } catch (err) {
+      this.logger.warn({ err, invoiceId }, 'Could not send tenant invoice email');
+    }
   }
 }
 

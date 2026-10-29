@@ -1,12 +1,14 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AppError } from '../../../common/errors/app-error.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
 import { paginated } from '../../../common/http/response.js';
 import type { Prisma, Tenant } from '../../../generated/prisma/client.js';
 import { violatesUnique } from '../../../prisma/errors.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
+import { PrismaService } from '../../../prisma/prisma.service.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
+import { NotificationsService } from '../../notifications/notifications.service.js';
 import { nextCode } from '../codes.js';
 import { optionalEmail, optionalPhone, optionalText, requiredPhone, upper } from '../fields.js';
 import { IdNumbers } from '../id-numbers.js';
@@ -55,11 +57,34 @@ function snapshot(t: Tenant) {
 
 @Injectable()
 export class TenantsService {
+  private readonly logger = new Logger(TenantsService.name);
+
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly ids: IdNumbers,
+    @Optional() private readonly prisma?: PrismaService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
+
+  /**
+   * Checks across the entire platform (unscoped) whether a User or Tenant with this
+   * phone or email already exists before creating a new tenant record.
+   */
+  async personAlreadyExists(phone: string, email: string | null): Promise<boolean> {
+    if (!this.prisma) return false;
+    const orFilters: { phone?: string; email?: { equals: string; mode: 'insensitive' } }[] = [
+      { phone },
+    ];
+    if (email) {
+      orFilters.push({ email: { equals: email, mode: 'insensitive' } });
+    }
+    const [userCount, tenantCount] = await Promise.all([
+      this.prisma.user.count({ where: { OR: orFilters } }),
+      this.prisma.tenant.count({ where: { OR: orFilters } }),
+    ]);
+    return userCount > 0 || tenantCount > 0;
+  }
 
   /** Owed per tenant: invoiced − credited − paid (negative = in credit). Void invoices skipped. */
   private async balances(ids: string[]): Promise<Map<string, bigint>> {
@@ -171,8 +196,101 @@ export class TenantsService {
   }
 
   async create(dto: CreateTenantDto) {
+    const { orgId } = orgContext();
+    const phone = requiredPhone('phone', dto.phone);
+    const email = optionalEmail('email', dto.email) ?? null;
+    const alreadyExisted = await this.personAlreadyExists(phone, email);
     const id = await this.write((tx) => this.createInTx(tx, dto));
-    return this.get(id);
+    const created = await this.get(id);
+
+    if (created.email && this.notifications) {
+      try {
+        const org = await this.db.organization.findUnique({
+          where: { id: orgId },
+          select: { name: true },
+        });
+        const orgName = org?.name ?? 'KodiHub';
+        if (!alreadyExisted) {
+          await this.notifications.sendTenantWelcome(
+            { email: created.email, phone: created.phone },
+            {
+              firstName: created.firstName,
+              lastName: created.lastName,
+              organizationName: orgName,
+              tenantCode: created.code,
+            },
+          );
+        } else {
+          await this.notifications.sendTenantAddedToOrg(
+            { email: created.email, phone: created.phone },
+            {
+              firstName: created.firstName,
+              lastName: created.lastName,
+              organizationName: orgName,
+              tenantCode: created.code,
+            },
+          );
+        }
+      } catch (err) {
+        this.logger.warn({ err, tenantId: created.id }, 'Could not send tenant onboarding email');
+      }
+    }
+
+    return created;
+  }
+
+  /**
+   * Used during move-in (`POST /tenancies`) when inline `tenant` details are provided:
+   * - If a tenant with this phone already exists in the organisation (e.g. occupying a
+   *   second unit in the same property or another property), reuses that tenant record!
+   * - Otherwise creates the tenant and reports whether they were a brand-new person on KodiHub.
+   */
+  async resolveOrCreateForMoveInInTx(
+    tx: Tx,
+    dto: CreateTenantDto,
+  ): Promise<{ tenantId: string; wasBrandNewPerson: boolean }> {
+    const phone = requiredPhone('phone', dto.phone);
+    const email = optionalEmail('email', dto.email) ?? null;
+    const existingInOrg = await tx.tenant.findFirst({
+      where: { phone },
+      select: {
+        id: true,
+        email: true,
+        kraPin: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        notes: true,
+      },
+    });
+    if (existingInOrg) {
+      const patch: Prisma.TenantUpdateInput = {};
+      if (!existingInOrg.email && email) patch.email = email;
+      const kraPin = upper(dto.kraPin);
+      if (!existingInOrg.kraPin && kraPin) patch.kraPin = kraPin;
+      const emergencyContactName = optionalText(dto.emergencyContactName);
+      if (!existingInOrg.emergencyContactName && emergencyContactName) {
+        patch.emergencyContactName = emergencyContactName;
+      }
+      const emergencyContactPhone = optionalPhone(
+        'emergencyContactPhone',
+        dto.emergencyContactPhone,
+      );
+      if (!existingInOrg.emergencyContactPhone && emergencyContactPhone) {
+        patch.emergencyContactPhone = emergencyContactPhone;
+      }
+      const notes = optionalText(dto.notes);
+      if (!existingInOrg.notes && notes) patch.notes = notes;
+      if (Object.keys(patch).length > 0) {
+        await tx.tenant.update({
+          where: { id: existingInOrg.id },
+          data: patch,
+        });
+      }
+      return { tenantId: existingInOrg.id, wasBrandNewPerson: false };
+    }
+    const alreadyExisted = await this.personAlreadyExists(phone, email);
+    const tenantId = await this.createInTx(tx, dto);
+    return { tenantId, wasBrandNewPerson: !alreadyExisted };
   }
 
   /** Creates a tenant inside the caller's transaction (also used by move-in). Returns its id. */

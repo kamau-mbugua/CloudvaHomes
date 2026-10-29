@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
   formatDateOnly,
   formatDateOnlyOrNull,
@@ -12,6 +12,10 @@ import { violatesUnique } from '../../../prisma/errors.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
+import {
+  formatKesMinor,
+  NotificationsService,
+} from '../../notifications/notifications.service.js';
 import { tenancyScope } from '../property-scope.js';
 import { mapTenantConflict, TenantsService } from '../tenants/tenants.service.js';
 import { CURRENT, lockUnit, UnitsService } from '../units/units.service.js';
@@ -98,6 +102,7 @@ export type MoveInHook = (
  */
 @Injectable()
 export class TenanciesService {
+  private readonly logger = new Logger(TenanciesService.name);
   private readonly moveInHooks: MoveInHook[] = [];
 
   constructor(
@@ -105,6 +110,7 @@ export class TenanciesService {
     private readonly audit: AuditService,
     private readonly units: UnitsService,
     private readonly tenants: TenantsService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   /** Lets later modules join the move-in transaction without portfolio depending on them. */
@@ -170,6 +176,7 @@ export class TenanciesService {
     const start = parseDateOnly(dto.startDate);
 
     try {
+      let wasBrandNewPerson = false;
       const id = await this.db.$transaction(async (tx) => {
         await lockUnit(tx, unit.id);
         const current = await tx.tenancy.count({
@@ -188,7 +195,15 @@ export class TenanciesService {
             `The previous tenant moved out on ${formatDateOnly(last.endDate)}; start on or after that day`,
           );
         }
-        const tenantId = dto.tenantId ?? (await this.tenants.createInTx(tx, dto.tenant!));
+        let tenantId: string;
+        if (dto.tenantId) {
+          tenantId = dto.tenantId;
+          wasBrandNewPerson = false;
+        } else {
+          const resolved = await this.tenants.resolveOrCreateForMoveInInTx(tx, dto.tenant!);
+          tenantId = resolved.tenantId;
+          wasBrandNewPerson = resolved.wasBrandNewPerson;
+        }
         const created = await tx.tenancy.create({
           data: {
             orgId: ctx.orgId,
@@ -211,14 +226,14 @@ export class TenanciesService {
           tx,
         );
         if (created.depositHeld > 0n) {
-          // Opening entry of the deposit ledger (phase 4): held before Hodi.
+          // Opening entry of the deposit ledger (phase 4): held before KodiHub.
           await tx.depositTransaction.create({
             data: {
               orgId: ctx.orgId,
               tenancyId: created.id,
               kind: 'OPENING',
               amount: created.depositHeld,
-              note: 'Deposit held before Hodi',
+              note: 'Deposit held before KodiHub',
               createdById: ctx.userId,
             },
           });
@@ -227,10 +242,128 @@ export class TenanciesService {
         for (const hook of this.moveInHooks) await hook(tx, moved, dto.issueMoveInInvoice);
         return created.id;
       });
-      return this.get(id);
+      const result = await this.get(id);
+      await this.notifyTenantMoveIn(ctx.orgId, result, unit.propertyId, wasBrandNewPerson);
+      return result;
     } catch (e) {
       if (violatesUnique(e, 'tenancies_one_current_per_unit')) throw unitOccupied();
       throw mapTenantConflict(e);
+    }
+  }
+
+  private async notifyTenantMoveIn(
+    orgId: string,
+    tenancy: ReturnType<typeof toTenancy>,
+    propertyId: string,
+    wasBrandNewPerson: boolean,
+  ): Promise<void> {
+    if (!this.notifications) return;
+    try {
+      const [tenantRecord, org, activeTenancies, channels] = await Promise.all([
+        this.db.tenant.findUnique({
+          where: { id: tenancy.tenant.id },
+          select: { email: true, phone: true, firstName: true, lastName: true, code: true },
+        }),
+        this.db.organization.findUnique({
+          where: { id: orgId },
+          select: { name: true },
+        }),
+        this.db.tenancy.findMany({
+          where: { tenantId: tenancy.tenant.id, status: { in: [...CURRENT] } },
+          select: {
+            unit: {
+              select: {
+                number: true,
+                property: { select: { name: true } },
+              },
+            },
+          },
+          orderBy: [{ startDate: 'asc' }],
+        }),
+        this.db.paymentChannel.findMany({
+          where: {
+            orgId,
+            status: 'ACTIVE',
+            kind: { in: ['MPESA_PAYBILL', 'MPESA_TILL', 'BANK_ACCOUNT'] },
+            OR: [{ propertyIds: { isEmpty: true } }, { propertyIds: { has: propertyId } }],
+          },
+          orderBy: { createdAt: 'asc' },
+        }),
+      ]);
+
+      if (!tenantRecord?.email) return;
+      const orgName = org?.name ?? 'KodiHub';
+
+      // 1. Send Welcome Email ONLY if this tenant/user did not previously exist on KodiHub
+      if (wasBrandNewPerson) {
+        await this.notifications.sendTenantWelcome(
+          { email: tenantRecord.email, phone: tenantRecord.phone },
+          {
+            firstName: tenantRecord.firstName,
+            lastName: tenantRecord.lastName,
+            organizationName: orgName,
+            tenantCode: tenantRecord.code,
+          },
+        );
+      }
+
+      // 2. Group all occupied units across properties for the summary
+      const unitsByProp = new Map<string, string[]>();
+      for (const t of activeTenancies) {
+        const pName = t.unit.property.name;
+        const list = unitsByProp.get(pName) ?? [];
+        if (!list.includes(t.unit.number)) list.push(t.unit.number);
+        unitsByProp.set(pName, list);
+      }
+      const occupiedUnitsSummary =
+        unitsByProp.size > 0
+          ? [...unitsByProp.entries()]
+              .map(([pName, nums]) => `${pName} (${nums.join(', ')})`)
+              .join('; ')
+          : `${tenancy.unit.property.name} (${tenancy.unit.number})`;
+
+      // 3. Build payment instructions for the unit's property
+      const payLines: string[] = [];
+      for (const c of channels) {
+        if (c.kind === 'MPESA_PAYBILL' && c.shortcode) {
+          payLines.push(`M-Pesa Paybill ${c.shortcode}, Account ${tenantRecord.code}`);
+        } else if (c.kind === 'MPESA_TILL' && c.shortcode) {
+          payLines.push(`M-Pesa Buy Goods Till ${c.shortcode}`);
+        } else if (c.kind === 'BANK_ACCOUNT' && c.accountNumber) {
+          payLines.push(
+            `${c.bankName || c.name} Acc ${c.accountNumber}${c.accountName ? ` (${c.accountName})` : ''}, Ref ${tenantRecord.code}`,
+          );
+        }
+      }
+      const paymentInstructions =
+        payLines.length > 0
+          ? `Pay via ${payLines.join(' or ')}.`
+          : `Use your tenant account code ${tenantRecord.code} when paying rent.`;
+
+      // 4. Send House / Unit Assigned Email
+      await this.notifications.sendTenantUnitAssigned(
+        { email: tenantRecord.email, phone: tenantRecord.phone },
+        {
+          firstName: tenantRecord.firstName,
+          lastName: tenantRecord.lastName,
+          organizationName: orgName,
+          tenantCode: tenantRecord.code,
+          propertyName: tenancy.unit.property.name,
+          propertyCode: tenancy.unit.property.code,
+          unitNumber: tenancy.unit.number,
+          rentKes: formatKesMinor(tenancy.rentAmount),
+          startDate: tenancy.startDate,
+          billingDay: tenancy.billingDay,
+          depositHeldKes: formatKesMinor(tenancy.depositHeld),
+          occupiedUnitsSummary,
+          paymentInstructions,
+        },
+      );
+    } catch (err) {
+      this.logger.warn(
+        { err, tenancyId: tenancy.id },
+        'Could not send tenant unit assignment email',
+      );
     }
   }
 

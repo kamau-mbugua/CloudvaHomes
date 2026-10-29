@@ -56,6 +56,50 @@ export interface PlatformInvoiceEmailPayload {
   paybill: string | null;
 }
 
+export interface TenantUnitAssignedEmailPayload {
+  firstName: string;
+  lastName: string;
+  organizationName: string;
+  tenantCode: string;
+  propertyName: string;
+  propertyCode: string;
+  unitNumber: string;
+  rentKes: string;
+  startDate: string;
+  billingDay: number;
+  depositHeldKes: string;
+  occupiedUnitsSummary: string;
+  paymentInstructions: string;
+}
+
+export interface TenantInvoiceEmailPayload {
+  firstName: string;
+  lastName: string;
+  organizationName: string;
+  tenantCode: string;
+  invoiceNumber: string;
+  invoiceKind: string;
+  period: string;
+  propertyName: string;
+  unitNumber: string;
+  issueDate: string;
+  dueDate: string;
+  linesSummary: string;
+  totalKes: string;
+  amountPaidKes: string;
+  balanceKes: string;
+  paymentInstructions: string;
+}
+
+export function formatKesMinor(minor: bigint | number): string {
+  const n = typeof minor === 'bigint' ? minor : BigInt(Math.trunc(minor));
+  const negative = n < 0n;
+  const abs = negative ? -n : n;
+  const whole = (abs / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const cents = (abs % 100n).toString().padStart(2, '0');
+  return `${negative ? '-' : ''}${whole}.${cents}`;
+}
+
 export function parseFromAddress(raw: string | null | undefined): {
   email: string | null;
   name: string | null;
@@ -299,6 +343,102 @@ export class NotificationsService {
       changeDescription: what,
     });
     await this.deliver(to, rendered.subject, rendered.text, 'payout_changed');
+  }
+
+  /**
+   * Sent ONLY when a brand-new tenant/user who did not previously exist on KodiHub is created.
+   */
+  async sendTenantWelcome(
+    to: Recipient,
+    p: {
+      firstName: string;
+      lastName: string;
+      organizationName: string;
+      tenantCode: string;
+    },
+  ): Promise<void> {
+    if (!to.email) return;
+    const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
+    const signInIdentifier = [to.phone, to.email].filter(Boolean).join(' / ');
+    const rendered = await this.renderSystemEmailTemplate('tenant_welcome', {
+      firstName: p.firstName,
+      lastName: p.lastName,
+      organizationName: p.organizationName,
+      tenantCode: p.tenantCode,
+      signInIdentifier,
+      portalLink,
+    });
+    await this.dispatchEmail(
+      { to: to.email, subject: rendered.subject, text: rendered.text },
+      'tenant_welcome',
+    );
+  }
+
+  /**
+   * Sent when an already-existing user/tenant on KodiHub is added to a new organisation
+   * without an immediate house/unit assignment.
+   */
+  async sendTenantAddedToOrg(
+    to: Recipient,
+    p: {
+      firstName: string;
+      lastName: string;
+      organizationName: string;
+      tenantCode: string;
+    },
+  ): Promise<void> {
+    if (!to.email) return;
+    const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
+    const rendered = await this.renderSystemEmailTemplate('tenant_added_to_org', {
+      firstName: p.firstName,
+      lastName: p.lastName,
+      organizationName: p.organizationName,
+      tenantCode: p.tenantCode,
+      portalLink,
+    });
+    await this.dispatchEmail(
+      { to: to.email, subject: rendered.subject, text: rendered.text },
+      'tenant_added_to_org',
+    );
+  }
+
+  /**
+   * Sent whenever a tenant is assigned to a house / unit (1st unit, additional units in the
+   * same property, or units across different properties).
+   */
+  async sendTenantUnitAssigned(
+    to: Recipient,
+    p: TenantUnitAssignedEmailPayload,
+  ): Promise<void> {
+    if (!to.email) return;
+    const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
+    const rendered = await this.renderSystemEmailTemplate('tenant_unit_assigned', {
+      ...p,
+      portalLink,
+    });
+    await this.dispatchEmail(
+      { to: to.email, subject: rendered.subject, text: rendered.text },
+      'tenant_unit_assigned',
+    );
+  }
+
+  /**
+   * Sent whenever a Move-In, Monthly, or Ad-hoc invoice is issued for a tenant.
+   */
+  async sendTenantInvoiceIssued(
+    to: Recipient,
+    p: TenantInvoiceEmailPayload,
+  ): Promise<void> {
+    if (!to.email) return;
+    const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
+    const rendered = await this.renderSystemEmailTemplate('tenant_invoice', {
+      ...p,
+      portalLink,
+    });
+    await this.dispatchEmail(
+      { to: to.email, subject: rendered.subject, text: rendered.text },
+      'tenant_invoice',
+    );
   }
 
   /** A plain SMS (callers log it). Throws if the provider refuses. */

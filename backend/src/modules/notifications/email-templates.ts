@@ -5,6 +5,10 @@ export const EMAIL_TEMPLATE_KEYS = [
   'verification_code',
   'owner_portal_access',
   'payout_changed',
+  'tenant_welcome',
+  'tenant_added_to_org',
+  'tenant_unit_assigned',
+  'tenant_invoice',
 ] as const;
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
@@ -18,7 +22,11 @@ export interface EmailTemplateVariable {
 export interface EmailTemplateDefinition {
   key: EmailTemplateKey;
   name: string;
-  category: 'Onboarding & Invitations' | 'Platform Billing' | 'Security & Access';
+  category:
+    | 'Onboarding & Invitations'
+    | 'Platform Billing'
+    | 'Security & Access'
+    | 'Tenant Communications';
   description: string;
   defaultSubject: string;
   defaultBody: string;
@@ -278,6 +286,225 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
         description:
           'Masked destination account or removal notice (e.g. "to ****4321" or "were removed")',
         sample: 'to ****4321',
+      },
+    ],
+  },
+  tenant_welcome: {
+    key: 'tenant_welcome',
+    name: 'Tenant Welcome to KodiHub',
+    category: 'Tenant Communications',
+    description:
+      'Sent only when a brand-new tenant (who does not yet exist on KodiHub) is registered by an organisation or imported via CSV.',
+    defaultSubject: 'Welcome to {{organizationName}} on KodiHub',
+    defaultBody:
+      'Hi {{firstName}},\n\n' +
+      'Welcome to KodiHub! {{organizationName}} has created your tenant profile.\n\n' +
+      '--- Your Tenant Account ---\n' +
+      'Organisation: {{organizationName}}\n' +
+      'Tenant account code: {{tenantCode}}\n' +
+      'Sign-in phone / email: {{signInIdentifier}}\n' +
+      'Tenant portal: {{portalLink}}\n\n' +
+      'Whenever you are assigned a house or billed for rent and utilities, you will receive updates here and can view your statements and receipts in the tenant portal.',
+    variables: [
+      { key: 'firstName', description: "Tenant's first name", sample: 'Grace' },
+      { key: 'lastName', description: "Tenant's last name", sample: 'Wanjiku' },
+      {
+        key: 'organizationName',
+        description: 'Name of the landlord or managing agency',
+        sample: 'Kilimani Crest Estates',
+      },
+      {
+        key: 'tenantCode',
+        description: 'Unique tenant account code used for payments',
+        sample: 'T00001',
+      },
+      {
+        key: 'signInIdentifier',
+        description: 'Phone number and/or email on file for the tenant',
+        sample: '+254712345678 / grace@example.com',
+      },
+      {
+        key: 'portalLink',
+        description: 'URL to the KodiHub Tenant Portal',
+        sample: 'https://app.kodihub.co.ke/tenant',
+      },
+    ],
+  },
+  tenant_added_to_org: {
+    key: 'tenant_added_to_org',
+    name: 'Existing User Added as Tenant',
+    category: 'Tenant Communications',
+    description:
+      'Sent when a tenant who already exists on KodiHub is added to a new organisation without an immediate unit assignment.',
+    defaultSubject: 'You have been added to {{organizationName}} on KodiHub',
+    defaultBody:
+      'Hi {{firstName}},\n\n' +
+      'You have been added as a tenant under {{organizationName}} on KodiHub.\n\n' +
+      '--- Account Details ---\n' +
+      'Organisation: {{organizationName}}\n' +
+      'Tenant account code: {{tenantCode}}\n' +
+      'Tenant portal: {{portalLink}}',
+    variables: [
+      { key: 'firstName', description: "Tenant's first name", sample: 'Grace' },
+      { key: 'lastName', description: "Tenant's last name", sample: 'Wanjiku' },
+      {
+        key: 'organizationName',
+        description: 'Name of the landlord or managing agency',
+        sample: 'Kilimani Crest Estates',
+      },
+      {
+        key: 'tenantCode',
+        description: 'Unique tenant account code in this organisation',
+        sample: 'T00001',
+      },
+      {
+        key: 'portalLink',
+        description: 'URL to the KodiHub Tenant Portal',
+        sample: 'https://app.kodihub.co.ke/tenant',
+      },
+    ],
+  },
+  tenant_unit_assigned: {
+    key: 'tenant_unit_assigned',
+    name: 'Tenant Assigned to a House / Unit',
+    category: 'Tenant Communications',
+    description:
+      'Sent every time a tenant is assigned to a house/unit (including additional units in the same property or across different properties, and during CSV import).',
+    defaultSubject: 'You have been added to {{propertyName}} (Unit {{unitNumber}}) — {{organizationName}}',
+    defaultBody:
+      'Hi {{firstName}},\n\n' +
+      'You have been assigned to Unit {{unitNumber}} at {{propertyName}} managed by {{organizationName}}.\n\n' +
+      '--- House & Tenancy Details ---\n' +
+      'Property: {{propertyName}} ({{propertyCode}})\n' +
+      'Unit / House: {{unitNumber}}\n' +
+      'Monthly rent: KES {{rentKes}}\n' +
+      'Move-in date: {{startDate}}\n' +
+      'Monthly billing day: Day {{billingDay}} of each month\n' +
+      'Opening deposit recorded: KES {{depositHeldKes}}\n' +
+      'Tenant account code: {{tenantCode}}\n' +
+      'Your occupied units: {{occupiedUnitsSummary}}\n\n' +
+      '--- How to Pay & Portal ---\n' +
+      '{{paymentInstructions}}\n' +
+      'Tenant portal: {{portalLink}}',
+    variables: [
+      { key: 'firstName', description: "Tenant's first name", sample: 'Grace' },
+      { key: 'lastName', description: "Tenant's last name", sample: 'Wanjiku' },
+      {
+        key: 'organizationName',
+        description: 'Name of the landlord or managing agency',
+        sample: 'Kilimani Crest Estates',
+      },
+      {
+        key: 'tenantCode',
+        description: 'Unique tenant account code used for Paybill/Bank payments',
+        sample: 'T00001',
+      },
+      {
+        key: 'propertyName',
+        description: 'Name of the property where the unit is located',
+        sample: 'Ivory Breeze Apartments',
+      },
+      { key: 'propertyCode', description: 'Short code of the property', sample: 'IVB' },
+      { key: 'unitNumber', description: 'House / unit number assigned', sample: 'A1' },
+      { key: 'rentKes', description: 'Monthly rent for this unit in KES', sample: '35,000.00' },
+      { key: 'startDate', description: 'Move-in / start date (YYYY-MM-DD)', sample: '2026-10-01' },
+      {
+        key: 'billingDay',
+        description: 'Day of the month rent falls due (1–28)',
+        sample: '5',
+      },
+      {
+        key: 'depositHeldKes',
+        description: 'Opening deposit recorded on move-in in KES',
+        sample: '35,000.00',
+      },
+      {
+        key: 'occupiedUnitsSummary',
+        description: 'All active units currently occupied by this tenant in the organisation',
+        sample: 'Ivory Breeze Apartments (A1, A2)',
+      },
+      {
+        key: 'paymentInstructions',
+        description: 'Paybill / Bank payment instructions for this property',
+        sample: 'Pay via M-Pesa Paybill 600111, Account T00001.',
+      },
+      {
+        key: 'portalLink',
+        description: 'URL to the KodiHub Tenant Portal',
+        sample: 'https://app.kodihub.co.ke/tenant',
+      },
+    ],
+  },
+  tenant_invoice: {
+    key: 'tenant_invoice',
+    name: 'Tenant Invoice Issued',
+    category: 'Tenant Communications',
+    description:
+      'Sent to the tenant whenever a Move-In, Monthly, or Ad-hoc invoice is issued for any of their units.',
+    defaultSubject:
+      'Invoice {{invoiceNumber}} ({{period}}) for {{propertyName}} ({{unitNumber}}) — KES {{balanceKes}}',
+    defaultBody:
+      'Hi {{firstName}},\n\n' +
+      'A new {{invoiceKind}} invoice {{invoiceNumber}} has been issued for Unit {{unitNumber}} at {{propertyName}} ({{organizationName}}).\n\n' +
+      '--- Invoice Summary ---\n' +
+      'Invoice number: {{invoiceNumber}}\n' +
+      'Property & Unit: {{propertyName}} — Unit {{unitNumber}}\n' +
+      'Billing period: {{period}}\n' +
+      'Issue date: {{issueDate}}\n' +
+      'Due date: {{dueDate}}\n\n' +
+      '--- Breakdown ---\n' +
+      '{{linesSummary}}\n\n' +
+      'Total billed: KES {{totalKes}}\n' +
+      'Paid / credited: KES {{amountPaidKes}}\n' +
+      'Balance due: KES {{balanceKes}}\n\n' +
+      '--- How to Pay ---\n' +
+      '{{paymentInstructions}}\n' +
+      'View & download PDF in the Tenant Portal: {{portalLink}}',
+    variables: [
+      { key: 'firstName', description: "Tenant's first name", sample: 'Grace' },
+      { key: 'lastName', description: "Tenant's last name", sample: 'Wanjiku' },
+      {
+        key: 'organizationName',
+        description: 'Name of the landlord or managing agency',
+        sample: 'Kilimani Crest Estates',
+      },
+      { key: 'tenantCode', description: 'Tenant account reference code', sample: 'T00001' },
+      { key: 'invoiceNumber', description: 'Invoice number', sample: 'INV-2026-000042' },
+      {
+        key: 'invoiceKind',
+        description: 'Human-readable invoice type (Monthly, Move-in, or Ad-hoc)',
+        sample: 'Monthly',
+      },
+      { key: 'period', description: 'Billing month (YYYY-MM)', sample: '2026-10' },
+      { key: 'propertyName', description: 'Property name', sample: 'Ivory Breeze Apartments' },
+      { key: 'unitNumber', description: 'Unit / house number', sample: 'A1' },
+      { key: 'issueDate', description: 'Date invoice was issued (YYYY-MM-DD)', sample: '2026-10-01' },
+      { key: 'dueDate', description: 'Date payment is due (YYYY-MM-DD)', sample: '2026-10-08' },
+      {
+        key: 'linesSummary',
+        description: 'Formatted list of line items on the invoice',
+        sample: '- Rent (2026-10): KES 35,000.00\n- Garbage: KES 500.00',
+      },
+      { key: 'totalKes', description: 'Total invoice amount in KES', sample: '35,500.00' },
+      {
+        key: 'amountPaidKes',
+        description: 'Amount already paid or credited in KES',
+        sample: '0.00',
+      },
+      {
+        key: 'balanceKes',
+        description: 'Remaining balance due on this invoice in KES',
+        sample: '35,500.00',
+      },
+      {
+        key: 'paymentInstructions',
+        description: 'Paybill / Bank payment instructions for this property',
+        sample: 'Pay via M-Pesa Paybill 600111, Account T00001.',
+      },
+      {
+        key: 'portalLink',
+        description: 'URL to the KodiHub Tenant Portal',
+        sample: 'https://app.kodihub.co.ke/tenant',
       },
     ],
   },

@@ -263,15 +263,23 @@ export function TenantsCsvImportSheet({ onClose }: { onClose: () => void }) {
     if (!lastName) return { ok: false as const, error: 'Missing last_name.', cells };
     if (!phone) return { ok: false as const, error: 'Missing phone number.', cells };
 
-    // Check duplicate phone within the CSV file
+    // A tenant can occupy multiple units (in the same property or across different properties).
+    // Only reject a duplicate phone in the same CSV when the row does not assign an additional unit.
     const normalizedPhone = phone.replace(/\s+/g, '');
     const dupPhone = allRows.some((other) => {
       if (other.rowNumber >= row.rowNumber) return false;
       const otherPhone = getCell(other, 'phone', 'phone_number', 'mobile', 'tel').replace(/\s+/g, '');
       return otherPhone !== '' && otherPhone === normalizedPhone;
     });
-    if (dupPhone) {
-      return { ok: false as const, error: `Duplicate phone "${phone}" in this CSV.`, cells };
+    if (dupPhone && !unitNumber) {
+      return {
+        ok: false as const,
+        error: `Duplicate phone "${phone}" in this CSV without an additional unit_number to assign.`,
+        cells,
+      };
+    }
+    if (dupPhone && unitNumber) {
+      cells.tenant = `${cells.tenant} (additional unit)`;
     }
 
     let matchedUnit: Unit | null = null;
@@ -413,20 +421,15 @@ export function TenantsCsvImportSheet({ onClose }: { onClose: () => void }) {
     onProgress: (done: number, total: number) => void,
   ): Promise<CsvImportResult> => {
     const rowResults: Record<number, CsvRowOutcome> = {};
+    const seenPhones = new Set<string>();
     let createdTenants = 0;
     let movedInCount = 0;
 
     let done = 0;
     for (const item of items) {
       const { rowNumber, data } = item;
+      const normPhone = data.phone.replace(/\s+/g, '');
       try {
-        const hasExtraProfileFields = Boolean(
-          data.kraPin ||
-            data.emergencyContactName ||
-            data.emergencyContactPhone ||
-            data.notes,
-        );
-
         if (!data.unit) {
           // Prospect tenant only (no unit move-in)
           await api.post<DataEnvelope<Tenant>>('/tenants', {
@@ -440,39 +443,14 @@ export function TenantsCsvImportSheet({ onClose }: { onClose: () => void }) {
             emergencyContactPhone: data.emergencyContactPhone || undefined,
             notes: data.notes || undefined,
           });
+          seenPhones.add(normPhone);
           createdTenants += 1;
           rowResults[rowNumber] = { status: 'imported', message: 'Tenant registered' };
-        } else if (hasExtraProfileFields) {
-          // Create tenant with full profile first, then move them into the unit
-          const tenantRes = await api.post<DataEnvelope<Tenant>>('/tenants', {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            email: data.email || undefined,
-            idNumber: data.idNumber || undefined,
-            kraPin: data.kraPin || undefined,
-            emergencyContactName: data.emergencyContactName || undefined,
-            emergencyContactPhone: data.emergencyContactPhone || undefined,
-            notes: data.notes || undefined,
-          });
-          createdTenants += 1;
-
-          await api.post<DataEnvelope<Tenancy>>('/tenancies', {
-            unitId: data.unit.id,
-            tenantId: tenantRes.data.id,
-            rentAmount: data.rentMinor ?? data.unit.rentAmount,
-            billingDay: data.billingDay,
-            startDate: data.startDate,
-            depositHeld: data.depositMinor ?? undefined,
-            issueMoveInInvoice,
-          });
-          movedInCount += 1;
-          rowResults[rowNumber] = {
-            status: 'imported',
-            message: `Moved into ${data.unit.property.code}-${data.unit.number}`,
-          };
         } else {
-          // Single-step move-in with inline new tenant
+          // Single-step move-in with inline tenant details.
+          // Backend reuses the tenant if they already exist in this org (e.g. occupying
+          // multiple units in the same property or across different properties), sending
+          // Welcome only when brand-new to KodiHub and Unit Assigned for every house.
           await api.post<DataEnvelope<Tenancy>>('/tenancies', {
             unitId: data.unit.id,
             rentAmount: data.rentMinor ?? data.unit.rentAmount,
@@ -486,9 +464,16 @@ export function TenantsCsvImportSheet({ onClose }: { onClose: () => void }) {
               phone: data.phone,
               email: data.email || undefined,
               idNumber: data.idNumber || undefined,
+              kraPin: data.kraPin || undefined,
+              emergencyContactName: data.emergencyContactName || undefined,
+              emergencyContactPhone: data.emergencyContactPhone || undefined,
+              notes: data.notes || undefined,
             },
           });
-          createdTenants += 1;
+          if (!seenPhones.has(normPhone)) {
+            seenPhones.add(normPhone);
+            createdTenants += 1;
+          }
           movedInCount += 1;
           rowResults[rowNumber] = {
             status: 'imported',
