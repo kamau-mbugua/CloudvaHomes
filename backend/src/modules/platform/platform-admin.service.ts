@@ -560,6 +560,12 @@ export class PlatformAdminService {
   async getEmailSettings() {
     const s = await this.billing.settings();
     const dbConfigured = Boolean(s.smtpHost);
+    const rawFrom = s.smtpFromEmail ?? this.env.EMAIL_FROM ?? null;
+    const match = rawFrom
+      ? /^(?:"?([^"<]*)"?\s*)?<([^<>@\s]+@[^<>@\s]+)>$/.exec(rawFrom.trim())
+      : null;
+    const parsedEmail = match ? match[2]!.trim() : rawFrom;
+    const parsedName = match?.[1]?.trim() || null;
     return {
       host:
         s.smtpHost ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_HOST ?? null) : null),
@@ -568,8 +574,8 @@ export class PlatformAdminService {
         s.smtpUser ?? (this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_USER ?? null) : null),
       encryption: (s.smtpEncryption ?? 'tls') as 'tls' | 'ssl' | 'none',
       passwordSet: Boolean(s.smtpPassEnc),
-      fromEmail: s.smtpFromEmail ?? this.env.EMAIL_FROM ?? null,
-      fromName: s.smtpFromName ?? 'Hodi',
+      fromEmail: parsedEmail,
+      fromName: s.smtpFromName ?? parsedName ?? 'Hodi',
       allowlist: s.smtpAllowlist ?? '',
       source: dbConfigured
         ? ('database' as const)
@@ -630,12 +636,18 @@ export class PlatformAdminService {
   async sendTestEmail(to: string) {
     const email = normalizeEmail(to);
     if (!email) throw AppError.fieldInvalid('to', 'Enter a valid email address');
-    await this.notifications.sendRawEmail({
-      to: email,
-      subject: 'Hodi test email',
-      text: `This is a test email from Hodi platform administration.\n\nSent at: ${new Date().toISOString()}`,
-      kind: 'test',
-    });
+    try {
+      await this.notifications.sendRawEmail({
+        to: email,
+        subject: 'Hodi test email',
+        text: `This is a test email from Hodi platform administration.\n\nSent at: ${new Date().toISOString()}`,
+        kind: 'test',
+      });
+    } catch (e) {
+      if (e instanceof AppError) throw e;
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new AppError(422, 'SMTP_DELIVERY_FAILED', `Could not send test email: ${reason}`);
+    }
     return { sent: true, to: email };
   }
 

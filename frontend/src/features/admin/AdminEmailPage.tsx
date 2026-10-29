@@ -100,7 +100,10 @@ function SmtpForm({ settings }: { settings: PlatformEmailSettings }) {
       setPassword('');
       await queryClient.invalidateQueries({ queryKey: keys.emailSettings });
     },
-    onError: (e) => setError(platformErrorMessage(e)),
+    onError: async (e) => {
+      await queryClient.invalidateQueries({ queryKey: keys.emailLogs });
+      setError(platformErrorMessage(e));
+    },
   });
 
   const submit = (event: FormEvent) => {
@@ -111,14 +114,18 @@ function SmtpForm({ settings }: { settings: PlatformEmailSettings }) {
       setError('Enter a valid SMTP port (1 to 65535).');
       return;
     }
+    const matchFrom = /^(?:"?([^"<]*)"?\s*)?<([^<>@\s]+@[^<>@\s]+)>$/.exec(fromEmail.trim());
+    const cleanFromEmail = matchFrom ? matchFrom[2]!.trim() : fromEmail.trim();
+    const cleanFromName = fromName.trim() || matchFrom?.[1]?.trim() || null;
+    if (cleanFromEmail !== fromEmail) setFromEmail(cleanFromEmail);
     save.mutate({
       host: host.trim() || null,
       port: parsedPort,
       username: user.trim() || null,
       ...(password ? { password } : {}),
       encryption,
-      fromEmail: fromEmail.trim() || null,
-      fromName: fromName.trim() || null,
+      fromEmail: cleanFromEmail || null,
+      fromName: cleanFromName,
       allowlist: allowlist.trim() || null,
     });
   };
@@ -148,7 +155,7 @@ function SmtpForm({ settings }: { settings: PlatformEmailSettings }) {
           <input id="em-port" inputMode="numeric" value={port} onChange={(e) => setPort(e.target.value)} />
         </Field>
         <Field id="em-user" label="Username">
-          <input id="em-user" value={user} onChange={(e) => setUser(e.target.value)} />
+          <input id="em-user" autoComplete="username" value={user} onChange={(e) => setUser(e.target.value)} />
         </Field>
         <Field id="em-enc" label="Encryption">
           <select id="em-enc" value={encryption} onChange={(e) => setEncryption(e.target.value as 'tls' | 'ssl' | 'none')}>
@@ -201,7 +208,10 @@ function TestEmailSection({ configured }: { configured: boolean }) {
         setError(res.error ?? 'Failed to send test email. Check What was sent for details.');
       }
     },
-    onError: (e) => setError(platformErrorMessage(e)),
+    onError: async (e) => {
+      await queryClient.invalidateQueries({ queryKey: keys.emailLogs });
+      setError(platformErrorMessage(e));
+    },
   });
 
   const submit = (event: FormEvent) => {

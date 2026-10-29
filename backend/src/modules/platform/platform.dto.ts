@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -334,6 +334,12 @@ export class UpdateEmailSettingsDto {
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    const match = /^(?:"?([^"<]*)"?\s*)?<([^<>@\s]+@[^<>@\s]+)>$/.exec(trimmed);
+    return match ? match[2]!.trim() : trimmed;
+  })
   @ValidateIf((_, v) => v !== null && v !== '')
   @IsEmail()
   fromEmail?: string | null;

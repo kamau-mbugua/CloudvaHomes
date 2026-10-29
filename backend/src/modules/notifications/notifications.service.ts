@@ -50,6 +50,22 @@ export interface PlatformInvoiceEmailPayload {
   paybill: string | null;
 }
 
+export function parseFromAddress(raw: string | null | undefined): {
+  email: string | null;
+  name: string | null;
+} {
+  const trimmed = raw?.trim();
+  if (!trimmed) return { email: null, name: null };
+  const match = /^(?:"?([^"<]*)"?\s*)?<([^<>@\s]+@[^<>@\s]+)>$/.exec(trimmed);
+  if (match) {
+    return {
+      name: match[1]?.trim() || null,
+      email: match[2]!.trim(),
+    };
+  }
+  return { name: null, email: trimmed };
+}
+
 export function isAllowedByAllowlist(
   email: string,
   allowlistRaw: string | null | undefined,
@@ -311,10 +327,15 @@ export class NotificationsService {
           port,
           secure: enc === 'ssl' || port === 465,
           ignoreTLS: enc === 'none',
+          connectionTimeout: 10_000,
+          greetingTimeout: 10_000,
+          socketTimeout: 15_000,
           ...(settings.smtpUser && pass ? { auth: { user: settings.smtpUser, pass } } : {}),
         });
-        const fromAddr = settings.smtpFromEmail || this.env.EMAIL_FROM;
-        const from = settings.smtpFromName ? `"${settings.smtpFromName}" <${fromAddr}>` : fromAddr;
+        const parsedFrom = parseFromAddress(settings.smtpFromEmail || this.env.EMAIL_FROM);
+        const fromAddr = parsedFrom.email || this.env.EMAIL_FROM;
+        const fromName = settings.smtpFromName || parsedFrom.name;
+        const from = fromName ? `"${fromName}" <${fromAddr}>` : fromAddr;
         await transport.sendMail({ from, to: m.to, subject: m.subject, text: m.text });
       } else {
         await this.email.send(m);
