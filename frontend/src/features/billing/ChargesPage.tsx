@@ -17,6 +17,7 @@ import { RECORD_STATUS } from '../portfolio/labels';
 import type { Unit } from '../portfolio/types';
 import { Badge, CheckList, Field } from '../portfolio/ui';
 import { billingErrorMessage, keys, useChargeTypes, useMoveInCharges } from './api';
+import { ChargesCsvImportSheet } from './ChargesCsvImportSheet';
 import { CHARGE_KIND, CHARGE_KIND_HINT, MOVE_IN_KIND } from './labels';
 import { moveInChargeRule, splitRowErrors } from './rules';
 import type { ChargeKind, ChargeType, MoveInCharge, MoveInKind, VariableGridRow } from './types';
@@ -44,6 +45,8 @@ export function ChargesPage() {
   const tabParam = filters.get('tab') as Tab;
   const tab: Tab = TABS.some((t) => t.id === tabParam) ? tabParam : 'recurring';
   const canSeeProperties = useCan('properties:view');
+  const canCreate = useCan('charges:create');
+  const [importingCsv, setImportingCsv] = useState(false);
 
   return (
     <div className="pg">
@@ -58,6 +61,9 @@ export function ChargesPage() {
               </button>
             ))}
           </div>
+        ) : null}
+        {canCreate && canSeeProperties ? (
+          <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>Import CSV</button>
         ) : null}
       </div>
 
@@ -76,6 +82,10 @@ export function ChargesPage() {
       ) : (
         <VariableTab propertyId={propertyId} />
       )}
+
+      {importingCsv ? (
+        <ChargesCsvImportSheet defaultPropertyId={propertyId || undefined} onClose={() => setImportingCsv(false)} />
+      ) : null}
     </div>
   );
 }

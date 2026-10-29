@@ -20,6 +20,7 @@ import { PrivateFilePreview } from '../uploads/ui';
 import { isImageType } from '../../lib/files';
 import { downloadExpensesCsv, expensesErrorMessage, keys, reportKeys } from './api';
 import { ExpenseSheet } from './ExpenseSheet';
+import { ExpensesCsvImportSheet } from './ExpensesCsvImportSheet';
 import { EXPENSE_CATEGORY, RECURRING, VOIDED, categoryText } from './labels';
 import { RecurringTab } from './RecurringTab';
 import { readVoidedFilter, voidedQuery } from './rules';
@@ -71,6 +72,7 @@ function ExpensesTab() {
   const [voiding, setVoiding] = useState<Expense | null>(null);
   const [viewing, setViewing] = useState<Expense | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
   const rangeError = checkStatementRange(from, to);
   const today = todayInNairobi();
   const query = { q, propertyId, category, from, to, voided: voidedQuery(voided) };
@@ -125,6 +127,7 @@ function ExpensesTab() {
           <button type="button" className="nx-btn" disabled={downloading || Boolean(rangeError)} onClick={download}>
             {downloading ? 'Preparing…' : 'Download CSV'}
           </button>
+          {canCreate ? <button type="button" className="nx-btn" onClick={() => setImportingCsv(true)}>Import CSV</button> : null}
           {canCreate ? <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Record expense</button> : null}
         </div>
       </div>
@@ -215,6 +218,7 @@ function ExpensesTab() {
       <Pager meta={meta} onPage={(next) => filters.setFilter({ page: String(next) })} />
 
       {editing ? <ExpenseSheet expense={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /> : null}
+      {importingCsv ? <ExpensesCsvImportSheet defaultPropertyId={propertyId || undefined} onClose={() => setImportingCsv(false)} /> : null}
       {voiding ? <VoidExpenseDialog expense={voiding} onClose={() => setVoiding(null)} /> : null}
       {viewing ? <ReceiptViewer expense={viewing} onClose={() => setViewing(null)} /> : null}
     </section>

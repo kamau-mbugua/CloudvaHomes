@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Pager } from '../../components/Pager';
 import { keys, portfolioErrorMessage } from './api';
 import { OCCUPANCY, RECORD_STATUS, optionsOf } from './labels';
+import { PortfolioCsvImportSheet } from './PortfolioCsvImportSheet';
 import { PropertySheet } from './PropertySheet';
 import type { Property, Unit } from './types';
 import { UnitSheet } from './UnitSheet';
@@ -44,6 +45,7 @@ export function PropertyDetailPage() {
   const canSeeLandlords = useCan('landlords:view') && isAgency;
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
 
   const property = useQuery({
     queryKey: [...keys.properties, propertyId],
@@ -101,7 +103,12 @@ export function PropertyDetailPage() {
           </p>
         </div>
         <div className="sl__headactions">
-          {canAddUnits ? <button type="button" className="nx-btn nx-btn--primary" onClick={() => setAdding(true)}>Add units</button> : null}
+          {canAddUnits ? (
+            <>
+              <button type="button" className="nx-btn" onClick={() => setImportingCsv(true)}>Import CSV</button>
+              <button type="button" className="nx-btn nx-btn--primary" onClick={() => setAdding(true)}>Add units</button>
+            </>
+          ) : null}
           {canUpdate ? <button type="button" className="nx-btn" onClick={() => setEditing(true)}>Edit</button> : null}
           {canDelete ? (
             <ConfirmDelete size="md" what={p.name}
@@ -184,6 +191,7 @@ export function PropertyDetailPage() {
 
       {editing ? <PropertySheet property={p} onClose={() => setEditing(false)} /> : null}
       {adding ? <UnitSheet property={p} allowBulk onClose={() => setAdding(false)} /> : null}
+      {importingCsv ? <PortfolioCsvImportSheet defaultProperty={p} onClose={() => setImportingCsv(false)} /> : null}
     </div>
   );
 }

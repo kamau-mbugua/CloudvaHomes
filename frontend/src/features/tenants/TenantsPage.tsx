@@ -18,6 +18,7 @@ import { useListFilters } from '../portfolio/hooks';
 import { Badge } from '../portfolio/ui';
 import { MoveInSheet } from './MoveInSheet';
 import { TenantSheet } from './TenantSheet';
+import { TenantsCsvImportSheet } from './TenantsCsvImportSheet';
 
 /**
  * Tenants: everyone the organisation rents to, has rented to, or has registered ahead of
@@ -45,6 +46,7 @@ export function TenantsPage() {
   const [editing, setEditing] = useState<Tenant | 'new' | null>(null);
   const [movingIn, setMovingIn] = useState<Tenant | null>(null);
   const [invitingAll, setInvitingAll] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
 
   const list = useQuery({
     queryKey: [...keys.tenants, { q, status, propertyId, page }],
@@ -102,7 +104,10 @@ export function TenantsPage() {
           </button>
         ) : null}
         {canCreate ? (
-          <button type="button" className={`nx-btn nx-btn--primary ${canUpdate ? '' : 'pg-push'}`} onClick={() => setEditing('new')}>Add tenant</button>
+          <>
+            <button type="button" className={`nx-btn ${canUpdate ? '' : 'pg-push'}`} onClick={() => setImportingCsv(true)}>Import CSV</button>
+            <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Add tenant</button>
+          </>
         ) : null}
       </div>
 
@@ -176,6 +181,7 @@ export function TenantsPage() {
 
       {editing ? <TenantSheet tenant={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /> : null}
       {movingIn ? <MoveInSheet tenant={movingIn} onClose={() => setMovingIn(null)} /> : null}
+      {importingCsv ? <TenantsCsvImportSheet onClose={() => setImportingCsv(false)} /> : null}
       {invitingAll ? (
         <Sheet
           title="Give portal access?"

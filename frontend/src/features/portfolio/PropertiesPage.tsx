@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Pager } from '../../components/Pager';
 import { keys, portfolioErrorMessage, useLandlordOptions } from './api';
 import { RECORD_STATUS } from './labels';
+import { PortfolioCsvImportSheet } from './PortfolioCsvImportSheet';
 import { PropertySheet } from './PropertySheet';
 import type { Property } from './types';
 import { useListFilters } from './hooks';
@@ -40,6 +41,7 @@ export function PropertiesPage() {
   const canSeeLandlords = useCan('landlords:view') && isAgency;
 
   const [editing, setEditing] = useState<Property | 'new' | null>(null);
+  const [importingCsv, setImportingCsv] = useState(false);
 
   const list = useQuery({
     queryKey: [...keys.properties, { q, status, landlordId, page }],
@@ -78,7 +80,10 @@ export function PropertiesPage() {
           </select>
         ) : null}
         {canCreate ? (
-          <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setEditing('new')}>Add property</button>
+          <>
+            <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>Import CSV</button>
+            <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Add property</button>
+          </>
         ) : null}
       </div>
 
@@ -167,6 +172,9 @@ export function PropertiesPage() {
 
       {editing ? (
         <PropertySheet property={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />
+      ) : null}
+      {importingCsv ? (
+        <PortfolioCsvImportSheet onClose={() => setImportingCsv(false)} />
       ) : null}
     </div>
   );

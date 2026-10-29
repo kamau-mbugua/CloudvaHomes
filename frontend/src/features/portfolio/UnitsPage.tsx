@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Pager } from '../../components/Pager';
 import { keys, portfolioErrorMessage, useCatalogue, usePropertyOptions } from './api';
 import { OCCUPANCY, optionsOf } from './labels';
+import { PortfolioCsvImportSheet } from './PortfolioCsvImportSheet';
 import type { Unit } from './types';
 import { UnitSheet } from './UnitSheet';
 import { UnitsTable } from './UnitsTable';
@@ -32,6 +33,7 @@ export function UnitsPage() {
   const canCreate = useCan('units:create');
   const canSeeProperties = useCan('properties:view');
   const [adding, setAdding] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
 
   const list = useQuery({
     queryKey: [...keys.units, { q, propertyId, occupancy, unitTypeId, categoryId, status, page }],
@@ -76,7 +78,10 @@ export function UnitsPage() {
           <option value="INACTIVE">Inactive</option>
         </select>
         {canCreate ? (
-          <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setAdding(true)}>Add units</button>
+          <>
+            <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>Import CSV</button>
+            <button type="button" className="nx-btn nx-btn--primary" onClick={() => setAdding(true)}>Add units</button>
+          </>
         ) : null}
       </div>
 
@@ -103,6 +108,12 @@ export function UnitsPage() {
       <Pager meta={list.data?.meta} onPage={(next) => filters.setFilter({ page: String(next) })} />
 
       {adding ? <UnitSheet allowBulk onClose={() => setAdding(false)} /> : null}
+      {importingCsv ? (
+        <PortfolioCsvImportSheet
+          defaultProperty={(properties.data?.data ?? []).find((p) => p.id === propertyId)}
+          onClose={() => setImportingCsv(false)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { billingErrorMessage, keys, useChargeTypes } from './api';
 import { splitRowErrors, uploadRowErrors } from './rules';
 import { MeterPhotoCell } from './MeterPhoto';
 import type { PendingPhoto } from './MeterPhoto';
+import { MetersCsvImportSheet } from './MetersCsvImportSheet';
 import type { ChargeType, Meter, ReadingSheetRow } from './types';
 import { MonthPicker, PropertySelect } from './ui';
 
@@ -37,8 +38,11 @@ type Tab = 'readings' | 'meters';
 export function MeterReadingsPage() {
   const filters = useListFilters();
   const propertyId = filters.get('propertyId');
+  const period = filters.get('period') || currentPeriod();
   const tab: Tab = filters.get('tab') === 'meters' ? 'meters' : 'readings';
   const canSeeProperties = useCan('properties:view');
+  const canCreate = useCan('meters:create');
+  const [importingCsv, setImportingCsv] = useState(false);
 
   return (
     <div className="pg">
@@ -49,6 +53,9 @@ export function MeterReadingsPage() {
             <button type="button" role="tab" aria-selected={tab === 'readings'} className="pf__tab" onClick={() => filters.setFilter({ tab: '' })}>Readings</button>
             <button type="button" role="tab" aria-selected={tab === 'meters'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'meters' })}>Meters</button>
           </div>
+        ) : null}
+        {canCreate && canSeeProperties ? (
+          <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>Import CSV</button>
         ) : null}
       </div>
 
@@ -61,6 +68,14 @@ export function MeterReadingsPage() {
       ) : (
         <ReadingsTab propertyId={propertyId} />
       )}
+
+      {importingCsv ? (
+        <MetersCsvImportSheet
+          defaultPropertyId={propertyId || undefined}
+          defaultPeriod={period}
+          onClose={() => setImportingCsv(false)}
+        />
+      ) : null}
     </div>
   );
 }

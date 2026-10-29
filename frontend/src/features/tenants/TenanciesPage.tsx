@@ -11,6 +11,7 @@ import type { Tenancy } from '../portfolio/types';
 import { useListFilters } from '../portfolio/hooks';
 import { MoveInSheet } from './MoveInSheet';
 import { TenancyTable } from './TenancyTable';
+import { TenantsCsvImportSheet } from './TenantsCsvImportSheet';
 
 /**
  * Tenancies: who lives (or lived) where, on what rent, newest first. The move-in sheet
@@ -27,6 +28,7 @@ export function TenanciesPage() {
   const canMoveIn = useCan('tenancies:create');
   const canSeeProperties = useCan('properties:view');
   const [movingIn, setMovingIn] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
 
   const list = useQuery({
     queryKey: [...keys.tenancies, { q, status, propertyId, page }],
@@ -54,7 +56,10 @@ export function TenanciesPage() {
           </select>
         ) : null}
         {canMoveIn ? (
-          <button type="button" className="nx-btn nx-btn--primary pg-push" onClick={() => setMovingIn(true)}>Move in</button>
+          <>
+            <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>Import CSV</button>
+            <button type="button" className="nx-btn nx-btn--primary" onClick={() => setMovingIn(true)}>Move in</button>
+          </>
         ) : null}
       </div>
 
@@ -78,6 +83,7 @@ export function TenanciesPage() {
       <Pager meta={list.data?.meta} onPage={(next) => filters.setFilter({ page: String(next) })} />
 
       {movingIn ? <MoveInSheet onClose={() => setMovingIn(false)} /> : null}
+      {importingCsv ? <TenantsCsvImportSheet onClose={() => setImportingCsv(false)} /> : null}
     </div>
   );
 }

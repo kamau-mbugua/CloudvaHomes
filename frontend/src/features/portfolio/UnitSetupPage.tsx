@@ -11,6 +11,7 @@ import { Sheet } from '../../components/Sheet';
 import { keys, portfolioErrorMessage, useCatalogue } from './api';
 import type { CatalogueKind } from './api';
 import { splitFormError } from './formErrors';
+import { PortfolioCsvImportSheet } from './PortfolioCsvImportSheet';
 import type { CatalogueItem } from './types';
 import { nullable, optional } from './forms';
 import { useForm } from './hooks';
@@ -42,6 +43,8 @@ const TABS: { id: string; kind: CatalogueKind; label: string; singular: string; 
 export function UnitSetupPage() {
   const [params, setParams] = useSearchParams();
   const tab = TABS.find((t) => t.id === params.get('tab')) ?? TABS[0];
+  const canCreate = useCan('unit-categories:create');
+  const [importingCsv, setImportingCsv] = useState(false);
 
   return (
     <div className="pg">
@@ -54,9 +57,15 @@ export function UnitSetupPage() {
             </button>
           ))}
         </div>
+        {canCreate ? (
+          <button type="button" className="nx-btn nx-btn--sm" onClick={() => setImportingCsv(true)}>Import CSV</button>
+        ) : null}
       </div>
       {/* Keyed so switching tabs starts each list fresh (its sheet closed). */}
       <CatalogueList key={tab.id} {...tab} />
+      {importingCsv ? (
+        <PortfolioCsvImportSheet onClose={() => setImportingCsv(false)} />
+      ) : null}
     </div>
   );
 }
