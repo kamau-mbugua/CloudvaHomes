@@ -6,6 +6,7 @@ import '../../features/tenant/tenant_api.dart';
 import '../api/api_error.dart';
 import '../auth/session_controller.dart';
 import '../config.dart';
+import '../theme.dart';
 import '../theme_mode.dart';
 import 'common.dart';
 
@@ -55,6 +56,8 @@ class AccountSheet extends ConsumerWidget {
       children: [
         ListTile(
           leading: CircleAvatar(
+            backgroundColor: HodiColors.navy,
+            foregroundColor: Colors.white,
             child: Text(
               session.user.initials,
               style: const TextStyle(fontWeight: FontWeight.w700),
@@ -188,7 +191,12 @@ class AccountButton extends ConsumerWidget {
       onPressed: () => AccountSheet.show(context),
       icon: CircleAvatar(
         radius: 15,
-        child: Text(user?.initials ?? '', style: const TextStyle(fontSize: 12)),
+        backgroundColor: HodiColors.navy,
+        foregroundColor: Colors.white,
+        child: Text(
+          user?.initials ?? '',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }

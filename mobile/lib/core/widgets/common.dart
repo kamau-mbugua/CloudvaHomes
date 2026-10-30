@@ -3,6 +3,113 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
+import '../theme.dart';
+
+/// Signature dark-blue curved hero card used at the top of home, tenant, and billing screens.
+class CurvedHeroCard extends StatelessWidget {
+  const CurvedHeroCard({
+    super.key,
+    this.label,
+    this.trailing,
+    required this.children,
+    this.padding = const EdgeInsets.all(20),
+  });
+  final String? label;
+  final Widget? trailing;
+  final List<Widget> children;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [HodiColors.navy, HodiColors.navyMid],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x24002B4D),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            right: -36,
+            top: -36,
+            child: IgnorePointer(
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.06),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 24,
+            bottom: -48,
+            child: IgnorePointer(
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.04),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: padding,
+            child: DefaultTextStyle.merge(
+              style: const TextStyle(color: Colors.white),
+              child: IconTheme.merge(
+                data: const IconThemeData(color: Colors.white),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (label != null || trailing != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            if (label != null)
+                              Expanded(
+                                child: Text(
+                                  label!,
+                                  style: const TextStyle(
+                                    color: Color(0xCCFFFFFF),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              )
+                            else
+                              const Spacer(),
+                            ?trailing,
+                          ],
+                        ),
+                      ),
+                    ...children,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Loading / error-with-retry / data for an AsyncValue, the same way on every screen.
 class AsyncBody<T> extends StatelessWidget {

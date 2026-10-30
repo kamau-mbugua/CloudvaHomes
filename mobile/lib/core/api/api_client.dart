@@ -1,26 +1,42 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
+import '../config.dart';
 import 'api_error.dart';
+import 'logging_interceptor.dart';
 
 /// Thin client for `/api/v1`, after the web app's `client.ts`. No general retries: a retried
 /// POST could record a payment twice. The one retry is `401 TOKEN_EXPIRED` → one shared
 /// refresh → the request again, once (the server refused it before doing anything).
 class ApiClient {
-  ApiClient({required String baseUrl, Dio? dio})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: baseUrl,
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 45),
-            ),
-          );
+  ApiClient({
+    required String baseUrl,
+    Dio? dio,
+    bool? enableLogging,
+    void Function(String message)? logPrint,
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               baseUrl: baseUrl,
+               connectTimeout: const Duration(seconds: 15),
+               receiveTimeout: const Duration(seconds: 45),
+             ),
+           ) {
+    if (enableLogging ??
+        (dio == null && (!kReleaseMode || !AppConfig.isProd))) {
+      final hasLogger = _dio.interceptors.any((i) => i is LoggingInterceptor);
+      if (!hasLogger) {
+        _dio.interceptors.add(
+          LoggingInterceptor(logPrint: logPrint ?? debugPrint),
+        );
+      }
+    }
+  }
 
   final Dio _dio;
 

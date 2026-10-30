@@ -6,6 +6,7 @@ import '../../core/dates.dart';
 import '../../core/files.dart';
 import '../../core/money.dart';
 import '../../core/providers.dart';
+import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import 'billing_api.dart';
 import 'pay_hodi.dart';
@@ -32,30 +33,73 @@ class PlanBillingScreen extends ConsumerWidget {
           data: (b) => ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              SectionCard(
-                title: 'Owed to Hodi',
-                trailing: StatusChip(
-                  _statusLabel(b.status),
-                  tone: _tone(b.status),
+              CurvedHeroCard(
+                label: 'Owed to Hodi',
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _statusLabel(b.status),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 children: [
-                  Text(
-                    formatKes(b.balance),
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  if (b.overdueAmount != null)
-                    Text(
-                      '${formatKes(b.overdueAmount!)} overdue since ${formatDay(b.overdueSince)}',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      formatKes(b.balance),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
                       ),
                     ),
-                  if (b.credit > 0) Text('${formatKes(b.credit)} in credit'),
+                  ),
+                  if (b.overdueAmount != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '${formatKes(b.overdueAmount!)} overdue since ${formatDay(b.overdueSince)}',
+                      style: const TextStyle(
+                        color: Color(0xFFFCA5A5),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                  if (b.credit > 0) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '${formatKes(b.credit)} in credit',
+                      style: const TextStyle(
+                        color: Color(0xCCFFFFFF),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                   if (b.balance > 0 &&
                       b.canPayInApp &&
                       (session?.can('settings:update') ?? false)) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: HodiColors.navy,
+                        minimumSize: const Size.fromHeight(46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                       onPressed: () =>
                           showPayHodi(context, ref, b, session?.user.phone),
                       child: const Text('Pay now'),
@@ -162,12 +206,6 @@ String _statusLabel(String s) => switch (s) {
   'SUSPENDED' => 'Read-only',
   'CLOSED' => 'Closed',
   _ => s,
-};
-
-Tone _tone(String s) => switch (s) {
-  'ACTIVE' || 'TRIAL' => Tone.good,
-  'GRACE' => Tone.warn,
-  _ => Tone.bad,
 };
 
 String _invoiceLabel(HodiInvoice i) => i.overdue

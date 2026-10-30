@@ -249,20 +249,96 @@ class _Balance extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final balance = t.balance ?? 0;
     final statement = canPayments ? ref.watch(statementProvider(t.id)) : null;
-    final scheme = Theme.of(context).colorScheme;
-    return SectionCard(
-      title: balance > 0 ? 'Owes' : (balance < 0 ? 'In credit' : 'Balance'),
-      children: [
-        Text(
-          formatKes(balance.abs()),
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: balance > 0 ? scheme.error : null,
+    final hasFooter = t.creditBalance > 0 || statement?.valueOrNull != null;
+    return CurvedHeroCard(
+      label: balance > 0 ? 'Owes' : (balance < 0 ? 'In credit' : 'Balance'),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          t.ref.code,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        if (t.creditBalance > 0)
-          FactRow('Unused credit', formatKes(t.creditBalance)),
-        if (statement?.valueOrNull != null)
-          FactRow('Deposit held', formatKes(statement!.value!.depositHeld)),
+      ),
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            formatKes(balance.abs()),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ),
+        if (hasFooter) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Divider(color: Color(0x2EFFFFFF), height: 1),
+          ),
+          if (t.creditBalance > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Unused credit',
+                      style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      formatKes(t.creditBalance),
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (statement?.valueOrNull != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Deposit held',
+                      style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      formatKes(statement!.value!.depositHeld),
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ],
     );
   }

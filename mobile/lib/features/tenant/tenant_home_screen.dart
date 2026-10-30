@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/dates.dart';
 import '../../core/money.dart';
 import '../../core/providers.dart';
+import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/stk_sheet.dart';
 import 'tenant_api.dart';
@@ -129,41 +130,74 @@ class _OwedCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
     final owes = o.owed > 0;
-    return Card(
-      color: owes ? scheme.secondaryContainer : null,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              owes ? 'You owe' : 'Nothing to pay',
-              style: TextStyle(color: scheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              formatKes(o.owed),
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            if (o.credit > 0)
-              Text(
-                '${formatKes(o.credit)} in credit — used on your next invoice',
-              ),
-            if (o.canPayInApp) ...[
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                icon: const Icon(Icons.phone_iphone),
-                label: Text(owes ? 'Pay now' : 'Pay in advance'),
-                onPressed: () => showTenantPaySheet(context, ref, o),
-              ),
-            ],
-          ],
+    return CurvedHeroCard(
+      label: owes ? 'You owe' : 'Nothing to pay',
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          o.orgName,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
+      children: [
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            formatKes(o.owed),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+            ),
+          ),
+        ),
+        if (o.credit > 0) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${formatKes(o.credit)} in credit — used on your next invoice',
+              style: const TextStyle(
+                color: Color(0xE6FFFFFF),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+        if (o.canPayInApp) ...[
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: HodiColors.navy,
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            icon: const Icon(Icons.phone_iphone, color: HodiColors.navy),
+            label: Text(owes ? 'Pay now' : 'Pay in advance'),
+            onPressed: () => showTenantPaySheet(context, ref, o),
+          ),
+        ],
+      ],
     );
   }
 }

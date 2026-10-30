@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hodi/core/api/api_client.dart';
 import 'package:hodi/core/api/api_error.dart';
 
 import '../helpers/fake_http.dart';
@@ -97,5 +99,51 @@ void main() {
       throwsA(isA<ApiError>()),
     );
     expect(adapter.calls, hasLength(1));
+  });
+
+  test('LoggingInterceptor logs requests, responses, and errors', () async {
+    final logs = <String>[];
+    final adapter = FakeAdapter(
+      (c) => c.path == '/ok'
+          ? (
+              200,
+              {
+                'data': {'hello': 'world'},
+              },
+            )
+          : (422, errorBody('BAD_INPUT', 'Invalid payload')),
+    );
+    final dio = Dio(BaseOptions(baseUrl: 'http://api.test/api/v1'))
+      ..httpClientAdapter = adapter;
+    final api = ApiClient(
+      baseUrl: 'http://api.test/api/v1',
+      dio: dio,
+      enableLogging: true,
+      logPrint: logs.add,
+    )..accessToken = 'secret-jwt-token-1234567890';
+
+    await api.post('/ok', body: {'amount': 500});
+    expect(
+      logs.any((l) => l.contains('--> POST http://api.test/api/v1/ok')),
+      isTrue,
+    );
+    expect(logs.any((l) => l.contains('{"amount":500}')), isTrue);
+    expect(
+      logs.any((l) => l.contains('<-- 200 POST http://api.test/api/v1/ok')),
+      isTrue,
+    );
+    expect(logs.any((l) => l.contains('{"data":{"hello":"world"}}')), isTrue);
+    // Masks full bearer token in logs
+    expect(logs.any((l) => l.contains('secret-jwt-token-1234567890')), isFalse);
+
+    logs.clear();
+    await expectLater(api.post('/fail'), throwsA(isA<ApiError>()));
+    expect(
+      logs.any(
+        (l) => l.contains('<-- ERROR [422] POST http://api.test/api/v1/fail'),
+      ),
+      isTrue,
+    );
+    expect(logs.any((l) => l.contains('BAD_INPUT')), isTrue);
   });
 }
