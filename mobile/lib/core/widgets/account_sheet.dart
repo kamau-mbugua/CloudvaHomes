@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../features/tenant/tenant_api.dart';
 import '../api/api_error.dart';
 import '../auth/session_controller.dart';
 import '../config.dart';
@@ -40,17 +41,34 @@ class AccountSheet extends ConsumerWidget {
       }
     }
 
+    final activeTenantId = ref.watch(currentTenantIdProvider);
+    final contactParts = [
+      if (session.user.phone != null && session.user.phone!.isNotEmpty)
+        session.user.phone!,
+      if (session.user.email != null && session.user.email!.isNotEmpty)
+        session.user.email!,
+    ];
+
     return ListView(
       shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
         ListTile(
-          leading: CircleAvatar(child: Text(session.user.initials)),
+          leading: CircleAvatar(
+            child: Text(
+              session.user.initials,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
           title: Text(
             session.user.fullName,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: Text(session.user.phone ?? session.user.email ?? ''),
+          subtitle: Text(contactParts.join(' · ')),
+          trailing: StatusChip(
+            mode == AppMode.tenant ? 'Tenant' : 'Staff',
+            tone: Tone.good,
+          ),
         ),
         if (session.organizations.isNotEmpty) ...[
           const Divider(),
@@ -71,18 +89,34 @@ class AccountSheet extends ConsumerWidget {
         if (session.isTenant) ...[
           const Divider(),
           _Heading('Where I rent', muted),
-          ListTile(
-            leading: const Icon(Icons.home_outlined),
-            title: const Text('My rent'),
-            subtitle: Text(
-              session.tenantOf.map((t) => t.orgName).toSet().join(', '),
-            ),
-            trailing: mode == AppMode.tenant ? const Icon(Icons.check) : null,
-            onTap: () {
-              ref.read(appModeProvider.notifier).state = AppMode.tenant;
-              Navigator.of(context).pop();
-            },
-          ),
+          if (session.tenantOf.length == 1)
+            ListTile(
+              leading: const Icon(Icons.home_outlined),
+              title: const Text('My rent'),
+              subtitle: Text(session.tenantOf.first.orgName),
+              trailing: mode == AppMode.tenant ? const Icon(Icons.check) : null,
+              onTap: () {
+                ref.read(chosenTenantProvider.notifier).state =
+                    session.tenantOf.first.tenantId;
+                ref.read(appModeProvider.notifier).state = AppMode.tenant;
+                Navigator.of(context).pop();
+              },
+            )
+          else
+            for (final t in session.tenantOf)
+              ListTile(
+                leading: const Icon(Icons.home_outlined),
+                title: Text(t.orgName),
+                subtitle: Text(t.name),
+                trailing: mode == AppMode.tenant && activeTenantId == t.tenantId
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () {
+                  ref.read(chosenTenantProvider.notifier).state = t.tenantId;
+                  ref.read(appModeProvider.notifier).state = AppMode.tenant;
+                  Navigator.of(context).pop();
+                },
+              ),
         ],
         const Divider(),
         _Heading('Appearance', muted),

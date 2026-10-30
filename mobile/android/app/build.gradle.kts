@@ -37,6 +37,22 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "env"
+
+    productFlavors {
+        create("dev") {
+            dimension = "env"
+            isDefault = true
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            resValue("string", "app_name", "Hodi Dev")
+        }
+        create("prod") {
+            dimension = "env"
+            resValue("string", "app_name", "Hodi")
+        }
+    }
+
     signingConfigs {
         if (keyProperties.isNotEmpty()) {
             create("release") {

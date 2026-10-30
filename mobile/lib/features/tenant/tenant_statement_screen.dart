@@ -104,7 +104,8 @@ class TenantStatementScreen extends ConsumerWidget {
                   Card(
                     child: Column(
                       children: [
-                        for (final e in s.entries)
+                        for (final (idx, e) in s.entries.indexed) ...[
+                          if (idx > 0) const Divider(height: 1),
                           ListTile(
                             title: Text(e.description),
                             subtitle: Text(
@@ -119,8 +120,11 @@ class TenantStatementScreen extends ConsumerWidget {
                                   e.debit > 0
                                       ? formatKes(e.debit)
                                       : '-${formatKes(e.credit)}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w600,
+                                    color: e.debit > 0
+                                        ? null
+                                        : toneColor(context, Tone.good),
                                   ),
                                 ),
                                 Text(
@@ -130,6 +134,7 @@ class TenantStatementScreen extends ConsumerWidget {
                               ],
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ),

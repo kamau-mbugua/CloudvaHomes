@@ -67,7 +67,9 @@ class TenantHomeScreen extends ConsumerWidget {
             for (final h in o.homes) ...[
               const SizedBox(height: 12),
               SectionCard(
-                title: 'Your home',
+                title: o.homes.length > 1
+                    ? 'Your home · ${h.unit}'
+                    : 'Your home',
                 children: [
                   Text(
                     '${h.unit}, ${h.property}',
@@ -156,7 +158,7 @@ class _OwedCard extends ConsumerWidget {
               FilledButton.icon(
                 icon: const Icon(Icons.phone_iphone),
                 label: Text(owes ? 'Pay now' : 'Pay in advance'),
-                onPressed: () => _pay(context, ref),
+                onPressed: () => showTenantPaySheet(context, ref, o),
               ),
             ],
           ],
@@ -164,29 +166,39 @@ class _OwedCard extends ConsumerWidget {
       ),
     );
   }
+}
 
-  void _pay(BuildContext context, WidgetRef ref) {
-    final api = ref.read(tenantApiProvider);
-    StkPaySheet.show(
-      context,
-      StkPaySheet(
-        title: 'Pay rent by M-Pesa',
-        intro:
-            'An M-Pesa prompt goes to the phone below. Enter your M-Pesa PIN to pay ${o.orgName}.',
-        defaultAmount: wholeShillingsUp(o.owed),
-        defaultPhone: o.phone,
-        amountHint: o.owed > 0
-            ? 'You owe ${formatKes(o.owed)}. Whole shillings only.'
-            : null,
-        submit: (amount, phone, key) => api.pay(o.tenantId, amount, phone, key),
-        poll: (id) => api.payStatus(o.tenantId, id),
-        pollEvery: ref.read(stkPollIntervalProvider),
-        onFinished: (s) {
-          if (s.state == 'SUCCESS') ref.invalidate(tenantOverviewProvider);
-        },
-      ),
-    );
-  }
+void showTenantPaySheet(
+  BuildContext context,
+  WidgetRef ref,
+  TenantOverview o, {
+  int? amountCents,
+  VoidCallback? onSuccess,
+}) {
+  final targetCents = amountCents ?? o.owed;
+  final api = ref.read(tenantApiProvider);
+  StkPaySheet.show(
+    context,
+    StkPaySheet(
+      title: 'Pay rent by M-Pesa',
+      intro:
+          'An M-Pesa prompt goes to the phone below. Enter your M-Pesa PIN to pay ${o.orgName}.',
+      defaultAmount: wholeShillingsUp(targetCents),
+      defaultPhone: o.phone,
+      amountHint: targetCents > 0
+          ? 'You owe ${formatKes(targetCents)}. Whole shillings only.'
+          : null,
+      submit: (amount, phone, key) => api.pay(o.tenantId, amount, phone, key),
+      poll: (id) => api.payStatus(o.tenantId, id),
+      pollEvery: ref.read(stkPollIntervalProvider),
+      onFinished: (s) {
+        if (s.state == 'SUCCESS') {
+          ref.invalidate(tenantOverviewProvider);
+          onSuccess?.call();
+        }
+      },
+    ),
+  );
 }
 
 class _PayWayView extends StatelessWidget {

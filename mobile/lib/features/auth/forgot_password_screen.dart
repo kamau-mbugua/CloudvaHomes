@@ -21,6 +21,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _password = TextEditingController();
   bool _sent = false;
   bool _busy = false;
+  bool _hide = true;
   String? _error;
 
   @override
@@ -31,7 +32,34 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  Future<void> _resend() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(sessionProvider.notifier).forgotPassword(_id.text);
+      if (mounted) showMessage(context, 'A fresh 6-digit code is on its way.');
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _go() async {
+    if (_id.text.trim().isEmpty) {
+      setState(() => _error = 'Enter your email address or phone number.');
+      return;
+    }
+    if (_sent && _code.text.trim().length != 6) {
+      setState(() => _error = 'Enter the 6-digit reset code.');
+      return;
+    }
+    if (_sent && _password.text.length < 10) {
+      setState(() => _error = 'New password must be at least 10 characters.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -66,12 +94,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final target = _id.text.trim();
+    final channelWord = target.contains('@') ? 'email' : 'SMS';
     return AuthScaffold(
       back: true,
       title: 'Reset your password',
       subtitle: _sent
-          ? 'If that account exists, a 6-digit code is on its way.'
-          : 'We’ll send a code to your phone or email.',
+          ? 'If $target has an account, a 6-digit reset code is on its way by $channelWord.'
+          : 'We’ll send a 6-digit reset code to your phone or email.',
       children: [
         TextField(
           controller: _id,
@@ -83,23 +113,35 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _code,
+            autofocus: true,
             keyboardType: TextInputType.number,
             autofillHints: const [AutofillHints.oneTimeCode],
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(6),
             ],
+            style: const TextStyle(fontSize: 22, letterSpacing: 6),
             decoration: const InputDecoration(labelText: 'Code'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _password,
-            obscureText: true,
+            obscureText: _hide,
             autofillHints: const [AutofillHints.newPassword],
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'New password',
               helperText: 'At least 10 characters.',
+              suffixIcon: IconButton(
+                tooltip: _hide ? 'Show password' : 'Hide password',
+                icon: Icon(
+                  _hide
+                      ? Icons.visibility_outlined
+                      : Icons.visibility_off_outlined,
+                ),
+                onPressed: () => setState(() => _hide = !_hide),
+              ),
             ),
+            onSubmitted: (_) => _go(),
           ),
         ],
         const SizedBox(height: 16),
@@ -110,6 +152,29 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             _busy ? 'Please wait…' : (_sent ? 'Set new password' : 'Send code'),
           ),
         ),
+        if (_sent) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: _busy ? null : _resend,
+                child: const Text('Send code again'),
+              ),
+              const Text('·'),
+              TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => setState(() {
+                        _sent = false;
+                        _code.clear();
+                        _password.clear();
+                      }),
+                child: const Text('Change email or phone'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

@@ -9,6 +9,30 @@ import 'token_store.dart';
 /// Which side of the app is showing. Someone who is both staff and a tenant can switch.
 enum AppMode { staff, tenant }
 
+/// Returned when password sign-in requires a second-factor verification code.
+class TwoFactorChallenge {
+  const TwoFactorChallenge({
+    required this.challengeToken,
+    required this.channel,
+    required this.destinationMasked,
+    this.expiresAt,
+  });
+
+  final String challengeToken;
+  final String channel;
+  final String destinationMasked;
+  final String? expiresAt;
+
+  factory TwoFactorChallenge.fromJson(Map<String, dynamic> j) =>
+      TwoFactorChallenge(
+        challengeToken: j['challengeToken'] as String,
+        channel: (j['channel'] as String?) ?? 'EMAIL',
+        destinationMasked:
+            (j['destinationMasked'] as String?) ?? 'your account',
+        expiresAt: j['expiresAt'] as String?,
+      );
+}
+
 /// The session: restored from the stored refresh token at launch, null when signed out.
 class SessionController extends AsyncNotifier<Session?> {
   late ApiClient _api;
@@ -68,7 +92,10 @@ class SessionController extends AsyncNotifier<Session?> {
     return session;
   }
 
-  Future<void> signInWithPassword(String identifier, String password) async {
+  Future<TwoFactorChallenge?> signInWithPassword(
+    String identifier,
+    String password,
+  ) async {
     final res = await _api.post(
       '/auth/login',
       body: {
@@ -77,18 +104,39 @@ class SessionController extends AsyncNotifier<Session?> {
         'client': 'mobile',
       },
     );
+    final data = res['data'] as Map<String, dynamic>;
+    if (data['requiresTwoFactor'] == true) {
+      return TwoFactorChallenge.fromJson(data);
+    }
+    state = AsyncData(await _accept(data));
+    return null;
+  }
+
+  Future<void> verifyTwoFactor(String challengeToken, String code) async {
+    final res = await _api.post(
+      '/auth/login/verify-2fa',
+      body: {
+        'challengeToken': challengeToken.trim(),
+        'code': code.trim(),
+        'client': 'mobile',
+      },
+    );
     state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
   }
 
-  /// Sends a sign-in code by SMS. The server answers the same whether or not the number has
-  /// an account, so this never says who uses Hodi.
-  Future<void> requestCode(String phone) =>
-      _api.post('/auth/otp/request', body: {'phone': phone.trim()});
+  /// Sends a sign-in code by SMS or email. The server answers the same whether or not the
+  /// phone/email has an account, so this never says who uses Hodi.
+  Future<void> requestCode(String phoneOrEmail) =>
+      _api.post('/auth/otp/request', body: {'phone': phoneOrEmail.trim()});
 
-  Future<void> signInWithCode(String phone, String code) async {
+  Future<void> signInWithCode(String phoneOrEmail, String code) async {
     final res = await _api.post(
       '/auth/otp/verify',
-      body: {'phone': phone.trim(), 'code': code.trim(), 'client': 'mobile'},
+      body: {
+        'phone': phoneOrEmail.trim(),
+        'code': code.trim(),
+        'client': 'mobile',
+      },
     );
     state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
   }

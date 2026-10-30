@@ -1,0 +1,53 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Hodi Dev",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_dev.dart",
+      "args": [
+        "--flavor",
+        "dev",
+        "--dart-define=FLAVOR=dev",
+        "--dart-define=API_URL=https://dev.34-35-37-207.sslip.io/api/v1"
+      ]
+    },
+    {
+      "name": "Hodi Prod",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_prod.dart",
+      "args": [
+        "--flavor",
+        "prod",
+        "--dart-define=FLAVOR=prod",
+        "--dart-define=API_URL=https://app.34-35-173-255.sslip.io/api/v1"
+      ]
+    },
+    {
+      "name": "Hodi Local (iOS)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_dev.dart",
+      "args": [
+        "--flavor",
+        "dev",
+        "--dart-define=FLAVOR=dev",
+        "--dart-define=API_URL=http://localhost:8080/api/v1"
+      ]
+    },
+    {
+      "name": "Hodi Local (Android)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main_dev.dart",
+      "args": [
+        "--flavor",
+        "dev",
+        "--dart-define=FLAVOR=dev",
+        "--dart-define=API_URL=http://10.0.2.2:8080/api/v1"
+      ]
+    }
+  ]
+}

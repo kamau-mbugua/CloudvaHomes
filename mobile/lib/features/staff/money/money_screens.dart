@@ -172,8 +172,12 @@ class PaymentDetailScreen extends ConsumerWidget {
                   contentPadding: EdgeInsets.zero,
                   title: Text(p.tenant.name),
                   subtitle: Text(p.tenant.code),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/staff/tenants/${p.tenant.id}'),
+                  trailing: can(ref, 'tenants:view')
+                      ? const Icon(Icons.chevron_right)
+                      : null,
+                  onTap: can(ref, 'tenants:view')
+                      ? () => context.push('/staff/tenants/${p.tenant.id}')
+                      : null,
                 ),
               ],
             ),
@@ -341,8 +345,12 @@ class InvoiceDetailScreen extends ConsumerWidget {
                     contentPadding: EdgeInsets.zero,
                     title: Text(i.tenant.name),
                     subtitle: Text(i.tenant.code),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.go('/staff/tenants/${i.tenant.id}'),
+                    trailing: can(ref, 'tenants:view')
+                        ? const Icon(Icons.chevron_right)
+                        : null,
+                    onTap: can(ref, 'tenants:view')
+                        ? () => context.push('/staff/tenants/${i.tenant.id}')
+                        : null,
                   ),
                 ],
               ),
@@ -577,9 +585,24 @@ class _InboundDetailScreenState extends ConsumerState<InboundDetailScreen> {
                 if (t.accountRef != null)
                   FactRow('Account entered', t.accountRef!),
                 FactRow('Into', t.channelName),
-                if (t.tenant != null) FactRow('Tenant', t.tenant!.name),
+                if (t.tenant != null)
+                  FactRow(
+                    'Tenant',
+                    t.tenant!.name,
+                    onTap: can(ref, 'tenants:view')
+                        ? () => context.push('/staff/tenants/${t.tenant!.id}')
+                        : null,
+                  ),
                 if (t.paymentNumber != null)
-                  FactRow('Payment', t.paymentNumber!),
+                  FactRow(
+                    'Payment',
+                    t.paymentNumber!,
+                    onTap: t.paymentId != null && can(ref, 'payments:view')
+                        ? () => context.push(
+                            '/staff/money/payments/${t.paymentId}',
+                          )
+                        : null,
+                  ),
                 if (t.ignoredReason != null)
                   FactRow('Ignored because', t.ignoredReason!),
               ],

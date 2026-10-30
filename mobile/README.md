@@ -5,18 +5,25 @@ The Flutter app for staff and tenants, on the new API (`backend/`). Plan:
 
 ## Run
 
+IDE run configurations (**Hodi Dev**, **Hodi Prod**, **Hodi Local (iOS)**, **Hodi Local (Android)**) are pre-configured in `.idea/runConfigurations/` (Android Studio / IntelliJ) and `.vscode/launch.json` (VS Code).
+
 ```bash
 flutter pub get
 
+# Dev flavor (https://dev.34-35-37-207.sslip.io/api/v1)
+flutter run --flavor dev -t lib/main_dev.dart
+
+# Prod flavor (https://app.34-35-173-255.sslip.io/api/v1)
+flutter run --flavor prod -t lib/main_prod.dart
+
 # iOS simulator against the local API (backend: npm run start:dev on :8080)
-flutter run --dart-define=API_URL=http://localhost:8080/api/v1
+flutter run --flavor dev -t lib/main_dev.dart --dart-define=API_URL=http://localhost:8080/api/v1
 
-# Android emulator: the host machine is 10.0.2.2
-flutter run --dart-define=API_URL=http://10.0.2.2:8080/api/v1
+# Android emulator against the local API (host machine is 10.0.2.2)
+flutter run --flavor dev -t lib/main_dev.dart --dart-define=API_URL=http://10.0.2.2:8080/api/v1
 
-# Other environments
-flutter run --dart-define=FLAVOR=uat --dart-define=API_URL=https://<uat-api-host>/api/v1
-flutter build appbundle --release --dart-define=FLAVOR=prod --dart-define=API_URL=https://<api-host>/api/v1
+# Release bundle (prod)
+flutter build appbundle --release --flavor prod -t lib/main_prod.dart
 ```
 
 Locally the API runs with simulated M-Pesa (prompts succeed after about 4 s) and prints

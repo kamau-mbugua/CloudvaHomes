@@ -139,7 +139,7 @@ class TenantDetailScreen extends ConsumerWidget {
   }
 }
 
-class _Contacts extends StatelessWidget {
+class _Contacts extends ConsumerWidget {
   const _Contacts(this.t);
   final Tenant t;
 
@@ -175,46 +175,69 @@ class _Contacts extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) => SectionCard(
-    title: t.name,
-    trailing: StatusChip(switch (t.status) {
-      'CURRENT' => 'Current',
-      'PAST' => 'Moved out',
-      _ => 'Prospect',
-    }, tone: t.status == 'CURRENT' ? Tone.good : Tone.neutral),
-    children: [
-      FactRow('Tenant code', t.ref.code),
-      if (t.ref.phone.isNotEmpty) _phone(context, 'Phone', t.ref.phone),
-      if (t.email != null)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Email',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 13,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final canUnits = can(ref, 'units:view');
+    return SectionCard(
+      title: t.name,
+      trailing: StatusChip(switch (t.status) {
+        'CURRENT' => 'Current',
+        'PAST' => 'Moved out',
+        _ => 'Prospect',
+      }, tone: t.status == 'CURRENT' ? Tone.good : Tone.neutral),
+      children: [
+        FactRow('Tenant code', t.ref.code),
+        if (t.ref.phone.isNotEmpty) _phone(context, 'Phone', t.ref.phone),
+        if (t.email != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Email',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        t.email!,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Text(
-                t.email!,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ],
+                IconButton(
+                  tooltip: 'Email ${t.email}',
+                  icon: const Icon(Icons.mail_outline),
+                  onPressed: () => launchOrSay(
+                    context,
+                    Uri(scheme: 'mailto', path: t.email),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      for (final u in t.units)
-        FactRow('Unit', '${u.unitNumber}, ${u.propertyName}'),
-      if (t.emergencyPhone != null)
-        _phone(
-          context,
-          'Emergency${t.emergencyName != null ? ' (${t.emergencyName})' : ''}',
-          t.emergencyPhone!,
-        ),
-    ],
-  );
+        for (final u in t.units)
+          FactRow(
+            'Unit',
+            '${u.unitNumber}, ${u.propertyName}',
+            onTap: canUnits
+                ? () => context.push('/staff/units/${u.unitId}')
+                : null,
+          ),
+        if (t.emergencyPhone != null)
+          _phone(
+            context,
+            'Emergency${t.emergencyName != null ? ' (${t.emergencyName})' : ''}',
+            t.emergencyPhone!,
+          ),
+      ],
+    );
+  }
 }
 
 class _Balance extends ConsumerWidget {
@@ -419,7 +442,8 @@ class _OpenInvoices extends ConsumerWidget {
                           ],
                         ),
                         onTap: can(ref, 'invoices:view')
-                            ? () => context.go('/staff/money/invoices/${i.id}')
+                            ? () =>
+                                  context.push('/staff/money/invoices/${i.id}')
                             : null,
                       ),
                   ],
@@ -454,7 +478,7 @@ class _RecentPayments extends ConsumerWidget {
                           '${p.number} · ${formatDay(p.receivedAt)} · ${channelKindLabel[p.method] ?? p.method}',
                         ),
                         onTap: () =>
-                            context.go('/staff/money/payments/${p.id}'),
+                            context.push('/staff/money/payments/${p.id}'),
                       ),
                   ],
                 ),

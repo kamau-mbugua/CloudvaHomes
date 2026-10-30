@@ -247,7 +247,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
         const SizedBox(height: 12),
         FactRow('Held as credit', formatKes(p.unallocated)),
         FactRow(
-          'SMS receipt',
+          'Receipt notification',
           p.receiptSent == true
               ? 'Sent'
               : _notify
@@ -258,7 +258,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
           const Padding(
             padding: EdgeInsets.only(top: 4),
             child: Text(
-              'The SMS could not be sent. The payment is saved; give the tenant the PDF receipt instead.',
+              'The receipt notification could not be sent. The payment is saved; give the tenant the PDF receipt instead.',
             ),
           ),
         const SizedBox(height: 8),
@@ -464,7 +464,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Send SMS receipt to the tenant'),
+          title: const Text('Send receipt to the tenant (SMS & email)'),
           value: _notify,
           onChanged: (v) => setState(() {
             _notify = v;

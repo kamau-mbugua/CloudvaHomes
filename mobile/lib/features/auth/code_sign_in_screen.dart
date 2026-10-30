@@ -7,7 +7,7 @@ import '../../core/auth/session_controller.dart';
 import '../../core/widgets/common.dart';
 import 'auth_scaffold.dart';
 
-/// Phone → 6-digit code by SMS → signed in. How tenants sign in.
+/// Phone or email → 6-digit code by SMS or email → signed in. How tenants sign in.
 class CodeSignInScreen extends ConsumerStatefulWidget {
   const CodeSignInScreen({super.key});
   @override
@@ -52,7 +52,7 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
       throw ApiError(
         status: 0,
         code: 'LOCAL',
-        message: 'Enter your phone number.',
+        message: 'Enter your phone number or email address.',
       );
     }
     await ref.read(sessionProvider.notifier).requestCode(_phone.text);
@@ -74,22 +74,30 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final target = _phone.text.trim();
+    final channelWord = target.contains('@') ? 'email' : 'SMS';
     return AuthScaffold(
       back: true,
       title: _sent ? 'Enter the code' : 'Sign in with a code',
       subtitle: _sent
-          ? 'If ${_phone.text.trim()} has a Hodi account, a 6-digit code is on its way by SMS.'
-          : 'We’ll text a 6-digit code to your phone.',
+          ? 'If $target has a Hodi account, a 6-digit code is on its way by $channelWord.'
+          : 'We’ll send a 6-digit code to your phone or email.',
       children: [
         TextField(
           controller: _phone,
           enabled: !_sent,
-          keyboardType: TextInputType.phone,
-          autofillHints: const [AutofillHints.telephoneNumber],
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [
+            AutofillHints.telephoneNumber,
+            AutofillHints.email,
+          ],
           decoration: const InputDecoration(
-            labelText: 'Phone number',
-            hintText: '0712 345 678',
+            labelText: 'Phone number or email',
+            hintText: '0712 345 678 or tenant@example.com',
           ),
+          onSubmitted: (_) {
+            if (!_sent) _send();
+          },
         ),
         if (_sent) ...[
           const SizedBox(height: 12),
@@ -115,16 +123,28 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
             _busy ? 'Please wait…' : (_sent ? 'Sign in' : 'Send code'),
           ),
         ),
-        if (_sent)
-          TextButton(
-            onPressed: _busy
-                ? null
-                : () => setState(() {
-                    _sent = false;
-                    _code.clear();
-                  }),
-            child: const Text('Use another number or send again'),
+        if (_sent) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: _busy ? null : _send,
+                child: const Text('Send code again'),
+              ),
+              const Text('·'),
+              TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => setState(() {
+                        _sent = false;
+                        _code.clear();
+                      }),
+                child: const Text('Use another contact'),
+              ),
+            ],
           ),
+        ],
       ],
     );
   }

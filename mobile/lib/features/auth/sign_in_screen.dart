@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -16,6 +17,8 @@ class SignInScreen extends ConsumerStatefulWidget {
 class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _id = TextEditingController();
   final _password = TextEditingController();
+  final _twoFactorCode = TextEditingController();
+  TwoFactorChallenge? _challenge;
   bool _busy = false;
   bool _hide = true;
   String? _error;
@@ -24,6 +27,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   void dispose() {
     _id.dispose();
     _password.dispose();
+    _twoFactorCode.dispose();
     super.dispose();
   }
 
@@ -37,9 +41,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       _error = null;
     });
     try {
-      await ref
+      final challenge = await ref
           .read(sessionProvider.notifier)
           .signInWithPassword(_id.text, _password.text);
+      if (challenge != null && mounted) {
+        setState(() {
+          _challenge = challenge;
+          _twoFactorCode.clear();
+        });
+      }
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -47,8 +57,75 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  Future<void> _verifyTwoFactor() async {
+    if (_twoFactorCode.text.trim().length != 6) {
+      setState(() => _error = 'Enter the 6-digit verification code.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(sessionProvider.notifier)
+          .verifyTwoFactor(_challenge!.challengeToken, _twoFactorCode.text);
+    } on ApiError catch (e) {
+      if (mounted) {
+        setState(() => _error = e.fieldErrors['code'] ?? e.message);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final challenge = _challenge;
+    if (challenge != null) {
+      final channelWord = challenge.channel == 'SMS' ? 'SMS' : 'email';
+      return AuthScaffold(
+        title: 'Two-step verification',
+        subtitle:
+            'Enter the 6-digit code sent by $channelWord to ${challenge.destinationMasked}.',
+        children: [
+          TextField(
+            controller: _twoFactorCode,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
+            style: const TextStyle(fontSize: 22, letterSpacing: 6),
+            decoration: const InputDecoration(labelText: 'Verification code'),
+            onSubmitted: (_) => _verifyTwoFactor(),
+          ),
+          const SizedBox(height: 16),
+          if (_error != null) ...[
+            ErrorBox(_error!),
+            const SizedBox(height: 12),
+          ],
+          FilledButton(
+            onPressed: _busy ? null : _verifyTwoFactor,
+            child: Text(_busy ? 'Verifying…' : 'Verify & sign in'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _challenge = null;
+                    _error = null;
+                    _twoFactorCode.clear();
+                  }),
+            child: const Text('Use a different account'),
+          ),
+        ],
+      );
+    }
+
     return AuthScaffold(
       title: 'Sign in',
       subtitle: 'Rent, invoices and payments in one place.',
@@ -113,13 +190,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         ),
         const SizedBox(height: 16),
         OutlinedButton.icon(
-          icon: const Icon(Icons.sms_outlined),
-          label: const Text('Sign in with a code by SMS'),
+          icon: const Icon(Icons.key_outlined),
+          label: const Text('Sign in with a one-time code'),
           onPressed: () => context.push('/sign-in/code'),
         ),
         const SizedBox(height: 8),
         Text(
-          'Tenants: use the phone number your landlord or agent has for you.',
+          'Tenants: receive a 6-digit code by SMS or email using the contact your landlord or agent has on file.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,

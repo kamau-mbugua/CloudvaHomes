@@ -137,38 +137,72 @@ class SectionCard extends StatelessWidget {
 
 /// "Label ........ value" on one line; the value is right-aligned and wraps if long.
 class FactRow extends StatelessWidget {
-  const FactRow(this.label, this.value, {super.key, this.bold = false});
+  const FactRow(
+    this.label,
+    this.value, {
+    super.key,
+    this.bold = false,
+    this.onTap,
+  });
   final String label;
   final String value;
   final bool bold;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 5,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 5,
+            child: Text(
+              label,
+              style: TextStyle(color: scheme.onSurfaceVariant),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 4,
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: bold ? const TextStyle(fontWeight: FontWeight.w600) : null,
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 4,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontWeight: bold || onTap != null
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: onTap != null ? scheme.secondary : null,
+                    ),
+                  ),
+                ),
+                if (onTap != null) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: scheme.secondary,
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+    if (onTap == null) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: row,
+    );
+  }
 }
 
 /// A value with a Copy button (paybill, account number).

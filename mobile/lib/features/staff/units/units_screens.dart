@@ -285,7 +285,7 @@ class _CurrentTenancy extends ConsumerWidget {
           subtitle: Text('${t.tenant.code} · ${t.tenant.phone}'),
           trailing: canTenants ? const Icon(Icons.chevron_right) : null,
           onTap: canTenants
-              ? () => context.go('/staff/tenants/${t.tenant.id}')
+              ? () => context.push('/staff/tenants/${t.tenant.id}')
               : null,
         ),
         FactRow('Moved in', formatDay(t.startDate)),

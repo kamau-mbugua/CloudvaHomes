@@ -9,6 +9,7 @@ import '../../core/providers.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
 import 'tenant_api.dart';
+import 'tenant_home_screen.dart';
 
 class TenantInvoicesScreen extends ConsumerWidget {
   const TenantInvoicesScreen({super.key});
@@ -55,6 +56,7 @@ class TenantInvoiceScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final invoice = ref.watch(tenantInvoiceProvider(invoiceId));
+    final overview = ref.watch(tenantOverviewProvider).valueOrNull;
     final tenantId = ref.watch(currentTenantIdProvider);
     return Scaffold(
       appBar: AppBar(
@@ -104,6 +106,23 @@ class TenantInvoiceScreen extends ConsumerWidget {
                   FactRow('Credited', '-${formatKes(d.credited)}'),
                 FactRow('Paid', formatKes(d.amountPaid)),
                 FactRow('Balance', formatKes(d.row.balance), bold: true),
+                if (d.row.balance > 0 &&
+                    overview != null &&
+                    overview.canPayInApp) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.phone_iphone),
+                    label: Text('Pay ${formatKes(d.row.balance)} now'),
+                    onPressed: () => showTenantPaySheet(
+                      context,
+                      ref,
+                      overview,
+                      amountCents: d.row.balance,
+                      onSuccess: () =>
+                          ref.invalidate(tenantInvoiceProvider(invoiceId)),
+                    ),
+                  ),
+                ],
               ],
             ),
             if (d.payments.isNotEmpty) ...[
@@ -115,6 +134,21 @@ class TenantInvoiceScreen extends ConsumerWidget {
                     FactRow(
                       '${p.number} · ${formatDay(p.receivedAt)}',
                       formatKes(p.amount),
+                      onTap: tenantId == null || p.id == null
+                          ? null
+                          : () =>
+                                openApiPdf(
+                                  ref.read(apiClientProvider),
+                                  '${ref.read(tenantApiProvider).base(tenantId)}/payments/${p.id}/receipt',
+                                  '${p.number}.pdf',
+                                ).catchError((Object _) {
+                                  if (context.mounted) {
+                                    showMessage(
+                                      context,
+                                      'Couldn’t open the receipt.',
+                                    );
+                                  }
+                                }),
                     ),
                 ],
               ),

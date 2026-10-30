@@ -186,7 +186,8 @@ class InvoiceDetail {
   final int amountPaid;
   final int credited;
   final List<({String description, int amount})> lines;
-  final List<({String number, String receivedAt, int amount})> payments;
+  final List<({String? id, String number, String receivedAt, int amount})>
+  payments;
 
   factory InvoiceDetail.fromJson(Map<String, dynamic> j) => InvoiceDetail(
     row: InvoiceRow.fromJson(j),
@@ -203,7 +204,8 @@ class InvoiceDetail {
     payments: [
       for (final p in j['payments'] as List? ?? const [])
         (
-          number: (p as Map)['number'] as String,
+          id: (p as Map)['id'] as String?,
+          number: p['number'] as String,
           receivedAt: p['receivedAt'] as String,
           amount: centsFrom(p['amount']),
         ),

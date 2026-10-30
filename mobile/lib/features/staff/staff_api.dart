@@ -285,8 +285,9 @@ final staffApiProvider = Provider(
 );
 
 /// The web app's origin: the API base without `/api/v1`.
-String webOrigin([String apiUrl = AppConfig.apiUrl]) {
-  final trimmed = apiUrl.replaceFirst(RegExp(r'/+$'), '');
+String webOrigin([String? apiUrl]) {
+  final raw = apiUrl ?? AppConfig.apiUrl;
+  final trimmed = raw.replaceFirst(RegExp(r'/+$'), '');
   return trimmed.endsWith('/api/v1')
       ? trimmed.substring(0, trimmed.length - '/api/v1'.length)
       : trimmed;
