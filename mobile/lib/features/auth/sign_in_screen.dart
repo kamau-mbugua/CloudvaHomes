@@ -126,10 +126,23 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       );
     }
 
+    final appConfig = ref.watch(appConfigProvider).valueOrNull;
     return AuthScaffold(
       title: 'Sign in',
       subtitle: 'Rent, invoices and payments in one place.',
       children: [
+        if (appConfig?.maintenanceMode == true) ...[
+          const ErrorBox(
+            'Hodi is currently in maintenance mode. Only platform administrators can sign in right now.',
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (appConfig?.forceUpdateRequired == true) ...[
+          ErrorBox(
+            'Please update the Hodi app${appConfig?.minimumMobileVersion != null ? ' to v${appConfig!.minimumMobileVersion} or newer' : ''} for the latest features.',
+          ),
+          const SizedBox(height: 12),
+        ],
         TextField(
           controller: _id,
           keyboardType: TextInputType.emailAddress,
@@ -203,6 +216,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             fontSize: 13,
           ),
         ),
+        if (appConfig?.allowPublicSignup != false) ...[
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => context.push('/register'),
+            child: const Text('Landlord or agency? Create an organisation'),
+          ),
+        ],
       ],
     );
   }

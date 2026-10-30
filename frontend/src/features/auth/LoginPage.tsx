@@ -14,6 +14,7 @@ import { EyeIcon } from './EyeIcon';
 import { AuthLayout } from './AuthLayout';
 import { CodeInput } from './CodeInput';
 import { authErrorMessage } from './authErrors';
+import { useAppConfig } from './useAppConfig';
 import { useCountdown } from './useCountdown';
 
 /**
@@ -53,6 +54,7 @@ export function LoginPage() {
   const [codeError, setCodeError] = useState<string | null>(null);
   const [twoFactor, setTwoFactor] = useState<AdminTwoFactorChallenge | null>(null);
   const countdown = useCountdown(RESEND_SECONDS);
+  const appConfig = useAppConfig();
 
   const finish = (payload: SessionPayload) => {
     acceptSession(payload);
@@ -272,6 +274,13 @@ export function LoginPage() {
           <h1>Welcome back</h1>
           <p className="au__lede">Sign in to manage your properties, tenants and rent.</p>
 
+          {appConfig.data?.maintenanceMode ? (
+            <p className="au__error" role="status">
+              {appConfig.data.maintenanceMessage ||
+                'KodiHub is currently undergoing scheduled maintenance. Platform administrators can still sign in below.'}
+            </p>
+          ) : null}
+
           <div className="au__field">
             <div className="au__labelrow">
               <label htmlFor="identifier">Email or phone number</label>
@@ -333,6 +342,12 @@ export function LoginPage() {
         <button type="button" className="au__alt" onClick={() => switchTo('otp-phone')}>
           Use a one-time code instead
         </button>
+
+        {appConfig.data?.allowPublicSignup ? (
+          <p className="au__note">
+            New to KodiHub? <Link to="/register">Create an organisation account</Link>
+          </p>
+        ) : null}
       </form>
     </AuthLayout>
   );

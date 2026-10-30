@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/widgets/account_sheet.dart';
+import '../../core/widgets/notifications_sheet.dart';
 import 'tenant_api.dart';
 
 /// Tenant mode: bottom tabs, the organisation's name on top, account switch when they rent
@@ -46,7 +47,7 @@ class TenantShell extends ConsumerWidget {
                 ),
               )
             : Text(current?.orgName ?? 'Hodi'),
-        actions: const [AccountButton()],
+        actions: const [NotificationButton(), AccountButton()],
       ),
       body: shell,
       bottomNavigationBar: NavigationBar(
@@ -73,6 +74,11 @@ class TenantShell extends ConsumerWidget {
             icon: Icon(Icons.list_alt_outlined),
             selectedIcon: Icon(Icons.list_alt),
             label: 'Statement',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.handyman_outlined),
+            selectedIcon: Icon(Icons.handyman),
+            label: 'Repairs',
           ),
         ],
       ),

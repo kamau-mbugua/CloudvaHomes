@@ -6,8 +6,8 @@ import '../providers.dart';
 import 'session.dart';
 import 'token_store.dart';
 
-/// Which side of the app is showing. Someone who is both staff and a tenant can switch.
-enum AppMode { staff, tenant }
+/// Which side of the app is showing. Someone who is staff, a tenant, or a landlord owner can switch.
+enum AppMode { staff, tenant, owner }
 
 /// Returned when password sign-in requires a second-factor verification code.
 class TwoFactorChallenge {
@@ -167,6 +167,33 @@ class SessionController extends AsyncNotifier<Session?> {
     state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
   }
 
+  Future<void> registerOrganization(Map<String, dynamic> body) async {
+    final res = await _api.post(
+      '/auth/register',
+      body: {...body, 'client': 'mobile'},
+    );
+    state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
+  }
+
+  Future<void> updateProfile({
+    required String firstName,
+    required String lastName,
+  }) async {
+    await _api.patch(
+      '/me',
+      body: {'firstName': firstName.trim(), 'lastName': lastName.trim()},
+    );
+    await reload();
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _api.post(
+    '/auth/password/change',
+    body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+  );
+
   /// Re-reads the session (permissions, organisation status).
   Future<void> reload() async {
     if (state.valueOrNull == null) return;
@@ -201,13 +228,15 @@ final sessionProvider = AsyncNotifierProvider<SessionController, Session?>(
 /// The mode the person chose; null = the default for their session.
 final appModeProvider = StateProvider<AppMode?>((ref) => null);
 
-/// The mode to show: staff when they belong to an organisation, else tenant.
+/// The mode to show: staff when they belong to an organisation, else tenant, else owner.
 AppMode? effectiveMode(Session? s, AppMode? chosen) {
   if (s == null) return null;
   if (chosen == AppMode.staff && s.isStaff) return AppMode.staff;
   if (chosen == AppMode.tenant && s.isTenant) return AppMode.tenant;
+  if (chosen == AppMode.owner && s.isOwner) return AppMode.owner;
   if (s.isStaff) return AppMode.staff;
   if (s.isTenant) return AppMode.tenant;
+  if (s.isOwner) return AppMode.owner;
   return null;
 }
 
@@ -217,3 +246,35 @@ final modeProvider = Provider<AppMode?>(
     ref.watch(appModeProvider),
   ),
 );
+
+class MobileAppConfig {
+  const MobileAppConfig({
+    required this.maintenanceMode,
+    required this.allowPublicSignup,
+    required this.minimumMobileVersion,
+    required this.forceUpdateRequired,
+  });
+  final bool maintenanceMode;
+  final bool allowPublicSignup;
+  final String? minimumMobileVersion;
+  final bool forceUpdateRequired;
+
+  factory MobileAppConfig.fromJson(Map<String, dynamic> j) => MobileAppConfig(
+    maintenanceMode: j['maintenanceMode'] == true,
+    allowPublicSignup: j['allowPublicSignup'] != false,
+    minimumMobileVersion: j['minimumMobileVersion'] as String?,
+    forceUpdateRequired: j['forceUpdateRequired'] == true,
+  );
+}
+
+final appConfigProvider = FutureProvider.autoDispose<MobileAppConfig?>((
+  ref,
+) async {
+  try {
+    final res = await ref.watch(apiClientProvider).get('/auth/app-config');
+    final data = res['data'];
+    return data is Map<String, dynamic> ? MobileAppConfig.fromJson(data) : null;
+  } on Object {
+    return null;
+  }
+});

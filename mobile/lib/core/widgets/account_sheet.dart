@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../features/owner/owner_screens.dart';
 import '../../features/tenant/tenant_api.dart';
 import '../api/api_error.dart';
 import '../auth/session_controller.dart';
@@ -68,10 +69,11 @@ class AccountSheet extends ConsumerWidget {
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           subtitle: Text(contactParts.join(' · ')),
-          trailing: StatusChip(
-            mode == AppMode.tenant ? 'Tenant' : 'Staff',
-            tone: Tone.good,
-          ),
+          trailing: StatusChip(switch (mode) {
+            AppMode.tenant => 'Tenant',
+            AppMode.owner => 'Owner',
+            _ => 'Staff',
+          }, tone: Tone.good),
         ),
         if (session.organizations.isNotEmpty) ...[
           const Divider(),
@@ -121,6 +123,36 @@ class AccountSheet extends ConsumerWidget {
                 },
               ),
         ],
+        if (session.isOwner) ...[
+          const Divider(),
+          _Heading('Where I own property', muted),
+          for (final o in session.ownerOf)
+            ListTile(
+              leading: const Icon(Icons.domain_outlined),
+              title: Text(o.name),
+              subtitle: Text(o.orgName),
+              trailing:
+                  mode == AppMode.owner &&
+                      ref.watch(currentOwnerIdProvider) == o.landlordId
+                  ? const Icon(Icons.check)
+                  : null,
+              onTap: () {
+                ref.read(chosenOwnerProvider.notifier).state = o.landlordId;
+                ref.read(appModeProvider.notifier).state = AppMode.owner;
+                Navigator.of(context).pop();
+              },
+            ),
+        ],
+        const Divider(),
+        ListTile(
+          leading: const Icon(Icons.manage_accounts_outlined),
+          title: const Text('Profile & password'),
+          subtitle: const Text('Update your name or change your password'),
+          onTap: () {
+            Navigator.of(context).pop();
+            _ProfileAndPasswordSheet.show(context);
+          },
+        ),
         const Divider(),
         _Heading('Appearance', muted),
         Padding(
@@ -196,6 +228,177 @@ class AccountButton extends ConsumerWidget {
         child: Text(
           user?.initials ?? '',
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileAndPasswordSheet extends ConsumerStatefulWidget {
+  const _ProfileAndPasswordSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => const _ProfileAndPasswordSheet(),
+  );
+
+  @override
+  ConsumerState<_ProfileAndPasswordSheet> createState() =>
+      _ProfileAndPasswordSheetState();
+}
+
+class _ProfileAndPasswordSheetState
+    extends ConsumerState<_ProfileAndPasswordSheet> {
+  final _first = TextEditingController();
+  final _last = TextEditingController();
+  final _currentPw = TextEditingController();
+  final _newPw = TextEditingController();
+  bool _savingProfile = false;
+  bool _savingPw = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final u = ref.read(sessionProvider).valueOrNull?.user;
+    if (u != null) {
+      _first.text = u.firstName;
+      _last.text = u.lastName;
+    }
+  }
+
+  @override
+  void dispose() {
+    _first.dispose();
+    _last.dispose();
+    _currentPw.dispose();
+    _newPw.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveProfile() async {
+    if (_first.text.trim().isEmpty || _last.text.trim().isEmpty) {
+      setState(() => _error = 'Enter your first and last name.');
+      return;
+    }
+    setState(() {
+      _savingProfile = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(sessionProvider.notifier)
+          .updateProfile(firstName: _first.text, lastName: _last.text);
+      if (mounted) showMessage(context, 'Profile updated.');
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _savingProfile = false);
+    }
+  }
+
+  Future<void> _savePassword() async {
+    if (_currentPw.text.isEmpty || _newPw.text.length < 10) {
+      setState(
+        () => _error =
+            'Enter your current password and a new password of 10+ characters.',
+      );
+      return;
+    }
+    setState(() {
+      _savingPw = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(sessionProvider.notifier)
+          .changePassword(
+            currentPassword: _currentPw.text,
+            newPassword: _newPw.text,
+          );
+      _currentPw.clear();
+      _newPw.clear();
+      if (mounted) showMessage(context, 'Password changed.');
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _savingPw = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Profile & password',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _first,
+                    decoration: const InputDecoration(labelText: 'First name'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _last,
+                    decoration: const InputDecoration(labelText: 'Last name'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _savingProfile ? null : _saveProfile,
+              child: Text(_savingProfile ? 'Saving…' : 'Save name'),
+            ),
+            const Divider(height: 32),
+            Text(
+              'Change password',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _currentPw,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Current password'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _newPw,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'New password (10+ characters)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_error != null) ...[
+              ErrorBox(_error!),
+              const SizedBox(height: 12),
+            ],
+            OutlinedButton(
+              onPressed: _savingPw ? null : _savePassword,
+              child: Text(_savingPw ? 'Updating…' : 'Update password'),
+            ),
+          ],
         ),
       ),
     );

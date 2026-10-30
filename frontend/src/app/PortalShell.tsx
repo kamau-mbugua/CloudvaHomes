@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NotificationBell } from './NotificationBell';
 import { MoonIcon, SignOutIcon, SunIcon } from './icons';
 import { portalsOf } from '../lib/auth/portals';
 import { logout } from '../lib/auth/session';
@@ -80,6 +81,7 @@ export function PortalShell({
           ) : <strong className="ow__name">{accountName}</strong>}
         </div>
         <div className="ow__actions">
+          <NotificationBell />
           <button type="button" className="sh__icon" onClick={() => setTheme(nextTheme)} aria-label={`Switch to ${nextTheme} theme`} title={`Switch to ${nextTheme} theme`}>
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>

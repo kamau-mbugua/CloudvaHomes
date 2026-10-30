@@ -4,6 +4,7 @@ import '../../core/navigation.dart';
 import 'tenant_home_screen.dart';
 import 'tenant_invoices_screen.dart';
 import 'tenant_payments_screen.dart';
+import 'tenant_requests_screen.dart';
 import 'tenant_shell.dart';
 import 'tenant_statement_screen.dart';
 
@@ -46,6 +47,14 @@ RouteBase tenantRoutes() => StatefulShellRoute.indexedStack(
         GoRoute(
           path: '/tenant/statement',
           builder: (_, _) => const TenantStatementScreen(),
+        ),
+      ],
+    ),
+    StatefulShellBranch(
+      routes: [
+        GoRoute(
+          path: '/tenant/requests',
+          builder: (_, _) => const TenantRequestsScreen(),
         ),
       ],
     ),

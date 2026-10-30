@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   Res,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import { InvitationsService } from '../users/invitations.service.js';
 import {
   AcceptInvitationDto,
   AdminTwoFactorVerifyDto,
+  AppConfigQueryDto,
   ChangePasswordDto,
   type ClientKind,
   ForgotPasswordDto,
@@ -29,6 +31,7 @@ import {
   OtpRequestDto,
   OtpVerifyDto,
   RefreshDto,
+  RegisterOrganizationDto,
   ResetPasswordDto,
   StepUpVerifyDto,
   SwitchOrgDto,
@@ -65,6 +68,22 @@ export class AuthController {
       sameSite: 'strict',
       path: COOKIE_PATH,
     };
+  }
+
+  @Public()
+  @Get('app-config')
+  async appConfig(@Query() q: AppConfigQueryDto) {
+    return ok(await this.auth.appConfig(q.versionCode));
+  }
+
+  @Public()
+  @Post('register')
+  @HttpCode(201)
+  async register(
+    @Body() dto: RegisterOrganizationDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.respond(res, await this.auth.registerOrganization(dto), dto.client);
   }
 
   @Public()

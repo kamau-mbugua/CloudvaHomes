@@ -31,6 +31,13 @@ class _TenantsScreenState extends ConsumerState<TenantsScreen> {
     final version = ref.watch(listsVersionProvider);
     return StaffTabScaffold(
       title: 'Tenants',
+      floatingActionButton: can(ref, 'tenants:create')
+          ? FloatingActionButton.extended(
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Add tenant'),
+              onPressed: () => _TenantFormSheet.show(context),
+            )
+          : null,
       body: !can(ref, 'tenants:view')
           ? const NoPermission('tenants')
           : Column(
@@ -99,7 +106,18 @@ class TenantDetailScreen extends ConsumerWidget {
     final tenant = ref.watch(tenantProvider(tenantId));
     final canPayments = can(ref, 'payments:view');
     return Scaffold(
-      appBar: AppBar(title: Text(tenant.valueOrNull?.name ?? 'Tenant')),
+      appBar: AppBar(
+        title: Text(tenant.valueOrNull?.name ?? 'Tenant'),
+        actions: [
+          if (tenant.valueOrNull != null && can(ref, 'tenants:update'))
+            IconButton(
+              tooltip: 'Edit tenant',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () =>
+                  _TenantFormSheet.show(context, existing: tenant.valueOrNull),
+            ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(tenantProvider(tenantId));
@@ -656,6 +674,191 @@ class _StatementCard extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _TenantFormSheet extends ConsumerStatefulWidget {
+  const _TenantFormSheet({this.existing});
+  final Tenant? existing;
+
+  static Future<void> show(BuildContext context, {Tenant? existing}) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (_) => _TenantFormSheet(existing: existing),
+      );
+
+  @override
+  ConsumerState<_TenantFormSheet> createState() => _TenantFormSheetState();
+}
+
+class _TenantFormSheetState extends ConsumerState<_TenantFormSheet> {
+  final _first = TextEditingController();
+  final _last = TextEditingController();
+  final _phone = TextEditingController();
+  final _email = TextEditingController();
+  final _emName = TextEditingController();
+  final _emPhone = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    if (e != null) {
+      _first.text = e.ref.firstName;
+      _last.text = e.ref.lastName;
+      _phone.text = e.ref.phone;
+      _email.text = e.email ?? '';
+      _emName.text = e.emergencyName ?? '';
+      _emPhone.text = e.emergencyPhone ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _first.dispose();
+    _last.dispose();
+    _phone.dispose();
+    _email.dispose();
+    _emName.dispose();
+    _emPhone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_first.text.trim().isEmpty ||
+        _last.text.trim().isEmpty ||
+        _phone.text.trim().isEmpty) {
+      setState(() => _error = 'Enter first name, last name and phone number.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final api = ref.read(staffApiProvider);
+    final body = {
+      'firstName': _first.text.trim(),
+      'lastName': _last.text.trim(),
+      'phone': _phone.text.trim(),
+      if (_email.text.trim().isNotEmpty) 'email': _email.text.trim(),
+      if (_emName.text.trim().isNotEmpty)
+        'emergencyContactName': _emName.text.trim(),
+      if (_emPhone.text.trim().isNotEmpty)
+        'emergencyContactPhone': _emPhone.text.trim(),
+    };
+    try {
+      if (widget.existing == null) {
+        await api.createTenant(body);
+      } else {
+        await api.updateTenant(widget.existing!.id, body);
+        ref.invalidate(tenantProvider(widget.existing!.id));
+      }
+      ref.read(listsVersionProvider.notifier).state++;
+      if (mounted) {
+        showMessage(
+          context,
+          widget.existing == null ? 'Tenant added.' : 'Tenant updated.',
+        );
+        Navigator.of(context).pop();
+      }
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = staffErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.existing == null ? 'Add tenant' : 'Edit tenant',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _first,
+                    decoration: const InputDecoration(labelText: 'First name'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _last,
+                    decoration: const InputDecoration(labelText: 'Last name'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Phone number'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email address (optional)',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _emName,
+                    decoration: const InputDecoration(
+                      labelText: 'Emergency contact (optional)',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _emPhone,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Emergency phone',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              ErrorBox(_error!),
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: Text(_saving ? 'Saving…' : 'Save tenant'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

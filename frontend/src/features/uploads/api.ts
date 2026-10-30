@@ -8,7 +8,7 @@ import { unwrap } from '../payments/rules';
  * the session's token, so they are shown from blob URLs, never plain links.
  */
 
-export type UploadPurpose = 'EXPENSE_RECEIPT' | 'METER_PHOTO';
+export type UploadPurpose = 'EXPENSE_RECEIPT' | 'METER_PHOTO' | 'MAINTENANCE_PHOTO';
 
 export interface Upload {
   id: string;

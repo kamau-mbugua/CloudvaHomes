@@ -14,6 +14,7 @@ export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const UPLOAD_PERMS: Record<UploadPurpose, string[]> = {
   EXPENSE_RECEIPT: ['expenses:create', 'expenses:update'],
   METER_PHOTO: ['meters:create', 'meters:update'],
+  MAINTENANCE_PHOTO: ['maintenance:create', 'maintenance:update'],
 };
 
 export function toUpload(u: Upload) {
@@ -96,6 +97,12 @@ export class UploadsService {
       if (!perms.has('expenses:view')) return false;
       return !!(await this.db.expense.count({
         where: { receiptUploadId: u.id, property: propertyScope() },
+      }));
+    }
+    if (u.purpose === 'MAINTENANCE_PHOTO') {
+      if (!perms.has('maintenance:view')) return false;
+      return !!(await this.db.maintenanceRequest.count({
+        where: { photoUploadIds: { has: u.id }, unit: unitScope() },
       }));
     }
     if (!perms.has('meters:view')) return false;

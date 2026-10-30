@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/code_sign_in_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
+import '../features/auth/register_screen.dart';
 import '../features/auth/sign_in_screen.dart';
+import '../features/owner/owner_screens.dart';
 import '../features/staff/staff_routes.dart';
 import '../features/tenant/tenant_routes.dart';
 import 'api/api_error.dart';
@@ -13,7 +15,7 @@ import 'auth/session_controller.dart';
 import 'navigation.dart';
 import 'widgets/common.dart';
 
-const _public = {'/sign-in', '/sign-in/code', '/forgot'};
+const _public = {'/sign-in', '/sign-in/code', '/forgot', '/register'};
 
 /// Where to send someone, given the session and the mode. Pure, so it is unit-tested.
 String? redirectFor({
@@ -33,11 +35,13 @@ String? redirectFor({
   final home = switch (mode) {
     AppMode.staff => '/staff',
     AppMode.tenant => '/tenant',
+    AppMode.owner => '/owner',
     null => '/no-access',
   };
   if (isPublic || location == '/' || location == '/offline') return home;
   if (location.startsWith('/staff') && mode != AppMode.staff) return home;
   if (location.startsWith('/tenant') && mode != AppMode.tenant) return home;
+  if (location.startsWith('/owner') && mode != AppMode.owner) return home;
   if (location == '/no-access' && mode != null) return home;
   return null;
 }
@@ -72,7 +76,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const CodeSignInScreen(),
       ),
       GoRoute(path: '/forgot', builder: (_, _) => const ForgotPasswordScreen()),
+      GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
       tenantRoutes(),
+      ownerRoutes(),
       staffRoutes(),
     ],
   );

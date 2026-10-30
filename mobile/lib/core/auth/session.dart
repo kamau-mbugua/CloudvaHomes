@@ -21,6 +21,7 @@ class Session {
   bool can(String permission) => permissions.contains(permission);
   bool get isStaff => activeOrganization != null;
   bool get isTenant => tenantOf.isNotEmpty;
+  bool get isOwner => ownerOf.isNotEmpty;
 
   factory Session.fromJson(Map<String, dynamic> j) {
     final active = j['activeOrganization'];

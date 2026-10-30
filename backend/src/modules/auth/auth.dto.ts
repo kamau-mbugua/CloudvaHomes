@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 const CLIENTS = ['web', 'mobile'] as const;
 export type ClientKind = (typeof CLIENTS)[number];
@@ -13,6 +24,63 @@ class ClientDto {
   @IsOptional()
   @IsIn(CLIENTS)
   client?: ClientKind;
+}
+
+export class AppConfigQueryDto {
+  @ApiPropertyOptional({ description: 'Current mobile app build/version code for force-update check' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  versionCode?: number;
+}
+
+export class RegisterOrganizationDto extends ClientDto {
+  @ApiProperty({ example: 'Sunrise Apartments' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  organizationName!: string;
+
+  @ApiPropertyOptional({ enum: ['LANDLORD', 'AGENCY'], default: 'LANDLORD' })
+  @IsOptional()
+  @IsIn(['LANDLORD', 'AGENCY'])
+  organizationKind?: 'LANDLORD' | 'AGENCY';
+
+  @ApiProperty({ example: '0712345678' })
+  @IsString()
+  @MaxLength(30)
+  phone!: string;
+
+  @ApiProperty({ example: 'owner@example.com' })
+  @IsString()
+  @MaxLength(254)
+  email!: string;
+
+  @ApiPropertyOptional({ example: 'A012345678Z' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z]\d{9}[A-Za-z]$/, {
+    message: 'KRA PIN must be 11 characters, e.g. A012345678Z',
+  })
+  kraPin?: string;
+
+  @ApiProperty({ example: 'Jane' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  firstName!: string;
+
+  @ApiProperty({ example: 'Wanjiku' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  lastName!: string;
+
+  @ApiProperty({ minLength: 10 })
+  @IsString()
+  @MaxLength(128)
+  password!: string;
 }
 
 export class LoginDto extends ClientDto {

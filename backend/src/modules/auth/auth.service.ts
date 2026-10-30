@@ -1,13 +1,24 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { currentContext } from '../../common/context/request-context.js';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { currentContext, withoutOrgScope } from '../../common/context/request-context.js';
+import { parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { RateLimitService } from '../../common/rate-limit/rate-limit.service.js';
+import { DB, type Db } from '../../prisma/prisma.module.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { addDays, todayInNairobi } from '../billing/billing-math.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { RolesService } from '../roles/roles.service.js';
+import type { RegisterOrganizationDto } from './auth.dto.js';
 import { hashPassword, verifyPassword } from './crypto.js';
 import { authContext } from './decorators.js';
-import { type Identifier, parseIdentifier, passwordProblem } from './identifiers.js';
+import {
+  type Identifier,
+  normalizeEmail,
+  normalizePhone,
+  parseIdentifier,
+  passwordProblem,
+} from './identifiers.js';
 import { OTP_TTL_MINUTES, OtpService } from './otp.service.js';
 import { type IssuedSession, SessionsService } from './sessions.service.js';
 import { TokensService } from './tokens.service.js';
@@ -53,7 +64,196 @@ export class AuthService {
     private readonly rateLimit: RateLimitService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    @Optional() @Inject(DB) private readonly db?: Db,
   ) {}
+
+  /**
+   * Public bootstrap configuration for web and mobile clients: maintenance status,
+   * public signup policy, and server-evaluated mobile version check (`forceUpdateRequired`).
+   */
+  async appConfig(versionCode?: number) {
+    const settings = await this.prisma.platformSettings.findUnique({ where: { id: 1 } });
+    const minCode = settings?.minAppVersionCode ?? 1;
+    const minName = settings?.minAppVersionName ?? '1.0.0';
+    const allowPublicSignup = settings?.allowPublicSignup ?? false;
+    const maintenanceMode = settings?.maintenanceMode ?? false;
+    const forceUpdateRequired =
+      versionCode !== undefined && Number.isFinite(versionCode) ? versionCode < minCode : false;
+
+    let defaultPlan: {
+      name: string;
+      trialDays: number;
+      pricePerUnit: bigint;
+      minimumMonthly: bigint;
+    } | null = null;
+
+    if (allowPublicSignup) {
+      const plan =
+        (settings?.defaultPlanId
+          ? await this.prisma.plan.findFirst({
+              where: { id: settings.defaultPlanId, active: true },
+            })
+          : null) ?? (await this.prisma.plan.findFirst({ where: { isDefault: true, active: true } }));
+      if (plan) {
+        defaultPlan = {
+          name: plan.name,
+          trialDays: plan.trialDays,
+          pricePerUnit: plan.pricePerUnit,
+          minimumMonthly: plan.minimumMonthly,
+        };
+      }
+    }
+
+    return {
+      maintenanceMode,
+      maintenanceMessage: settings?.maintenanceMessage ?? null,
+      allowPublicSignup,
+      minAppVersionCode: minCode,
+      minAppVersionName: minName,
+      appUpdateMessage: settings?.appUpdateMessage ?? null,
+      appStoreUrl: settings?.appStoreUrl ?? null,
+      forceUpdateRequired,
+      defaultPlan,
+    };
+  }
+
+  /**
+   * Self-service organisation registration when `PlatformSettings.allowPublicSignup` is enabled.
+   * Atomically creates the organisation, seeds system roles, creates/links the owner User,
+   * and returns an authenticated session.
+   */
+  async registerOrganization(dto: RegisterOrganizationDto): Promise<IssuedSession> {
+    await this.rateLimit.hit({
+      key: `register:ip:${this.ip()}`,
+      limit: 10,
+      windowSeconds: HOUR,
+    });
+
+    const settings = await this.prisma.platformSettings.findUnique({ where: { id: 1 } });
+    if (!settings?.allowPublicSignup) {
+      throw new AppError(
+        403,
+        'SIGNUP_DISABLED',
+        'Public organisation registration is currently disabled. Contact Hodi to get started.',
+      );
+    }
+
+    const phone = normalizePhone(dto.phone);
+    if (!phone) {
+      throw AppError.fieldInvalid('phone', 'Enter a valid phone number, e.g. 0712 345 678');
+    }
+    const email = normalizeEmail(dto.email);
+    if (!email) {
+      throw AppError.fieldInvalid('email', 'Enter a valid email address');
+    }
+    const problem = passwordProblem(dto.password, [email, phone]);
+    if (problem) {
+      throw AppError.fieldInvalid('password', problem);
+    }
+
+    const passwordHash = await hashPassword(dto.password);
+
+    const runner = this.db ?? (this.prisma as unknown as Db);
+    const { userId, orgId } = await withoutOrgScope(async () =>
+      runner.$transaction(async (tx) => {
+        const existingEmailUser = await tx.user.findUnique({ where: { email } });
+        const existingPhoneUser = await tx.user.findUnique({ where: { phone } });
+
+        if (
+          existingEmailUser &&
+          existingPhoneUser &&
+          existingEmailUser.id !== existingPhoneUser.id
+        ) {
+          throw AppError.fieldInvalid(
+            'email',
+            'This email and phone number belong to two different accounts. Sign in instead.',
+          );
+        }
+
+        const existingUser = existingEmailUser ?? existingPhoneUser;
+        if (existingUser?.passwordHash) {
+          throw AppError.fieldInvalid(
+            existingEmailUser ? 'email' : 'phone',
+            'An account with these details already exists. Sign in instead.',
+          );
+        }
+
+        const [{ n }] = await tx.$queryRaw<
+          { n: bigint }[]
+        >`SELECT nextval('"billing_ref_seq"') AS n`;
+
+        const plan =
+          (settings.defaultPlanId
+            ? await tx.plan.findFirst({ where: { id: settings.defaultPlanId, active: true } })
+            : null) ?? (await tx.plan.findFirst({ where: { isDefault: true, active: true } }));
+
+        const trialEndsAt = plan ? addDays(parseDateOnly(todayInNairobi()), plan.trialDays) : null;
+
+        const org = await tx.organization.create({
+          data: {
+            name: dto.organizationName.trim(),
+            kind: dto.organizationKind ?? 'LANDLORD',
+            phone,
+            email,
+            kraPin: dto.kraPin ? dto.kraPin.toUpperCase() : null,
+            billingRef: `H${String(n).padStart(5, '0')}`,
+            planId: plan?.id ?? null,
+            trialEndsAt,
+          },
+        });
+
+        const roles = await RolesService.seedSystemRoles(tx, org.id);
+
+        const user = existingUser
+          ? await tx.user.update({
+              where: { id: existingUser.id },
+              data: {
+                firstName: dto.firstName.trim(),
+                lastName: dto.lastName.trim(),
+                email: existingUser.email ?? email,
+                phone: existingUser.phone ?? phone,
+                passwordHash,
+              },
+            })
+          : await tx.user.create({
+              data: {
+                firstName: dto.firstName.trim(),
+                lastName: dto.lastName.trim(),
+                email,
+                phone,
+                passwordHash,
+              },
+            });
+
+        await tx.membership.create({
+          data: {
+            orgId: org.id,
+            userId: user.id,
+            roleId: roles.OWNER,
+            propertyIds: [],
+            status: 'ACTIVE',
+            joinedAt: new Date(),
+          },
+        });
+
+        await this.audit.record(
+          {
+            action: 'organization.register',
+            entity: 'organization',
+            entityId: org.id,
+            actorId: user.id,
+            orgId: org.id,
+            after: { name: org.name, kind: org.kind, billingRef: org.billingRef },
+          },
+          tx,
+        );
+
+        return { userId: user.id, orgId: org.id };
+      }),
+    );
+
+    return this.sessions.start(userId, orgId);
+  }
 
   async login(identifier: string, password: string): Promise<LoginResult> {
     const invalid = AppError.unauthenticated(

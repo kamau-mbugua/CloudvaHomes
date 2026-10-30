@@ -8,6 +8,7 @@ import 'money/money_screens.dart';
 import 'more/expenses_screens.dart';
 import 'more/meters_screen.dart';
 import 'more/more_screen.dart';
+import 'more/parity_screens.dart';
 import 'tenants/tenants_screens.dart';
 import 'units/units_screens.dart';
 
@@ -104,6 +105,11 @@ RouteBase staffRoutes() => StatefulShellRoute.indexedStack(
           builder: (_, _) => const MoreScreen(),
           routes: [
             GoRoute(
+              path: 'maintenance',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const StaffMaintenanceScreen(),
+            ),
+            GoRoute(
               path: 'meters',
               parentNavigatorKey: rootNavigatorKey,
               builder: (_, _) => const MetersScreen(),
@@ -119,6 +125,36 @@ RouteBase staffRoutes() => StatefulShellRoute.indexedStack(
                   builder: (_, _) => const ExpenseFormScreen(),
                 ),
               ],
+            ),
+            GoRoute(
+              path: 'reports',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const StaffReportsScreen(),
+            ),
+            GoRoute(
+              path: 'properties',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const StaffPropertiesScreen(),
+            ),
+            GoRoute(
+              path: 'channels',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const StaffChannelsScreen(),
+            ),
+            GoRoute(
+              path: 'charges',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const StaffChargesScreen(),
+            ),
+            GoRoute(
+              path: 'agency',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const StaffAgencyScreen(),
+            ),
+            GoRoute(
+              path: 'users',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const StaffUsersScreen(),
             ),
           ],
         ),

@@ -278,6 +278,147 @@ class StaffApi {
     );
     return _data(body)['id'] as String;
   }
+
+  // ── properties & units CRUD
+  Future<Json> createProperty(Json body) async =>
+      _data(await _api.post('/properties', body: body));
+
+  Future<Json> updateProperty(String id, Json body) async =>
+      _data(await _api.patch('/properties/$id', body: body));
+
+  Future<UnitRow> createUnit(Json body) async =>
+      UnitRow.fromJson(_data(await _api.post('/units', body: body)));
+
+  Future<UnitRow> updateUnit(String id, Json body) async =>
+      UnitRow.fromJson(_data(await _api.patch('/units/$id', body: body)));
+
+  // ── tenants & tenancies CRUD / lifecycle
+  Future<Tenant> createTenant(Json body) async =>
+      Tenant.fromJson(_data(await _api.post('/tenants', body: body)));
+
+  Future<Tenant> updateTenant(String id, Json body) async =>
+      Tenant.fromJson(_data(await _api.patch('/tenants/$id', body: body)));
+
+  Future<Tenancy> createTenancy(Json body) async =>
+      Tenancy.fromJson(_data(await _api.post('/tenancies', body: body)));
+
+  Future<Tenancy> giveNotice(String tenancyId, Json body) async =>
+      Tenancy.fromJson(
+        _data(await _api.post('/tenancies/$tenancyId/notice', body: body)),
+      );
+
+  Future<Tenancy> endTenancy(String tenancyId, Json body) async =>
+      Tenancy.fromJson(
+        _data(await _api.post('/tenancies/$tenancyId/end', body: body)),
+      );
+
+  Future<Json> settleDeposit(String tenancyId, Json body) async =>
+      _data(await _api.post('/tenancies/$tenancyId/deposit', body: body));
+
+  // ── billing & invoices actions
+  Future<Json> runInvoices(Json body) async =>
+      _data(await _api.post('/invoices/run', body: body));
+
+  Future<Invoice> createInvoice(Json body) async =>
+      Invoice.fromJson(_data(await _api.post('/invoices', body: body)));
+
+  Future<Json> createCreditNote(String invoiceId, Json body) async =>
+      _data(await _api.post('/invoices/$invoiceId/credit-notes', body: body));
+
+  Future<Invoice> voidInvoice(String invoiceId, String reason) async =>
+      Invoice.fromJson(
+        _data(
+          await _api.post(
+            '/invoices/$invoiceId/void',
+            body: {'reason': reason},
+          ),
+        ),
+      );
+
+  Future<Meter> createMeter(Json body) async =>
+      Meter.fromJson(_data(await _api.post('/meters', body: body)));
+
+  Future<List<Json>> chargeTypes() async =>
+      _rows(await _api.get('/charge-types'));
+
+  Future<Json> createChargeType(Json body) async =>
+      _data(await _api.post('/charge-types', body: body));
+
+  Future<List<Json>> moveInCharges() async =>
+      _rows(await _api.get('/move-in-charges'));
+
+  Future<Json> createMoveInCharge(Json body) async =>
+      _data(await _api.post('/move-in-charges', body: body));
+
+  // ── expenses actions
+  Future<Expense> voidExpense(String id, String reason) async =>
+      Expense.fromJson(
+        _data(await _api.post('/expenses/$id/void', body: {'reason': reason})),
+      );
+
+  Future<List<Json>> recurringExpenses() async =>
+      _rows(await _api.get('/recurring-expenses'));
+
+  Future<Json> createRecurringExpense(Json body) async =>
+      _data(await _api.post('/recurring-expenses', body: body));
+
+  // ── maintenance requests
+  Future<Page<Json>> maintenanceRequests({
+    required int page,
+    String? status,
+    String? q,
+  }) async => Page.from(
+    await _api.get(
+      '/maintenance-requests',
+      query: {'page': page, 'pageSize': pageSize, 'status': status, 'q': q},
+    ),
+    (r) => r,
+  );
+
+  Future<Json> createMaintenanceRequest(Json body) async =>
+      _data(await _api.post('/maintenance-requests', body: body));
+
+  Future<Json> updateMaintenanceRequest(String id, Json body) async =>
+      _data(await _api.patch('/maintenance-requests/$id', body: body));
+
+  Future<Json> convertMaintenanceToExpense(String id, Json body) async =>
+      _data(await _api.post('/maintenance-requests/$id/expense', body: body));
+
+  // ── reports, channels, agency, users & roles
+  Future<Json> reportPl(String period) async => _data(
+    await _api.get('/reports/pl', query: {'from': period, 'to': period}),
+  );
+
+  Future<Json> reportArrears() async =>
+      _data(await _api.get('/reports/arrears'));
+
+  Future<Json> reportOccupancy() async =>
+      _data(await _api.get('/reports/occupancy'));
+
+  Future<List<Channel>> allChannels() async => [
+    for (final r in _rows(await _api.get('/payment-channels')))
+      Channel.fromJson(r),
+  ];
+
+  Future<Channel> createChannel(Json body) async =>
+      Channel.fromJson(_data(await _api.post('/payment-channels', body: body)));
+
+  Future<List<Json>> landlords() async =>
+      _rows(await _api.get('/landlords', query: {'pageSize': 100}));
+
+  Future<Json> createLandlord(Json body) async =>
+      _data(await _api.post('/landlords', body: body));
+
+  Future<List<Json>> remittances() async =>
+      _rows(await _api.get('/remittances', query: {'pageSize': 50}));
+
+  Future<List<Json>> users() async =>
+      _rows(await _api.get('/users', query: {'pageSize': 100}));
+
+  Future<Json> inviteUser(Json body) async =>
+      _data(await _api.post('/users/invitations', body: body));
+
+  Future<List<Json>> roles() async => _rows(await _api.get('/roles'));
 }
 
 final staffApiProvider = Provider(

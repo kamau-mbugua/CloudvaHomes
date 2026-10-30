@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';
 import { AccountMenu } from './AccountMenu';
 import { CommandPalette } from './CommandPalette';
+import { NotificationBell } from './NotificationBell';
 import { MenuIcon, MoonIcon, SunIcon } from './icons';
 import { ACCOUNT_ENTRY, ORG_NAV, bestEntry, destinations, filterNav, matchScore } from './navigation';
 import { readStored, writeStored } from '../lib/storage';
@@ -170,6 +171,7 @@ export function AppShell() {
           </button>
 
           <div className="ms__right">
+            <NotificationBell />
             <button
               type="button"
               className="sh__icon"

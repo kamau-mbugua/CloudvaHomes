@@ -290,13 +290,14 @@ model Property {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
-  organization      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  landlord          Landlord?          @relation(fields: [landlordId], references: [id], onDelete: Restrict)
-  units             Unit[]
-  chargeTypes       ChargeType[]
-  moveInCharges     MoveInCharge[]
-  expenses          Expense[]
-  recurringExpenses RecurringExpense[]
+  organization        Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  landlord            Landlord?            @relation(fields: [landlordId], references: [id], onDelete: Restrict)
+  units               Unit[]
+  chargeTypes         ChargeType[]
+  moveInCharges       MoveInCharge[]
+  expenses            Expense[]
+  recurringExpenses   RecurringExpense[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@unique([orgId, code])
   @@index([orgId, name])
@@ -364,11 +365,12 @@ model Unit {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  property  Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  unitType  UnitType?     @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
-  category  UnitCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  tenancies Tenancy[]
-  meters    Meter[]
+  property            Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  unitType            UnitType?            @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
+  category            UnitCategory?        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  tenancies           Tenancy[]
+  meters              Meter[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@unique([propertyId, number])
   @@index([orgId, propertyId])
@@ -398,9 +400,10 @@ model Tenant {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  tenancies    Tenancy[]
-  payments     Payment[]
+  organization        Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  tenancies           Tenancy[]
+  payments            Payment[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@unique([orgId, code])
   @@unique([orgId, phone])
@@ -911,6 +914,7 @@ model Upload {
 enum UploadPurpose {
   EXPENSE_RECEIPT
   METER_PHOTO
+  MAINTENANCE_PHOTO
 }
 
 enum ExpenseCategory {
@@ -967,12 +971,75 @@ model Expense {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 
-  property  Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  recurring RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: Restrict)
+  property           Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  recurring          RecurringExpense?   @relation(fields: [recurringExpenseId], references: [id], onDelete: Restrict)
+  maintenanceRequest MaintenanceRequest?
 
   @@unique([recurringExpenseId, incurredOn])
   @@index([orgId, propertyId, incurredOn])
   @@map("expenses")
+}
+
+// ───────────────────────────── Maintenance requests ─────────────────────────────
+
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  APPLIANCE
+  CARPENTRY
+  PAINTING
+  PEST_CONTROL
+  STRUCTURAL
+  OTHER
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+/// A maintenance or repair request raised by a tenant or recorded by staff for a unit.
+model MaintenanceRequest {
+  id             String              @id @default(uuid(7)) @db.Uuid
+  orgId          String              @db.Uuid
+  propertyId     String              @db.Uuid
+  unitId         String              @db.Uuid
+  tenancyId      String?             @db.Uuid
+  tenantId       String?             @db.Uuid
+  number         String // "MNT-2026-000001"
+  category       MaintenanceCategory @default(OTHER)
+  priority       MaintenancePriority @default(MEDIUM)
+  status         MaintenanceStatus   @default(OPEN)
+  title          String
+  description    String
+  photoUploadIds String[]            @db.Uuid
+  resolutionNote String?
+  expenseId      String?             @unique @db.Uuid
+  createdById    String?             @db.Uuid
+  resolvedById   String?             @db.Uuid
+  resolvedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  tenant   Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  expense  Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, number])
+  @@index([orgId, status, createdAt])
+  @@index([orgId, propertyId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("maintenance_requests")
 }
 
 // ───────────────────────────── Agency accounting ─────────────────────────────
@@ -1419,4 +1486,35 @@ model RateLimitBucket {
   @@id([key, windowStart])
   @@index([expiresAt])
   @@map("rate_limit_buckets")
+}
+
+/// In-app notifications for a signed-in user (staff, tenant, or landlord).
+model UserNotification {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @db.Uuid
+  orgId     String?   @db.Uuid
+  tenantId  String?   @db.Uuid
+  kind      String
+  title     String
+  body      String
+  actionUrl String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@index([userId, createdAt])
+  @@map("user_notifications")
+}
+
+/// Push notification device tokens (FCM / APNs) registered by mobile or web clients.
+model DeviceToken {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  platform  String   @default("ANDROID")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("device_tokens")
 }

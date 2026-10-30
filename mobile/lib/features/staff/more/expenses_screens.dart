@@ -23,12 +23,58 @@ class ExpensesScreen extends ConsumerStatefulWidget {
 class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   String _q = '';
 
+  Future<void> _voidExpense(BuildContext context, Expense e) async {
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Void ${e.name}?'),
+        content: TextField(
+          controller: reasonCtrl,
+          decoration: const InputDecoration(labelText: 'Reason for voiding'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Void'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted || reasonCtrl.text.trim().isEmpty) {
+      return;
+    }
+    try {
+      await ref
+          .read(staffApiProvider)
+          .voidExpense(e.id, reasonCtrl.text.trim());
+      ref.read(listsVersionProvider.notifier).state++;
+      ref.invalidate(dashboardProvider);
+      if (context.mounted) showMessage(context, 'Expense voided.');
+    } on ApiError catch (err) {
+      if (context.mounted) showMessage(context, staffErrorMessage(err));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final api = ref.watch(staffApiProvider);
     final version = ref.watch(listsVersionProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Expenses')),
+      appBar: AppBar(
+        title: const Text('Expenses'),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.autorenew_outlined),
+            label: const Text('Recurring'),
+            onPressed: () => _RecurringExpensesSheet.show(context),
+          ),
+        ],
+      ),
       floatingActionButton: can(ref, 'expenses:create')
           ? FloatingActionButton.extended(
               icon: const Icon(Icons.add),
@@ -70,6 +116,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                               Icons.attach_file,
                               semanticLabel: 'Has a receipt',
                             )
+                          : null,
+                      onLongPress: !e.voided && can(ref, 'expenses:update')
+                          ? () => _voidExpense(context, e)
                           : null,
                     ),
                   ),
@@ -319,6 +368,70 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+final _recurringExpensesProvider = FutureProvider.autoDispose<List<Json>>(
+  (ref) => ref.watch(staffApiProvider).recurringExpenses(),
+);
+
+class _RecurringExpensesSheet extends ConsumerWidget {
+  const _RecurringExpensesSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => const _RecurringExpensesSheet(),
+  );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncRows = ref.watch(_recurringExpensesProvider);
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.65,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: Text(
+              'Recurring expenses',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: AsyncBody(
+              value: asyncRows,
+              onRetry: () => ref.invalidate(_recurringExpensesProvider),
+              data: (rows) => rows.isEmpty
+                  ? const EmptyState(
+                      icon: Icons.autorenew_outlined,
+                      title: 'No recurring expenses',
+                      body:
+                          'Monthly recurring expenses (security, cleaning, salaries) appear here.',
+                    )
+                  : ListView.builder(
+                      itemCount: rows.length,
+                      itemBuilder: (context, i) {
+                        final r = rows[i];
+                        return ListTile(
+                          title: Text(
+                            '${r['name'] ?? ''} · ${formatKes(centsFrom(r['amount']))}',
+                          ),
+                          subtitle: Text(
+                            '${expenseCategoryLabel[r['category']] ?? r['category'] ?? ''} · Day ${r['dayOfMonth'] ?? 1}',
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

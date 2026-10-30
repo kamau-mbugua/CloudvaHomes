@@ -80,7 +80,7 @@ export function AttachmentField({
   const [uploading, setUploading] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const allowed = purpose === 'METER_PHOTO' ? PHOTO_TYPES : RECEIPT_TYPES;
+  const allowed = purpose === 'METER_PHOTO' || purpose === 'MAINTENANCE_PHOTO' ? PHOTO_TYPES : RECEIPT_TYPES;
   const localUrl = useLocalFileUrl(value.kind === 'new' ? value.file : null);
 
   const take = async (file: File | undefined) => {
@@ -145,10 +145,10 @@ export function AttachmentField({
           onDrop={onDrop}
         >
           <p className="up__droptext">
-            {uploading ? 'Uploading…' : purpose === 'METER_PHOTO' ? 'Drop a photo here' : 'Drop a photo or PDF of the receipt here'}
+            {uploading ? 'Uploading…' : purpose === 'METER_PHOTO' || purpose === 'MAINTENANCE_PHOTO' ? 'Drop a photo here' : 'Drop a photo or PDF of the receipt here'}
           </p>
           <div className="up__dropbtns">{pickButtons(false)}</div>
-          <span className="hint">JPEG, PNG, WebP{purpose === 'METER_PHOTO' ? '' : ' or PDF'}, up to 10 MB.</span>
+          <span className="hint">JPEG, PNG, WebP{purpose === 'METER_PHOTO' || purpose === 'MAINTENANCE_PHOTO' ? '' : ' or PDF'}, up to 10 MB.</span>
         </div>
       ) : (
         <div className="up__attached">

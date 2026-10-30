@@ -10,6 +10,9 @@ import { DB, type Db } from '../../prisma/prisma.module.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { authContext } from '../auth/decorators.js';
 import { InvoicesService } from '../billing/invoices/invoices.service.js';
+import { UploadsService } from '../files/uploads.service.js';
+import type { CreateTenantMaintenanceRequestDto } from '../maintenance/maintenance.dto.js';
+import { MaintenanceService } from '../maintenance/maintenance.service.js';
 import { StkService } from '../mpesa/stk.service.js';
 import { AccountsService } from '../payments/accounts.service.js';
 import { PaymentsService } from '../payments/payments.service.js';
@@ -34,6 +37,8 @@ export class TenantPortalService {
     private readonly accounts: AccountsService,
     private readonly stk: StkService,
     private readonly tenantAccounts: TenantAccountsService,
+    private readonly maintenance: MaintenanceService,
+    private readonly uploads: UploadsService,
   ) {}
 
   async mine() {
@@ -72,7 +77,13 @@ export class TenantPortalService {
         userId,
         sessionId,
         orgId: t.orgId,
-        permissions: new Set(['tenants:view', 'invoices:view', 'payments:view']),
+        permissions: new Set([
+          'tenants:view',
+          'invoices:view',
+          'payments:view',
+          'maintenance:view',
+          'maintenance:create',
+        ]),
       },
       fn,
     );
@@ -197,6 +208,29 @@ export class TenantPortalService {
       const r = await this.stk.get(stkId);
       if (r.tenant?.id !== tenantId) throw AppError.notFound('Payment request');
       return r;
+    });
+  }
+
+  requestsList(tenantId: string, q: PaginationQueryDto) {
+    return this.as(tenantId, () => this.maintenance.listForTenant(tenantId, q));
+  }
+
+  createRequest(tenantId: string, dto: CreateTenantMaintenanceRequestDto) {
+    return this.as(tenantId, () => this.maintenance.createForTenant(tenantId, dto));
+  }
+
+  uploadMaintenancePhoto(
+    tenantId: string,
+    file?: { buffer: Buffer; size: number },
+  ) {
+    return this.as(tenantId, () => this.uploads.create('MAINTENANCE_PHOTO', file));
+  }
+
+  requestPhoto(tenantId: string, requestId: string, uploadId: string) {
+    return this.as(tenantId, async () => {
+      const req = await this.maintenance.get(requestId);
+      if (req.tenant?.id !== tenantId) throw AppError.notFound('Maintenance request');
+      return this.maintenance.photoContent(requestId, uploadId);
     });
   }
 }

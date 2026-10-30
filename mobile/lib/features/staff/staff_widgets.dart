@@ -6,6 +6,7 @@ import '../../core/api/api_error.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/notifications_sheet.dart';
 import '../billing/billing_banner.dart';
 import 'staff_models.dart';
 
@@ -142,7 +143,7 @@ class StaffTabScaffold extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: Text(title),
-      actions: [...actions, const AccountButton()],
+      actions: [...actions, const NotificationButton(), const AccountButton()],
       bottom: bottom,
     ),
     floatingActionButton: floatingActionButton,

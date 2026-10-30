@@ -9,6 +9,7 @@ import { RequireAdmin, RequireAuth, RequireOwner, RequirePermission, RequireSupe
 import { NotFoundPage, PlaceholderPage } from './app/PlaceholderPage';
 import { ORG_NAV, destinations } from './app/navigation';
 import { LoginPage } from './features/auth/LoginPage';
+import { RegisterPage } from './features/auth/RegisterPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { AcceptInvitationPage } from './features/auth/AcceptInvitationPage';
@@ -40,6 +41,7 @@ import { PaymentChannelsPage } from './features/payments/PaymentChannelsPage';
 import { ReconciliationPage } from './features/mpesa/ReconciliationPage';
 import { InboundDetailPage } from './features/mpesa/InboundDetailPage';
 import { ExpensesPage } from './features/expenses/ExpensesPage';
+import { MaintenancePage } from './features/maintenance/MaintenancePage';
 import { DashboardPage } from './features/reports/DashboardPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { AgreementsPage } from './features/agency/AgreementsPage';
@@ -64,7 +66,7 @@ import {
   OwnerOverviewPage, OwnerPayoutsPage, OwnerShell, OwnerStatementsPage as OwnerPortalStatementsPage,
 } from './features/owner/OwnerPortal';
 import {
-  TenantHomePage, TenantInvoicePage, TenantInvoicesPage, TenantPaymentsPage, TenantShell, TenantStatementPage,
+  TenantHomePage, TenantInvoicePage, TenantInvoicesPage, TenantPaymentsPage, TenantRequestsPage, TenantShell, TenantStatementPage,
 } from './features/tenant/TenantPortal';
 
 /**
@@ -98,6 +100,7 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; tit
   properties: { element: <PropertiesPage />, children: [{ path: ':propertyId', title: 'Property details', element: <PropertyDetailPage /> }] },
   units: { element: <UnitsPage />, children: [{ path: ':unitId', title: 'Unit details', element: <UnitDetailPage /> }] },
   'unit-categories': { element: <UnitSetupPage /> },
+  maintenance: { element: <MaintenancePage /> },
   tenants: { element: <TenantsPage />, children: [{ path: ':tenantId', title: 'Tenant details', element: <TenantDetailPage /> }] },
   tenancies: { element: <TenanciesPage /> },
   // `invoices/run` is its own nav entry and route. React Router ranks the static `run`
@@ -126,6 +129,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/app" replace />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/invite/:token" element={<AcceptInvitationPage />} />
@@ -223,6 +227,7 @@ export default function App() {
                 </Route>
                 <Route path="statement" element={<TenantStatementPage />} />
                 <Route path="payments" element={<TenantPaymentsPage />} />
+                <Route path="requests" element={<TenantRequestsPage />} />
                 <Route path="*" element={<Navigate to="/tenant" replace />} />
               </Route>
 

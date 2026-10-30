@@ -227,12 +227,32 @@ class _InvoicesListState extends ConsumerState<_InvoicesList> {
   Widget build(BuildContext context) {
     final api = ref.watch(staffApiProvider);
     final version = ref.watch(listsVersionProvider);
+    final canCreate = can(ref, 'invoices:create');
     return Column(
       children: [
         SearchField(
           hint: 'Invoice no., tenant or unit',
           onChanged: (v) => setState(() => _q = v),
         ),
+        if (canCreate)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Row(
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.playlist_add_check_outlined, size: 18),
+                  label: const Text('Run monthly'),
+                  onPressed: () => _InvoiceRunSheet.show(context),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Ad-hoc invoice'),
+                  onPressed: () => _AdHocInvoiceSheet.show(context),
+                ),
+              ],
+            ),
+          ),
         SizedBox(
           height: 52,
           child: SingleChildScrollView(
@@ -373,6 +393,38 @@ class InvoiceDetailScreen extends ConsumerWidget {
                   FactRow('Balance', formatKes(i.balance), bold: true),
                 ],
               ),
+              if (i.status != 'VOID' && can(ref, 'invoices:update')) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (i.balance > 0)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        label: const Text('Issue credit note'),
+                        onPressed: () => _InvoiceActions.creditNote(
+                          context,
+                          ref,
+                          invoiceId: i.id,
+                          tenantId: i.tenant.id,
+                          maxBalance: i.balance,
+                        ),
+                      ),
+                    if (i.amountPaid == 0)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('Void invoice'),
+                        onPressed: () => _InvoiceActions.voidInvoice(
+                          context,
+                          ref,
+                          invoiceId: i.id,
+                          tenantId: i.tenant.id,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
               if (d.creditNotes.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 SectionCard(
@@ -740,5 +792,336 @@ class _TenantPickerState extends ConsumerState<TenantPicker> {
         ],
       ),
     );
+  }
+}
+
+class _InvoiceRunSheet extends ConsumerStatefulWidget {
+  const _InvoiceRunSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => const _InvoiceRunSheet(),
+  );
+
+  @override
+  ConsumerState<_InvoiceRunSheet> createState() => _InvoiceRunSheetState();
+}
+
+class _InvoiceRunSheetState extends ConsumerState<_InvoiceRunSheet> {
+  late final _period = TextEditingController(text: nairobiPeriod());
+  bool _running = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _period.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run() async {
+    setState(() {
+      _running = true;
+      _error = null;
+    });
+    try {
+      final res = await ref.read(staffApiProvider).runInvoices({
+        'period': _period.text.trim(),
+      });
+      ref.read(listsVersionProvider.notifier).state++;
+      ref.invalidate(dashboardProvider);
+      if (mounted) {
+        final created = res['created'] ?? 0;
+        showMessage(context, 'Invoice run finished ($created created).');
+        Navigator.of(context).pop();
+      }
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = staffErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Run monthly invoices',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _period,
+            decoration: const InputDecoration(
+              labelText: 'Billing period (YYYY-MM)',
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            ErrorBox(_error!),
+          ],
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _running ? null : _run,
+            child: Text(_running ? 'Running…' : 'Generate invoices'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdHocInvoiceSheet extends ConsumerStatefulWidget {
+  const _AdHocInvoiceSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => const _AdHocInvoiceSheet(),
+  );
+
+  @override
+  ConsumerState<_AdHocInvoiceSheet> createState() => _AdHocInvoiceSheetState();
+}
+
+class _AdHocInvoiceSheetState extends ConsumerState<_AdHocInvoiceSheet> {
+  TenantRef? _tenant;
+  final _desc = TextEditingController();
+  final _amount = TextEditingController();
+  late final DateTime _dueDate = nairobiToday().add(const Duration(days: 5));
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _desc.dispose();
+    _amount.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final cents = parseKes(_amount.text);
+    if (_tenant == null ||
+        _desc.text.trim().isEmpty ||
+        cents == null ||
+        cents <= 0) {
+      setState(
+        () => _error = 'Choose a tenant, description and amount in KES.',
+      );
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final t = await ref.read(staffApiProvider).tenant(_tenant!.id);
+      if (t.units.isEmpty) {
+        setState(
+          () => _error = 'This tenant does not have an active tenancy yet.',
+        );
+        return;
+      }
+      await ref.read(staffApiProvider).createInvoice({
+        'tenancyId': t.units.first.tenancyId,
+        'dueDate': toDay(_dueDate),
+        'lines': [
+          {
+            'description': _desc.text.trim(),
+            'quantity': '1',
+            'unitAmount': cents,
+          },
+        ],
+      });
+      invalidateAfterPayment(ref, tenantId: _tenant!.id);
+      if (mounted) {
+        showMessage(context, 'Invoice issued.');
+        Navigator.of(context).pop();
+      }
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = staffErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'New ad-hoc invoice',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.person_search_outlined),
+              label: Text(
+                _tenant == null
+                    ? 'Choose tenant'
+                    : '${_tenant!.name} (${_tenant!.code})',
+              ),
+              onPressed: () async {
+                final picked = await showModalBottomSheet<TenantRef>(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  showDragHandle: true,
+                  builder: (_) => const TenantPicker(),
+                );
+                if (picked != null) setState(() => _tenant = picked);
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _desc,
+              decoration: const InputDecoration(
+                labelText: 'Line description',
+                hintText: 'e.g. Lock replacement fee',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _amount,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Amount (KES)'),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              ErrorBox(_error!),
+            ],
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: Text(_saving ? 'Issuing…' : 'Issue invoice'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InvoiceActions {
+  static Future<void> creditNote(
+    BuildContext context,
+    WidgetRef ref, {
+    required String invoiceId,
+    required String tenantId,
+    required int maxBalance,
+  }) async {
+    final amountCtrl = TextEditingController(text: '${maxBalance ~/ 100}');
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Issue credit note'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Amount (KES)'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonCtrl,
+              decoration: const InputDecoration(labelText: 'Reason'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Issue'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final cents = parseKes(amountCtrl.text);
+    if (cents == null || cents <= 0 || reasonCtrl.text.trim().isEmpty) return;
+    try {
+      await ref.read(staffApiProvider).createCreditNote(invoiceId, {
+        'amount': cents,
+        'reason': reasonCtrl.text.trim(),
+      });
+      invalidateAfterPayment(ref, tenantId: tenantId);
+      if (context.mounted) showMessage(context, 'Credit note issued.');
+    } on ApiError catch (e) {
+      if (context.mounted) showMessage(context, staffErrorMessage(e));
+    }
+  }
+
+  static Future<void> voidInvoice(
+    BuildContext context,
+    WidgetRef ref, {
+    required String invoiceId,
+    required String tenantId,
+  }) async {
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Void this invoice?'),
+        content: TextField(
+          controller: reasonCtrl,
+          decoration: const InputDecoration(labelText: 'Reason for voiding'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Void'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted || reasonCtrl.text.trim().isEmpty) {
+      return;
+    }
+    try {
+      await ref
+          .read(staffApiProvider)
+          .voidInvoice(invoiceId, reasonCtrl.text.trim());
+      invalidateAfterPayment(ref, tenantId: tenantId);
+      if (context.mounted) showMessage(context, 'Invoice voided.');
+    } on ApiError catch (e) {
+      if (context.mounted) showMessage(context, staffErrorMessage(e));
+    }
   }
 }

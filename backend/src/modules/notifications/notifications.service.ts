@@ -734,6 +734,146 @@ export class NotificationsService {
       this.logger.warn({ err }, 'Could not write PlatformEmailLog');
     }
   }
+
+  // ── In-App Notifications & Push Devices ──
+
+  async notifyUser(entry: {
+    userId: string;
+    orgId?: string | null;
+    tenantId?: string | null;
+    kind: string;
+    title: string;
+    body: string;
+    actionUrl?: string | null;
+  }): Promise<void> {
+    if (!this.prisma) return;
+    try {
+      await this.prisma.userNotification.create({
+        data: {
+          userId: entry.userId,
+          orgId: entry.orgId ?? null,
+          tenantId: entry.tenantId ?? null,
+          kind: entry.kind,
+          title: entry.title,
+          body: entry.body,
+          actionUrl: entry.actionUrl ?? null,
+        },
+      });
+    } catch (err) {
+      this.logger.warn({ err }, 'Could not create UserNotification');
+    }
+  }
+
+  async notifyOrgStaff(
+    orgId: string,
+    entry: {
+      kind: string;
+      title: string;
+      body: string;
+      actionUrl?: string | null;
+      excludeUserId?: string | null;
+    },
+  ): Promise<void> {
+    if (!this.prisma) return;
+    try {
+      const memberships = await this.prisma.membership.findMany({
+        where: {
+          orgId,
+          status: 'ACTIVE',
+          ...(entry.excludeUserId ? { userId: { not: entry.excludeUserId } } : {}),
+        },
+        select: { userId: true },
+      });
+      if (!memberships.length) return;
+      await this.prisma.userNotification.createMany({
+        data: memberships.map((m) => ({
+          userId: m.userId,
+          orgId,
+          kind: entry.kind,
+          title: entry.title,
+          body: entry.body,
+          actionUrl: entry.actionUrl ?? null,
+        })),
+      });
+    } catch (err) {
+      this.logger.warn({ err }, 'Could not create staff UserNotifications');
+    }
+  }
+
+  async listForUser(
+    userId: string,
+    q: { page: number; pageSize: number; unreadOnly?: boolean },
+  ) {
+    if (!this.prisma) {
+      return {
+        data: [],
+        meta: { page: q.page, pageSize: q.pageSize, total: 0, totalPages: 1, unreadCount: 0 },
+      };
+    }
+    const where = {
+      userId,
+      ...(q.unreadOnly ? { readAt: null } : {}),
+    };
+    const skip = (q.page - 1) * q.pageSize;
+    const [rows, total, unreadCount] = await Promise.all([
+      this.prisma.userNotification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: q.pageSize,
+      }),
+      this.prisma.userNotification.count({ where }),
+      this.prisma.userNotification.count({ where: { userId, readAt: null } }),
+    ]);
+    return {
+      data: rows,
+      meta: {
+        page: q.page,
+        pageSize: q.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / q.pageSize)),
+        unreadCount,
+      },
+    };
+  }
+
+  async markRead(userId: string, id: string) {
+    if (!this.prisma) return { updated: 0 };
+    const res = await this.prisma.userNotification.updateMany({
+      where: { id, userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { updated: res.count };
+  }
+
+  async markAllRead(userId: string) {
+    if (!this.prisma) return { updated: 0 };
+    const res = await this.prisma.userNotification.updateMany({
+      where: { userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    return { updated: res.count };
+  }
+
+  async registerDevice(userId: string, dto: { token: string; platform: string }) {
+    if (!this.prisma) return { registered: false };
+    const token = dto.token.trim();
+    const platform = dto.platform.trim().toUpperCase();
+    await this.prisma.deviceToken.upsert({
+      where: { token },
+      update: { userId, platform },
+      create: { userId, token, platform },
+    });
+    return { registered: true };
+  }
+
+  async unregisterDevice(userId: string, token: string) {
+    if (!this.prisma) return { removed: 0 };
+    const res = await this.prisma.deviceToken.deleteMany({
+      where: { userId, token: token.trim() },
+    });
+    return { removed: res.count };
+  }
 }
 
 export function paymentReceiptText(p: {

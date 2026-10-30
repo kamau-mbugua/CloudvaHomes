@@ -77,6 +77,11 @@ export const PERMISSION_CATALOGUE: PermissionGroup[] = [
     permissions: crud('expenses', 'expenses'),
   },
   {
+    group: 'maintenance',
+    label: 'Maintenance',
+    permissions: crud('maintenance', 'maintenance requests', ['view', 'create', 'update']),
+  },
+  {
     group: 'reports',
     label: 'Reports',
     permissions: [{ key: 'reports:view', label: 'View reports and dashboard figures' }],
@@ -161,6 +166,9 @@ export const SYSTEM_ROLE_DEFAULTS = {
       'meters:view',
       'meters:create',
       'meters:update',
+      'maintenance:view',
+      'maintenance:create',
+      'maintenance:update',
     ],
   },
 } as const satisfies Record<

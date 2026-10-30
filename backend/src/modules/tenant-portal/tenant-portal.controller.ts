@@ -11,22 +11,29 @@ import {
   Query,
   Res,
   StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiExcludeEndpoint,
   ApiHeader,
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { AppError } from '../../common/errors/app-error.js';
 import { PaginationQueryDto } from '../../common/http/pagination.js';
 import { ok } from '../../common/http/response.js';
 import { Public, RequirePermission } from '../auth/decorators.js';
 import { renderInvoicePdf } from '../billing/invoices/invoice-pdf.js';
+import { sendFile } from '../files/uploads.controller.js';
+import { MAX_UPLOAD_BYTES } from '../files/uploads.service.js';
 import { JobsGuard } from '../jobs/job-auth.js';
+import { CreateTenantMaintenanceRequestDto } from '../maintenance/maintenance.dto.js';
 import { StatementQueryDto } from '../payments/payments.dto.js';
 import { renderReceiptPdf, renderStatementPdf } from '../payments/pdfs.js';
 import { MessagesService } from './messages.service.js';
@@ -189,6 +196,41 @@ export class TenantPortalController {
     @Param('stkId', ParseUUIDPipe) stkId: string,
   ) {
     return ok(await this.portal.payStatus(id, stkId));
+  }
+
+  @Get(':id/requests')
+  requests(@Param('id', ParseUUIDPipe) id: string, @Query() q: PaginationQueryDto) {
+    return this.portal.requestsList(id, q);
+  }
+
+  @Post(':id/requests')
+  async createRequest(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateTenantMaintenanceRequestDto,
+  ) {
+    return ok(await this.portal.createRequest(id, dto));
+  }
+
+  @Post(':id/uploads')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } }))
+  async uploadPhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile()
+    file?: { buffer: Buffer; size: number },
+  ) {
+    return ok(await this.portal.uploadMaintenancePhoto(id, file));
+  }
+
+  @Get(':id/requests/:requestId/photos/:uploadId')
+  async requestPhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @Param('uploadId', ParseUUIDPipe) uploadId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { upload, data } = await this.portal.requestPhoto(id, requestId, uploadId);
+    return sendFile(res, upload, data);
   }
 }
 

@@ -20,8 +20,8 @@ import { RequireOrg } from '../auth/decorators.js';
 import { MAX_UPLOAD_BYTES, UploadsService } from './uploads.service.js';
 
 class UploadBodyDto {
-  @IsIn(['EXPENSE_RECEIPT', 'METER_PHOTO'])
-  purpose!: 'EXPENSE_RECEIPT' | 'METER_PHOTO';
+  @IsIn(['EXPENSE_RECEIPT', 'METER_PHOTO', 'MAINTENANCE_PHOTO'])
+  purpose!: 'EXPENSE_RECEIPT' | 'METER_PHOTO' | 'MAINTENANCE_PHOTO';
 }
 
 /** Streams a stored file inline, never cached by shared caches. */
@@ -48,7 +48,7 @@ export class UploadsController {
       type: 'object',
       properties: {
         file: { type: 'string', format: 'binary' },
-        purpose: { enum: ['EXPENSE_RECEIPT', 'METER_PHOTO'] },
+        purpose: { enum: ['EXPENSE_RECEIPT', 'METER_PHOTO', 'MAINTENANCE_PHOTO'] },
       },
     },
   })

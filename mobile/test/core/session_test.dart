@@ -48,6 +48,28 @@ void main() {
     test('signed out → sign-in; public pages stay', () {
       expect(go(const AsyncData(null), null, '/staff'), '/sign-in');
       expect(go(const AsyncData(null), null, '/sign-in/code'), isNull);
+      expect(go(const AsyncData(null), null, '/register'), isNull);
+    });
+
+    test('owner mode routes to /owner when user owns properties', () {
+      final raw = sessionJson(staff: false);
+      raw['ownerOf'] = [
+        {
+          'landlordId': 'l1',
+          'name': 'Jane Landlord',
+          'organization': {'id': 'o1', 'name': 'Apex Agency'},
+        },
+      ];
+      final ownerSession = Session.fromJson(raw);
+      expect(effectiveMode(ownerSession, null), AppMode.owner);
+      expect(
+        go(AsyncData<Session?>(ownerSession), AppMode.owner, '/sign-in'),
+        '/owner',
+      );
+      expect(
+        go(AsyncData<Session?>(ownerSession), AppMode.owner, '/owner/payouts'),
+        isNull,
+      );
     });
 
     test('signed in → home of the mode; the other mode is off-limits', () {

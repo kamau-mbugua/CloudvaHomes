@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Link, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PortalShell } from '../../app/PortalShell';
 import { pickTenantAccount } from '../../lib/auth/portals';
 import type { TenantOf } from '../../lib/auth/types';
@@ -21,13 +22,21 @@ import { checkStatementRange, isReversal, methodText } from '../payments/rules';
 import type { Payment, StatementEntry } from '../payments/types';
 import { PaymentBadges, SignedAmount } from '../payments/ui';
 import { labelFor, optionsOf } from '../portfolio/labels';
+import { Sheet } from '../../components/Sheet';
+import { Field } from '../portfolio/ui';
 import {
-  downloadTenantInvoice, downloadTenantReceipt, downloadTenantStatement, tenantErrorMessage,
-  useTenantInvoice, useTenantInvoices, useTenantOverview, useTenantPayments, useTenantStatement,
+  MAINTENANCE_CATEGORIES,
+  MAINTENANCE_PRIORITIES,
+  MAINTENANCE_STATUSES,
+} from '../maintenance/types';
+import {
+  createTenantRequest, downloadTenantInvoice, downloadTenantReceipt, downloadTenantStatement,
+  keys as tenantKeys, tenantErrorMessage, uploadTenantPhoto,
+  useTenantInvoice, useTenantInvoices, useTenantOverview, useTenantPayments, useTenantRequests, useTenantStatement,
 } from './api';
 import { PaySheet } from './PaySheet';
 import { accountSearch, currentTenancies, homeText, howToPaySteps, ordinal, payNumber, shortcodeLabel } from './rules';
-import type { HowToPay, PortalOpenInvoice, TenantOverview } from './types';
+import type { HowToPay, PortalOpenInvoice, PortalTenancy, TenantOverview } from './types';
 
 /**
  * The tenant portal (`/tenant`): a tenant sees their own account and pays by M-Pesa.
@@ -45,6 +54,7 @@ const TABS = [
   { to: '/tenant/invoices', label: 'Invoices', end: false },
   { to: '/tenant/statement', label: 'Statement', end: false },
   { to: '/tenant/payments', label: 'Payments', end: false },
+  { to: '/tenant/requests', label: 'Maintenance', end: false },
 ];
 
 export function TenantShell() {
@@ -552,5 +562,258 @@ function PaymentRow({ payment: p, tenantId, orgName }: { payment: Payment; tenan
         ) : null}
       </span>
     </li>
+  );
+}
+
+// ---------------------------------------------------------------- maintenance requests
+
+export function TenantRequestsPage() {
+  const { account } = useTenantContext();
+  const [page, setPage] = useState(1);
+  const [creating, setCreating] = useState(false);
+  const list = useTenantRequests(account.tenantId, page);
+  const overview = useTenantOverview(account.tenantId);
+  const orgName = account.organization.name;
+  const rows = list.data?.rows ?? [];
+  const homes = currentTenancies(overview.data?.tenancies ?? []);
+
+  return (
+    <div className="ow__stack">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+        <h1 className="ow__h1" style={{ margin: 0 }}>Maintenance</h1>
+        {homes.length > 0 ? (
+          <button type="button" className="nx-btn nx-btn--primary" onClick={() => setCreating(true)}>
+            Report an issue
+          </button>
+        ) : null}
+      </div>
+
+      {list.isError ? (
+        <p className="ad__error" role="alert">{tenantErrorMessage(list.error, orgName)}</p>
+      ) : list.isPending ? (
+        <Loading />
+      ) : rows.length === 0 ? (
+        <div className="ph">
+          <EmptyState
+            title="No maintenance requests"
+            detail="Need a repair in your unit? Report an issue and track its progress here."
+            action={
+              homes.length > 0 ? (
+                <button type="button" className="nx-btn nx-btn--primary" onClick={() => setCreating(true)}>
+                  Report an issue
+                </button>
+              ) : null
+            }
+          />
+        </div>
+      ) : (
+        <ul className="tp__rows tp__rows--card">
+          {rows.map((r) => (
+            <li key={r.id} className="tp__row tp__row--static">
+              <span className="tp__rowmain">
+                <strong>
+                  {r.title}{' '}
+                  <span
+                    className={`ad__badge ${
+                      r.status === 'RESOLVED'
+                        ? 'ad__badge--ok'
+                        : r.status === 'IN_PROGRESS'
+                          ? 'ad__badge--warn'
+                          : r.status === 'CANCELLED'
+                            ? 'ad__badge--neutral'
+                            : 'ad__badge--bad'
+                    }`}
+                  >
+                    {MAINTENANCE_STATUSES[r.status] ?? r.status}
+                  </span>
+                </strong>
+                <span className="ad__sub">
+                  <span className="num">{r.number}</span> · {r.property.name} Unit {r.unit.number} ·{' '}
+                  {MAINTENANCE_CATEGORIES[r.category] ?? r.category} · {formatDay(r.createdAt.slice(0, 10))}
+                </span>
+                <span className="ad__sub">{r.description}</span>
+                {r.resolutionNote ? (
+                  <span className="ad__sub">
+                    <strong>Update:</strong> {r.resolutionNote}
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Pager meta={list.data?.meta} onPage={setPage} />
+
+      {creating ? (
+        <TenantCreateRequestSheet
+          tenantId={account.tenantId}
+          orgName={orgName}
+          homes={homes}
+          onClose={() => setCreating(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function TenantCreateRequestSheet({
+  tenantId,
+  orgName,
+  homes,
+  onClose,
+}: {
+  tenantId: string;
+  orgName: string;
+  homes: PortalTenancy[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const firstUnitId =
+    homes[0] && typeof homes[0].unit === 'object' ? (homes[0].unit.id ?? '') : '';
+  const [unitId, setUnitId] = useState(firstUnitId);
+  const [category, setCategory] = useState('PLUMBING');
+  const [priority, setPriority] = useState('MEDIUM');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      let photoUploadIds: string[] | undefined;
+      if (photoFile) {
+        const up = await uploadTenantPhoto(tenantId, photoFile);
+        photoUploadIds = [up.id];
+      }
+      return createTenantRequest(tenantId, {
+        unitId: unitId || undefined,
+        category,
+        priority,
+        title: title.trim(),
+        description: description.trim(),
+        photoUploadIds,
+      });
+    },
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: tenantKeys.account(tenantId) });
+      toast.saved(`Request ${created.number} sent to ${orgName}.`);
+      onClose();
+    },
+  });
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    submitMutation.mutate();
+  };
+
+  return (
+    <Sheet title="Report a maintenance issue" onClose={onClose}>
+      <form className="fm" onSubmit={submit}>
+        <div className="fm__grid">
+          {homes.length > 1 ? (
+            <Field id="t-req-unit" label="Unit" wide>
+              <select
+                id="t-req-unit"
+                className="nx-select"
+                value={unitId}
+                onChange={(e) => setUnitId(e.target.value)}
+              >
+                {homes.map((h) => {
+                  const uid = typeof h.unit === 'object' ? (h.unit.id ?? '') : '';
+                  return (
+                    <option key={h.id} value={uid}>
+                      {homeText(h)}
+                    </option>
+                  );
+                })}
+              </select>
+            </Field>
+          ) : null}
+
+          <Field id="t-req-cat" label="Category">
+            <select
+              id="t-req-cat"
+              className="nx-select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {Object.entries(MAINTENANCE_CATEGORIES).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field id="t-req-prio" label="Urgency">
+            <select
+              id="t-req-prio"
+              className="nx-select"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+            >
+              {Object.entries(MAINTENANCE_PRIORITIES).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field id="t-req-title" label="Short summary" wide>
+            <input
+              id="t-req-title"
+              className="nx-input"
+              type="text"
+              placeholder="e.g. Kitchen sink leaking"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </Field>
+
+          <Field id="t-req-desc" label="What happened?" wide>
+            <textarea
+              id="t-req-desc"
+              className="nx-textarea"
+              rows={3}
+              placeholder="Describe the issue and best time for a technician to visit…"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+          </Field>
+
+          <Field id="t-req-photo" label="Photo (optional)" wide>
+            <input
+              id="t-req-photo"
+              className="nx-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+            />
+          </Field>
+        </div>
+
+        {submitMutation.isError ? (
+          <p className="ad__error" role="alert">
+            {tenantErrorMessage(submitMutation.error, orgName)}
+          </p>
+        ) : null}
+
+        <div className="sh__foot">
+          <button type="button" className="nx-btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="nx-btn nx-btn--primary"
+            disabled={submitMutation.isPending}
+          >
+            {submitMutation.isPending ? 'Sending…' : 'Send request'}
+          </button>
+        </div>
+      </form>
+    </Sheet>
   );
 }

@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
@@ -297,6 +300,52 @@ class StatementEntry {
   );
 }
 
+class TenantMaintenanceRequest {
+  TenantMaintenanceRequest({
+    required this.id,
+    required this.number,
+    required this.title,
+    required this.description,
+    required this.category,
+    required this.priority,
+    required this.status,
+    required this.createdAt,
+    this.unitNumber,
+    this.propertyName,
+    this.resolutionNote,
+    this.resolvedAt,
+  });
+
+  final String id;
+  final String number;
+  final String title;
+  final String description;
+  final String category;
+  final String priority;
+  final String status;
+  final String createdAt;
+  final String? unitNumber;
+  final String? propertyName;
+  final String? resolutionNote;
+  final String? resolvedAt;
+
+  factory TenantMaintenanceRequest.fromJson(Map<String, dynamic> j) =>
+      TenantMaintenanceRequest(
+        id: j['id'] as String,
+        number: j['number'] as String? ?? '',
+        title: j['title'] as String? ?? '',
+        description: j['description'] as String? ?? '',
+        category: j['category'] as String? ?? 'OTHER',
+        priority: j['priority'] as String? ?? 'MEDIUM',
+        status: j['status'] as String? ?? 'OPEN',
+        createdAt: j['createdAt'] as String? ?? '',
+        unitNumber: (j['unit'] as Map?)?['number'] as String?,
+        propertyName: (j['property'] as Map?)?['name'] as String?,
+        resolutionNote: j['resolutionNote'] as String?,
+        resolvedAt: j['resolvedAt'] as String?,
+      );
+}
+
 /// A page of a list plus whether there's more.
 class Page<T> {
   Page(this.rows, {required this.page, required this.pages});
@@ -381,6 +430,34 @@ class TenantApi {
             ))['data']
             as Map<String, dynamic>,
       );
+
+  Future<Page<TenantMaintenanceRequest>> requests(String id, {int page = 1}) =>
+      _page('${_base(id)}/requests', {
+        'page': page,
+        'pageSize': 25,
+      }, TenantMaintenanceRequest.fromJson);
+
+  Future<TenantMaintenanceRequest> createRequest(
+    String id,
+    Map<String, dynamic> body,
+  ) async => TenantMaintenanceRequest.fromJson(
+    (await _api.post('${_base(id)}/requests', body: body))['data']
+        as Map<String, dynamic>,
+  );
+
+  Future<String> uploadPhoto(String id, Uint8List jpeg) async {
+    final res = await _api.upload(
+      '${_base(id)}/uploads',
+      () => FormData.fromMap({
+        'file': MultipartFile.fromBytes(
+          jpeg,
+          filename: 'maintenance.jpg',
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
+      }),
+    );
+    return (res['data'] as Map<String, dynamic>)['id'] as String;
+  }
 }
 
 final tenantApiProvider = Provider(

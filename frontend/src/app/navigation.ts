@@ -95,6 +95,7 @@ export const ORG_NAV: NavGroup[] = [
       { label: 'Properties', to: '/app/properties', permission: 'properties:view', phase: '2', hint: 'Buildings and compounds' },
       { label: 'Units', to: '/app/units', permission: 'units:view', phase: '2', hint: 'Rentable spaces in each property' },
       { label: 'Unit setup', to: '/app/unit-categories', permission: 'unit-categories:view', phase: '2', hint: 'Categories, types and features, e.g. Executive · 2 Bedroom · Balcony' },
+      { label: 'Maintenance', to: '/app/maintenance', permission: 'maintenance:view', phase: '12', hint: 'Tenant repair requests and unit maintenance' },
     ],
   },
   {

@@ -6,6 +6,8 @@ import type { InvoiceDetail, Invoice } from '../billing/types';
 import { mpesaErrorMessage } from '../mpesa/api';
 import { unwrap, unwrapList } from '../payments/rules';
 import type { Payment, Statement } from '../payments/types';
+import type { MaintenanceRequestItem } from '../maintenance/types';
+import type { Upload } from '../uploads/api';
 import type { TenantOverview } from './types';
 
 /**
@@ -66,6 +68,37 @@ export function useTenantPayments(tenantId: string, page = 1) {
     queryFn: () => api.get<unknown>(`${base(tenantId)}/payments`, { page: page > 1 ? page : undefined }).then((body) => readPage<Payment>(body)),
     placeholderData: keepPreviousData,
   });
+}
+
+export function useTenantRequests(tenantId: string, page = 1) {
+  return useQuery({
+    queryKey: [...keys.account(tenantId), 'requests', { page }],
+    queryFn: () =>
+      api
+        .get<unknown>(`${base(tenantId)}/requests`, { page: page > 1 ? page : undefined })
+        .then((body) => readPage<MaintenanceRequestItem>(body)),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export async function uploadTenantPhoto(tenantId: string, file: File): Promise<Upload> {
+  const body = await api.upload<unknown>(`${base(tenantId)}/uploads`, { file });
+  return unwrap<Upload>(body);
+}
+
+export async function createTenantRequest(
+  tenantId: string,
+  dto: {
+    unitId?: string;
+    category?: string;
+    priority?: string;
+    title: string;
+    description: string;
+    photoUploadIds?: string[];
+  },
+): Promise<MaintenanceRequestItem> {
+  const body = await api.post<unknown>(`${base(tenantId)}/requests`, dto);
+  return unwrap<MaintenanceRequestItem>(body);
 }
 
 export async function downloadTenantInvoice(tenantId: string, invoice: { id: string; number: string }): Promise<void> {
