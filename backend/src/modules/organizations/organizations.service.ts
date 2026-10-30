@@ -8,12 +8,14 @@ import { AuditService } from '../audit/audit.service.js';
 import { authContext, orgContext } from '../auth/decorators.js';
 import { normalizeEmail, normalizePhone } from '../auth/identifiers.js';
 import { addDays, todayInNairobi } from '../billing/billing-math.js';
+import { readOrgDocumentInstructions } from '../../common/pdf/pdf.js';
 import { RolesService } from '../roles/roles.service.js';
 import { readReminders } from '../tenant-portal/reminders.js';
 import { InvitationsService } from '../users/invitations.service.js';
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './organizations.dto.js';
 
 function toOrg(o: Organization) {
+  const docInstructions = readOrgDocumentInstructions(o.settings);
   return {
     id: o.id,
     name: o.name,
@@ -28,6 +30,8 @@ function toOrg(o: Organization) {
     settings: o.settings,
     invoiceDueDays: o.invoiceDueDays,
     reminders: readReminders(o.settings),
+    invoiceInstructions: docInstructions.invoiceInstructions,
+    receiptInstructions: docInstructions.receiptInstructions,
     createdAt: o.createdAt,
   };
 }
@@ -68,16 +72,36 @@ export class OrganizationsService {
     };
     return this.db.$transaction(async (tx) => {
       const before = await tx.organization.findUniqueOrThrow({ where: { id: orgId } });
-      if (dto.reminders) {
-        const overdueDays = [...new Set(dto.reminders.overdueDays)].sort((a, b) => a - b);
-        data.settings = {
-          ...(before.settings as Prisma.JsonObject | null),
-          reminders: {
+      const prevSettings = (before.settings as Prisma.JsonObject | null) ?? {};
+      const prevDocInstructions = readOrgDocumentInstructions(before.settings);
+      let nextSettings: Prisma.JsonObject | undefined;
+      if (
+        dto.reminders ||
+        dto.invoiceInstructions !== undefined ||
+        dto.receiptInstructions !== undefined
+      ) {
+        nextSettings = { ...prevSettings };
+        if (dto.reminders) {
+          const overdueDays = [...new Set(dto.reminders.overdueDays)].sort((a, b) => a - b);
+          nextSettings.reminders = {
             enabled: dto.reminders.enabled,
             daysBefore: dto.reminders.daysBefore,
             overdueDays,
-          },
-        };
+          };
+        }
+        if (dto.invoiceInstructions !== undefined || dto.receiptInstructions !== undefined) {
+          nextSettings.documentInstructions = {
+            invoiceInstructions:
+              dto.invoiceInstructions !== undefined
+                ? dto.invoiceInstructions?.trim() || null
+                : prevDocInstructions.invoiceInstructions,
+            receiptInstructions:
+              dto.receiptInstructions !== undefined
+                ? dto.receiptInstructions?.trim() || null
+                : prevDocInstructions.receiptInstructions,
+          };
+        }
+        data.settings = nextSettings;
       }
       const after = await tx.organization.update({ where: { id: orgId }, data });
       await this.audit.record(

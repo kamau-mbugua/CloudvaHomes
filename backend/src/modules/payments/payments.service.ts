@@ -3,7 +3,11 @@ import { formatDateOnly, parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError, type ErrorDetail } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
-import { money } from '../../common/pdf/pdf.js';
+import {
+  money,
+  readOrgDocumentInstructions,
+  readSystemDocumentInstructions,
+} from '../../common/pdf/pdf.js';
 import type { PaymentChannel, Prisma } from '../../generated/prisma/client.js';
 import { violatesUnique } from '../../prisma/errors.js';
 import { DB, type Db, type Tx } from '../../prisma/prisma.module.js';
@@ -172,11 +176,28 @@ export class PaymentsService {
   async forReceipt(id: string) {
     const payment = await this.get(id);
     const p = await this.find(id);
-    const org = await this.db.organization.findUniqueOrThrow({
-      where: { id: p.orgId },
-      select: { name: true, phone: true, email: true, kraPin: true },
-    });
-    return { payment, org, balance: await this.tenantBalance(this.db, p.tenantId) };
+    const [org, platformSettings, balance] = await Promise.all([
+      this.db.organization.findUniqueOrThrow({
+        where: { id: p.orgId },
+        select: { name: true, phone: true, email: true, kraPin: true, settings: true },
+      }),
+      this.db.platformSettings.findUnique({
+        where: { id: 1 },
+        select: { emailTemplates: true },
+      }),
+      this.tenantBalance(this.db, p.tenantId),
+    ]);
+    const orgDocs = readOrgDocumentInstructions(org.settings);
+    const sysDocs = readSystemDocumentInstructions(platformSettings?.emailTemplates);
+    return {
+      payment,
+      org: { name: org.name, phone: org.phone, email: org.email, kraPin: org.kraPin },
+      balance,
+      instructions: {
+        org: orgDocs.receiptInstructions,
+        system: sysDocs.receiptInstructions,
+      },
+    };
   }
 
   /** Invoiced − credited − paid; negative = the tenant is in credit. Void invoices don't count. */
@@ -411,7 +432,8 @@ export class PaymentsService {
   /** After commit, best effort: sends SMS receipt + detailed email receipt with PDF attached. */
   private async sendReceipt(id: string, phone: string, number: string): Promise<boolean> {
     try {
-      const { payment, org, balance } = await this.forReceipt(id);
+      const receiptData = await this.forReceipt(id);
+      const { payment, org, balance } = receiptData;
       const standing = balanceText(balance);
       let sentAny = false;
       try {
@@ -432,7 +454,7 @@ export class PaymentsService {
       });
       if (tenantRow?.email) {
         try {
-          const pdfBuffer = await renderReceiptPdf({ payment, org, balance });
+          const pdfBuffer = await renderReceiptPdf(receiptData);
           const allocationsSummary =
             payment.allocations.length > 0
               ? payment.allocations

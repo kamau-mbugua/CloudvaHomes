@@ -22,6 +22,7 @@ import { withoutOrgScope } from '../../common/context/request-context.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { PaginationQueryDto } from '../../common/http/pagination.js';
 import { ok } from '../../common/http/response.js';
+import { readSystemDocumentInstructions } from '../../common/pdf/pdf.js';
 import { formatDateOnlyOrNull, parseDateOnly } from '../../common/dates/date-only.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import {
@@ -148,7 +149,13 @@ export class BillingController {
     return pdf(
       res,
       `${invoice.number}.pdf`,
-      renderPlatformInvoicePdf({ invoice, org, paybill: settings.paybill }),
+      renderPlatformInvoicePdf({
+        invoice,
+        org,
+        paybill: settings.paybill,
+        systemInstructions: readSystemDocumentInstructions(settings.emailTemplates)
+          .invoiceInstructions,
+      }),
     );
   }
 
@@ -270,7 +277,13 @@ export class PlatformController {
     return pdf(
       res,
       `${invoice.number}.pdf`,
-      renderPlatformInvoicePdf({ invoice, org, paybill: settings.paybill }),
+      renderPlatformInvoicePdf({
+        invoice,
+        org,
+        paybill: settings.paybill,
+        systemInstructions: readSystemDocumentInstructions(settings.emailTemplates)
+          .invoiceInstructions,
+      }),
     );
   }
 

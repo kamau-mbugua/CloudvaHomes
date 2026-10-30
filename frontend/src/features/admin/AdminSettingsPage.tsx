@@ -17,11 +17,12 @@ import { checkSettings, darajaSettingsBody, settingsDraft } from '../platform/ru
 import type { SettingsBody, SettingsDraft } from '../platform/rules';
 import type { PlatformSettings } from '../platform/types';
 
-type SettingsTab = 'billing' | 'mpesa' | 'security' | 'locks' | 'sms' | 'app';
+type SettingsTab = 'billing' | 'documents' | 'mpesa' | 'security' | 'locks' | 'sms' | 'app';
 
 /**
  * Admin → Settings (`/admin/settings`):
  * - Billing rules: due days, grace days, default plan, KodiHub's paybill.
+ * - Document instructions: system-wide footer/notice instructions for invoices and receipts.
  * - M-Pesa (Daraja): KodiHub's Daraja keys & callback URLs.
  * - Admin 2FA: require 2FA for platform operators & channel (Email/SMS).
  * - Rate-limit locks: active OTP & login rate-limit lockouts.
@@ -32,7 +33,12 @@ export function AdminSettingsPage() {
   const filters = useListFilters();
   const rawTab = filters.get('tab');
   const tab: SettingsTab =
-    rawTab === 'mpesa' || rawTab === 'security' || rawTab === 'locks' || rawTab === 'sms' || rawTab === 'app'
+    rawTab === 'documents' ||
+    rawTab === 'mpesa' ||
+    rawTab === 'security' ||
+    rawTab === 'locks' ||
+    rawTab === 'sms' ||
+    rawTab === 'app'
       ? rawTab
       : 'billing';
   const settings = usePlatformSettings();
@@ -48,6 +54,9 @@ export function AdminSettingsPage() {
         <div className="pf__tabs" role="tablist" aria-label="Platform settings">
           <button type="button" role="tab" aria-selected={tab === 'billing'} className="pf__tab" onClick={() => filters.setFilter({ tab: '' })}>
             Billing rules
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'documents'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'documents' })}>
+            Document instructions
           </button>
           <button type="button" role="tab" aria-selected={tab === 'mpesa'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'mpesa' })}>
             M-Pesa (Daraja)
@@ -70,6 +79,11 @@ export function AdminSettingsPage() {
       <div className="pg-narrow">
         {tab === 'billing' ? (
           <SettingsForm key={s.updatedAt ?? JSON.stringify(settingsDraft(s))} settings={s} />
+        ) : tab === 'documents' ? (
+          <DocumentInstructionsForm
+            key={`${s.invoiceInstructions ?? ''}-${s.receiptInstructions ?? ''}`}
+            settings={s}
+          />
         ) : tab === 'mpesa' ? (
           <DarajaSection settings={s} />
         ) : tab === 'security' ? (
@@ -582,6 +596,107 @@ function AppAndMaintenanceForm({ settings }: { settings: PlatformSettings }) {
       <div className="pg-actions">
         <button type="submit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
           {save.isPending ? 'Saving…' : 'Save app & maintenance settings'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS =
+  'Please quote your Account / Reference Code exactly when making payment so your account is credited automatically.';
+const DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS =
+  'This is an official computer-generated payment receipt. Retain this document as proof of payment.';
+
+function DocumentInstructionsForm({ settings }: { settings: PlatformSettings }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const initialInvoice = settings.invoiceInstructions ?? DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS;
+  const initialReceipt = settings.receiptInstructions ?? DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS;
+  const [invoiceInstructions, setInvoiceInstructions] = useState(initialInvoice);
+  const [receiptInstructions, setReceiptInstructions] = useState(initialReceipt);
+
+  const dirty =
+    invoiceInstructions !== initialInvoice || receiptInstructions !== initialReceipt;
+
+  const save = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.put<unknown>('/platform/settings', body),
+    onSuccess: async () => {
+      toast.saved('System document instructions saved.');
+      await queryClient.invalidateQueries({ queryKey: keys.platform });
+    },
+    onError: (error) => toast.failed(platformErrorMessage(error)),
+  });
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate({
+      invoiceInstructions: invoiceInstructions.trim() || null,
+      receiptInstructions: receiptInstructions.trim() || null,
+    });
+  };
+
+  return (
+    <form className="fm__section" onSubmit={submit} noValidate>
+      <h2>System document instructions (PDFs)</h2>
+      <p>
+        System-wide notices printed at the bottom of every invoice and payment receipt PDF across
+        all organisations. Each organisation can also add its own organisation-specific invoice and
+        receipt instructions under <strong>Settings → Organisation → Billing</strong>.
+      </p>
+
+      <div className="fm__grid">
+        <Field
+          id="doc-inv-inst"
+          label="System invoice instructions"
+          optional
+          wide
+          hint="Printed under SYSTEM NOTICE on every tenant invoice and platform invoice PDF."
+        >
+          <textarea
+            id="doc-inv-inst"
+            rows={3}
+            maxLength={1000}
+            value={invoiceInstructions}
+            onChange={(e) => setInvoiceInstructions(e.target.value)}
+            placeholder={DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS}
+          />
+        </Field>
+        <Field
+          id="doc-rct-inst"
+          label="System receipt instructions"
+          optional
+          wide
+          hint="Printed under SYSTEM NOTICE on every payment receipt PDF."
+        >
+          <textarea
+            id="doc-rct-inst"
+            rows={3}
+            maxLength={1000}
+            value={receiptInstructions}
+            onChange={(e) => setReceiptInstructions(e.target.value)}
+            placeholder={DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS}
+          />
+        </Field>
+      </div>
+
+      <div className="pg-actions">
+        <button
+          type="button"
+          className="nx-btn"
+          disabled={save.isPending}
+          onClick={() => {
+            setInvoiceInstructions(DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS);
+            setReceiptInstructions(DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS);
+          }}
+        >
+          Restore defaults
+        </button>
+        <button
+          type="submit"
+          className="nx-btn nx-btn--primary"
+          disabled={!dirty || save.isPending}
+        >
+          {save.isPending ? 'Saving…' : 'Save document instructions'}
         </button>
       </div>
     </form>

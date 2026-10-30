@@ -146,6 +146,10 @@ export interface Organization {
   settings: Record<string, unknown>;
   /** Days from issue to due date on new invoices, 0–60 (phase 3; default 7). */
   invoiceDueDays?: number;
+  /** Organisation-level instructions printed on tenant invoice PDFs. */
+  invoiceInstructions?: string | null;
+  /** Organisation-level instructions printed on tenant payment receipt PDFs. */
+  receiptInstructions?: string | null;
   /** Phase 7: SMS rent reminders. Absent from older servers; read as the defaults (off). */
   reminders?: ReminderSettings;
 }

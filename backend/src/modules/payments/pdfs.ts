@@ -1,9 +1,22 @@
-import { a4, footer, header, money, PDF_BRAND } from '../../common/pdf/pdf.js';
+import {
+  a4,
+  DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS,
+  drawInstructionsAndSignoff,
+  footer,
+  header,
+  money,
+  PDF_BRAND,
+} from '../../common/pdf/pdf.js';
 import type { AccountsService } from './accounts.service.js';
 import type { PaymentsService } from './payments.service.js';
 import { balanceText } from './payments.service.js';
 
-type ReceiptInput = Awaited<ReturnType<PaymentsService['forReceipt']>>;
+type ReceiptInput = Awaited<ReturnType<PaymentsService['forReceipt']>> & {
+  instructions?: {
+    org?: string | null;
+    system?: string | null;
+  };
+};
 type StatementInput = Awaited<ReturnType<AccountsService['forStatementPdf']>>;
 
 const METHOD = {
@@ -15,7 +28,12 @@ const METHOD = {
   DEPOSIT: 'Deposit applied',
 } as const;
 
-export function renderReceiptPdf({ payment: p, org, balance }: ReceiptInput): Promise<Buffer> {
+export function renderReceiptPdf({
+  payment: p,
+  org,
+  balance,
+  instructions,
+}: ReceiptInput): Promise<Buffer> {
   const { doc, bytes, left, right } = a4(p.number, org.name);
   const width = right - left;
   const reversal = p.amount < 0n;
@@ -25,85 +43,95 @@ export function renderReceiptPdf({ payment: p, org, balance }: ReceiptInput): Pr
     org,
     reversal ? 'Payment reversal' : 'Receipt',
     [
-      ['Number', p.number],
+      ['Receipt No.', p.number],
       ['Date', p.receivedAt],
+      ['Method', METHOD[p.method]],
+      ...(p.reference ? ([['Reference', p.reference]] as const) : []),
     ],
     reversal
       ? { label: 'Reversed', tone: 'danger' }
       : { label: 'Payment received', tone: 'success' },
   );
 
-  // Highlight banner for Amount Received + Received From card
-  const cardTop = yAfterHeader + 2;
-  const cardHeight = 76;
-  const colGap = 14;
-  const colWidth = (width - colGap) / 2;
+  // Two-column sharp bordered accounting summary grid
+  const gridTop = yAfterHeader;
+  const gridHeight = 78;
+  const halfWidth = width / 2;
 
   doc.save();
   doc
-    .roundedRect(left, cardTop, colWidth, cardHeight, 6)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.border);
+    .rect(left, gridTop, width, gridHeight)
+    .lineWidth(0.75)
+    .fillAndStroke('#FFFFFF', PDF_BRAND.borderStrong);
   doc
-    .roundedRect(left + colWidth + colGap, cardTop, colWidth, cardHeight, 6)
-    .fillAndStroke(
-      reversal ? PDF_BRAND.dangerBg : PDF_BRAND.brandSoft,
-      reversal ? PDF_BRAND.dangerBorder : PDF_BRAND.brandBorder,
-    );
+    .moveTo(left + halfWidth, gridTop)
+    .lineTo(left + halfWidth, gridTop + gridHeight)
+    .lineWidth(0.6)
+    .strokeColor(PDF_BRAND.border)
+    .stroke();
   doc.restore();
 
   const padX = 12;
+  const colW = halfWidth - padX * 2;
+
+  // Left cell: RECEIVED FROM
   doc
     .font('Helvetica-Bold')
-    .fontSize(7.5)
-    .fillColor(PDF_BRAND.brandAccent)
-    .text('RECEIVED FROM', left + padX, cardTop + 10, { width: colWidth - padX * 2 });
+    .fontSize(7)
+    .fillColor(PDF_BRAND.muted)
+    .text('RECEIVED FROM', left + padX, gridTop + 10, { width: colW });
   doc
     .font('Helvetica-Bold')
-    .fontSize(10.5)
+    .fontSize(11)
     .fillColor(PDF_BRAND.ink)
     .text(
       `${p.tenant.firstName} ${p.tenant.lastName} (${p.tenant.code})`,
       left + padX,
-      cardTop + 23,
-      {
-        width: colWidth - padX * 2,
-      },
+      gridTop + 22,
+      { width: colW },
     );
   doc
     .font('Helvetica')
     .fontSize(8.5)
     .fillColor(PDF_BRAND.inkSecondary)
-    .text(p.tenant.phone, left + padX, doc.y + 2, { width: colWidth - padX * 2 });
-  if (p.paidBy) {
-    doc.text(`Paid by ${p.paidBy}`, left + padX, doc.y + 2, { width: colWidth - padX * 2 });
-  }
+    .text(`Tel: ${p.tenant.phone}`, left + padX, doc.y + 2, { width: colW });
+  doc
+    .font('Helvetica')
+    .fontSize(8.5)
+    .fillColor(PDF_BRAND.inkSecondary)
+    .text(
+      p.paidBy ? `Paid by ${p.paidBy}` : `Tenant Account Ref: ${p.tenant.code}`,
+      left + padX,
+      doc.y + 2,
+      { width: colW },
+    );
 
-  // Right card: Amount & Method
-  const rightBoxX = left + colWidth + colGap + padX;
+  // Right cell: PAYMENT SUMMARY
+  const rightX = left + halfWidth + padX;
   doc
     .font('Helvetica-Bold')
-    .fontSize(7.5)
-    .fillColor(reversal ? PDF_BRAND.dangerText : PDF_BRAND.brandDark)
-    .text(reversal ? 'REVERSED AMOUNT' : 'AMOUNT RECEIVED', rightBoxX, cardTop + 10, {
-      width: colWidth - padX * 2,
+    .fontSize(7)
+    .fillColor(reversal ? PDF_BRAND.dangerText : PDF_BRAND.muted)
+    .text(reversal ? 'REVERSED AMOUNT' : 'AMOUNT RECEIVED', rightX, gridTop + 10, {
+      width: colW,
     });
   doc
     .font('Helvetica-Bold')
-    .fontSize(17)
-    .fillColor(reversal ? PDF_BRAND.dangerText : PDF_BRAND.brandDark)
-    .text(`KES ${money(p.amount)}`, rightBoxX, cardTop + 23, { width: colWidth - padX * 2 });
+    .fontSize(16)
+    .fillColor(reversal ? PDF_BRAND.dangerText : PDF_BRAND.ink)
+    .text(`KES ${money(p.amount)}`, rightX, gridTop + 21, { width: colW });
   doc
     .font('Helvetica')
     .fontSize(8.5)
     .fillColor(PDF_BRAND.inkSecondary)
     .text(
       `${METHOD[p.method]}${p.channel ? ` - ${p.channel.name}` : ''}${p.reference ? `, ref ${p.reference}` : ''}`,
-      rightBoxX,
+      rightX,
       doc.y + 3,
-      { width: colWidth - padX * 2 },
+      { width: colW },
     );
 
-  let y = cardTop + cardHeight + 16;
+  let y = gridTop + gridHeight + 16;
 
   if (reversal && p.reversalReason) {
     doc
@@ -114,19 +142,40 @@ export function renderReceiptPdf({ payment: p, org, balance }: ReceiptInput): Pr
     y = doc.y + 12;
   }
 
+  if (p.note) {
+    doc
+      .font('Helvetica')
+      .fontSize(8.5)
+      .fillColor(PDF_BRAND.inkSecondary)
+      .text(`Note: ${p.note}`, left, y, { width });
+    y = doc.y + 10;
+  }
+
+  // Invoice allocations ledger table
   if (p.allocations.length) {
     const headerBarH = 22;
     doc.save();
-    doc.roundedRect(left, y, width, headerBarH, 4).fill(PDF_BRAND.tableHeaderBg);
+    doc.rect(left, y, width, headerBarH).fill(PDF_BRAND.tableHeaderBg);
+    doc.moveTo(left, y).lineTo(right, y).lineWidth(1).strokeColor(PDF_BRAND.ruleHeavy).stroke();
+    doc
+      .moveTo(left, y + headerBarH)
+      .lineTo(right, y + headerBarH)
+      .lineWidth(0.75)
+      .strokeColor(PDF_BRAND.ruleHeavy)
+      .stroke();
     doc.restore();
 
-    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#FFFFFF');
-    doc.text(reversal ? 'Taken back from' : 'Paid towards', left + 10, y + 6.5, {
-      width: width - 130,
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
+    doc.text(reversal ? 'Taken back from' : 'Paid towards', left + 8, y + 7, {
+      width: 240,
       lineBreak: false,
     });
-    doc.text('Amount (KES)', right - 120, y + 6.5, {
-      width: 110,
+    doc.text('Billing period', left + 255, y + 7, {
+      width: 100,
+      lineBreak: false,
+    });
+    doc.text('Amount (KES)', right - 120, y + 7, {
+      width: 112,
       align: 'right',
       lineBreak: false,
     });
@@ -144,15 +193,27 @@ export function renderReceiptPdf({ payment: p, org, balance }: ReceiptInput): Pr
         .font('Helvetica')
         .fontSize(9)
         .fillColor(PDF_BRAND.ink)
-        .text(`${a.invoice.number} (${a.invoice.period})`, left + 10, y + 6, {
-          width: width - 130,
+        .text(`${a.invoice.number} (${a.invoice.period})`, left + 8, y + 6.5, {
+          width: 240,
           lineBreak: false,
         });
-      doc.font('Helvetica-Bold').text(money(a.amount), right - 120, y + 6, {
-        width: 110,
-        align: 'right',
-        lineBreak: false,
-      });
+      doc
+        .font('Helvetica')
+        .fontSize(8.5)
+        .fillColor(PDF_BRAND.inkSecondary)
+        .text(a.invoice.period, left + 255, y + 6.5, {
+          width: 100,
+          lineBreak: false,
+        });
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor(PDF_BRAND.ink)
+        .text(money(a.amount), right - 120, y + 6.5, {
+          width: 112,
+          align: 'right',
+          lineBreak: false,
+        });
       y += rowH;
       doc.save();
       doc.moveTo(left, y).lineTo(right, y).lineWidth(0.5).strokeColor(PDF_BRAND.border).stroke();
@@ -164,29 +225,42 @@ export function renderReceiptPdf({ payment: p, org, balance }: ReceiptInput): Pr
   if (p.unallocated > 0n) {
     doc
       .font('Helvetica')
-      .fontSize(9.5)
+      .fontSize(9)
       .fillColor(PDF_BRAND.inkSecondary)
       .text(`Held as credit: KES ${money(p.unallocated)}`, left, y, { width });
     y = doc.y + 8;
   }
 
-  // Account standing summary bar
+  // Account standing summary bar (crisp bordered ledger box)
+  const standingBoxH = 28;
   doc.save();
   doc
-    .roundedRect(left, y + 4, width, 30, 6)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.borderStrong);
+    .rect(left, y, width, standingBoxH)
+    .lineWidth(0.75)
+    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.ruleHeavy);
   doc.restore();
   doc
     .font('Helvetica-Bold')
-    .fontSize(10)
-    .fillColor(PDF_BRAND.brandDark)
-    .text(`Account now: ${balanceText(balance)}`, left + 12, y + 14, { width: width - 24 });
+    .fontSize(9.5)
+    .fillColor(PDF_BRAND.ink)
+    .text(`Account now: ${balanceText(balance)}`, left + 10, y + 9, { width: width - 20 });
 
-  footer(
-    doc,
-    p.recordedBy ? `Recorded by ${p.recordedBy.name}` : 'Recorded automatically',
-    p.number,
-  );
+  y += standingBoxH + 18;
+
+  const recordedByText = p.recordedBy
+    ? `Recorded by ${p.recordedBy.name}`
+    : 'Recorded automatically';
+
+  drawInstructionsAndSignoff(doc, y, {
+    orgName: org.name,
+    orgInstructions: instructions?.org ?? null,
+    systemInstructions: instructions?.system ?? DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS,
+    signoffLeft: recordedByText,
+    signoffCenter: `Tenant Ref: ${p.tenant.code}`,
+    signoffRight: `Receipt: ${p.number}`,
+  });
+
+  footer(doc, recordedByText, p.number);
   doc.end();
   return bytes;
 }
@@ -210,11 +284,10 @@ export function renderStatementPdf({ statement: s, org }: StatementInput): Promi
     },
   );
 
-  // KPI summary strip
-  const stripY = yAfterHeader + 2;
-  const stripH = 46;
-  const boxGap = 10;
-  const boxW = (width - boxGap * 2) / 3;
+  // KPI summary strip (sharp accounting boxes)
+  const stripY = yAfterHeader;
+  const stripH = 44;
+  const boxW = width / 3;
 
   const kpis: [string, string][] = [
     ['OPENING BALANCE', `KES ${money(s.openingBalance)}`],
@@ -222,16 +295,23 @@ export function renderStatementPdf({ statement: s, org }: StatementInput): Promi
     ['DEPOSIT HELD', `KES ${money(s.depositHeld)}`],
   ];
 
-  for (let i = 0; i < kpis.length; i++) {
-    const bx = left + i * (boxW + boxGap);
-    doc.save();
+  doc.save();
+  doc
+    .rect(left, stripY, width, stripH)
+    .lineWidth(0.75)
+    .fillAndStroke('#FFFFFF', PDF_BRAND.borderStrong);
+  for (let i = 1; i < kpis.length; i++) {
     doc
-      .roundedRect(bx, stripY, boxW, stripH, 5)
-      .fillAndStroke(
-        i === 1 ? PDF_BRAND.brandSoft : PDF_BRAND.surface,
-        i === 1 ? PDF_BRAND.brandBorder : PDF_BRAND.border,
-      );
-    doc.restore();
+      .moveTo(left + i * boxW, stripY)
+      .lineTo(left + i * boxW, stripY + stripH)
+      .lineWidth(0.5)
+      .strokeColor(PDF_BRAND.border)
+      .stroke();
+  }
+  doc.restore();
+
+  for (let i = 0; i < kpis.length; i++) {
+    const bx = left + i * boxW;
     doc
       .font('Helvetica-Bold')
       .fontSize(7)
@@ -257,9 +337,16 @@ export function renderStatementPdf({ statement: s, org }: StatementInput): Promi
 
   const drawTableHeader = () => {
     doc.save();
-    doc.roundedRect(left, y, width, 20, 4).fill(PDF_BRAND.tableHeaderBg);
+    doc.rect(left, y, width, 20).fill(PDF_BRAND.tableHeaderBg);
+    doc.moveTo(left, y).lineTo(right, y).lineWidth(1).strokeColor(PDF_BRAND.ruleHeavy).stroke();
+    doc
+      .moveTo(left, y + 20)
+      .lineTo(right, y + 20)
+      .lineWidth(0.75)
+      .strokeColor(PDF_BRAND.ruleHeavy)
+      .stroke();
     doc.restore();
-    doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF');
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
     const ty = y + 6;
     doc.text('Date', cols.date, ty, { width: 58, lineBreak: false });
     doc.text('Reference', cols.ref, ty, { width: 92, lineBreak: false });
@@ -287,7 +374,7 @@ export function renderStatementPdf({ statement: s, org }: StatementInput): Promi
 
     if (bold) {
       doc.save();
-      doc.rect(left, y, width, rowH).fill(PDF_BRAND.brandSoft);
+      doc.rect(left, y, width, rowH).fill(PDF_BRAND.surface);
       doc.restore();
     } else if (rowIdx % 2 === 1) {
       doc.save();
@@ -332,7 +419,7 @@ export function renderStatementPdf({ statement: s, org }: StatementInput): Promi
   doc
     .font('Helvetica-Bold')
     .fontSize(9.5)
-    .fillColor(PDF_BRAND.brandDark)
+    .fillColor(PDF_BRAND.ink)
     .text(balanceText(s.closingBalance), left, y + 12);
   if (s.depositHeld > 0n) {
     doc

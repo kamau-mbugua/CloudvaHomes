@@ -208,6 +208,8 @@ export interface PlatformSettings {
   appStoreUrl?: string | null;
   maintenanceMode?: boolean;
   maintenanceMessage?: string | null;
+  invoiceInstructions?: string | null;
+  receiptInstructions?: string | null;
   updatedAt?: string;
 }
 

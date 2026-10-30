@@ -3,6 +3,10 @@ import { formatDateOnly, parseDateOnly } from '../../../common/dates/date-only.j
 import { AppError } from '../../../common/errors/app-error.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
 import { paginated } from '../../../common/http/response.js';
+import {
+  readOrgDocumentInstructions,
+  readSystemDocumentInstructions,
+} from '../../../common/pdf/pdf.js';
 import type { Prisma } from '../../../generated/prisma/client.js';
 import { violatesUnique } from '../../../prisma/errors.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
@@ -170,10 +174,10 @@ export class InvoicesService {
   /** The invoice with everything the PDF needs. */
   async forPdf(id: string) {
     const i = await this.find(id);
-    const [org, channels] = await Promise.all([
+    const [org, channels, platformSettings] = await Promise.all([
       this.db.organization.findUniqueOrThrow({
         where: { id: i.orgId },
-        select: { name: true, phone: true, email: true, kraPin: true },
+        select: { name: true, phone: true, email: true, kraPin: true, settings: true },
       }),
       this.db.paymentChannel.findMany({
         where: {
@@ -195,8 +199,22 @@ export class InvoicesService {
         },
         orderBy: { createdAt: 'asc' },
       }),
+      this.db.platformSettings.findUnique({
+        where: { id: 1 },
+        select: { emailTemplates: true },
+      }),
     ]);
-    return { invoice: await this.toDetail(i), org, channels };
+    const orgDocs = readOrgDocumentInstructions(org.settings);
+    const sysDocs = readSystemDocumentInstructions(platformSettings?.emailTemplates);
+    return {
+      invoice: await this.toDetail(i),
+      org: { name: org.name, phone: org.phone, email: org.email, kraPin: org.kraPin },
+      channels,
+      instructions: {
+        org: orgDocs.invoiceInstructions,
+        system: sysDocs.invoiceInstructions,
+      },
+    };
   }
 
   private async toDetail(i: DetailRow) {

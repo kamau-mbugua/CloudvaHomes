@@ -253,6 +253,27 @@ export class PlatformSettingsDto {
   @IsString()
   @MaxLength(500)
   maintenanceMessage?: string | null;
+
+  // ── System Document Instructions for PDFs (Invoices & Receipts) ──
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Platform-wide system instructions printed on all Invoice PDFs',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(1000)
+  invoiceInstructions?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Platform-wide system instructions printed on all Receipt PDFs',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(1000)
+  receiptInstructions?: string | null;
 }
 
 export class CreateOperatorDto {

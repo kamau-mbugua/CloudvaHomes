@@ -91,6 +91,24 @@ export class UpdateOrganizationDto {
   @ValidateNested()
   @Type(() => RemindersDto)
   reminders?: RemindersDto;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Organisation-specific instructions printed on tenant Invoice PDFs',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  invoiceInstructions?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Organisation-specific instructions printed on tenant Receipt PDFs',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  receiptInstructions?: string | null;
 }
 
 export class OwnerDto {

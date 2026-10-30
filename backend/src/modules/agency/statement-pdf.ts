@@ -31,11 +31,10 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
     { label: 'Landlord Statement', tone: 'neutral' },
   );
 
-  // KPI strip
-  const stripY = yAfterHeader + 2;
+  // KPI strip (sharp accounting boxes)
+  const stripY = yAfterHeader;
   const stripH = 44;
-  const boxGap = 8;
-  const boxW = (width - boxGap * 3) / 4;
+  const boxW = width / 4;
   const kpis: [string, string][] = [
     ['COLLECTED', `KES ${money(s.totals.collections)}`],
     ['COMMISSION & EXPENSES', `KES ${money(s.totals.commission + s.totals.expenses)}`],
@@ -43,16 +42,23 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
     ['BALANCE OWED TO YOU', `KES ${money(s.closing.payable)}`],
   ];
 
-  for (let i = 0; i < kpis.length; i++) {
-    const bx = left + i * (boxW + boxGap);
-    doc.save();
+  doc.save();
+  doc
+    .rect(left, stripY, width, stripH)
+    .lineWidth(0.75)
+    .fillAndStroke('#FFFFFF', PDF_BRAND.borderStrong);
+  for (let i = 1; i < kpis.length; i++) {
     doc
-      .roundedRect(bx, stripY, boxW, stripH, 5)
-      .fillAndStroke(
-        i === 3 ? PDF_BRAND.brandSoft : PDF_BRAND.surface,
-        i === 3 ? PDF_BRAND.brandBorder : PDF_BRAND.border,
-      );
-    doc.restore();
+      .moveTo(left + i * boxW, stripY)
+      .lineTo(left + i * boxW, stripY + stripH)
+      .lineWidth(0.5)
+      .strokeColor(PDF_BRAND.border)
+      .stroke();
+  }
+  doc.restore();
+
+  for (let i = 0; i < kpis.length; i++) {
+    const bx = left + i * boxW;
     doc
       .font('Helvetica-Bold')
       .fontSize(6.5)
@@ -76,9 +82,16 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
 
   const drawTableHeader = () => {
     doc.save();
-    doc.roundedRect(left, y, width, 20, 4).fill(PDF_BRAND.tableHeaderBg);
+    doc.rect(left, y, width, 20).fill(PDF_BRAND.tableHeaderBg);
+    doc.moveTo(left, y).lineTo(right, y).lineWidth(1).strokeColor(PDF_BRAND.ruleHeavy).stroke();
+    doc
+      .moveTo(left, y + 20)
+      .lineTo(right, y + 20)
+      .lineWidth(0.75)
+      .strokeColor(PDF_BRAND.ruleHeavy)
+      .stroke();
     doc.restore();
-    doc.font('Helvetica-Bold').fontSize(8).fillColor('#FFFFFF');
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
     const ty = y + 6;
     doc.text('Date', cols.date, ty, { width: 58, lineBreak: false });
     doc.text('Item', cols.what, ty, { width: 72, lineBreak: false });
@@ -105,7 +118,7 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
 
     if (bold) {
       doc.save();
-      doc.rect(left, y, width, rowH).fill(PDF_BRAND.brandSoft);
+      doc.rect(left, y, width, rowH).fill(PDF_BRAND.surface);
       doc.restore();
     } else if (rowIdx % 2 === 1) {
       doc.save();
@@ -154,7 +167,7 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
     y = 40;
   }
 
-  doc.font('Helvetica-Bold').fontSize(10).fillColor(PDF_BRAND.brandDark).text('Summary', left, y);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(PDF_BRAND.ink).text('Summary', left, y);
   y = doc.y + 4;
   doc.font('Helvetica').fontSize(9).fillColor(PDF_BRAND.ink);
   for (const [k, v] of [
@@ -164,10 +177,11 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
     ['Adjustments', s.totals.adjustments],
     ['Paid out to you', -s.totals.remittances],
   ] as const) {
-    doc.text(k, left, y, { continued: true, width: 300 });
-    doc.font('Helvetica-Bold').text(money(v), { align: 'right', width: 300 });
-    doc.font('Helvetica');
-    y = doc.y + 2;
+    doc.font('Helvetica').text(k, left, y, { width: 170, align: 'left', lineBreak: false });
+    doc
+      .font('Helvetica-Bold')
+      .text(money(v), left + 175, y, { align: 'right', width: 120, lineBreak: false });
+    y += 14;
   }
 
   y += 8;

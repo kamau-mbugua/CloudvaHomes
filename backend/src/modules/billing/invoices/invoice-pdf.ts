@@ -1,5 +1,7 @@
 import {
   a4,
+  DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS,
+  drawInstructionsAndSignoff,
   footer,
   header,
   money,
@@ -8,7 +10,12 @@ import {
 } from '../../../common/pdf/pdf.js';
 import type { InvoicesService } from './invoices.service.js';
 
-type PdfInput = Awaited<ReturnType<InvoicesService['forPdf']>>;
+type PdfInput = Awaited<ReturnType<InvoicesService['forPdf']>> & {
+  instructions?: {
+    org?: string | null;
+    system?: string | null;
+  };
+};
 
 export { money };
 
@@ -33,10 +40,15 @@ function statusBadgeFor(status: string, overdue?: boolean): StatusBadgeOptions {
 }
 
 /**
- * Renders a branded A4 Tenant Invoice PDF.
+ * Renders an institutional A4 Tenant Invoice PDF.
  * Uses built-in Helvetica / Helvetica-Bold only so no external font files ship in the image.
  */
-export function renderInvoicePdf({ invoice: i, org, channels }: PdfInput): Promise<Buffer> {
+export function renderInvoicePdf({
+  invoice: i,
+  org,
+  channels,
+  instructions,
+}: PdfInput): Promise<Buffer> {
   const { doc, bytes, left, right } = a4(i.number, org.name);
   const width = right - left;
 
@@ -46,36 +58,41 @@ export function renderInvoicePdf({ invoice: i, org, channels }: PdfInput): Promi
     org,
     i.status === 'VOID' ? `${KIND_TITLE[i.kind]} - VOID` : KIND_TITLE[i.kind],
     [
-      ['Number', i.number],
+      ['Invoice No.', i.number],
       ['Issued', i.issueDate],
-      ['Due', i.dueDate],
+      ['Due Date', i.dueDate],
       ['Period', i.period],
     ],
     badge,
   );
 
-  // Two-column info card: BILL TO (left) and PROPERTY & UNIT (right)
-  const cardTop = yAfterHeader + 2;
-  const cardHeight = 76;
-  const colGap = 14;
-  const colWidth = (width - colGap) / 2;
+  // Two-column sharp bordered accounting summary grid: BILL TO (left) and PROPERTY & UNIT (right)
+  const gridTop = yAfterHeader;
+  const gridHeight = 76;
+  const halfWidth = width / 2;
 
   doc.save();
   doc
-    .roundedRect(left, cardTop, colWidth, cardHeight, 6)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.border);
+    .rect(left, gridTop, width, gridHeight)
+    .lineWidth(0.75)
+    .fillAndStroke('#FFFFFF', PDF_BRAND.borderStrong);
   doc
-    .roundedRect(left + colWidth + colGap, cardTop, colWidth, cardHeight, 6)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.border);
+    .moveTo(left + halfWidth, gridTop)
+    .lineTo(left + halfWidth, gridTop + gridHeight)
+    .lineWidth(0.6)
+    .strokeColor(PDF_BRAND.border)
+    .stroke();
   doc.restore();
 
-  // Left box: Bill To
   const padX = 12;
+  const colW = halfWidth - padX * 2;
+
+  // Left cell: Bill To
   doc
     .font('Helvetica-Bold')
-    .fontSize(7.5)
-    .fillColor(PDF_BRAND.brandAccent)
-    .text('BILL TO', left + padX, cardTop + 10, { width: colWidth - padX * 2 });
+    .fontSize(7)
+    .fillColor(PDF_BRAND.muted)
+    .text('BILLED TO', left + padX, gridTop + 10, { width: colW });
   doc
     .font('Helvetica-Bold')
     .fontSize(10.5)
@@ -83,82 +100,79 @@ export function renderInvoicePdf({ invoice: i, org, channels }: PdfInput): Promi
     .text(
       `${i.tenant.firstName} ${i.tenant.lastName} (${i.tenant.code})`,
       left + padX,
-      cardTop + 23,
-      {
-        width: colWidth - padX * 2,
-      },
+      gridTop + 22,
+      { width: colW },
     );
   doc
     .font('Helvetica')
     .fontSize(8.5)
     .fillColor(PDF_BRAND.inkSecondary)
-    .text(`Tel: ${i.tenant.phone}`, left + padX, doc.y + 2, { width: colWidth - padX * 2 });
+    .text(`Tel: ${i.tenant.phone}`, left + padX, doc.y + 2, { width: colW });
   doc
     .font('Helvetica-Bold')
     .fontSize(8)
-    .fillColor(PDF_BRAND.brandDark)
-    .text(`Account / Payment Ref: ${i.tenant.code}`, left + padX, doc.y + 2, {
-      width: colWidth - padX * 2,
-    });
+    .fillColor(PDF_BRAND.ink)
+    .text(`Account / Payment Ref: ${i.tenant.code}`, left + padX, doc.y + 2, { width: colW });
 
-  // Right box: Property & Unit
-  const rightBoxX = left + colWidth + colGap + padX;
+  // Right cell: Property & Unit
+  const rightBoxX = left + halfWidth + padX;
   doc
     .font('Helvetica-Bold')
-    .fontSize(7.5)
-    .fillColor(PDF_BRAND.brandAccent)
-    .text('PROPERTY & UNIT', rightBoxX, cardTop + 10, { width: colWidth - padX * 2 });
+    .fontSize(7)
+    .fillColor(PDF_BRAND.muted)
+    .text('PROPERTY & UNIT', rightBoxX, gridTop + 10, { width: colW });
   doc
     .font('Helvetica-Bold')
     .fontSize(10.5)
     .fillColor(PDF_BRAND.ink)
-    .text(`Unit ${i.unit.number}, ${i.property.name}`, rightBoxX, cardTop + 23, {
-      width: colWidth - padX * 2,
-    });
+    .text(`Unit ${i.unit.number}, ${i.property.name}`, rightBoxX, gridTop + 22, { width: colW });
   doc
     .font('Helvetica')
     .fontSize(8.5)
     .fillColor(PDF_BRAND.inkSecondary)
-    .text(`Billing Type: ${KIND_SUBTITLE[i.kind]}`, rightBoxX, doc.y + 2, {
-      width: colWidth - padX * 2,
-    });
+    .text(`Billing Type: ${KIND_SUBTITLE[i.kind]}`, rightBoxX, doc.y + 2, { width: colW });
   doc
     .font('Helvetica')
     .fontSize(8.5)
     .fillColor(PDF_BRAND.inkSecondary)
     .text(`Billing Period: ${i.period}  |  Due Date: ${i.dueDate}`, rightBoxX, doc.y + 2, {
-      width: colWidth - padX * 2,
+      width: colW,
     });
 
   // Line items table
-  let y = cardTop + cardHeight + 18;
+  let y = gridTop + gridHeight + 16;
   const cols = {
-    desc: left + 10,
+    desc: left + 8,
     qty: left + 275,
     unit: left + 335,
     amount: left + 415,
   };
 
-  // Dark branded table header bar
   const headerBarH = 22;
   doc.save();
-  doc.roundedRect(left, y, width, headerBarH, 4).fill(PDF_BRAND.tableHeaderBg);
+  doc.rect(left, y, width, headerBarH).fill(PDF_BRAND.tableHeaderBg);
+  doc.moveTo(left, y).lineTo(right, y).lineWidth(1).strokeColor(PDF_BRAND.ruleHeavy).stroke();
+  doc
+    .moveTo(left, y + headerBarH)
+    .lineTo(right, y + headerBarH)
+    .lineWidth(0.75)
+    .strokeColor(PDF_BRAND.ruleHeavy)
+    .stroke();
   doc.restore();
 
-  const headerTextY = y + 6.5;
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#FFFFFF');
+  const headerTextY = y + 7;
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
   doc.text('Description', cols.desc, headerTextY, { width: 255, lineBreak: false });
   doc.text('Qty', cols.qty, headerTextY, { width: 52, align: 'right', lineBreak: false });
   doc.text('Unit price', cols.unit, headerTextY, { width: 72, align: 'right', lineBreak: false });
   doc.text('Amount (KES)', cols.amount, headerTextY, {
-    width: right - 10 - cols.amount,
+    width: right - 8 - cols.amount,
     align: 'right',
     lineBreak: false,
   });
 
   y += headerBarH;
 
-  // Table rows with zebra striping
   for (let idx = 0; idx < i.lines.length; idx++) {
     const l = i.lines[idx]!;
     const qty = l.quantity.replace(/\.?0+$/, '') || '0';
@@ -192,7 +206,7 @@ export function renderInvoicePdf({ invoice: i, org, channels }: PdfInput): Promi
       .font('Helvetica-Bold')
       .fillColor(PDF_BRAND.ink)
       .text(money(l.amount), cols.amount, rowTextY, {
-        width: right - 10 - cols.amount,
+        width: right - 8 - cols.amount,
         align: 'right',
         lineBreak: false,
       });
@@ -203,51 +217,11 @@ export function renderInvoicePdf({ invoice: i, org, channels }: PdfInput): Promi
     doc.restore();
   }
 
-  // Totals & Payment Instructions side-by-side below table
-  y += 14;
-  const summaryStartY = y;
-
-  // Left side: How to pay box
-  const payBoxWidth = width * 0.54;
-  const payLines: string[] = [];
-  for (const c of channels) {
-    if (c.kind === 'MPESA_PAYBILL' && c.shortcode) {
-      payLines.push(`M-Pesa Paybill: ${c.shortcode}  |  Account: ${i.tenant.code}`);
-    } else if (c.kind === 'MPESA_TILL' && c.shortcode) {
-      payLines.push(`M-Pesa Buy Goods Till: ${c.shortcode}  |  Ref: ${i.tenant.code}`);
-    } else if (c.kind === 'BANK_ACCOUNT' && c.accountNumber) {
-      payLines.push(
-        `${c.bankName || c.name}: Acc ${c.accountNumber}${c.accountName ? ` (${c.accountName})` : ''}  |  Ref: ${i.tenant.code}`,
-      );
-    }
-  }
-  if (payLines.length === 0) {
-    payLines.push(`Quote tenant reference ${i.tenant.code} on all rent & utility payments.`);
-  }
-
-  const payBoxHeight = Math.max(46, 28 + payLines.length * 14);
-  doc.save();
-  doc
-    .roundedRect(left, summaryStartY, payBoxWidth, payBoxHeight, 6)
-    .fillAndStroke(PDF_BRAND.brandSoft, PDF_BRAND.brandBorder);
-  doc.restore();
-
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(8)
-    .fillColor(PDF_BRAND.brandDark)
-    .text('HOW TO PAY', left + 12, summaryStartY + 9, { width: payBoxWidth - 24 });
-  let payY = doc.y + 3;
-  doc.font('Helvetica').fontSize(8.5).fillColor(PDF_BRAND.ink);
-  for (const line of payLines) {
-    doc.text(line, left + 12, payY, { width: payBoxWidth - 24 });
-    payY = doc.y + 2;
-  }
-
-  // Right side: Totals summary rows + Balance Due highlight box
-  const totalsWidth = width * 0.42;
+  // Right-aligned Totals block
+  y += 12;
+  const totalsWidth = 210;
   const totalsX = right - totalsWidth;
-  let totalsY = summaryStartY;
+  let totalsY = y;
 
   const summaryRows: [string, bigint][] = [['Total', i.total]];
   if (i.creditedAmount > 0n) summaryRows.push(['Credited', -i.creditedAmount]);
@@ -256,45 +230,49 @@ export function renderInvoicePdf({ invoice: i, org, channels }: PdfInput): Promi
   for (const [label, value] of summaryRows) {
     doc
       .font('Helvetica')
-      .fontSize(9.5)
+      .fontSize(9)
       .fillColor(PDF_BRAND.inkSecondary)
-      .text(label, totalsX, totalsY, { width: totalsWidth - 95, align: 'right' });
+      .text(label, totalsX, totalsY, { width: 95, align: 'left', lineBreak: false });
     doc
       .font('Helvetica-Bold')
-      .fontSize(9.5)
+      .fontSize(9)
       .fillColor(PDF_BRAND.ink)
-      .text(`KES ${money(value)}`, totalsX + totalsWidth - 90, totalsY, {
-        width: 90,
+      .text(`KES ${money(value)}`, totalsX + 100, totalsY, {
+        width: totalsWidth - 100,
         align: 'right',
+        lineBreak: false,
       });
-    totalsY += 16;
+    totalsY += 15;
   }
 
-  // Highlighted Balance Due bar
   totalsY += 4;
+  const balBoxH = 26;
   doc.save();
-  doc.roundedRect(totalsX, totalsY, totalsWidth, 26, 5).fill(PDF_BRAND.brandDark);
+  doc
+    .rect(totalsX, totalsY, totalsWidth, balBoxH)
+    .lineWidth(1)
+    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.ruleHeavy);
   doc.restore();
   doc
     .font('Helvetica-Bold')
-    .fontSize(9.5)
-    .fillColor('#FFFFFF')
-    .text('Balance due', totalsX + 10, totalsY + 7.5, {
-      width: totalsWidth - 110,
+    .fontSize(9)
+    .fillColor(PDF_BRAND.ink)
+    .text('Balance due', totalsX + 8, totalsY + 8, {
+      width: 90,
       align: 'left',
       lineBreak: false,
     });
   doc
     .font('Helvetica-Bold')
-    .fontSize(10.5)
-    .fillColor('#FFFFFF')
-    .text(`KES ${money(i.balance)}`, totalsX + totalsWidth - 105, totalsY + 7, {
-      width: 95,
+    .fontSize(10)
+    .fillColor(PDF_BRAND.ink)
+    .text(`KES ${money(i.balance)}`, totalsX + 100, totalsY + 7.5, {
+      width: totalsWidth - 108,
       align: 'right',
       lineBreak: false,
     });
 
-  let afterSummaryY = Math.max(summaryStartY + payBoxHeight, totalsY + 32) + 12;
+  let afterSummaryY = totalsY + balBoxH + 14;
 
   if (i.creditNotes.length) {
     doc
@@ -316,7 +294,36 @@ export function renderInvoicePdf({ invoice: i, org, channels }: PdfInput): Promi
       .fontSize(9)
       .fillColor(PDF_BRAND.dangerText)
       .text(`Voided: ${i.voidReason}`, left, afterSummaryY, { width });
+    afterSummaryY = doc.y + 10;
   }
+
+  // Payment methods + Organisation Instructions + System Instructions
+  const payLines: string[] = [];
+  for (const c of channels) {
+    if (c.kind === 'MPESA_PAYBILL' && c.shortcode) {
+      payLines.push(`M-Pesa Paybill: ${c.shortcode}  |  Account: ${i.tenant.code}`);
+    } else if (c.kind === 'MPESA_TILL' && c.shortcode) {
+      payLines.push(`M-Pesa Buy Goods Till: ${c.shortcode}  |  Ref: ${i.tenant.code}`);
+    } else if (c.kind === 'BANK_ACCOUNT' && c.accountNumber) {
+      payLines.push(
+        `${c.bankName || c.name}: Acc ${c.accountNumber}${c.accountName ? ` (${c.accountName})` : ''}  |  Ref: ${i.tenant.code}`,
+      );
+    }
+  }
+  if (payLines.length === 0) {
+    payLines.push(`Quote tenant reference ${i.tenant.code} on all rent & utility payments.`);
+  }
+
+  drawInstructionsAndSignoff(doc, afterSummaryY, {
+    orgName: org.name,
+    extraTitle: 'How to pay',
+    extraLines: payLines,
+    orgInstructions: instructions?.org ?? null,
+    systemInstructions: instructions?.system ?? DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS,
+    signoffLeft: `Issued by ${org.name}`,
+    signoffCenter: `Tenant Ref: ${i.tenant.code}`,
+    signoffRight: `Invoice: ${i.number}`,
+  });
 
   footer(doc, `Please quote ${i.tenant.code} when paying.`, i.number);
   doc.end();

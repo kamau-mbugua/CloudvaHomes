@@ -8,7 +8,7 @@ import {
 import { AppError } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
-import { money } from '../../common/pdf/pdf.js';
+import { money, readSystemDocumentInstructions } from '../../common/pdf/pdf.js';
 import type {
   Organization,
   Plan,
@@ -158,6 +158,8 @@ export class PlatformBillingService {
             invoice: this.toInvoice(inv),
             org: { name: org.name, billingRef: org.billingRef },
             paybill: settings.paybill ?? null,
+            systemInstructions: readSystemDocumentInstructions(settings.emailTemplates)
+              .invoiceInstructions,
           });
           await this.notifications.sendPlatformInvoiceIssued(
             { email: recipientEmail },

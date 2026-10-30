@@ -31,7 +31,16 @@ import { checkReminders, describeReminders, overdueDaysText, readReminders } fro
  * `settings:update` / `channels:manage` can edit.
  */
 
-type Field = 'name' | 'phone' | 'email' | 'kraPin' | 'invoiceDueDays' | 'daysBefore' | 'overdueDays';
+type Field =
+  | 'name'
+  | 'phone'
+  | 'email'
+  | 'kraPin'
+  | 'invoiceDueDays'
+  | 'invoiceInstructions'
+  | 'receiptInstructions'
+  | 'daysBefore'
+  | 'overdueDays';
 
 const KIND_LABEL: Record<string, string> = {
   LANDLORD: 'Landlord — manages its own properties',
@@ -81,6 +90,8 @@ function OrganizationForm({ org }: { org: Organization }) {
     email: org.email ?? '',
     kraPin: org.kraPin ?? '',
     invoiceDueDays: String(org.invoiceDueDays ?? 7),
+    invoiceInstructions: org.invoiceInstructions ?? '',
+    receiptInstructions: org.receiptInstructions ?? '',
     daysBefore: String(savedReminders.daysBefore),
     overdueDays: overdueDaysText(savedReminders.overdueDays),
   };
@@ -116,7 +127,7 @@ function OrganizationForm({ org }: { org: Organization }) {
         }
         setErrors(found);
         if (found.name || found.phone || found.email || found.kraPin) setTab('details');
-        else if (found.invoiceDueDays) setTab('billing');
+        else if (found.invoiceDueDays || found.invoiceInstructions || found.receiptInstructions) setTab('billing');
         else if (found.daysBefore || found.overdueDays) setTab('reminders');
       }
     },
@@ -128,16 +139,22 @@ function OrganizationForm({ org }: { org: Organization }) {
     if (!values.name.trim()) found.name = 'The organisation needs a name.';
     const dueDays = checkDueDays(values.invoiceDueDays);
     if (!dueDays.ok) found.invoiceDueDays = dueDays.error;
+    if (values.invoiceInstructions.trim().length > 1000) {
+      found.invoiceInstructions = 'Keep invoice instructions to 1,000 characters.';
+    }
+    if (values.receiptInstructions.trim().length > 1000) {
+      found.receiptInstructions = 'Keep receipt instructions to 1,000 characters.';
+    }
     if (!checkedReminders.ok) Object.assign(found, checkedReminders.errors);
     setErrors(found);
     if (Object.keys(found).length > 0 || !dueDays.ok || !checkedReminders.ok) {
       if (found.name || found.phone || found.email || found.kraPin) setTab('details');
-      else if (found.invoiceDueDays) setTab('billing');
+      else if (found.invoiceDueDays || found.invoiceInstructions || found.receiptInstructions) setTab('billing');
       else if (found.daysBefore || found.overdueDays) setTab('reminders');
       return;
     }
 
-    save.mutate({
+    const patchBody: Record<string, unknown> = {
       name: values.name.trim(),
       // Required on an organisation (docs/specs §5.5), so never sent as null.
       phone: values.phone.trim(),
@@ -146,7 +163,20 @@ function OrganizationForm({ org }: { org: Organization }) {
       invoiceDueDays: dueDays.days,
       // The whole object, every time (the contract's PATCH takes it whole).
       reminders: checkedReminders.reminders,
-    });
+    };
+    if (
+      org.invoiceInstructions !== undefined ||
+      values.invoiceInstructions !== initial.invoiceInstructions
+    ) {
+      patchBody.invoiceInstructions = values.invoiceInstructions.trim() || null;
+    }
+    if (
+      org.receiptInstructions !== undefined ||
+      values.receiptInstructions !== initial.receiptInstructions
+    ) {
+      patchBody.receiptInstructions = values.receiptInstructions.trim() || null;
+    }
+    save.mutate(patchBody);
   };
 
   const field = (name: Field, label: string, props: InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -237,12 +267,53 @@ function OrganizationForm({ org }: { org: Organization }) {
 
           {tab === 'billing' ? (
             <section className="fm__section">
-              <h2>Billing</h2>
-              <p>Applies to invoices issued from now on; invoices already issued keep their due date.</p>
+              <h2>Billing &amp; document instructions</h2>
+              <p>
+                Configure when new invoices fall due and the custom instructions or terms printed on
+                your organisation’s invoice and payment receipt PDFs (alongside system-wide notices).
+              </p>
               <div className="fm__grid">
                 <div className="fld-days">
                   {field('invoiceDueDays', 'Invoice due after (days)', { inputMode: 'numeric', autoComplete: 'off', maxLength: 2 })}
                   <span className="hint">0 to 60. 0 means due on the day it is issued.</span>
+                </div>
+                <div className={`fld fm__wide ${errors.invoiceInstructions ? 'is-bad' : ''}`}>
+                  <label htmlFor="org-invoiceInstructions">Invoice instructions (optional)</label>
+                  <textarea
+                    id="org-invoiceInstructions"
+                    rows={3}
+                    maxLength={1000}
+                    value={values.invoiceInstructions}
+                    onChange={(e) => setValues((v) => ({ ...v, invoiceInstructions: e.target.value }))}
+                    disabled={!canEdit || save.isPending}
+                    placeholder="e.g. Quote your tenant account code as the payment reference. Late payments after the 5th attract a 5% penalty."
+                  />
+                  {errors.invoiceInstructions ? (
+                    <span className="fld__err">{errors.invoiceInstructions}</span>
+                  ) : (
+                    <span className="hint">
+                      Printed in the Instructions &amp; Terms section of every tenant invoice PDF.
+                    </span>
+                  )}
+                </div>
+                <div className={`fld fm__wide ${errors.receiptInstructions ? 'is-bad' : ''}`}>
+                  <label htmlFor="org-receiptInstructions">Receipt instructions (optional)</label>
+                  <textarea
+                    id="org-receiptInstructions"
+                    rows={3}
+                    maxLength={1000}
+                    value={values.receiptInstructions}
+                    onChange={(e) => setValues((v) => ({ ...v, receiptInstructions: e.target.value }))}
+                    disabled={!canEdit || save.isPending}
+                    placeholder="e.g. Thank you for your payment. Please retain this receipt for your records and contact management within 48 hours for any queries."
+                  />
+                  {errors.receiptInstructions ? (
+                    <span className="fld__err">{errors.receiptInstructions}</span>
+                  ) : (
+                    <span className="hint">
+                      Printed in the Instructions &amp; Terms section of every payment receipt PDF.
+                    </span>
+                  )}
                 </div>
               </div>
             </section>

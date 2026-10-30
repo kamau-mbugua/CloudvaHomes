@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 
 /**
- * Shared executive branding & layout primitives for server-rendered A4 PDFs
+ * Shared institutional accounting & layout primitives for server-rendered A4 PDFs
  * (Tenant Invoices, Platform Invoices, Payment Receipts, Tenant Statements, Owner Statements).
  *
  * Uses built-in Helvetica / Helvetica-Bold only so no external font files need to ship in the
@@ -9,31 +9,89 @@ import PDFDocument from 'pdfkit';
  */
 
 export const PDF_BRAND = {
-  brandDark: '#0F291E',
-  brandAccent: '#15803D',
-  brandSoft: '#F0FDF4',
-  brandBorder: '#BBF7D0',
-  ink: '#0F172A',
-  inkSecondary: '#334155',
-  muted: '#64748B',
-  surface: '#F8FAFC',
-  tableHeaderBg: '#0F291E',
-  tableZebraBg: '#F8FAFC',
-  border: '#E2E8F0',
-  borderStrong: '#CBD5E1',
-  successText: '#166534',
-  successBg: '#DCFCE7',
+  brandDark: '#111827',
+  brandAccent: '#1F2937',
+  brandSoft: '#F9FAFB',
+  brandBorder: '#D1D5DB',
+  ink: '#111827',
+  inkSecondary: '#374151',
+  muted: '#6B7280',
+  surface: '#F9FAFB',
+  tableHeaderBg: '#F3F4F6',
+  tableZebraBg: '#FAFAFA',
+  border: '#E5E7EB',
+  borderStrong: '#9CA3AF',
+  ruleHeavy: '#111827',
+  successText: '#14532D',
+  successBg: '#F0FDF4',
   successBorder: '#86EFAC',
-  warnText: '#9A3412',
-  warnBg: '#FFEDD5',
+  warnText: '#7C2D12',
+  warnBg: '#FFF7ED',
   warnBorder: '#FDBA74',
-  dangerText: '#991B1B',
-  dangerBg: '#FEE2E2',
+  dangerText: '#7F1D1D',
+  dangerBg: '#FEF2F2',
   dangerBorder: '#FCA5A5',
-  neutralText: '#334155',
-  neutralBg: '#F1F5F9',
-  neutralBorder: '#CBD5E1',
+  neutralText: '#1F2937',
+  neutralBg: '#F3F4F6',
+  neutralBorder: '#D1D5DB',
 } as const;
+
+export const DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS =
+  'Always quote your unique Tenant Account Reference when paying via M-Pesa Paybill, Buy Goods Till, or Bank Transfer so your payment is reconciled automatically. This is an official computer-generated invoice issued via KodiHub and is valid without a physical signature.';
+
+export const DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS =
+  'This is an official computer-generated receipt issued via KodiHub and is valid without a physical signature or stamp. Please retain this receipt for your records. Cheques and bank transfers are subject to bank clearing.';
+
+export interface DocumentInstructions {
+  invoiceInstructions: string | null;
+  receiptInstructions: string | null;
+}
+
+export interface SystemDocumentInstructions {
+  invoiceInstructions: string;
+  receiptInstructions: string;
+}
+
+/** Reads organisation-specific invoice & receipt instructions from `Organization.settings`. */
+export function readOrgDocumentInstructions(settings: unknown): DocumentInstructions {
+  const s = (settings as { documentInstructions?: Partial<DocumentInstructions> } | null)
+    ?.documentInstructions;
+  const inv =
+    typeof s?.invoiceInstructions === 'string' && s.invoiceInstructions.trim()
+      ? s.invoiceInstructions.trim()
+      : null;
+  const rct =
+    typeof s?.receiptInstructions === 'string' && s.receiptInstructions.trim()
+      ? s.receiptInstructions.trim()
+      : null;
+  return {
+    invoiceInstructions: inv,
+    receiptInstructions: rct,
+  };
+}
+
+/** Reads platform-wide system invoice & receipt instructions from `PlatformSettings.emailTemplates`. */
+export function readSystemDocumentInstructions(
+  rawEmailTemplates: unknown,
+): SystemDocumentInstructions {
+  const container =
+    rawEmailTemplates && typeof rawEmailTemplates === 'object' && !Array.isArray(rawEmailTemplates)
+      ? ((rawEmailTemplates as Record<string, unknown>)._pdfInstructions as
+          Partial<DocumentInstructions> | undefined)
+      : undefined;
+  const inv =
+    typeof container?.invoiceInstructions === 'string' && container.invoiceInstructions.trim()
+      ? container.invoiceInstructions.trim()
+      : DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS;
+  const rct =
+    typeof container?.receiptInstructions === 'string' && container.receiptInstructions.trim()
+      ? container.receiptInstructions.trim()
+      : DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS;
+  return {
+    invoiceInstructions: inv,
+    receiptInstructions: rct,
+  };
+}
 
 /** 2500000n → "25,000.00" (grouped by hand: identical output on every server locale). */
 export function money(minor: bigint): string {
@@ -43,24 +101,11 @@ export function money(minor: bigint): string {
   return `${neg ? '-' : ''}${whole}.${(abs % 100n).toString().padStart(2, '0')}`;
 }
 
-/** Extracts up to 2 uppercase monogram initials from an organisation name. */
-export function monogramOf(name: string): string {
-  if (name.trim().toLowerCase() === 'kodihub') return 'KH';
-  const words = name
-    .trim()
-    .split(/[^A-Za-z0-9]+/)
-    .filter(Boolean);
-  if (words.length === 0) return 'KH';
-  if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
-  return `${words[0]![0]!}${words[1]![0]!}`.toUpperCase();
-}
-
-/** Draws the signature KodiHub top brand bar across the page. */
+/** Draws a crisp top architectural rule across the page. */
 export function drawTopBrandBar(doc: PDFKit.PDFDocument): void {
   const pageWidth = doc.page.width;
   doc.save();
-  doc.rect(0, 0, pageWidth, 8).fill(PDF_BRAND.brandDark);
-  doc.rect(0, 8, pageWidth, 2.5).fill(PDF_BRAND.brandAccent);
+  doc.rect(0, 0, pageWidth, 4).fill(PDF_BRAND.ruleHeavy);
   doc.restore();
 }
 
@@ -104,10 +149,11 @@ export interface StatusBadgeOptions {
 }
 
 /**
- * Draws a branded executive header:
- * - Left: Monogram badge + Organisation name, subtitle, and contact details.
- * - Right: Document title, optional status pill badge, and structured metadata rows.
- * - Bottom: Subtle divider rule and advances `doc.y` cleanly below the header.
+ * Draws an authoritative, editorial accounting header:
+ * - Left: "ISSUED BY" overline, Organisation name, and contact details (Tel, Email, KRA PIN).
+ * - Right: Document title, crisp rectangular status tag, and a two-column metadata table
+ *   (Label on left, Value right-aligned on right — never overlapping).
+ * - Bottom: 1.2pt solid rule and advances `doc.y` cleanly below the header.
  */
 export function header(
   doc: PDFKit.PDFDocument,
@@ -121,36 +167,21 @@ export function header(
   const width = right - left;
   const topY = 34;
 
-  // Monogram tile
-  const initials = monogramOf(org.name);
-  doc.save();
-  doc.roundedRect(left, topY, 38, 38, 7).fill(PDF_BRAND.brandDark);
-  doc.restore();
+  // Left column: Issuer details
+  const leftColWidth = width * 0.52;
   doc
     .font('Helvetica-Bold')
-    .fontSize(13)
-    .fillColor('#FFFFFF')
-    .text(initials, left, topY + 12, { width: 38, align: 'center', lineBreak: false });
+    .fontSize(7)
+    .fillColor(PDF_BRAND.muted)
+    .text(org.subtitle ? org.subtitle.toUpperCase() : 'ISSUED BY', left, topY, {
+      width: leftColWidth,
+    });
 
-  // Organisation text block next to monogram
-  const orgTextX = left + 48;
-  const orgTextWidth = width * 0.52 - 48;
   doc
     .font('Helvetica-Bold')
-    .fontSize(15)
+    .fontSize(16)
     .fillColor(PDF_BRAND.ink)
-    .text(org.name, orgTextX, topY, { width: orgTextWidth });
-
-  const subtitle =
-    org.subtitle ??
-    (org.name.trim().toLowerCase() === 'kodihub'
-      ? 'Platform Subscription & Billing'
-      : 'Property & Rental Management');
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(8)
-    .fillColor(PDF_BRAND.brandAccent)
-    .text(subtitle.toUpperCase(), orgTextX, doc.y + 1, { width: orgTextWidth });
+    .text(org.name, left, doc.y + 2, { width: leftColWidth });
 
   doc.font('Helvetica').fontSize(8.5).fillColor(PDF_BRAND.inkSecondary);
   const contactLines = [
@@ -160,27 +191,28 @@ export function header(
   ].filter((x): x is string => Boolean(x));
 
   if (contactLines.length > 0) {
-    doc.moveDown(0.25);
+    let contactY = doc.y + 4;
     for (const line of contactLines) {
-      doc.text(line, orgTextX, undefined, { width: orgTextWidth });
+      doc.text(line, left, contactY, { width: leftColWidth });
+      contactY = doc.y + 1;
     }
   }
-  const leftBottomY = Math.max(doc.y, topY + 42);
+  const leftBottomY = Math.max(doc.y, topY + 46);
 
-  // Right side: Document title + optional status pill + metadata facts
-  const rightColWidth = width * 0.45;
+  // Right column: Document Title + Status Tag + Two-Column Key-Value Metadata Grid
+  const rightColWidth = 210;
   const rightColX = right - rightColWidth;
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(17)
-    .fillColor(PDF_BRAND.brandDark)
+    .fontSize(15)
+    .fillColor(PDF_BRAND.ink)
     .text(title.toUpperCase(), rightColX, topY, {
       width: rightColWidth,
       align: 'right',
     });
 
-  let rightY = doc.y + 3;
+  let rightY = doc.y + 4;
 
   if (badge) {
     const toneColors = {
@@ -206,110 +238,270 @@ export function header(
       },
     }[badge.tone];
 
-    doc.font('Helvetica-Bold').fontSize(8);
-    const pillText = badge.label.toUpperCase();
-    const pillWidth = Math.max(doc.widthOfString(pillText) + 18, 56);
-    const pillHeight = 16;
-    const pillX = right - pillWidth;
+    doc.font('Helvetica-Bold').fontSize(7);
+    const tagText = badge.label.toUpperCase();
+    const tagWidth = Math.max(doc.widthOfString(tagText) + 14, 54);
+    const tagHeight = 14;
+    const tagX = right - tagWidth;
 
     doc.save();
     doc
-      .roundedRect(pillX, rightY, pillWidth, pillHeight, 8)
+      .rect(tagX, rightY, tagWidth, tagHeight)
+      .lineWidth(0.75)
       .fillAndStroke(toneColors.bg, toneColors.border);
     doc.restore();
     doc
       .font('Helvetica-Bold')
-      .fontSize(7.5)
+      .fontSize(7)
       .fillColor(toneColors.text)
-      .text(pillText, pillX, rightY + 4.5, {
-        width: pillWidth,
+      .text(tagText, tagX, rightY + 3.5, {
+        width: tagWidth,
         align: 'center',
         lineBreak: false,
       });
 
-    rightY += pillHeight + 6;
+    rightY += tagHeight + 6;
+  }
+
+  // Draw each fact row in a strict 2-column table (Label left, Value right-aligned)
+  const labelW = 68;
+  const valueX = rightColX + labelW + 6;
+  const valueW = rightColWidth - labelW - 6;
+
+  if (facts.length > 0) {
+    doc.save();
+    doc
+      .moveTo(rightColX, rightY)
+      .lineTo(right, rightY)
+      .lineWidth(0.5)
+      .strokeColor(PDF_BRAND.border)
+      .stroke();
+    doc.restore();
+    rightY += 4;
   }
 
   for (const [k, v] of facts) {
     doc
       .font('Helvetica')
-      .fontSize(8.5)
+      .fontSize(8)
       .fillColor(PDF_BRAND.muted)
-      .text(`${k}: `, rightColX, rightY, {
-        width: rightColWidth,
-        align: 'right',
-        continued: true,
+      .text(k.toUpperCase(), rightColX, rightY, {
+        width: labelW,
+        align: 'left',
+        lineBreak: false,
       });
-    doc.font('Helvetica-Bold').fillColor(PDF_BRAND.ink).text(v);
-    rightY = doc.y + 1;
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(8.5)
+      .fillColor(PDF_BRAND.ink)
+      .text(v, valueX, rightY - 0.5, {
+        width: valueW,
+        align: 'right',
+      });
+    const rowBottom = Math.max(doc.y, rightY + 11) + 3;
+    doc.save();
+    doc
+      .moveTo(rightColX, rowBottom)
+      .lineTo(right, rowBottom)
+      .lineWidth(0.4)
+      .strokeColor(PDF_BRAND.border)
+      .stroke();
+    doc.restore();
+    rightY = rowBottom + 4;
   }
 
-  const dividerY = Math.max(leftBottomY, rightY) + 12;
+  const dividerY = Math.max(leftBottomY, rightY) + 8;
   doc.save();
   doc
     .moveTo(left, dividerY)
     .lineTo(right, dividerY)
-    .lineWidth(1)
-    .strokeColor(PDF_BRAND.border)
+    .lineWidth(1.2)
+    .strokeColor(PDF_BRAND.ruleHeavy)
     .stroke();
   doc.restore();
 
   doc.fillColor(PDF_BRAND.ink).font('Helvetica').fontSize(10);
   doc.x = left;
-  doc.y = dividerY + 14;
+  doc.y = dividerY + 12;
   return doc.y;
 }
 
 /**
- * Draws the branded KodiHub footer at the bottom of the current page.
+ * Draws a structured Instructions & Verification section on Invoices and Receipts,
+ * combining Organisation Instructions (set by the landlord/agency) and System Instructions
+ * (set by the platform admin), plus an optional audit/verification sign-off row.
+ */
+export function drawInstructionsAndSignoff(
+  doc: PDFKit.PDFDocument,
+  startY: number,
+  opts: {
+    orgName: string;
+    orgInstructions?: string | null;
+    systemInstructions?: string | null;
+    extraTitle?: string;
+    extraLines?: string[];
+    signoffLeft?: string;
+    signoffCenter?: string;
+    signoffRight?: string;
+  },
+): number {
+  const left = 50;
+  const right = doc.page.width - 50;
+  const width = right - left;
+  let y = startY;
+
+  const hasExtra = Boolean(opts.extraLines && opts.extraLines.length > 0);
+  const orgText = opts.orgInstructions?.trim() || null;
+  const sysText = opts.systemInstructions?.trim() || null;
+
+  if (hasExtra || orgText || sysText) {
+    doc.save();
+    doc
+      .moveTo(left, y)
+      .lineTo(right, y)
+      .lineWidth(0.75)
+      .strokeColor(PDF_BRAND.borderStrong)
+      .stroke();
+    doc.restore();
+    y += 8;
+
+    if (hasExtra && opts.extraLines) {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.5)
+        .fillColor(PDF_BRAND.ink)
+        .text((opts.extraTitle ?? 'PAYMENT METHODS & INSTRUCTIONS').toUpperCase(), left, y, {
+          width,
+        });
+      y = doc.y + 3;
+      doc.font('Helvetica').fontSize(8.5).fillColor(PDF_BRAND.inkSecondary);
+      for (const line of opts.extraLines) {
+        doc.text(line, left, y, { width });
+        y = doc.y + 1.5;
+      }
+      y += 6;
+    }
+
+    if (orgText) {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.5)
+        .fillColor(PDF_BRAND.ink)
+        .text(`${opts.orgName.toUpperCase()} — INSTRUCTIONS & TERMS`, left, y, { width });
+      y = doc.y + 3;
+      doc
+        .font('Helvetica')
+        .fontSize(8.5)
+        .fillColor(PDF_BRAND.inkSecondary)
+        .text(orgText, left, y, { width, lineGap: 1.5 });
+      y = doc.y + 8;
+    }
+
+    if (sysText) {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7)
+        .fillColor(PDF_BRAND.muted)
+        .text('SYSTEM NOTICE', left, y, { width });
+      y = doc.y + 2.5;
+      doc
+        .font('Helvetica')
+        .fontSize(8)
+        .fillColor(PDF_BRAND.muted)
+        .text(sysText, left, y, { width, lineGap: 1.2 });
+      y = doc.y + 8;
+    }
+  }
+
+  if (opts.signoffLeft || opts.signoffCenter || opts.signoffRight) {
+    const boxH = 22;
+    doc.save();
+    doc
+      .rect(left, y, width, boxH)
+      .lineWidth(0.5)
+      .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.border);
+    doc.restore();
+
+    const colW = width / 3;
+    const textY = y + 7;
+    if (opts.signoffLeft) {
+      doc
+        .font('Helvetica')
+        .fontSize(7.5)
+        .fillColor(PDF_BRAND.inkSecondary)
+        .text(opts.signoffLeft, left + 8, textY, {
+          width: colW - 12,
+          align: 'left',
+          lineBreak: false,
+        });
+    }
+    if (opts.signoffCenter) {
+      doc
+        .font('Helvetica')
+        .fontSize(7.5)
+        .fillColor(PDF_BRAND.inkSecondary)
+        .text(opts.signoffCenter, left + colW, textY, {
+          width: colW,
+          align: 'center',
+          lineBreak: false,
+        });
+    }
+    if (opts.signoffRight) {
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(7.5)
+        .fillColor(PDF_BRAND.ink)
+        .text(opts.signoffRight, left + colW * 2, textY, {
+          width: colW - 8,
+          align: 'right',
+          lineBreak: false,
+        });
+    }
+    y += boxH + 8;
+  }
+
+  doc.y = y;
+  return y;
+}
+
+/**
+ * Draws the institutional document footer at the bottom of the current page.
  */
 export function footer(doc: PDFKit.PDFDocument, centerNote?: string, reference?: string): void {
   const left = 50;
   const right = doc.page.width - 50;
   const width = right - left;
-  const footerLineY = doc.page.height - 64;
-
-  if (centerNote) {
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(8.5)
-      .fillColor(PDF_BRAND.brandDark)
-      .text(centerNote, left, footerLineY - 16, {
-        width,
-        align: 'center',
-        lineBreak: false,
-      });
-  }
+  const footerLineY = doc.page.height - 58;
 
   doc.save();
   doc
     .moveTo(left, footerLineY)
     .lineTo(right, footerLineY)
-    .lineWidth(0.75)
-    .strokeColor(PDF_BRAND.border)
+    .lineWidth(0.6)
+    .strokeColor(PDF_BRAND.borderStrong)
     .stroke();
   doc.restore();
 
   const leftLabel = reference
-    ? `${reference} · Official document generated via KodiHub`
-    : 'Official document generated via KodiHub';
+    ? `Ref: ${reference}${centerNote ? `  ·  ${centerNote}` : ''}`
+    : (centerNote ?? 'Official accounting document');
 
   doc
     .font('Helvetica')
     .fontSize(7.5)
     .fillColor(PDF_BRAND.muted)
-    .text(leftLabel, left, footerLineY + 7, {
-      width: width * 0.6,
+    .text(leftLabel, left, footerLineY + 6, {
+      width: width * 0.72,
       align: 'left',
       lineBreak: false,
     });
 
   doc
-    .font('Helvetica-Bold')
+    .font('Helvetica')
     .fontSize(7.5)
-    .fillColor(PDF_BRAND.brandAccent)
-    .text('Powered by KodiHub', left + width * 0.6, footerLineY + 7, {
-      width: width * 0.4,
+    .fillColor(PDF_BRAND.muted)
+    .text('KodiHub Financial Ledger', left + width * 0.72, footerLineY + 6, {
+      width: width * 0.28,
       align: 'right',
       lineBreak: false,
     });

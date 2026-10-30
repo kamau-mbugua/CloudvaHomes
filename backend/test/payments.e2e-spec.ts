@@ -487,6 +487,18 @@ describe('Payments (e2e)', () => {
     expect(tail.closingBalance).toBe(owed);
     await get(owner, `/tenants/${x.tenantId}/statement?from=${TODAY}&to=${STARTED}`, 422);
 
+    const updatedOrg = (
+      await patch(owner, '/organization', {
+        invoiceInstructions: 'Pay by the 5th of every month to avoid a 5% late fee.',
+        receiptInstructions: 'Keep this receipt safe for deposit reconciliation.',
+      })
+    ).data;
+    expect(updatedOrg).toMatchObject({
+      invoiceInstructions: 'Pay by the 5th of every month to avoid a 5% late fee.',
+      receiptInstructions: 'Keep this receipt safe for deposit reconciliation.',
+    });
+
+    expect((await pdf(owner, `/invoices/${x.rent}/pdf`)).subarray(0, 5).toString()).toBe('%PDF-');
     expect((await pdf(owner, `/payments/${p1.id}/receipt`)).subarray(0, 5).toString()).toBe(
       '%PDF-',
     );

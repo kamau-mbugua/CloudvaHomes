@@ -1,6 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { formatDateOnly } from '../../../common/dates/date-only.js';
 import { AppError } from '../../../common/errors/app-error.js';
+import {
+  readOrgDocumentInstructions,
+  readSystemDocumentInstructions,
+} from '../../../common/pdf/pdf.js';
 import type { InvoiceKind } from '../../../generated/prisma/client.js';
 import type { Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
@@ -135,7 +139,7 @@ export class InvoiceIssuer {
   private async notifyTenantInvoice(tx: Tx, invoiceId: string, r: IssueRequest): Promise<void> {
     if (!this.notifications) return;
     try {
-      const [fullInvoice, org, channels] = await Promise.all([
+      const [fullInvoice, org, channels, platformSettings] = await Promise.all([
         tx.invoice.findUnique({
           where: { id: invoiceId },
           include: {
@@ -166,7 +170,7 @@ export class InvoiceIssuer {
         }),
         tx.organization.findUnique({
           where: { id: r.orgId },
-          select: { name: true, phone: true, email: true, kraPin: true },
+          select: { name: true, phone: true, email: true, kraPin: true, settings: true },
         }),
         tx.paymentChannel.findMany({
           where: {
@@ -179,6 +183,10 @@ export class InvoiceIssuer {
             ],
           },
           orderBy: { createdAt: 'asc' },
+        }),
+        tx.platformSettings.findUnique({
+          where: { id: 1 },
+          select: { emailTemplates: true },
         }),
       ]);
 
@@ -273,6 +281,11 @@ export class InvoiceIssuer {
           accountNumber: c.accountNumber,
           accountName: c.accountName,
         })),
+        instructions: {
+          org: readOrgDocumentInstructions(org?.settings).invoiceInstructions,
+          system: readSystemDocumentInstructions(platformSettings?.emailTemplates)
+            .invoiceInstructions,
+        },
       });
 
       await this.notifications.sendTenantInvoiceIssued(

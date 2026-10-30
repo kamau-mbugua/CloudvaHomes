@@ -755,7 +755,19 @@ export class PlatformAdminService {
         }
       }
 
-      const jsonPayload = stored as unknown as Prisma.InputJsonValue;
+      const existingRaw =
+        settings?.emailTemplates &&
+        typeof settings.emailTemplates === 'object' &&
+        !Array.isArray(settings.emailTemplates)
+          ? (settings.emailTemplates as Record<string, unknown>)
+          : {};
+      const jsonPayload = {
+        ...existingRaw,
+        ...stored,
+      } as unknown as Prisma.InputJsonValue;
+      if (dto.reset && !(key in stored)) {
+        delete (jsonPayload as Record<string, unknown>)[key];
+      }
       await this.db.$transaction(async (tx) => {
         await tx.platformSettings.upsert({
           where: { id: 1 },

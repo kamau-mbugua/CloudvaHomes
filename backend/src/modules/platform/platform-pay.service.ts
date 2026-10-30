@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { FieldCipher } from '../../common/crypto/field-cipher.js';
 import { withoutOrgScope } from '../../common/context/request-context.js';
 import { AppError } from '../../common/errors/app-error.js';
+import { readSystemDocumentInstructions } from '../../common/pdf/pdf.js';
 import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
 import type {
@@ -65,6 +66,7 @@ export class PlatformPayService {
   view(s: PlatformSettings) {
     const creds = this.credentials(s);
     const smsDbConfigured = Boolean(s.atUsername && s.atApiKeyEnc);
+    const sysInstructions = readSystemDocumentInstructions(s.emailTemplates);
     return {
       dueDays: s.dueDays,
       suspendAfterDays: s.suspendAfterDays,
@@ -98,6 +100,8 @@ export class PlatformPayService {
       appStoreUrl: s.appStoreUrl,
       maintenanceMode: s.maintenanceMode,
       maintenanceMessage: s.maintenanceMessage,
+      invoiceInstructions: sysInstructions.invoiceInstructions,
+      receiptInstructions: sysInstructions.receiptInstructions,
       updatedAt: s.updatedAt,
     };
   }
@@ -154,6 +158,26 @@ export class PlatformPayService {
         data.atApiKeyEnc = null;
       } else if (dto.atApiKey?.trim()) {
         data.atApiKeyEnc = this.cipher.encrypt(dto.atApiKey.trim(), AT_API_KEY_CONTEXT);
+      }
+      if (dto.invoiceInstructions !== undefined || dto.receiptInstructions !== undefined) {
+        const prevContainer =
+          before.emailTemplates &&
+          typeof before.emailTemplates === 'object' &&
+          !Array.isArray(before.emailTemplates)
+            ? { ...(before.emailTemplates as Record<string, unknown>) }
+            : {};
+        const prevPdf = readSystemDocumentInstructions(before.emailTemplates);
+        prevContainer._pdfInstructions = {
+          invoiceInstructions:
+            dto.invoiceInstructions !== undefined
+              ? dto.invoiceInstructions?.trim() || null
+              : prevPdf.invoiceInstructions,
+          receiptInstructions:
+            dto.receiptInstructions !== undefined
+              ? dto.receiptInstructions?.trim() || null
+              : prevPdf.receiptInstructions,
+        };
+        data.emailTemplates = prevContainer as Prisma.InputJsonValue;
       }
       if (keysChange) {
         const previous = this.credentials(before);

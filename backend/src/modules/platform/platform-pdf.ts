@@ -1,5 +1,7 @@
 import {
   a4,
+  DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS,
+  drawInstructionsAndSignoff,
   footer,
   header,
   money,
@@ -23,6 +25,7 @@ export interface PlatformInvoicePdf {
   };
   org: { name: string; billingRef: string | null };
   paybill: string | null;
+  systemInstructions?: string | null;
 }
 
 function platformStatusBadge(status: string): StatusBadgeOptions {
@@ -33,7 +36,12 @@ function platformStatusBadge(status: string): StatusBadgeOptions {
 }
 
 /** KodiHub's monthly platform subscription invoice to an organisation. */
-export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformInvoicePdf) {
+export function renderPlatformInvoicePdf({
+  invoice: i,
+  org,
+  paybill,
+  systemInstructions,
+}: PlatformInvoicePdf) {
   const { doc, bytes, left, right } = a4(i.number, 'KodiHub');
   const width = right - left;
 
@@ -48,63 +56,64 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
     },
     i.status === 'VOID' ? 'Invoice (void)' : 'Platform Invoice',
     [
-      ['Number', i.number],
+      ['Invoice No.', i.number],
       ['Issued', i.issueDate],
-      ['Due', i.dueDate],
+      ['Due Date', i.dueDate],
       ['Period', i.period],
     ],
     platformStatusBadge(i.status),
   );
 
-  // Two-column info card: BILL TO (left) & SUBSCRIPTION SUMMARY (right)
-  const cardTop = yAfterHeader + 2;
-  const cardHeight = 68;
-  const colGap = 14;
-  const colWidth = (width - colGap) / 2;
+  // Two-column sharp bordered accounting summary grid
+  const gridTop = yAfterHeader;
+  const gridHeight = 68;
+  const halfWidth = width / 2;
 
   doc.save();
   doc
-    .roundedRect(left, cardTop, colWidth, cardHeight, 6)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.border);
+    .rect(left, gridTop, width, gridHeight)
+    .lineWidth(0.75)
+    .fillAndStroke('#FFFFFF', PDF_BRAND.borderStrong);
   doc
-    .roundedRect(left + colWidth + colGap, cardTop, colWidth, cardHeight, 6)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.border);
+    .moveTo(left + halfWidth, gridTop)
+    .lineTo(left + halfWidth, gridTop + gridHeight)
+    .lineWidth(0.6)
+    .strokeColor(PDF_BRAND.border)
+    .stroke();
   doc.restore();
 
   const padX = 12;
+  const colW = halfWidth - padX * 2;
+
   doc
     .font('Helvetica-Bold')
-    .fontSize(7.5)
-    .fillColor(PDF_BRAND.brandAccent)
-    .text('BILL TO', left + padX, cardTop + 10, { width: colWidth - padX * 2 });
+    .fontSize(7)
+    .fillColor(PDF_BRAND.muted)
+    .text('BILLED TO', left + padX, gridTop + 10, { width: colW });
   doc
     .font('Helvetica-Bold')
     .fontSize(11)
     .fillColor(PDF_BRAND.ink)
-    .text(org.name, left + padX, cardTop + 23, { width: colWidth - padX * 2 });
+    .text(org.name, left + padX, gridTop + 22, { width: colW });
   if (org.billingRef) {
     doc
       .font('Helvetica-Bold')
       .fontSize(8.5)
-      .fillColor(PDF_BRAND.brandDark)
-      .text(`Account number ${org.billingRef}`, left + padX, doc.y + 4, {
-        width: colWidth - padX * 2,
-      });
+      .fillColor(PDF_BRAND.ink)
+      .text(`Account number ${org.billingRef}`, left + padX, doc.y + 4, { width: colW });
   }
 
-  const rightBoxX = left + colWidth + colGap + padX;
+  const rightBoxX = left + halfWidth + padX;
   doc
     .font('Helvetica-Bold')
-    .fontSize(7.5)
-    .fillColor(PDF_BRAND.brandAccent)
-    .text('SUBSCRIPTION METRICS', rightBoxX, cardTop + 10, { width: colWidth - padX * 2 });
+    .fontSize(7)
+    .fillColor(PDF_BRAND.muted)
+    .text('SUBSCRIPTION METRICS', rightBoxX, gridTop + 10, { width: colW });
   doc
     .font('Helvetica-Bold')
     .fontSize(10)
     .fillColor(PDF_BRAND.ink)
-    .text(`${i.occupiedUnits} Let Units (${i.period})`, rightBoxX, cardTop + 23, {
-      width: colWidth - padX * 2,
-    });
+    .text(`${i.occupiedUnits} Let Units (${i.period})`, rightBoxX, gridTop + 22, { width: colW });
   doc
     .font('Helvetica')
     .fontSize(8.5)
@@ -113,13 +122,13 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
       `Rate: KES ${money(i.rate)} / unit  |  Minimum: KES ${money(i.minimum)}`,
       rightBoxX,
       doc.y + 3,
-      { width: colWidth - padX * 2 },
+      { width: colW },
     );
 
   // Table
-  let y = cardTop + cardHeight + 18;
+  let y = gridTop + gridHeight + 16;
   const cols = {
-    desc: left + 10,
+    desc: left + 8,
     units: left + 275,
     rate: left + 340,
     amount: left + 420,
@@ -127,16 +136,23 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
 
   const headerBarH = 22;
   doc.save();
-  doc.roundedRect(left, y, width, headerBarH, 4).fill(PDF_BRAND.tableHeaderBg);
+  doc.rect(left, y, width, headerBarH).fill(PDF_BRAND.tableHeaderBg);
+  doc.moveTo(left, y).lineTo(right, y).lineWidth(1).strokeColor(PDF_BRAND.ruleHeavy).stroke();
+  doc
+    .moveTo(left, y + headerBarH)
+    .lineTo(right, y + headerBarH)
+    .lineWidth(0.75)
+    .strokeColor(PDF_BRAND.ruleHeavy)
+    .stroke();
   doc.restore();
 
-  const headerTextY = y + 6.5;
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#FFFFFF');
+  const headerTextY = y + 7;
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
   doc.text('Description', cols.desc, headerTextY, { width: 255, lineBreak: false });
   doc.text('Let units', cols.units, headerTextY, { width: 55, align: 'right', lineBreak: false });
   doc.text('Rate (KES)', cols.rate, headerTextY, { width: 70, align: 'right', lineBreak: false });
   doc.text('Amount (KES)', cols.amount, headerTextY, {
-    width: right - 10 - cols.amount,
+    width: right - 8 - cols.amount,
     align: 'right',
     lineBreak: false,
   });
@@ -165,7 +181,7 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
     .font('Helvetica-Bold')
     .fillColor(PDF_BRAND.ink)
     .text(money(usageTotal), cols.amount, rowTextY, {
-      width: right - 10 - cols.amount,
+      width: right - 8 - cols.amount,
       align: 'right',
       lineBreak: false,
     });
@@ -189,7 +205,7 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
       .font('Helvetica-Bold')
       .fillColor(PDF_BRAND.ink)
       .text(money(i.total), cols.amount, minRowY, {
-        width: right - 10 - cols.amount,
+        width: right - 8 - cols.amount,
         align: 'right',
         lineBreak: false,
       });
@@ -199,35 +215,11 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
     doc.restore();
   }
 
-  // Payment instructions & totals summary
-  y += 16;
-  const summaryStartY = y;
-
-  if (paybill && org.billingRef && i.balance > 0n) {
-    const payBoxWidth = width * 0.54;
-    doc.save();
-    doc
-      .roundedRect(left, summaryStartY, payBoxWidth, 54, 6)
-      .fillAndStroke(PDF_BRAND.brandSoft, PDF_BRAND.brandBorder);
-    doc.restore();
-
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(8)
-      .fillColor(PDF_BRAND.brandDark)
-      .text('HOW TO PAY', left + 12, summaryStartY + 10, { width: payBoxWidth - 24 });
-    doc
-      .font('Helvetica')
-      .fontSize(8.5)
-      .fillColor(PDF_BRAND.ink)
-      .text(`Pay by M-Pesa: paybill ${paybill}, account ${org.billingRef}.`, left + 12, doc.y + 4, {
-        width: payBoxWidth - 24,
-      });
-  }
-
-  const totalsWidth = width * 0.42;
+  // Right-aligned totals
+  y += 12;
+  const totalsWidth = 210;
   const totalsX = right - totalsWidth;
-  let totalsY = summaryStartY;
+  let totalsY = y;
 
   for (const [label, val] of [
     ['Total', `KES ${money(i.total)}`],
@@ -235,45 +227,65 @@ export function renderPlatformInvoicePdf({ invoice: i, org, paybill }: PlatformI
   ] as const) {
     doc
       .font('Helvetica')
-      .fontSize(9.5)
+      .fontSize(9)
       .fillColor(PDF_BRAND.inkSecondary)
-      .text(label, totalsX, totalsY, { width: totalsWidth - 95, align: 'right' });
+      .text(label, totalsX, totalsY, { width: 95, align: 'left', lineBreak: false });
     doc
       .font('Helvetica-Bold')
-      .fontSize(9.5)
+      .fontSize(9)
       .fillColor(PDF_BRAND.ink)
-      .text(val, totalsX + totalsWidth - 90, totalsY, { width: 90, align: 'right' });
-    totalsY += 16;
+      .text(val, totalsX + 100, totalsY, {
+        width: totalsWidth - 100,
+        align: 'right',
+        lineBreak: false,
+      });
+    totalsY += 15;
   }
 
   totalsY += 4;
+  const balBoxH = 26;
   doc.save();
-  doc.roundedRect(totalsX, totalsY, totalsWidth, 26, 5).fill(PDF_BRAND.brandDark);
+  doc
+    .rect(totalsX, totalsY, totalsWidth, balBoxH)
+    .lineWidth(1)
+    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.ruleHeavy);
   doc.restore();
   doc
     .font('Helvetica-Bold')
-    .fontSize(9.5)
-    .fillColor('#FFFFFF')
-    .text('Balance', totalsX + 10, totalsY + 7.5, {
-      width: totalsWidth - 110,
+    .fontSize(9)
+    .fillColor(PDF_BRAND.ink)
+    .text('Balance due', totalsX + 8, totalsY + 8, {
+      width: 90,
       align: 'left',
       lineBreak: false,
     });
   doc
     .font('Helvetica-Bold')
-    .fontSize(10.5)
-    .fillColor('#FFFFFF')
-    .text(`KES ${money(i.balance)}`, totalsX + totalsWidth - 105, totalsY + 7, {
-      width: 95,
+    .fontSize(10)
+    .fillColor(PDF_BRAND.ink)
+    .text(`KES ${money(i.balance)}`, totalsX + 100, totalsY + 7.5, {
+      width: totalsWidth - 108,
       align: 'right',
       lineBreak: false,
     });
 
-  footer(
-    doc,
-    org.billingRef ? `Quote account reference ${org.billingRef} when paying.` : undefined,
-    i.number,
-  );
+  const afterSummaryY = totalsY + balBoxH + 16;
+  const payLines =
+    paybill && org.billingRef && i.balance > 0n
+      ? [`Pay by M-Pesa: paybill ${paybill}, account ${org.billingRef}.`]
+      : [];
+
+  drawInstructionsAndSignoff(doc, afterSummaryY, {
+    orgName: 'KodiHub',
+    extraTitle: 'How to pay',
+    extraLines: payLines,
+    systemInstructions: systemInstructions ?? DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS,
+    signoffLeft: 'Issued by KodiHub Billing',
+    signoffCenter: org.billingRef ? `Account Ref: ${org.billingRef}` : undefined,
+    signoffRight: `Invoice: ${i.number}`,
+  });
+
+  footer(doc, org.billingRef ? `Please quote ${org.billingRef} when paying.` : undefined, i.number);
   doc.end();
   return bytes;
 }
