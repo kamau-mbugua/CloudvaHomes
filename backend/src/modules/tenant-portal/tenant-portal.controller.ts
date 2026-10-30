@@ -36,6 +36,7 @@ import { JobsGuard } from '../jobs/job-auth.js';
 import { CreateTenantMaintenanceRequestDto } from '../maintenance/maintenance.dto.js';
 import { StatementQueryDto } from '../payments/payments.dto.js';
 import { renderReceiptPdf, renderStatementPdf } from '../payments/pdfs.js';
+import { renderLeasePdf } from '../portfolio/tenancies/lease-pdf.js';
 import { MessagesService } from './messages.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
 import {
@@ -96,6 +97,14 @@ export class TenantAccessController {
   @RequirePermission('tenants:update')
   async remind(@Param('id', ParseUUIDPipe) id: string) {
     return ok(await this.accounts.remindNow(id));
+  }
+
+  /** Runs today's automatic due-soon and overdue reminders for the active organisation. */
+  @Post('tenants/run-reminders')
+  @HttpCode(200)
+  @RequirePermission('tenants:update')
+  async runReminders() {
+    return ok(await this.accounts.runReminders());
   }
 
   @Get('messages')
@@ -232,6 +241,28 @@ export class TenantPortalController {
     const { upload, data } = await this.portal.requestPhoto(id, requestId, uploadId);
     return sendFile(res, upload, data);
   }
+
+  @Get(':id/tenancies/:tenancyId/lease/pdf')
+  @ApiProduces('application/pdf')
+  async leasePdf(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const data = await this.portal.leasePdf(id, tenancyId);
+    const filename = `Lease-${data.tenancy.unit.property.code}-${data.tenancy.unit.number}.pdf`;
+    return pdf(res, filename, await renderLeasePdf(data));
+  }
+
+  @Get(':id/tenancies/:tenancyId/lease-document')
+  async leaseDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { upload, data } = await this.portal.leaseDocument(id, tenancyId);
+    return sendFile(res, upload, data);
+  }
 }
 
 /** Cloud Scheduler, daily 09:00 Nairobi. */
@@ -245,6 +276,13 @@ export class ReminderJobsController {
   @HttpCode(200)
   @ApiExcludeEndpoint()
   async reminders() {
+    return { data: await this.accounts.runRemindersAll() };
+  }
+
+  @Post('rent-reminders')
+  @HttpCode(200)
+  @ApiExcludeEndpoint()
+  async rentReminders() {
     return { data: await this.accounts.runRemindersAll() };
   }
 }

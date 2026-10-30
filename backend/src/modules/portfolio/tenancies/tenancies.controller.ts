@@ -9,11 +9,17 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiProduces, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { ok } from '../../../common/http/response.js';
 import { RequirePermission } from '../../auth/decorators.js';
+import { sendFile } from '../../files/uploads.controller.js';
+import { renderLeasePdf } from './lease-pdf.js';
 import {
+  AttachLeaseDocumentDto,
   CreateTenancyDto,
   ListTenanciesQueryDto,
   MoveOutDto,
@@ -45,6 +51,42 @@ export class TenanciesController {
   @RequirePermission('tenancies:view')
   async get(@Param('id', ParseUUIDPipe) id: string) {
     return ok(await this.tenancies.get(id));
+  }
+
+  @Get(':id/lease/pdf')
+  @RequirePermission('tenancies:view')
+  @ApiProduces('application/pdf')
+  async leasePdf(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const data = await this.tenancies.forLeasePdf(id);
+    const filename = `Lease-${data.tenancy.unit.property.code}-${data.tenancy.unit.number}.pdf`;
+    const pdfBytes = await renderLeasePdf(data);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    return new StreamableFile(pdfBytes);
+  }
+
+  @Post(':id/lease-document')
+  @HttpCode(200)
+  @RequirePermission('tenancies:update')
+  async attachLeaseDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AttachLeaseDocumentDto,
+  ) {
+    return ok(await this.tenancies.attachLeaseDocument(id, dto));
+  }
+
+  @Get(':id/lease-document')
+  @RequirePermission('tenancies:view')
+  async leaseDocument(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { upload, data } = await this.tenancies.leaseDocument(id);
+    return sendFile(res, upload, data);
   }
 
   @Patch(':id')

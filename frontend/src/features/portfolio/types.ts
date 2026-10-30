@@ -86,6 +86,7 @@ export interface Unit {
     status: TenancyStatus;
     startDate: string;
     endDate: string | null;
+    hasSignedLease?: boolean;
     tenant: TenantRef;
   } | null;
   createdAt: string;
@@ -127,6 +128,7 @@ export interface Tenancy {
   noticeGivenAt: string | null;
   depositHeld: number;
   moveOutReason: string | null;
+  hasSignedLease?: boolean;
   tenant: TenantRef;
   unit: { id: string; number: string; property: CodedRef };
   createdAt: string;

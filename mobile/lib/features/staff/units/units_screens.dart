@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_error.dart';
 import '../../../core/dates.dart';
+import '../../../core/files.dart';
 import '../../../core/money.dart';
+import '../../../core/providers.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
 import '../money/money_screens.dart';
@@ -327,13 +329,34 @@ class _CurrentTenancy extends ConsumerWidget {
             formatKes(balance.abs()),
             bold: true,
           ),
-        if (can(ref, 'tenancies:update')) ...[
+        if (can(ref, 'tenancies:view') || can(ref, 'tenancies:update')) ...[
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (t.status == 'ACTIVE')
+              if (can(ref, 'tenancies:view')) ...[
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                  label: const Text('Lease PDF'),
+                  onPressed: () => openApiPdf(
+                    ref.read(apiClientProvider),
+                    '/tenancies/${t.id}/lease/pdf',
+                    'Lease-${u.number}.pdf',
+                  ),
+                ),
+                if (tenancy?.hasSignedLease == true || t.hasSignedLease)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.verified_outlined, size: 18),
+                    label: const Text('Signed lease'),
+                    onPressed: () => openApiPdf(
+                      ref.read(apiClientProvider),
+                      '/tenancies/${t.id}/lease-document',
+                      'Signed-Lease-${u.number}.pdf',
+                    ),
+                  ),
+              ],
+              if (can(ref, 'tenancies:update') && t.status == 'ACTIVE')
                 OutlinedButton(
                   onPressed: () => _TenancyLifecycleSheet.giveNotice(
                     context,
@@ -344,7 +367,8 @@ class _CurrentTenancy extends ConsumerWidget {
                   ),
                   child: const Text('Give notice'),
                 ),
-              if (t.status == 'ACTIVE' || t.status == 'NOTICE')
+              if (can(ref, 'tenancies:update') &&
+                  (t.status == 'ACTIVE' || t.status == 'NOTICE'))
                 OutlinedButton(
                   onPressed: () => _TenancyLifecycleSheet.moveOut(
                     context,
@@ -355,7 +379,8 @@ class _CurrentTenancy extends ConsumerWidget {
                   ),
                   child: const Text('Move out'),
                 ),
-              if ((tenancy?.depositHeld ?? 0) > 0)
+              if (can(ref, 'tenancies:update') &&
+                  (tenancy?.depositHeld ?? 0) > 0)
                 OutlinedButton(
                   onPressed: () => _TenancyLifecycleSheet.settleDeposit(
                     context,

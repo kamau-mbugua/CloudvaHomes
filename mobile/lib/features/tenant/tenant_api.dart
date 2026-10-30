@@ -80,6 +80,7 @@ class TenantOverview {
 
 class Home {
   Home({
+    this.id = '',
     required this.unit,
     required this.property,
     required this.rent,
@@ -87,7 +88,9 @@ class Home {
     required this.status,
     required this.startDate,
     this.endDate,
+    this.hasSignedLease = false,
   });
+  final String id;
   final String unit;
   final String property;
   final int rent;
@@ -95,8 +98,10 @@ class Home {
   final String status;
   final String startDate;
   final String? endDate;
+  final bool hasSignedLease;
 
   factory Home.fromJson(Map<String, dynamic> j) => Home(
+    id: j['id'] as String? ?? '',
     unit: _name(j['unit'], 'number'),
     property: _name(j['property'], 'name'),
     rent: centsFrom(j['rentAmount']),
@@ -104,6 +109,7 @@ class Home {
     status: j['status'] as String? ?? 'ACTIVE',
     startDate: j['startDate'] as String,
     endDate: j['endDate'] as String?,
+    hasSignedLease: j['hasSignedLease'] == true,
   );
 }
 

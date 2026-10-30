@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { FilesModule } from '../files/files.module.js';
 import {
   UnitCategoriesController,
   UnitFeaturesController,
@@ -22,6 +23,7 @@ import { UnitsService } from './units/units.service.js';
  * (agencies), properties, unit setup lists, units, tenants and tenancies.
  */
 @Module({
+  imports: [FilesModule],
   controllers: [
     LandlordsController,
     PropertiesController,

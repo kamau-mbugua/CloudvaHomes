@@ -9,13 +9,17 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
+import { sendCsv } from '../../../common/http/csv.js';
 import { ok } from '../../../common/http/response.js';
 import { RequirePermission } from '../../auth/decorators.js';
 import {
   BulkCreateUnitsDto,
   CreateUnitDto,
+  ImportUnitsCsvDto,
   ListUnitsQueryDto,
   UpdateUnitDto,
 } from './units.dto.js';
@@ -44,6 +48,19 @@ export class UnitsController {
   @RequirePermission('units:create')
   async bulk(@Body() dto: BulkCreateUnitsDto) {
     return ok(await this.units.bulkCreate(dto));
+  }
+
+  @Get('import-template')
+  @RequirePermission('units:view')
+  importTemplate(@Res({ passthrough: true }) res: Response) {
+    return sendCsv(res, 'units-import-template.csv', this.units.importTemplate());
+  }
+
+  @Post('import-csv')
+  @HttpCode(200)
+  @RequirePermission('units:create')
+  async importCsv(@Body() dto: ImportUnitsCsvDto) {
+    return ok(await this.units.importCsv(dto));
   }
 
   @Get(':id')

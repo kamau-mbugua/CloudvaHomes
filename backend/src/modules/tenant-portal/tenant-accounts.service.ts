@@ -379,16 +379,28 @@ export class TenantAccountsService {
     });
     const channels = await this.channelsFor([...new Set(open.map((i) => i.propertyId))]);
     const plan: ReminderPlan = { kind: 'REMINDER_MANUAL', amount };
+    const text = reminderText(
+      { firstName: t.firstName, code: t.code, orgName: org.name, pay: this.payHint(channels) },
+      plan,
+    );
     const msg = await this.messages.sms({
       orgId: orgContext().orgId,
       tenantId: t.id,
       kind: 'REMINDER_MANUAL',
       to: t.phone,
-      text: reminderText(
-        { firstName: t.firstName, code: t.code, orgName: org.name, pay: this.payHint(channels) },
-        plan,
-      ),
+      text,
     });
+    if (t.userId) {
+      await this.notifications.notifyUser({
+        userId: t.userId,
+        orgId: orgContext().orgId,
+        tenantId: t.id,
+        kind: 'REMINDER_MANUAL',
+        title: `Rent reminder · KES ${money(amount)}`,
+        body: text,
+        actionUrl: '/tenant',
+      });
+    }
     await this.sendReminderEmailIfPossible(t, org.name, plan, open, channels);
     return msg!;
   }
@@ -410,6 +422,7 @@ export class TenantAccountsService {
       where: { id: { in: [...plans.keys()] }, remindersOff: false },
       select: {
         id: true,
+        userId: true,
         firstName: true,
         lastName: true,
         code: true,
@@ -448,6 +461,20 @@ export class TenantAccountsService {
         to: t.phone,
         text,
       });
+      if (t.userId) {
+        await this.notifications.notifyUser({
+          userId: t.userId,
+          orgId: ctxOrg,
+          tenantId: t.id,
+          kind: plan.kind,
+          title:
+            plan.kind === 'REMINDER_OVERDUE'
+              ? `Overdue rent · KES ${money(plan.amount)}`
+              : `Rent due soon · KES ${money(plan.amount)}`,
+          body: text,
+          actionUrl: '/tenant',
+        });
+      }
       await this.sendReminderEmailIfPossible(t, org.name, plan, tenantOpen, channels);
       if (msg?.status === 'SENT') sent++;
     }

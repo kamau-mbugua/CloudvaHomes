@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/dates.dart';
+import '../../core/files.dart';
 import '../../core/money.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
@@ -84,6 +85,37 @@ class TenantHomeScreen extends ConsumerWidget {
                   ),
                   FactRow('Since', formatDay(h.startDate)),
                   if (h.endDate != null) FactRow('Until', formatDay(h.endDate)),
+                  if (h.id.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          icon: const Icon(
+                            Icons.picture_as_pdf_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Lease agreement PDF'),
+                          onPressed: () => openApiPdf(
+                            ref.read(apiClientProvider),
+                            '${ref.read(tenantApiProvider).base(o.tenantId)}/tenancies/${h.id}/lease/pdf',
+                            'Lease-${h.unit}.pdf',
+                          ),
+                        ),
+                        if (h.hasSignedLease)
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.verified_outlined, size: 18),
+                            label: const Text('Signed lease'),
+                            onPressed: () => openApiPdf(
+                              ref.read(apiClientProvider),
+                              '${ref.read(tenantApiProvider).base(o.tenantId)}/tenancies/${h.id}/lease-document',
+                              'Signed-Lease-${h.unit}.pdf',
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ],

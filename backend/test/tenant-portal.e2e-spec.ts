@@ -336,4 +336,122 @@ describe('Tenant portal & reminders (e2e)', () => {
     expect((await post(owner, '/tenants/portal-access', {})).data).toEqual({ invited: 0 });
     expect((await get(owner, `/tenants/${x.ann.tenant.id}`)).data.portal.hasAccess).toBe(true);
   });
+
+  it('generates lease agreement PDFs, attaches signed lease documents, and imports units and tenants via CSV', async () => {
+    const x = await setUp();
+    await post(owner, `/tenants/${x.tom.tenant.id}/portal-access`);
+    const tom = await signInAsTenant('0711000701');
+
+    // 1. Staff and tenant can download the backend-generated Lease Agreement PDF
+    const staffPdf = await t
+      .http()
+      .get(`/api/v1/tenancies/${x.tom.id}/lease/pdf`)
+      .set(auth(owner))
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(staffPdf.status).toBe(200);
+    expect(staffPdf.headers['content-type']).toContain('application/pdf');
+    expect((staffPdf.body as Buffer).subarray(0, 4).toString()).toBe('%PDF');
+
+    const tenantPdf = await t
+      .http()
+      .get(`/api/v1/tenant/accounts/${x.tom.tenant.id}/tenancies/${x.tom.id}/lease/pdf`)
+      .set(auth(tom))
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(tenantPdf.status).toBe(200);
+    expect((tenantPdf.body as Buffer).subarray(0, 4).toString()).toBe('%PDF');
+
+    // 2. Upload and attach a signed lease document (PDF)
+    const fakePdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF', 'utf8');
+    const upRes = await t
+      .http()
+      .post('/api/v1/uploads')
+      .set(auth(owner))
+      .field('purpose', 'LEASE_DOCUMENT')
+      .attach('file', fakePdf, { filename: 'signed-lease.pdf', contentType: 'application/pdf' });
+    expect(upRes.status).toBe(201);
+    const uploadId = upRes.body.data.id as string;
+
+    const attached = (await post(owner, `/tenancies/${x.tom.id}/lease-document`, { uploadId }))
+      .data;
+    expect(attached.hasSignedLease).toBe(true);
+
+    const dlStaff = await t
+      .http()
+      .get(`/api/v1/tenancies/${x.tom.id}/lease-document`)
+      .set(auth(owner));
+    expect(dlStaff.status).toBe(200);
+
+    const dlTenant = await t
+      .http()
+      .get(`/api/v1/tenant/accounts/${x.tom.tenant.id}/tenancies/${x.tom.id}/lease-document`)
+      .set(auth(tom));
+    expect(dlTenant.status).toBe(200);
+
+    // 3. Bulk CSV import for Units (dryRun + commit)
+    const unitTpl = await t.http().get('/api/v1/units/import-template').set(auth(owner));
+    expect(unitTpl.status).toBe(200);
+    expect(unitTpl.text).toContain('propertyCode,number,floor');
+
+    const unitCsv = `propertyCode,number,floor,sizeSqft,rentAmount,description\nHOM,B1,1,700,25000,First floor\nHOM,B2,1,750,27500,Balcony unit`;
+    const dryUnits = (await post(owner, '/units/import-csv', { csv: unitCsv, dryRun: true })).data;
+    expect(dryUnits).toMatchObject({
+      dryRun: true,
+      created: 0,
+      validCount: 2,
+      totalRows: 2,
+      errors: [],
+    });
+
+    const committedUnits = (await post(owner, '/units/import-csv', { csv: unitCsv, dryRun: false }))
+      .data;
+    expect(committedUnits).toMatchObject({
+      dryRun: false,
+      created: 2,
+      validCount: 2,
+      totalRows: 2,
+      errors: [],
+    });
+
+    // 4. Bulk CSV import for Tenants (dryRun + commit)
+    const tenantTpl = await t.http().get('/api/v1/tenants/import-template').set(auth(owner));
+    expect(tenantTpl.status).toBe(200);
+    expect(tenantTpl.text).toContain('firstName,lastName,phone');
+
+    const tenantCsv = `firstName,lastName,phone,email,idNumber,kraPin\nGrace,Njeri,0722111222,grace@example.invalid,33445566,A123456789Z\nPeter,Kamau,0722333444,peter@example.invalid,77889900,`;
+    const dryTenants = (await post(owner, '/tenants/import-csv', { csv: tenantCsv, dryRun: true }))
+      .data;
+    expect(dryTenants).toMatchObject({
+      dryRun: true,
+      created: 0,
+      validCount: 2,
+      totalRows: 2,
+      errors: [],
+    });
+
+    const committedTenants = (
+      await post(owner, '/tenants/import-csv', { csv: tenantCsv, dryRun: false })
+    ).data;
+    expect(committedTenants).toMatchObject({
+      dryRun: false,
+      created: 2,
+      validCount: 2,
+      totalRows: 2,
+      errors: [],
+    });
+
+    // 5. Manual reminder creates an in-app notification for the portal-enabled tenant
+    await post(owner, `/tenants/${x.tom.tenant.id}/reminder`);
+    const notifs = await get(tom, '/notifications');
+    expect(notifs.data.some((n: { kind: string }) => n.kind === 'REMINDER_MANUAL')).toBe(true);
+  });
 });

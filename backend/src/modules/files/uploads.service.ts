@@ -15,6 +15,7 @@ const UPLOAD_PERMS: Record<UploadPurpose, string[]> = {
   EXPENSE_RECEIPT: ['expenses:create', 'expenses:update'],
   METER_PHOTO: ['meters:create', 'meters:update'],
   MAINTENANCE_PHOTO: ['maintenance:create', 'maintenance:update'],
+  LEASE_DOCUMENT: ['tenancies:create', 'tenancies:update', 'tenants:create', 'tenants:update'],
 };
 
 export function toUpload(u: Upload) {
@@ -103,6 +104,12 @@ export class UploadsService {
       if (!perms.has('maintenance:view')) return false;
       return !!(await this.db.maintenanceRequest.count({
         where: { photoUploadIds: { has: u.id }, unit: unitScope() },
+      }));
+    }
+    if (u.purpose === 'LEASE_DOCUMENT') {
+      if (!perms.has('tenancies:view') && !perms.has('tenants:view')) return false;
+      return !!(await this.db.tenancy.count({
+        where: { leaseUploadId: u.id, unit: unitScope() },
       }));
     }
     if (!perms.has('meters:view')) return false;

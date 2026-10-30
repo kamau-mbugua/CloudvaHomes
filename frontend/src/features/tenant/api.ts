@@ -115,6 +115,27 @@ export async function downloadTenantStatement(tenantId: string, code: string | u
   saveBlob(blob, `Statement-${code || 'tenant'}${span}.pdf`, 'application/pdf');
 }
 
+export async function downloadTenantLeasePdf(
+  tenantId: string,
+  tenancy: { id: string },
+): Promise<void> {
+  const blob = await api.blob(
+    `${base(tenantId)}/tenancies/${encodeURIComponent(tenancy.id)}/lease/pdf`,
+  );
+  saveBlob(blob, `Lease-${tenancy.id.slice(0, 8)}.pdf`, 'application/pdf');
+}
+
+export async function downloadTenantSignedLease(
+  tenantId: string,
+  tenancy: { id: string },
+): Promise<void> {
+  const blob = await api.blob(
+    `${base(tenantId)}/tenancies/${encodeURIComponent(tenancy.id)}/lease-document`,
+  );
+  const ext = blob.type === 'application/pdf' ? 'pdf' : 'jpg';
+  saveBlob(blob, `Signed-Lease-${tenancy.id.slice(0, 8)}.${ext}`, blob.type);
+}
+
 export const payPath = (tenantId: string) => `${base(tenantId)}/pay`;
 export const payStatusPath = (tenantId: string, stkId: string) => `${base(tenantId)}/pay/${encodeURIComponent(stkId)}`;
 

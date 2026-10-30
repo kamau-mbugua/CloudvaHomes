@@ -32,6 +32,7 @@ export interface PortalTenancy {
   status: TenancyStatus;
   startDate: string;
   endDate: string | null;
+  hasSignedLease?: boolean;
 }
 
 /**

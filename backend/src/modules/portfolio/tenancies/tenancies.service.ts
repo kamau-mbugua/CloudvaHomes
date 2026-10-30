@@ -12,11 +12,15 @@ import { violatesUnique } from '../../../prisma/errors.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
+import { UploadsService } from '../../files/uploads.service.js';
 import { formatKesMinor, NotificationsService } from '../../notifications/notifications.service.js';
+import { readOrgDocumentInstructions } from '../../../common/pdf/pdf.js';
 import { tenancyScope } from '../property-scope.js';
 import { mapTenantConflict, TenantsService } from '../tenants/tenants.service.js';
 import { CURRENT, lockUnit, UnitsService } from '../units/units.service.js';
+import type { LeasePdfInput } from './lease-pdf.js';
 import type {
+  AttachLeaseDocumentDto,
   CreateTenancyDto,
   ListTenanciesQueryDto,
   MoveOutDto,
@@ -49,6 +53,7 @@ function toTenancy(t: TenancyRow) {
     noticeGivenAt: t.noticeGivenAt,
     depositHeld: t.depositHeld,
     moveOutReason: t.moveOutReason,
+    hasSignedLease: Boolean(t.leaseUploadId),
     tenant: t.tenant,
     unit: t.unit,
     createdAt: t.createdAt,
@@ -108,6 +113,7 @@ export class TenanciesService {
     private readonly units: UnitsService,
     private readonly tenants: TenantsService,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly uploads?: UploadsService,
   ) {}
 
   /** Lets later modules join the move-in transaction without portfolio depending on them. */
@@ -459,6 +465,131 @@ export class TenanciesService {
       return after;
     });
     return toTenancy(updated);
+  }
+
+  async forLeasePdf(id: string): Promise<LeasePdfInput> {
+    const t = await this.db.tenancy.findFirst({
+      where: { AND: [{ id }, tenancyScope()] },
+      include: {
+        unit: {
+          include: {
+            unitType: { select: { name: true } },
+            property: {
+              include: {
+                landlord: { select: { name: true } },
+              },
+            },
+          },
+        },
+        tenant: true,
+      },
+    });
+    if (!t) throw AppError.notFound('Tenancy');
+
+    const [org, channels] = await Promise.all([
+      this.db.organization.findUniqueOrThrow({
+        where: { id: orgContext().orgId },
+        select: { name: true, phone: true, email: true, kraPin: true, settings: true },
+      }),
+      this.db.paymentChannel.findMany({
+        where: {
+          status: 'ACTIVE',
+          kind: { in: ['MPESA_PAYBILL', 'MPESA_TILL', 'BANK_ACCOUNT'] },
+          OR: [{ propertyIds: { isEmpty: true } }, { propertyIds: { has: t.unit.propertyId } }],
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    const docInstructions = readOrgDocumentInstructions(org.settings);
+    return {
+      org: {
+        name: org.name,
+        phone: org.phone,
+        email: org.email,
+        kraPin: org.kraPin,
+      },
+      tenancy: {
+        id: t.id,
+        status: t.status,
+        rentAmount: t.rentAmount,
+        billingDay: t.billingDay,
+        depositHeld: t.depositHeld,
+        startDate: formatDateOnly(t.startDate),
+        endDate: formatDateOnlyOrNull(t.endDate),
+        unit: {
+          id: t.unit.id,
+          number: t.unit.number,
+          floor: t.unit.floor,
+          unitType: t.unit.unitType?.name ?? null,
+          property: {
+            id: t.unit.property.id,
+            code: t.unit.property.code,
+            name: t.unit.property.name,
+            county: t.unit.property.county,
+            area: t.unit.property.location,
+            landlordName: t.unit.property.landlord?.name ?? null,
+          },
+        },
+        tenant: {
+          id: t.tenant.id,
+          code: t.tenant.code,
+          firstName: t.tenant.firstName,
+          lastName: t.tenant.lastName,
+          phone: t.tenant.phone,
+          email: t.tenant.email,
+          kraPin: t.tenant.kraPin,
+          idNumberHint: t.tenant.idNumberHint,
+        },
+      },
+      channels: channels.map((c) => ({
+        kind: c.kind,
+        name: c.name,
+        shortcode: c.shortcode,
+        bankName: c.bankName,
+        accountNumber: c.accountNumber,
+        accountName: c.accountName,
+      })),
+      orgInstructions: docInstructions.invoiceInstructions,
+    };
+  }
+
+  async attachLeaseDocument(id: string, dto: AttachLeaseDocumentDto) {
+    if (!this.uploads) throw AppError.notFound('File storage');
+    const before = await this.find(id);
+    const uploads = this.uploads;
+    return this.db.$transaction(async (tx) => {
+      await uploads.attach(tx, dto.uploadId, 'LEASE_DOCUMENT', 'uploadId');
+      if (before.leaseUploadId && before.leaseUploadId !== dto.uploadId) {
+        await tx.upload.updateMany({
+          where: { id: before.leaseUploadId },
+          data: { attachedAt: null },
+        });
+      }
+      const after = await tx.tenancy.update({
+        where: { id },
+        data: { leaseUploadId: dto.uploadId },
+        include: INCLUDE,
+      });
+      await this.audit.record(
+        {
+          action: 'tenancy.attach_lease',
+          entity: 'tenancy',
+          entityId: id,
+          before: snapshot(before),
+          after: snapshot(after),
+        },
+        tx,
+      );
+      return toTenancy(after);
+    });
+  }
+
+  async leaseDocument(id: string) {
+    if (!this.uploads) throw AppError.notFound('File storage');
+    const t = await this.find(id);
+    if (!t.leaseUploadId) throw AppError.notFound('Signed lease document');
+    return this.uploads.content(t.leaseUploadId);
   }
 }
 

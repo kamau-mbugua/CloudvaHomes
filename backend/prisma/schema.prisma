@@ -426,6 +426,7 @@ model Tenancy {
   depositHeld   BigInt        @default(0)
   status        TenancyStatus @default(ACTIVE)
   moveOutReason String?
+  leaseUploadId String?       @unique @db.Uuid
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -915,6 +916,7 @@ enum UploadPurpose {
   EXPENSE_RECEIPT
   METER_PHOTO
   MAINTENANCE_PHOTO
+  LEASE_DOCUMENT
 }
 
 enum ExpenseCategory {

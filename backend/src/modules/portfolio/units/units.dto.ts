@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -182,4 +183,16 @@ export class UpdateUnitDto {
   @IsOptional()
   @IsIn(STATUSES)
   status?: (typeof STATUSES)[number];
+}
+
+export class ImportUnitsCsvDto {
+  @ApiProperty({ description: 'UTF-8 CSV text containing units to import' })
+  @IsString()
+  @MaxLength(1_000_000)
+  csv!: string;
+
+  @ApiPropertyOptional({ description: 'When true, validates and previews without saving' })
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
 }

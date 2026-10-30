@@ -114,3 +114,9 @@ export class MoveOutDto {
   @MaxLength(300)
   reason?: string;
 }
+
+export class AttachLeaseDocumentDto {
+  @ApiProperty({ description: 'Uploaded LEASE_DOCUMENT file id' })
+  @IsUUID()
+  uploadId!: string;
+}

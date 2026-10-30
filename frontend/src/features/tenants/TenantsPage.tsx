@@ -78,6 +78,22 @@ export function TenantsPage() {
     },
     onError: (error) => toast.failed(tenantMessagingError(error)),
   });
+  const runReminders = useMutation({
+    mutationFn: () =>
+      api
+        .post<unknown>('/tenants/run-reminders', {})
+        .then((body) => unwrap<{ dueSent?: number; overdueSent?: number } | undefined>(body)),
+    onSuccess: async (out) => {
+      const total = (out?.dueSent ?? 0) + (out?.overdueSent ?? 0);
+      toast.saved(
+        total === 0
+          ? 'No due or overdue reminders were needed right now.'
+          : `Sent ${total} rent reminder${total === 1 ? '' : 's'} (${out?.dueSent ?? 0} due soon, ${out?.overdueSent ?? 0} overdue).`,
+      );
+      await queryClient.invalidateQueries({ queryKey: messageKeys.messages });
+    },
+    onError: (error) => toast.failed(tenantMessagingError(error)),
+  });
   const propertyName = (properties.data?.data ?? []).find((p) => p.id === propertyId)?.name;
 
   const rows = list.data?.data ?? [];
@@ -99,9 +115,19 @@ export function TenantsPage() {
           </select>
         ) : null}
         {canUpdate ? (
-          <button type="button" className="nx-btn pg-push" onClick={() => setInvitingAll(true)}>
-            {propertyId ? 'Give portal access to this property’s tenants' : 'Give portal access to all current tenants'}
-          </button>
+          <>
+            <button
+              type="button"
+              className="nx-btn pg-push"
+              disabled={runReminders.isPending}
+              onClick={() => runReminders.mutate()}
+            >
+              {runReminders.isPending ? 'Sending reminders…' : 'Send due reminders'}
+            </button>
+            <button type="button" className="nx-btn" onClick={() => setInvitingAll(true)}>
+              {propertyId ? 'Give portal access to this property’s tenants' : 'Give portal access to all current tenants'}
+            </button>
+          </>
         ) : null}
         {canCreate ? (
           <>

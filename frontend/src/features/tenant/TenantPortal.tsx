@@ -30,7 +30,8 @@ import {
   MAINTENANCE_STATUSES,
 } from '../maintenance/types';
 import {
-  createTenantRequest, downloadTenantInvoice, downloadTenantReceipt, downloadTenantStatement,
+  createTenantRequest, downloadTenantInvoice, downloadTenantLeasePdf, downloadTenantReceipt,
+  downloadTenantSignedLease, downloadTenantStatement,
   keys as tenantKeys, tenantErrorMessage, uploadTenantPhoto,
   useTenantInvoice, useTenantInvoices, useTenantOverview, useTenantPayments, useTenantRequests, useTenantStatement,
 } from './api';
@@ -174,6 +175,22 @@ export function TenantHomePage() {
               <div><dt>Since</dt><dd>{formatDay(t.startDate)}</dd></div>
               {t.status === 'NOTICE' ? <div><dt>Leaving</dt><dd>{t.endDate ? formatDay(t.endDate) : 'On notice'}</dd></div> : null}
             </dl>
+            <div className="pf__actions" style={{ marginTop: '0.5rem' }}>
+              <DownloadButton
+                label="Lease agreement PDF"
+                className="nx-btn nx-btn--sm"
+                orgName={orgName}
+                run={() => downloadTenantLeasePdf(account.tenantId, t)}
+              />
+              {t.hasSignedLease ? (
+                <DownloadButton
+                  label="Signed lease copy"
+                  className="nx-btn nx-btn--sm"
+                  orgName={orgName}
+                  run={() => downloadTenantSignedLease(account.tenantId, t)}
+                />
+              ) : null}
+            </div>
           </div>
         ))}
         <dl className="tp__facts">

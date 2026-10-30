@@ -9,11 +9,19 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
+import { sendCsv } from '../../../common/http/csv.js';
 import { ok } from '../../../common/http/response.js';
 import { RequirePermission } from '../../auth/decorators.js';
-import { CreateTenantDto, ListTenantsQueryDto, UpdateTenantDto } from './tenants.dto.js';
+import {
+  CreateTenantDto,
+  ImportTenantsCsvDto,
+  ListTenantsQueryDto,
+  UpdateTenantDto,
+} from './tenants.dto.js';
 import { TenantsService } from './tenants.service.js';
 
 @ApiTags('Tenants')
@@ -32,6 +40,19 @@ export class TenantsController {
   @RequirePermission('tenants:create')
   async create(@Body() dto: CreateTenantDto) {
     return ok(await this.tenants.create(dto));
+  }
+
+  @Get('import-template')
+  @RequirePermission('tenants:view')
+  importTemplate(@Res({ passthrough: true }) res: Response) {
+    return sendCsv(res, 'tenants-import-template.csv', this.tenants.importTemplate());
+  }
+
+  @Post('import-csv')
+  @HttpCode(200)
+  @RequirePermission('tenants:create')
+  async importCsv(@Body() dto: ImportTenantsCsvDto) {
+    return ok(await this.tenants.importCsv(dto));
   }
 
   @Get(':id')

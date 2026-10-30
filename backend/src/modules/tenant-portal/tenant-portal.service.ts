@@ -16,6 +16,7 @@ import { MaintenanceService } from '../maintenance/maintenance.service.js';
 import { StkService } from '../mpesa/stk.service.js';
 import { AccountsService } from '../payments/accounts.service.js';
 import { PaymentsService } from '../payments/payments.service.js';
+import { TenanciesService } from '../portfolio/tenancies/tenancies.service.js';
 import { TenantsService } from '../portfolio/tenants/tenants.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
 import type { TenantInvoicesQueryDto, TenantPayDto } from './tenant-portal.dto.js';
@@ -32,6 +33,7 @@ export class TenantPortalService {
     @Inject(DB) private readonly db: Db,
     private readonly prisma: PrismaService,
     private readonly tenants: TenantsService,
+    private readonly tenancies: TenanciesService,
     private readonly invoices: InvoicesService,
     private readonly payments: PaymentsService,
     private readonly accounts: AccountsService,
@@ -79,6 +81,7 @@ export class TenantPortalService {
         orgId: t.orgId,
         permissions: new Set([
           'tenants:view',
+          'tenancies:view',
           'invoices:view',
           'payments:view',
           'maintenance:view',
@@ -133,6 +136,7 @@ export class TenantPortalService {
           status: x.status,
           startDate: formatDateOnly(x.startDate),
           endDate: formatDateOnlyOrNull(x.endDate),
+          hasSignedLease: Boolean(x.leaseUploadId),
         })),
         openInvoices: await this.payments.openInvoices(tenantId),
         howToPay: this.tenantAccounts.howToPay(channels, tenant.code),
@@ -228,6 +232,22 @@ export class TenantPortalService {
       const req = await this.maintenance.get(requestId);
       if (req.tenant?.id !== tenantId) throw AppError.notFound('Maintenance request');
       return this.maintenance.photoContent(requestId, uploadId);
+    });
+  }
+
+  leasePdf(tenantId: string, tenancyId: string) {
+    return this.as(tenantId, async () => {
+      const data = await this.tenancies.forLeasePdf(tenancyId);
+      if (data.tenancy.tenant.id !== tenantId) throw AppError.notFound('Tenancy');
+      return data;
+    });
+  }
+
+  leaseDocument(tenantId: string, tenancyId: string) {
+    return this.as(tenantId, async () => {
+      const t = await this.tenancies.get(tenancyId);
+      if (t.tenant.id !== tenantId) throw AppError.notFound('Tenancy');
+      return this.tenancies.leaseDocument(tenancyId);
     });
   }
 }

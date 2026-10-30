@@ -155,3 +155,15 @@ export class UpdateTenantDto {
   @IsBoolean()
   remindersOff?: boolean;
 }
+
+export class ImportTenantsCsvDto {
+  @ApiProperty({ description: 'UTF-8 CSV text containing tenants to import' })
+  @IsString()
+  @MaxLength(1_000_000)
+  csv!: string;
+
+  @ApiPropertyOptional({ description: 'When true, validates and previews without saving' })
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
+}

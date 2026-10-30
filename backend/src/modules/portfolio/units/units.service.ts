@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { formatDateOnly, formatDateOnlyOrNull } from '../../../common/dates/date-only.js';
 import { AppError, type ErrorDetail } from '../../../common/errors/app-error.js';
+import { parseCsv, toCsv } from '../../../common/http/csv.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
 import { paginated } from '../../../common/http/response.js';
 import type { Prisma } from '../../../generated/prisma/client.js';
@@ -11,12 +12,15 @@ import { orgContext } from '../../auth/decorators.js';
 import { CatalogService } from '../catalog/catalog.service.js';
 import { optionalText } from '../fields.js';
 import { PropertiesService } from '../properties/properties.service.js';
-import { unitScope } from '../property-scope.js';
-import type {
-  BulkCreateUnitsDto,
-  CreateUnitDto,
-  ListUnitsQueryDto,
-  UpdateUnitDto,
+import { propertyScope, unitScope } from '../property-scope.js';
+import {
+  type BulkCreateUnitsDto,
+  type CreateUnitDto,
+  type ImportUnitsCsvDto,
+  type ListUnitsQueryDto,
+  MAX_BULK_UNITS,
+  UNIT_NUMBER,
+  type UpdateUnitDto,
 } from './units.dto.js';
 
 export const CURRENT = ['ACTIVE', 'NOTICE'] as const;
@@ -112,6 +116,7 @@ export class UnitsService {
               status: current.status,
               startDate: formatDateOnly(current.startDate),
               endDate: formatDateOnlyOrNull(current.endDate),
+              hasSignedLease: Boolean(current.leaseUploadId),
               tenant: current.tenant,
             }
           : null,
@@ -308,6 +313,292 @@ export class UnitsService {
         tx,
       );
     });
+  }
+
+  importTemplate(): string {
+    return toCsv(
+      [
+        'propertyCode',
+        'number',
+        'floor',
+        'sizeSqft',
+        'rentAmount',
+        'unitType',
+        'category',
+        'description',
+      ],
+      [['P0001', 'A1', 0, 650, 25000, '2 Bedroom', 'Residential', 'Corner unit with balcony']],
+    );
+  }
+
+  async importCsv(dto: ImportUnitsCsvDto) {
+    const { orgId } = orgContext();
+    const dryRun = Boolean(dto.dryRun);
+    const { rows } = parseCsv(dto.csv);
+    if (rows.length === 0) {
+      return {
+        dryRun,
+        created: 0,
+        validCount: 0,
+        totalRows: 0,
+        rows: [],
+        errors: [{ rowNumber: 1, field: 'csv', message: 'CSV has no data rows' }],
+      };
+    }
+    if (rows.length > MAX_BULK_UNITS) {
+      return {
+        dryRun,
+        created: 0,
+        validCount: 0,
+        totalRows: rows.length,
+        rows: [],
+        errors: [
+          {
+            rowNumber: 1,
+            field: 'csv',
+            message: `At most ${MAX_BULK_UNITS} units can be imported at once`,
+          },
+        ],
+      };
+    }
+
+    const [props, types, categories] = await Promise.all([
+      this.db.property.findMany({
+        where: propertyScope(),
+        select: { id: true, code: true, name: true },
+      }),
+      this.db.unitType.findMany({ select: { id: true, name: true } }),
+      this.db.unitCategory.findMany({ select: { id: true, name: true } }),
+    ]);
+
+    const propByKey = new Map<string, { id: string; code: string; name: string }>();
+    for (const p of props) {
+      propByKey.set(p.code.toLowerCase(), p);
+      propByKey.set(p.name.toLowerCase(), p);
+    }
+    const typeByName = new Map(types.map((t) => [t.name.toLowerCase(), t]));
+    const catByName = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
+
+    const existingUnits = props.length
+      ? await this.db.unit.findMany({
+          where: { propertyId: { in: props.map((p) => p.id) } },
+          select: { propertyId: true, number: true },
+        })
+      : [];
+    const existingSet = new Set(
+      existingUnits.map((u) => `${u.propertyId}:${u.number.toLowerCase()}`),
+    );
+    const seenInCsv = new Set<string>();
+
+    const errors: { rowNumber: number; field: string; message: string }[] = [];
+    const validToInsert: {
+      orgId: string;
+      propertyId: string;
+      number: string;
+      floor: number;
+      sizeSqft: number | null;
+      rentAmount: bigint;
+      unitTypeId: string | null;
+      categoryId: string | null;
+      description: string | null;
+    }[] = [];
+    const previewRows: {
+      rowNumber: number;
+      propertyCode: string;
+      propertyName: string | null;
+      number: string;
+      floor: number;
+      sizeSqft: number | null;
+      rentAmount: bigint;
+      unitType: string | null;
+      category: string | null;
+      valid: boolean;
+    }[] = [];
+
+    for (const r of rows) {
+      const rowErrors: { rowNumber: number; field: string; message: string }[] = [];
+      const rawProp = (r.values.propertycode || r.values.property || '').trim();
+      const prop = rawProp ? propByKey.get(rawProp.toLowerCase()) : undefined;
+      if (!prop) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'propertyCode',
+          message: rawProp ? `Unknown property "${rawProp}"` : 'Property code is required',
+        });
+      }
+
+      const number = (r.values.number || r.values.unit || r.values.unitnumber || '').trim();
+      if (!number || !UNIT_NUMBER.test(number)) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'number',
+          message: 'Unit number must be 1–20 letters, digits, spaces or . / -',
+        });
+      } else if (prop) {
+        const key = `${prop.id}:${number.toLowerCase()}`;
+        if (seenInCsv.has(key)) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'number',
+            message: `Unit ${number} is listed more than once for ${prop.code}`,
+          });
+        } else if (existingSet.has(key)) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'number',
+            message: `Unit ${number} already exists in ${prop.code}`,
+          });
+        }
+        seenInCsv.add(key);
+      }
+
+      const rawFloor = (r.values.floor || '').trim();
+      let floor = 0;
+      if (rawFloor) {
+        const parsedFloor = Number(rawFloor);
+        if (!Number.isInteger(parsedFloor) || parsedFloor < -5 || parsedFloor > 200) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'floor',
+            message: 'Floor must be an integer between -5 and 200',
+          });
+        } else {
+          floor = parsedFloor;
+        }
+      }
+
+      const rawSize = (r.values.sizesqft || r.values.size || '').trim();
+      let sizeSqft: number | null = null;
+      if (rawSize) {
+        const parsedSize = Number(rawSize.replace(/,/g, ''));
+        if (!Number.isInteger(parsedSize) || parsedSize < 1 || parsedSize > 1_000_000) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'sizeSqft',
+            message: 'sizeSqft must be a positive integer',
+          });
+        } else {
+          sizeSqft = parsedSize;
+        }
+      }
+
+      const rawRent = (r.values.rentamount || r.values.rent || r.values.rentkes || '').trim();
+      const parsedRent = Number(rawRent.replace(/,/g, ''));
+      let rentAmount = 0n;
+      if (!rawRent || !Number.isFinite(parsedRent) || parsedRent < 0 || parsedRent > 100_000_000) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'rentAmount',
+          message: 'Enter a valid monthly rent in KES (e.g. 25000)',
+        });
+      } else {
+        rentAmount = BigInt(Math.round(parsedRent * 100));
+      }
+
+      const rawType = (r.values.unittype || r.values.type || '').trim();
+      let unitTypeId: string | null = null;
+      let unitTypeName: string | null = null;
+      if (rawType) {
+        const matchedType = typeByName.get(rawType.toLowerCase());
+        if (!matchedType) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'unitType',
+            message: `Unknown unit type "${rawType}"`,
+          });
+        } else {
+          unitTypeId = matchedType.id;
+          unitTypeName = matchedType.name;
+        }
+      }
+
+      const rawCat = (r.values.category || r.values.unitcategory || '').trim();
+      let categoryId: string | null = null;
+      let categoryName: string | null = null;
+      if (rawCat) {
+        const matchedCat = catByName.get(rawCat.toLowerCase());
+        if (!matchedCat) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'category',
+            message: `Unknown unit category "${rawCat}"`,
+          });
+        } else {
+          categoryId = matchedCat.id;
+          categoryName = matchedCat.name;
+        }
+      }
+
+      const description = optionalText(r.values.description)?.slice(0, 500) ?? null;
+
+      errors.push(...rowErrors);
+      const valid = rowErrors.length === 0;
+      previewRows.push({
+        rowNumber: r.rowNumber,
+        propertyCode: prop?.code ?? rawProp,
+        propertyName: prop?.name ?? null,
+        number,
+        floor,
+        sizeSqft,
+        rentAmount,
+        unitType: unitTypeName ?? (rawType || null),
+        category: categoryName ?? (rawCat || null),
+        valid,
+      });
+
+      if (valid && prop) {
+        validToInsert.push({
+          orgId,
+          propertyId: prop.id,
+          number,
+          floor,
+          sizeSqft,
+          rentAmount,
+          unitTypeId,
+          categoryId,
+          description,
+        });
+      }
+    }
+
+    if (dryRun || errors.length > 0) {
+      return {
+        dryRun,
+        created: 0,
+        validCount: validToInsert.length,
+        totalRows: rows.length,
+        rows: previewRows,
+        errors,
+      };
+    }
+
+    const created = await this.write(async (tx) => {
+      const { count } = await tx.unit.createMany({
+        data: validToInsert.map((u) => ({
+          ...u,
+          featureIds: [],
+        })),
+      });
+      await this.audit.record(
+        {
+          action: 'unit.import_csv',
+          entity: 'unit',
+          entityId: orgId,
+          after: { count, units: validToInsert.map((u) => u.number) },
+        },
+        tx,
+      );
+      return count;
+    });
+
+    return {
+      dryRun: false,
+      created,
+      validCount: validToInsert.length,
+      totalRows: rows.length,
+      rows: previewRows,
+      errors: [],
+    };
   }
 
   /** A unit the caller may see, or 404. */

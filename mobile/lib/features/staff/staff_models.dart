@@ -159,6 +159,7 @@ class UnitRow {
     String status,
     String startDate,
     String? endDate,
+    bool hasSignedLease,
     TenantRef tenant,
   })?
   tenancy;
@@ -181,6 +182,7 @@ class UnitRow {
               status: _s(t['status']) ?? '',
               startDate: _s(t['startDate']) ?? '',
               endDate: _s(t['endDate']),
+              hasSignedLease: t['hasSignedLease'] == true,
               tenant: TenantRef.fromJson(t['tenant'] as Json),
             ),
     );
@@ -196,6 +198,7 @@ class Tenancy {
     required this.startDate,
     required this.endDate,
     required this.depositHeld,
+    this.hasSignedLease = false,
   });
   final String id;
   final String status;
@@ -204,6 +207,7 @@ class Tenancy {
   final String startDate;
   final String? endDate;
   final int depositHeld;
+  final bool hasSignedLease;
 
   factory Tenancy.fromJson(Json j) => Tenancy(
     id: j['id'] as String,
@@ -213,6 +217,7 @@ class Tenancy {
     startDate: _s(j['startDate']) ?? '',
     endDate: _s(j['endDate']),
     depositHeld: centsFrom(j['depositHeld']),
+    hasSignedLease: j['hasSignedLease'] == true,
   );
 }
 

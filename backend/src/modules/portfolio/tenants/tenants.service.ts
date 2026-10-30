@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AppError } from '../../../common/errors/app-error.js';
+import { parseCsv, toCsv } from '../../../common/http/csv.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
 import { paginated } from '../../../common/http/response.js';
 import type { Prisma, Tenant } from '../../../generated/prisma/client.js';
@@ -8,7 +9,9 @@ import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
+import { normalizeEmail, normalizePhone } from '../../auth/identifiers.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
+import { KRA_PIN } from '../../organizations/organizations.dto.js';
 import { nextCode } from '../codes.js';
 import { optionalEmail, optionalPhone, optionalText, requiredPhone, upper } from '../fields.js';
 import { IdNumbers } from '../id-numbers.js';
@@ -16,6 +19,7 @@ import { tenantScope } from '../property-scope.js';
 import { CURRENT } from '../units/units.service.js';
 import type {
   CreateTenantDto,
+  ImportTenantsCsvDto,
   ListTenantsQueryDto,
   TenantStatus,
   UpdateTenantDto,
@@ -437,6 +441,265 @@ export class TenantsService {
         tx,
       );
     });
+  }
+
+  importTemplate(): string {
+    return toCsv(
+      [
+        'firstName',
+        'lastName',
+        'phone',
+        'email',
+        'idNumber',
+        'kraPin',
+        'emergencyContactName',
+        'emergencyContactPhone',
+        'notes',
+      ],
+      [
+        [
+          'Jane',
+          'Wanjiku',
+          '0712345678',
+          'jane@example.com',
+          '12345678',
+          'A123456789Z',
+          'John Kamau',
+          '0722000111',
+          'Preferred contact via SMS',
+        ],
+      ],
+    );
+  }
+
+  async importCsv(dto: ImportTenantsCsvDto) {
+    const { orgId } = orgContext();
+    const dryRun = Boolean(dto.dryRun);
+    const { rows } = parseCsv(dto.csv);
+    if (rows.length === 0) {
+      return {
+        dryRun,
+        created: 0,
+        validCount: 0,
+        totalRows: 0,
+        rows: [],
+        errors: [{ rowNumber: 1, field: 'csv', message: 'CSV has no data rows' }],
+      };
+    }
+    if (rows.length > 500) {
+      return {
+        dryRun,
+        created: 0,
+        validCount: 0,
+        totalRows: rows.length,
+        rows: [],
+        errors: [
+          {
+            rowNumber: 1,
+            field: 'csv',
+            message: 'At most 500 tenants can be imported at once',
+          },
+        ],
+      };
+    }
+
+    const existingTenants = await this.db.tenant.findMany({
+      select: { code: true, phone: true, idNumberIndex: true },
+    });
+    const phoneToCode = new Map(existingTenants.map((t) => [t.phone, t.code]));
+    const idIndexToCode = new Map(
+      existingTenants
+        .filter((t): t is typeof t & { idNumberIndex: string } => Boolean(t.idNumberIndex))
+        .map((t) => [t.idNumberIndex, t.code]),
+    );
+
+    const seenPhones = new Set<string>();
+    const seenIdIndexes = new Set<string>();
+    const errors: { rowNumber: number; field: string; message: string }[] = [];
+    const validDtos: CreateTenantDto[] = [];
+    const previewRows: {
+      rowNumber: number;
+      firstName: string;
+      lastName: string;
+      phone: string;
+      email: string | null;
+      kraPin: string | null;
+      valid: boolean;
+    }[] = [];
+
+    for (const r of rows) {
+      const rowErrors: { rowNumber: number; field: string; message: string }[] = [];
+      const firstName = (r.values.firstname || r.values.first || '').trim();
+      const lastName = (r.values.lastname || r.values.last || r.values.surname || '').trim();
+
+      if (!firstName || firstName.length > 80) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'firstName',
+          message: 'firstName is required (1–80 characters)',
+        });
+      }
+      if (!lastName || lastName.length > 80) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'lastName',
+          message: 'lastName is required (1–80 characters)',
+        });
+      }
+
+      const rawPhone = (r.values.phone || r.values.phonenumber || r.values.tel || '').trim();
+      const phone = normalizePhone(rawPhone);
+      if (!phone) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'phone',
+          message: 'Enter a valid Kenyan phone number (e.g. 0712345678)',
+        });
+      } else if (seenPhones.has(phone)) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'phone',
+          message: `Phone ${rawPhone} is listed more than once in this CSV`,
+        });
+      } else if (phoneToCode.has(phone)) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'phone',
+          message: `Tenant ${phoneToCode.get(phone)} already uses phone ${rawPhone}`,
+        });
+      } else {
+        seenPhones.add(phone);
+      }
+
+      const rawEmail = (r.values.email || '').trim();
+      let email: string | undefined;
+      if (rawEmail) {
+        const normEmail = normalizeEmail(rawEmail);
+        if (!normEmail) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'email',
+            message: `Invalid email "${rawEmail}"`,
+          });
+        } else {
+          email = normEmail;
+        }
+      }
+
+      const rawId = (r.values.idnumber || r.values.nationalid || r.values.id || '').trim();
+      let idNumber: string | undefined;
+      if (rawId) {
+        const normId = this.ids.normalize(rawId);
+        if (!normId || normId.length > 30) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'idNumber',
+            message: 'idNumber must be 4–30 characters',
+          });
+        } else {
+          const idx = this.ids.index(normId, orgId, 'tenant');
+          if (seenIdIndexes.has(idx)) {
+            rowErrors.push({
+              rowNumber: r.rowNumber,
+              field: 'idNumber',
+              message: 'This ID number is listed more than once in the CSV',
+            });
+          } else if (idIndexToCode.has(idx)) {
+            rowErrors.push({
+              rowNumber: r.rowNumber,
+              field: 'idNumber',
+              message: `Tenant ${idIndexToCode.get(idx)} already has this ID number`,
+            });
+          } else {
+            seenIdIndexes.add(idx);
+            idNumber = normId;
+          }
+        }
+      }
+
+      const rawKra = (r.values.krapin || r.values.kra || '').trim().toUpperCase();
+      if (rawKra && !KRA_PIN.test(rawKra)) {
+        rowErrors.push({
+          rowNumber: r.rowNumber,
+          field: 'kraPin',
+          message: 'kraPin must look like A123456789Z',
+        });
+      }
+
+      const rawEmPhone = (r.values.emergencycontactphone || r.values.emergencyphone || '').trim();
+      let emergencyContactPhone: string | undefined;
+      if (rawEmPhone) {
+        const normEm = normalizePhone(rawEmPhone);
+        if (!normEm) {
+          rowErrors.push({
+            rowNumber: r.rowNumber,
+            field: 'emergencyContactPhone',
+            message: 'Enter a valid emergency contact phone number',
+          });
+        } else {
+          emergencyContactPhone = normEm;
+        }
+      }
+
+      const emergencyContactName =
+        (r.values.emergencycontactname || r.values.emergencyname || '').trim().slice(0, 120) ||
+        undefined;
+      const notes = (r.values.notes || '').trim().slice(0, 1000) || undefined;
+
+      errors.push(...rowErrors);
+      const valid = rowErrors.length === 0;
+      previewRows.push({
+        rowNumber: r.rowNumber,
+        firstName,
+        lastName,
+        phone: phone ?? rawPhone,
+        email: email ?? (rawEmail || null),
+        kraPin: rawKra || null,
+        valid,
+      });
+
+      if (valid && phone) {
+        validDtos.push({
+          firstName,
+          lastName,
+          phone,
+          email,
+          idNumber,
+          kraPin: rawKra || undefined,
+          emergencyContactName,
+          emergencyContactPhone,
+          notes,
+        });
+      }
+    }
+
+    if (dryRun || errors.length > 0) {
+      return {
+        dryRun,
+        created: 0,
+        validCount: validDtos.length,
+        totalRows: rows.length,
+        rows: previewRows,
+        errors,
+      };
+    }
+
+    const createdIds = await this.write(async (tx) => {
+      const ids: string[] = [];
+      for (const rowDto of validDtos) {
+        ids.push(await this.createInTx(tx, rowDto));
+      }
+      return ids;
+    });
+
+    return {
+      dryRun: false,
+      created: createdIds.length,
+      validCount: validDtos.length,
+      totalRows: rows.length,
+      rows: previewRows,
+      errors: [],
+    };
   }
 
   /** A tenant the caller may see, or 404. */
