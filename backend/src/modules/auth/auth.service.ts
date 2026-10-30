@@ -93,7 +93,8 @@ export class AuthService {
           ? await this.prisma.plan.findFirst({
               where: { id: settings.defaultPlanId, active: true },
             })
-          : null) ?? (await this.prisma.plan.findFirst({ where: { isDefault: true, active: true } }));
+          : null) ??
+        (await this.prisma.plan.findFirst({ where: { isDefault: true, active: true } }));
       if (plan) {
         defaultPlan = {
           name: plan.name,

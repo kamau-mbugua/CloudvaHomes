@@ -62,10 +62,7 @@ describe('App Config, Public Signup, Maintenance & Notifications (e2e)', () => {
   });
 
   it('evaluates app-config and enforces public signup policy on POST /auth/register', async () => {
-    const initialCfg = check(
-      await t.http().get('/api/v1/auth/app-config?versionCode=1'),
-      200,
-    ).data;
+    const initialCfg = check(await t.http().get('/api/v1/auth/app-config?versionCode=1'), 200).data;
     expect(initialCfg.allowPublicSignup).toBe(false);
     expect(initialCfg.forceUpdateRequired).toBe(false);
 
@@ -97,10 +94,7 @@ describe('App Config, Public Signup, Maintenance & Notifications (e2e)', () => {
       })
       .expect(200);
 
-    const updatedCfg = check(
-      await t.http().get('/api/v1/auth/app-config?versionCode=3'),
-      200,
-    ).data;
+    const updatedCfg = check(await t.http().get('/api/v1/auth/app-config?versionCode=3'), 200).data;
     expect(updatedCfg.allowPublicSignup).toBe(true);
     expect(updatedCfg.forceUpdateRequired).toBe(true);
     expect(updatedCfg.minAppVersionName).toBe('1.2.0');
@@ -124,9 +118,8 @@ describe('App Config, Public Signup, Maintenance & Notifications (e2e)', () => {
   });
 
   it('handles full tenant -> staff maintenance request lifecycle, expense conversion, and notifications', async () => {
-    const prop = (
-      await post(owner, '/properties', { name: 'Kilimani Heights', code: 'KIL' }, 201)
-    ).data;
+    const prop = (await post(owner, '/properties', { name: 'Kilimani Heights', code: 'KIL' }, 201))
+      .data;
     await post(
       owner,
       '/units/bulk',
@@ -158,11 +151,7 @@ describe('App Config, Public Signup, Maintenance & Notifications (e2e)', () => {
     await post(owner, `/tenants/${tenancy.tenant.id}/portal-access`, {}, 200);
 
     // Sign in as tenant via OTP
-    await t
-      .http()
-      .post('/api/v1/auth/otp/request')
-      .send({ phone: '0722111222' })
-      .expect(202);
+    await t.http().post('/api/v1/auth/otp/request').send({ phone: '0722111222' }).expect(202);
     const otpVerify = check(
       await t
         .http()

@@ -219,10 +219,7 @@ export class TenantPortalService {
     return this.as(tenantId, () => this.maintenance.createForTenant(tenantId, dto));
   }
 
-  uploadMaintenancePhoto(
-    tenantId: string,
-    file?: { buffer: Buffer; size: number },
-  ) {
+  uploadMaintenancePhoto(tenantId: string, file?: { buffer: Buffer; size: number }) {
     return this.as(tenantId, () => this.uploads.create('MAINTENANCE_PHOTO', file));
   }
 

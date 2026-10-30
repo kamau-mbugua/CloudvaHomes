@@ -49,10 +49,7 @@ export class MaintenanceController {
 
   @Patch(':id')
   @RequirePermission('maintenance:update')
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateMaintenanceRequestDto,
-  ) {
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateMaintenanceRequestDto) {
     return ok(await this.maintenance.update(id, dto));
   }
 

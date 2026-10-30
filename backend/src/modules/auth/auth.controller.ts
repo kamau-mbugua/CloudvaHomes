@@ -79,10 +79,7 @@ export class AuthController {
   @Public()
   @Post('register')
   @HttpCode(201)
-  async register(
-    @Body() dto: RegisterOrganizationDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async register(@Body() dto: RegisterOrganizationDto, @Res({ passthrough: true }) res: Response) {
     return this.respond(res, await this.auth.registerOrganization(dto), dto.client);
   }
 

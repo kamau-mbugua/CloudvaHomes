@@ -800,10 +800,7 @@ export class NotificationsService {
     }
   }
 
-  async listForUser(
-    userId: string,
-    q: { page: number; pageSize: number; unreadOnly?: boolean },
-  ) {
+  async listForUser(userId: string, q: { page: number; pageSize: number; unreadOnly?: boolean }) {
     if (!this.prisma) {
       return {
         data: [],

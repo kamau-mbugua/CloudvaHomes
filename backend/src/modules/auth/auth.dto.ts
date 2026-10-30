@@ -27,7 +27,9 @@ class ClientDto {
 }
 
 export class AppConfigQueryDto {
-  @ApiPropertyOptional({ description: 'Current mobile app build/version code for force-update check' })
+  @ApiPropertyOptional({
+    description: 'Current mobile app build/version code for force-update check',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

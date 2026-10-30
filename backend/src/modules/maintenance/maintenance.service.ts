@@ -2,11 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { currentContext } from '../../common/context/request-context.js';
 import { formatDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
-import {
-  type PaginationQueryDto,
-  pageMeta,
-  toSkipTake,
-} from '../../common/http/pagination.js';
+import { type PaginationQueryDto, pageMeta, toSkipTake } from '../../common/http/pagination.js';
 import type { MaintenanceRequest, Prisma } from '../../generated/prisma/client.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -417,9 +413,7 @@ export class MaintenanceService {
             ? { resolutionNote: optionalText(dto.resolutionNote) ?? null }
             : {}),
           ...(nextPhotoIds !== undefined ? { photoUploadIds: nextPhotoIds } : {}),
-          ...(statusChangedToResolved
-            ? { resolvedById: ctx.userId, resolvedAt: new Date() }
-            : {}),
+          ...(statusChangedToResolved ? { resolvedById: ctx.userId, resolvedAt: new Date() } : {}),
         },
         include: INCLUDE,
       });
