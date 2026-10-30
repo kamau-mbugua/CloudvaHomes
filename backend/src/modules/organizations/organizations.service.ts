@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { withoutOrgScope } from '../../common/context/request-context.js';
 import type { Organization, Prisma } from '../../generated/prisma/client.js';
@@ -6,6 +7,7 @@ import { DB, type Db } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
 import { authContext, orgContext } from '../auth/decorators.js';
 import { normalizeEmail, normalizePhone } from '../auth/identifiers.js';
+import { addDays, todayInNairobi } from '../billing/billing-math.js';
 import { RolesService } from '../roles/roles.service.js';
 import { readReminders } from '../tenant-portal/reminders.js';
 import { InvitationsService } from '../users/invitations.service.js';
@@ -128,7 +130,7 @@ export class OrganizationsService {
             throw AppError.fieldInvalid('onboardedById', 'Choose a valid platform operator');
           }
         }
-        const trialEndsAt = plan ? new Date(Date.now() + plan.trialDays * 86_400_000) : null;
+        const trialEndsAt = plan ? addDays(parseDateOnly(todayInNairobi()), plan.trialDays) : null;
         const org = await tx.organization.create({
           data: {
             name: dto.name.trim(),
@@ -138,7 +140,7 @@ export class OrganizationsService {
             kraPin: dto.kraPin?.toUpperCase() ?? null,
             billingRef: `H${String(n).padStart(5, '0')}`,
             planId: plan?.id ?? null,
-            trialEndsAt: trialEndsAt ? new Date(trialEndsAt.toISOString().slice(0, 10)) : null,
+            trialEndsAt,
             onboardedById,
           },
         });
