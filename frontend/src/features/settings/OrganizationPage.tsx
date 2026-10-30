@@ -251,7 +251,7 @@ function OrganizationForm({ org }: { org: Organization }) {
           {tab === 'reminders' ? (
             <section className="fm__section">
               <h2>Rent reminders</h2>
-              <p>An SMS to tenants who owe, before rent is due and when it is overdue. Each message costs an SMS; tenants who asked not to get them are skipped (untick it on their page).</p>
+              <p>An SMS and detailed email (with their account statement PDF attached) to tenants who owe, before rent is due and when it is overdue. Each SMS costs a message credit; tenants who asked not to get reminders are skipped (untick it on their page).</p>
               <label className="tm__toggle">
                 <input type="checkbox" checked={remindersOn} disabled={!canEdit || save.isPending} onChange={(e) => setRemindersOn(e.target.checked)} />
                 <span>

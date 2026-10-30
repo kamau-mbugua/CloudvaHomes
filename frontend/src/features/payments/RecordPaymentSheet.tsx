@@ -201,7 +201,7 @@ export function RecordPaymentSheet({
             <div><dt>Receipt</dt><dd><Link to={`/app/payments/${result.id}`} onClick={onClose}><strong className="num">{result.number}</strong></Link></dd></div>
             <div><dt>Credit left</dt><dd className="num">{formatKES(result.unallocated)}</dd></div>
             <div>
-              <dt>SMS receipt</dt>
+              <dt>Receipt sent (SMS &amp; email)</dt>
               <dd>
                 {result.receiptSent ? <span className="ad__badge ad__badge--ok">Sent</span>
                   : notify ? <span className="ad__badge ad__badge--warn">Not sent</span>
@@ -210,7 +210,7 @@ export function RecordPaymentSheet({
             </div>
           </dl>
           {!result.receiptSent && notify ? (
-            <p className="ad__muted">The SMS could not be sent. The payment is saved; give the tenant the PDF receipt instead.</p>
+            <p className="ad__muted">The receipt notification could not be sent. The payment is saved; give the tenant the PDF receipt instead.</p>
           ) : null}
           <h3 className="ad__h2">Allocated to</h3>
           {(result.allocations ?? []).length === 0 ? (
@@ -325,7 +325,7 @@ export function RecordPaymentSheet({
 
         <label className="fld__check">
           <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
-          Send SMS receipt to the tenant
+          Send SMS &amp; email receipt (with PDF attached) to the tenant
         </label>
 
         {general ? <p className="nx-sheet__error" role="alert">{general}</p> : null}

@@ -6,6 +6,7 @@ import {
 } from '../../common/context/request-context.js';
 import { formatDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
+import { money } from '../../common/pdf/pdf.js';
 import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
 import type { PaymentChannel } from '../../generated/prisma/client.js';
@@ -16,10 +17,21 @@ import { orgContext } from '../auth/decorators.js';
 import { normalizeEmail, normalizePhone } from '../auth/identifiers.js';
 import { todayInNairobi } from '../billing/billing-math.js';
 import { DarajaConfigService } from '../mpesa/daraja-config.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
+import { AccountsService } from '../payments/accounts.service.js';
+import { renderStatementPdf } from '../payments/pdfs.js';
 import { TenantsService } from '../portfolio/tenants/tenants.service.js';
 import { tenantScope } from '../portfolio/property-scope.js';
 import { MessagesService } from './messages.service.js';
-import { type PayHint, planReminders, readReminders, reminderText } from './reminders.js';
+import {
+  type PayHint,
+  type Plan,
+  planReminders,
+  readReminders,
+  reminderText,
+} from './reminders.js';
+
+type ReminderPlan = Plan | { kind: 'REMINDER_MANUAL'; amount: bigint };
 
 /**
  * Staff side of the tenant portal and reminders: who has access, how a tenant pays, and the
@@ -36,6 +48,8 @@ export class TenantAccountsService {
     private readonly tenants: TenantsService,
     private readonly messages: MessagesService,
     private readonly daraja: DarajaConfigService,
+    private readonly notifications: NotificationsService,
+    private readonly accounts: AccountsService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -140,6 +154,7 @@ export class TenantAccountsService {
   private async grantOne(t: {
     id: string;
     orgId: string;
+    code: string;
     phone: string;
     email: string | null;
     firstName: string;
@@ -196,6 +211,21 @@ export class TenantAccountsService {
       to: phone,
       text: `Hi ${t.firstName}, see your rent account with ${org.name.slice(0, 40)} and pay by M-Pesa: ${link} - sign in with a code sent to this phone.`,
     });
+    if (email) {
+      try {
+        await this.notifications.sendTenantWelcome(
+          { email, phone },
+          {
+            firstName: t.firstName,
+            lastName: t.lastName,
+            organizationName: org.name,
+            tenantCode: t.code,
+          },
+        );
+      } catch (e) {
+        this.log.warn({ err: e, tenantId: t.id }, 'Portal access email failed');
+      }
+    }
   }
 
   async revoke(tenantId: string) {
@@ -226,21 +256,115 @@ export class TenantAccountsService {
         status: { in: ['ISSUED', 'PARTIALLY_PAID'] },
         ...(tenantIds ? { tenantId: { in: tenantIds } } : {}),
       },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
       select: {
+        id: true,
+        number: true,
+        period: true,
         tenantId: true,
         propertyId: true,
         dueDate: true,
         total: true,
         amountPaid: true,
         creditedAmount: true,
+        tenancy: {
+          select: {
+            unit: {
+              select: {
+                number: true,
+                property: { select: { name: true } },
+              },
+            },
+          },
+        },
       },
     });
     return rows.map((i) => ({
+      id: i.id,
+      number: i.number,
+      period: i.period,
+      propertyName: i.tenancy?.unit.property.name ?? null,
+      unitNumber: i.tenancy?.unit.number ?? null,
       tenantId: i.tenantId,
       propertyId: i.propertyId,
       dueDate: formatDateOnly(i.dueDate),
       balance: i.total - i.amountPaid - i.creditedAmount,
     }));
+  }
+
+  private formatPaymentInstructions(channels: PaymentChannel[], tenantCode: string): string {
+    const ways = this.howToPay(channels, tenantCode);
+    if (!ways.length) {
+      return `Sign in to the KodiHub Tenant Portal to view payment options (Account ref: ${tenantCode}).`;
+    }
+    return ways
+      .map((w) => {
+        if (w.kind === 'MPESA_PAYBILL') {
+          return `- M-Pesa Paybill ${w.shortcode} (${w.name}), Account: ${w.accountRef}`;
+        }
+        if (w.kind === 'MPESA_TILL') {
+          return `- M-Pesa Buy Goods Till ${w.shortcode} (${w.name})`;
+        }
+        return `- Bank transfer: ${w.bankName ?? w.name}, Account ${w.accountNumber}${w.accountName ? ` (${w.accountName})` : ''}, Ref: ${w.accountRef}`;
+      })
+      .join('\n');
+  }
+
+  private async sendReminderEmailIfPossible(
+    tenant: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      code: string;
+      phone: string;
+      email: string | null;
+    },
+    orgName: string,
+    plan: ReminderPlan,
+    tenantOpenInvoices: Awaited<ReturnType<TenantAccountsService['openInvoices']>>,
+    channels: PaymentChannel[],
+  ) {
+    if (!tenant.email) return;
+    try {
+      const reminderStatus =
+        plan.kind === 'REMINDER_DUE'
+          ? `due on ${plan.due}`
+          : plan.kind === 'REMINDER_OVERDUE'
+            ? `overdue since ${plan.since}`
+            : 'payment due';
+      const openInvoicesSummary = tenantOpenInvoices
+        .filter((i) => i.balance > 0n)
+        .map((i) => {
+          const where =
+            i.propertyName && i.unitNumber
+              ? ` · ${i.propertyName}, Unit ${i.unitNumber}`
+              : i.propertyName
+                ? ` · ${i.propertyName}`
+                : '';
+          return `- ${i.number} (${i.period}${where} · due ${i.dueDate}): KES ${money(i.balance)}`;
+        })
+        .join('\n');
+      const statementData = await this.accounts.forStatementPdf(tenant.id, {});
+      const pdfBuffer = await renderStatementPdf(statementData);
+      await this.notifications.sendTenantRentReminder(
+        { email: tenant.email, phone: tenant.phone },
+        {
+          firstName: tenant.firstName,
+          lastName: tenant.lastName,
+          organizationName: orgName,
+          tenantCode: tenant.code,
+          reminderStatus,
+          amountDueKes: money(plan.amount),
+          openInvoicesSummary:
+            openInvoicesSummary || `- Total open balance: KES ${money(plan.amount)}`,
+          paymentInstructions: this.formatPaymentInstructions(channels, tenant.code),
+          pdfBuffer,
+          pdfFilename: `Statement-${tenant.code}.pdf`,
+        },
+      );
+    } catch (e) {
+      this.log.warn({ err: e, tenantId: tenant.id }, 'Rent reminder email failed');
+    }
   }
 
   /** "Send reminder now": the tenant's whole open balance. */
@@ -254,6 +378,7 @@ export class TenantAccountsService {
       select: { name: true },
     });
     const channels = await this.channelsFor([...new Set(open.map((i) => i.propertyId))]);
+    const plan: ReminderPlan = { kind: 'REMINDER_MANUAL', amount };
     const msg = await this.messages.sms({
       orgId: orgContext().orgId,
       tenantId: t.id,
@@ -261,9 +386,10 @@ export class TenantAccountsService {
       to: t.phone,
       text: reminderText(
         { firstName: t.firstName, code: t.code, orgName: org.name, pay: this.payHint(channels) },
-        { kind: 'REMINDER_MANUAL', amount },
+        plan,
       ),
     });
+    await this.sendReminderEmailIfPossible(t, org.name, plan, open, channels);
     return msg!;
   }
 
@@ -282,7 +408,14 @@ export class TenantAccountsService {
     if (!plans.size) return { sent: 0 };
     const tenants = await this.db.tenant.findMany({
       where: { id: { in: [...plans.keys()] }, remindersOff: false },
-      select: { id: true, firstName: true, code: true, phone: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        code: true,
+        phone: true,
+        email: true,
+      },
     });
     let sent = 0;
     for (const t of tenants) {
@@ -296,13 +429,15 @@ export class TenantAccountsService {
         },
       });
       if (already) continue;
-      const props = [...new Set(open.filter((i) => i.tenantId === t.id).map((i) => i.propertyId))];
+      const tenantOpen = open.filter((i) => i.tenantId === t.id);
+      const props = [...new Set(tenantOpen.map((i) => i.propertyId))];
+      const channels = await this.channelsFor(props);
       const text = reminderText(
         {
           firstName: t.firstName,
           code: t.code,
           orgName: org.name,
-          pay: this.payHint(await this.channelsFor(props)),
+          pay: this.payHint(channels),
         },
         plan,
       );
@@ -313,6 +448,7 @@ export class TenantAccountsService {
         to: t.phone,
         text,
       });
+      await this.sendReminderEmailIfPossible(t, org.name, plan, tenantOpen, channels);
       if (msg?.status === 'SENT') sent++;
     }
     return { sent };

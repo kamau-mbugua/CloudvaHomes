@@ -93,6 +93,37 @@ export interface TenantInvoiceEmailPayload {
   pdfBuffer?: Buffer;
 }
 
+export interface TenantPaymentReceiptEmailPayload {
+  firstName: string;
+  lastName: string;
+  organizationName: string;
+  tenantCode: string;
+  receiptNumber: string;
+  amountKes: string;
+  receivedAt: string;
+  paymentMethod: string;
+  channelName: string;
+  reference: string;
+  paidBy: string;
+  allocationsSummary: string;
+  unallocatedCreditKes: string;
+  accountStanding: string;
+  pdfBuffer?: Buffer;
+}
+
+export interface TenantRentReminderEmailPayload {
+  firstName: string;
+  lastName: string;
+  organizationName: string;
+  tenantCode: string;
+  reminderStatus: string;
+  amountDueKes: string;
+  openInvoicesSummary: string;
+  paymentInstructions: string;
+  pdfBuffer?: Buffer;
+  pdfFilename?: string;
+}
+
 export function formatKesMinor(minor: bigint | number): string {
   const n = typeof minor === 'bigint' ? minor : BigInt(Math.trunc(minor));
   const negative = n < 0n;
@@ -475,6 +506,75 @@ export class NotificationsService {
           : {}),
       },
       'tenant_invoice',
+    );
+  }
+
+  /**
+   * Detailed payment receipt email with the official branded Receipt PDF (`<receiptNumber>.pdf`)
+   * attached, sent whenever a payment receipt is issued for a tenant who has an email address.
+   */
+  async sendTenantPaymentReceiptEmail(
+    to: Recipient,
+    p: TenantPaymentReceiptEmailPayload,
+  ): Promise<void> {
+    if (!to.email) return;
+    const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
+    const { pdfBuffer, ...vars } = p;
+    const rendered = await this.renderSystemEmailTemplate('tenant_payment_receipt', {
+      ...vars,
+      portalLink,
+    });
+    await this.dispatchEmail(
+      {
+        to: to.email,
+        subject: rendered.subject,
+        text: rendered.text,
+        ...(pdfBuffer
+          ? {
+              attachments: [
+                {
+                  filename: `${p.receiptNumber}.pdf`,
+                  content: pdfBuffer,
+                  contentType: 'application/pdf',
+                },
+              ],
+            }
+          : {}),
+      },
+      'tenant_payment_receipt',
+    );
+  }
+
+  /**
+   * Detailed rent reminder email with open-invoice breakdown and statement/invoice PDF attached,
+   * sent alongside SMS rent reminders (manual, due soon, or overdue).
+   */
+  async sendTenantRentReminder(to: Recipient, p: TenantRentReminderEmailPayload): Promise<void> {
+    if (!to.email) return;
+    const portalLink = `${this.env.APP_URL.replace(/\/$/, '')}/tenant`;
+    const { pdfBuffer, pdfFilename, ...vars } = p;
+    const rendered = await this.renderSystemEmailTemplate('tenant_rent_reminder', {
+      ...vars,
+      portalLink,
+    });
+    await this.dispatchEmail(
+      {
+        to: to.email,
+        subject: rendered.subject,
+        text: rendered.text,
+        ...(pdfBuffer
+          ? {
+              attachments: [
+                {
+                  filename: pdfFilename ?? `Statement-${p.tenantCode}.pdf`,
+                  content: pdfBuffer,
+                  contentType: 'application/pdf',
+                },
+              ],
+            }
+          : {}),
+      },
+      'tenant_rent_reminder',
     );
   }
 

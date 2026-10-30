@@ -198,7 +198,7 @@ export function TenantsPage() {
         >
           <p>
             Every current tenant{propertyId ? ` of ${propertyName ?? 'the chosen property'}` : ''} who doesn’t have portal access yet gets
-            it, and an SMS with the link. They sign in with a one-time code and see only their own account. You can remove
+            it, plus an SMS and email with their sign-in and password-setup links. They sign in with a one-time code or password and see only their own account. You can remove
             access for anyone from their page.
           </p>
         </Sheet>

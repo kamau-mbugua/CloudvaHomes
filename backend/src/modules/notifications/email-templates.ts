@@ -9,6 +9,8 @@ export const EMAIL_TEMPLATE_KEYS = [
   'tenant_added_to_org',
   'tenant_unit_assigned',
   'tenant_invoice',
+  'tenant_payment_receipt',
+  'tenant_rent_reminder',
 ] as const;
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
@@ -509,6 +511,141 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
         key: 'paymentInstructions',
         description: 'Paybill / Bank payment instructions for this property',
         sample: 'Pay via M-Pesa Paybill 600111, Account T00001.',
+      },
+      {
+        key: 'portalLink',
+        description: 'URL to the KodiHub Tenant Portal',
+        sample: 'https://app.kodihub.co.ke/tenant',
+      },
+    ],
+  },
+  tenant_payment_receipt: {
+    key: 'tenant_payment_receipt',
+    name: 'Tenant Payment Receipt',
+    category: 'Tenant Communications',
+    description:
+      'Sent to the tenant whenever a payment receipt is issued (manual payment, M-Pesa STK/Paybill/Till, bank transfer, or deposit applied), with the official Receipt PDF attached.',
+    defaultSubject:
+      'Payment Receipt {{receiptNumber}} — KES {{amountKes}} received ({{organizationName}})',
+    defaultBody:
+      'Hi {{firstName}},\n\n' +
+      'Thank you for your payment! {{organizationName}} has received your payment of KES {{amountKes}}. Your official PDF receipt ({{receiptNumber}}.pdf) is attached to this email.\n\n' +
+      '--- Receipt Details ---\n' +
+      'Receipt number: {{receiptNumber}}\n' +
+      'Amount received: KES {{amountKes}}\n' +
+      'Date received: {{receivedAt}}\n' +
+      'Payment method: {{paymentMethod}}\n' +
+      'Channel: {{channelName}}\n' +
+      'Reference: {{reference}}\n' +
+      'Paid by: {{paidBy}}\n' +
+      'Tenant account code: {{tenantCode}}\n\n' +
+      '--- Allocated To ---\n' +
+      '{{allocationsSummary}}\n\n' +
+      '--- Account Standing ---\n' +
+      'Unallocated credit from this payment: KES {{unallocatedCreditKes}}\n' +
+      'Overall account standing: {{accountStanding}}\n\n' +
+      'View your full statement & download receipts anytime in the Tenant Portal: {{portalLink}}',
+    variables: [
+      { key: 'firstName', description: "Tenant's first name", sample: 'Faith' },
+      { key: 'lastName', description: "Tenant's last name", sample: 'Mutua' },
+      {
+        key: 'organizationName',
+        description: 'Name of the landlord or managing agency',
+        sample: 'Ivory Breeze Estates',
+      },
+      { key: 'tenantCode', description: 'Tenant account reference code', sample: 'T00005' },
+      { key: 'receiptNumber', description: 'Official receipt number', sample: 'RCT-2026-000007' },
+      { key: 'amountKes', description: 'Payment amount received in KES', sample: '27,000.00' },
+      {
+        key: 'receivedAt',
+        description: 'Date payment was received (YYYY-MM-DD)',
+        sample: '2026-10-30',
+      },
+      {
+        key: 'paymentMethod',
+        description: 'Human-readable payment method (Cash, M-Pesa Paybill, Bank transfer, etc.)',
+        sample: 'Cash',
+      },
+      {
+        key: 'channelName',
+        description: 'Payment channel name recorded against',
+        sample: 'Cash Payment',
+      },
+      {
+        key: 'reference',
+        description: 'External reference, M-Pesa receipt code, or cash slip number',
+        sample: '2026/AD004/10/30',
+      },
+      { key: 'paidBy', description: 'Payer name', sample: 'Faith Mutua' },
+      {
+        key: 'allocationsSummary',
+        description: 'Formatted breakdown of invoices paid by this receipt',
+        sample:
+          '- INV-2026-000007 (2026-10): KES 22,000.00\n- INV-2026-000004 (2026-10): KES 5,000.00',
+      },
+      {
+        key: 'unallocatedCreditKes',
+        description: 'Surplus credit remaining on the payment in KES',
+        sample: '0.00',
+      },
+      {
+        key: 'accountStanding',
+        description: 'Closing balance or credit summary after the payment',
+        sample: 'Balance KES 20,000.00',
+      },
+      {
+        key: 'portalLink',
+        description: 'URL to the KodiHub Tenant Portal',
+        sample: 'https://app.kodihub.co.ke/tenant',
+      },
+    ],
+  },
+  tenant_rent_reminder: {
+    key: 'tenant_rent_reminder',
+    name: 'Tenant Rent Reminder (Due / Overdue)',
+    category: 'Tenant Communications',
+    description:
+      'Sent alongside SMS rent reminders (manual, due soon, or overdue) with a detailed summary of open invoices and the tenant account statement PDF attached.',
+    defaultSubject:
+      'Rent Reminder: KES {{amountDueKes}} ({{reminderStatus}}) — {{organizationName}}',
+    defaultBody:
+      'Hi {{firstName}},\n\n' +
+      'This is a {{reminderStatus}} reminder from {{organizationName}} regarding your rent account ({{tenantCode}}). Your up-to-date account statement PDF is attached to this email.\n\n' +
+      '--- Summary ---\n' +
+      'Organisation: {{organizationName}}\n' +
+      'Tenant account code: {{tenantCode}}\n' +
+      'Status: {{reminderStatus}}\n' +
+      'Total balance due: KES {{amountDueKes}}\n\n' +
+      '--- Open Invoices ---\n' +
+      '{{openInvoicesSummary}}\n\n' +
+      '--- How to Pay ---\n' +
+      '{{paymentInstructions}}\n' +
+      'View your invoices, statement & pay in the Tenant Portal: {{portalLink}}',
+    variables: [
+      { key: 'firstName', description: "Tenant's first name", sample: 'Faith' },
+      { key: 'lastName', description: "Tenant's last name", sample: 'Mutua' },
+      {
+        key: 'organizationName',
+        description: 'Name of the landlord or managing agency',
+        sample: 'Ivory Breeze Estates',
+      },
+      { key: 'tenantCode', description: 'Tenant account reference code', sample: 'T00005' },
+      {
+        key: 'reminderStatus',
+        description:
+          'Human-readable reminder status (e.g. "due on 2026-11-05", "overdue by 3 days")',
+        sample: 'due on 2026-11-05',
+      },
+      { key: 'amountDueKes', description: 'Total open balance due in KES', sample: '20,000.00' },
+      {
+        key: 'openInvoicesSummary',
+        description: 'Formatted list of open invoices with due dates and balances',
+        sample: '- INV-2026-000004 (2026-10 · due 2026-11-05): KES 20,000.00',
+      },
+      {
+        key: 'paymentInstructions',
+        description: 'Paybill / Till / Bank payment instructions for the tenant',
+        sample: 'Pay via M-Pesa Paybill 600111, Account T00005.',
       },
       {
         key: 'portalLink',

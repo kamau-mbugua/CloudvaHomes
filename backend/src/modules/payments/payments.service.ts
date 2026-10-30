@@ -17,6 +17,16 @@ import { TenantsService } from '../portfolio/tenants/tenants.service.js';
 import { ChannelsService } from './channels/channels.service.js';
 import { LedgerService } from './ledger.service.js';
 import type { CreatePaymentDto, ListPaymentsQueryDto, ReversePaymentDto } from './payments.dto.js';
+import { renderReceiptPdf } from './pdfs.js';
+
+const METHOD_NAMES: Record<string, string> = {
+  MPESA_PAYBILL: 'M-Pesa Paybill',
+  MPESA_TILL: 'M-Pesa Till',
+  BANK_ACCOUNT: 'Bank transfer',
+  CASH: 'Cash',
+  CHEQUE: 'Cheque',
+  DEPOSIT: 'Deposit applied',
+};
 
 const LIST_INCLUDE = {
   tenant: { select: { id: true, code: true, firstName: true, lastName: true, phone: true } },
@@ -392,25 +402,71 @@ export class PaymentsService {
     return payment.id;
   }
 
-  /** SMS receipt for a payment recorded without a user (after commit). */
+  /** Receipt notification (SMS + detailed email with PDF receipt attached) after commit. */
   async notifyReceipt(paymentId: string): Promise<boolean> {
     const p = await this.find(paymentId);
     return this.sendReceipt(paymentId, p.tenant.phone, p.number);
   }
 
-  /** After commit, best effort: a failed SMS is logged, never undoes the payment. */
+  /** After commit, best effort: sends SMS receipt + detailed email receipt with PDF attached. */
   private async sendReceipt(id: string, phone: string, number: string): Promise<boolean> {
     try {
       const { payment, org, balance } = await this.forReceipt(id);
-      await this.notifications.sendPaymentReceipt(phone, {
-        amount: money(payment.amount),
-        number,
-        balance: balanceText(balance),
-        organizationName: org.name,
+      const standing = balanceText(balance);
+      let sentAny = false;
+      try {
+        await this.notifications.sendPaymentReceipt(phone, {
+          amount: money(payment.amount),
+          number,
+          balance: standing,
+          organizationName: org.name,
+        });
+        sentAny = true;
+      } catch (e) {
+        this.log.warn({ err: e, paymentId: id }, 'Payment receipt SMS failed');
+      }
+
+      const tenantRow = await this.db.tenant.findUnique({
+        where: { id: payment.tenant.id },
+        select: { email: true },
       });
-      return true;
+      if (tenantRow?.email) {
+        try {
+          const pdfBuffer = await renderReceiptPdf({ payment, org, balance });
+          const allocationsSummary =
+            payment.allocations.length > 0
+              ? payment.allocations
+                  .map((a) => `- ${a.invoice.number} (${a.invoice.period}): KES ${money(a.amount)}`)
+                  .join('\n')
+              : `- Held as credit on your tenant account (KES ${money(payment.unallocated)})`;
+          await this.notifications.sendTenantPaymentReceiptEmail(
+            { email: tenantRow.email, phone },
+            {
+              firstName: payment.tenant.firstName,
+              lastName: payment.tenant.lastName,
+              organizationName: org.name,
+              tenantCode: payment.tenant.code,
+              receiptNumber: payment.number,
+              amountKes: money(payment.amount),
+              receivedAt: payment.receivedAt,
+              paymentMethod: METHOD_NAMES[payment.method] ?? payment.method,
+              channelName: payment.channel?.name ?? 'Deposit',
+              reference: payment.reference ?? '—',
+              paidBy: payment.paidBy ?? `${payment.tenant.firstName} ${payment.tenant.lastName}`,
+              allocationsSummary,
+              unallocatedCreditKes: money(payment.unallocated),
+              accountStanding: standing,
+              pdfBuffer,
+            },
+          );
+          sentAny = true;
+        } catch (e) {
+          this.log.warn({ err: e, paymentId: id }, 'Payment receipt email failed');
+        }
+      }
+      return sentAny;
     } catch (e) {
-      this.log.warn({ err: e, paymentId: id }, 'Payment receipt SMS failed');
+      this.log.warn({ err: e, paymentId: id }, 'Payment receipt notification failed');
       return false;
     }
   }

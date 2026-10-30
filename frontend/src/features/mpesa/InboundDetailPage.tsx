@@ -345,7 +345,7 @@ function AssignSheet({ inbound, suggestions, initial, onClose }: {
       <form id="assign-form" className="sheet-form" onSubmit={submit} noValidate>
         <p className="ad__muted">
           Records <span className="num">{formatKES(inbound.amount)}</span> from {payerText(inbound)} as the chosen tenant’s payment, with
-          M-Pesa receipt <span className="num">{inbound.providerRef}</span>, and sends them the SMS receipt.
+          M-Pesa receipt <span className="num">{inbound.providerRef}</span>, and sends them the SMS and email receipt (with PDF attached).
         </p>
 
         <div className={`fld ${error.tenant ? 'is-bad' : ''}`}>

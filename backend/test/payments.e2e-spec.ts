@@ -89,7 +89,12 @@ describe('Payments (e2e)', () => {
         '/tenancies',
         {
           unitId: u.id,
-          tenant: { firstName: 'Pat', lastName: 'Payer', phone },
+          tenant: {
+            firstName: 'Pat',
+            lastName: 'Payer',
+            phone,
+            email: `pat-${code.toLowerCase()}@example.invalid`,
+          },
           startDate: STARTED,
           billingDay: 1,
         },
@@ -163,6 +168,21 @@ describe('Payments (e2e)', () => {
     expect(sms.text).toBe(
       `Received KES 8,000.00 ref ${first.number}. Balance KES 17,000.00. Thank you - Pay Org`,
     );
+    // And the detailed email receipt has the official PDF receipt attached.
+    const emailReceipt = outbox
+      .filter(
+        (m): m is Extract<typeof m, { channel: 'email' }> =>
+          m.channel === 'email' &&
+          m.to === 'pat-pay@example.invalid' &&
+          m.subject.includes(first.number),
+      )
+      .at(-1)!;
+    expect(emailReceipt).toBeDefined();
+    expect(emailReceipt.text).toContain(first.number);
+    expect(emailReceipt.text).toContain(x.old.number);
+    expect(emailReceipt.attachments).toHaveLength(1);
+    expect(emailReceipt.attachments![0]!.filename).toBe(`${first.number}.pdf`);
+    expect(emailReceipt.attachments![0]!.content.subarray(0, 5).toString()).toBe('%PDF-');
 
     const over = (
       await pay(owner, {

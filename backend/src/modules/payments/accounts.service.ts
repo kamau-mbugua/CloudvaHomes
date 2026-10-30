@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { currentContext } from '../../common/context/request-context.js';
 import { formatDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
@@ -8,7 +9,7 @@ import { todayInNairobi } from '../billing/billing-math.js';
 import { tenancyScope } from '../portfolio/property-scope.js';
 import { TenantsService } from '../portfolio/tenants/tenants.service.js';
 import { LedgerService } from './ledger.service.js';
-import { receiptNumber } from './payments.service.js';
+import { PaymentsService, receiptNumber } from './payments.service.js';
 import type { SettleDepositDto } from './payments.dto.js';
 import { buildStatement, type RawEntry } from './statement.js';
 
@@ -37,6 +38,7 @@ export class AccountsService {
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
     private readonly tenants: TenantsService,
+    private readonly payments: PaymentsService,
   ) {}
 
   async statement(tenantId: string, q: { from?: string; to?: string }) {
@@ -116,8 +118,9 @@ export class AccountsService {
 
   async forStatementPdf(tenantId: string, q: { from?: string; to?: string }) {
     const statement = await this.statement(tenantId, q);
+    const orgId = currentContext()?.orgId ?? orgContext().orgId;
     const org = await this.db.organization.findUniqueOrThrow({
-      where: { id: orgContext().orgId },
+      where: { id: orgId },
       select: { name: true, phone: true, email: true, kraPin: true },
     });
     return { statement, org };
@@ -173,6 +176,7 @@ export class AccountsService {
     }
     if (apply > 0n && !ctx.permissions.has('payments:create')) throw AppError.forbidden();
     if (refund > 0n && !ctx.permissions.has('payments:refund')) throw AppError.forbidden();
+    let appliedPaymentId: string | null = null;
     await this.db.$transaction(async (tx) => {
       await this.ledger.lockTenant(tx, t.tenantId);
       const held = (await tx.tenancy.findUniqueOrThrow({ where: { id: tenancyId } })).depositHeld;
@@ -206,6 +210,7 @@ export class AccountsService {
             recordedById: ctx.userId,
           },
         });
+        appliedPaymentId = payment.id;
         await this.ledger.spend(tx, {
           orgId: ctx.orgId,
           tenantId: t.tenantId,
@@ -245,6 +250,9 @@ export class AccountsService {
         tx,
       );
     });
+    if (appliedPaymentId) {
+      await this.payments.notifyReceipt(appliedPaymentId);
+    }
     return this.deposit(tenancyId);
   }
 
