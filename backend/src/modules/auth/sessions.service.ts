@@ -30,14 +30,50 @@ export interface SessionPayload {
     phone: string | null;
     isPlatformAdmin: boolean;
     platformRole: 'SUPERADMIN' | 'SALESPERSON' | null;
+    defaultOrgId: string | null;
+    defaultPropertyId: string | null;
+    defaultTenantId: string | null;
+    defaultLandlordId: string | null;
   };
   organizations: { id: string; name: string; kind: string; roleName: string; isOwner: boolean }[];
   activeOrganization: { id: string; name: string; kind: string; status: string } | null;
+  activePropertyId: string | null;
+  properties: {
+    id: string;
+    code: string;
+    name: string;
+    unitCount: number;
+    occupiedCount: number;
+  }[];
+  activeTenantId: string | null;
+  activeLandlordId: string | null;
   permissions: string[];
   /** Landlords this user may see in the owner portal (phase 6b). */
-  ownerOf: { landlordId: string; name: string; organization: { id: string; name: string } }[];
+  ownerOf: {
+    landlordId: string;
+    name: string;
+    organization: { id: string; name: string };
+    properties: { id: string; code: string; name: string }[];
+  }[];
   /** Tenant accounts this user may see in the tenant portal (phase 7). */
-  tenantOf: { tenantId: string; name: string; organization: { id: string; name: string } }[];
+  tenantOf: {
+    tenantId: string;
+    name: string;
+    organization: { id: string; name: string };
+    units: {
+      tenancyId: string;
+      unitId: string;
+      unitNumber: string;
+      propertyId: string;
+      propertyName: string;
+    }[];
+  }[];
+}
+
+export interface SessionScopeInput {
+  propertyId?: string | null;
+  tenantId?: string | null;
+  landlordId?: string | null;
 }
 
 export interface IssuedSession {
@@ -66,11 +102,25 @@ export class SessionsService {
 
   /** New sign-in → new family. */
   async start(userId: string, preferredOrgId: string | null): Promise<IssuedSession> {
-    const orgId = await this.pickOrg(userId, preferredOrgId);
+    const userDefaults = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        defaultOrgId: true,
+        defaultPropertyId: true,
+        defaultTenantId: true,
+        defaultLandlordId: true,
+      },
+    });
+    const orgId = await this.pickOrg(userId, preferredOrgId ?? userDefaults?.defaultOrgId ?? null);
+    const scope: SessionScopeInput = {
+      propertyId: userDefaults?.defaultPropertyId ?? null,
+      tenantId: userDefaults?.defaultTenantId ?? null,
+      landlordId: userDefaults?.defaultLandlordId ?? null,
+    };
     const familyId = randomUUID();
-    const refreshToken = await this.storeRefresh(userId, familyId, orgId);
+    const refreshToken = await this.storeRefresh(userId, familyId, orgId, scope);
     await this.prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
-    return { payload: await this.build(userId, orgId, familyId), refreshToken };
+    return { payload: await this.build(userId, orgId, familyId, scope), refreshToken };
   }
 
   /** Rotates a refresh token. Throws 401 SESSION_REVOKED / SESSION_EXPIRED. */
@@ -112,23 +162,143 @@ export class SessionsService {
       await this.revokeFamily(record.familyId);
       throw AppError.unauthenticated('SESSION_REVOKED', 'Please sign in again');
     }
-    const orgId = await this.pickOrg(record.userId, record.orgId);
-    const refreshToken = await this.storeRefresh(record.userId, record.familyId, orgId);
-    return { payload: await this.build(record.userId, orgId, record.familyId), refreshToken };
+    const orgId = await this.pickOrg(record.userId, record.orgId ?? user.defaultOrgId);
+    const scope: SessionScopeInput = {
+      propertyId: record.propertyId ?? user.defaultPropertyId ?? null,
+      tenantId: record.tenantId ?? user.defaultTenantId ?? null,
+      landlordId: record.landlordId ?? user.defaultLandlordId ?? null,
+    };
+    const refreshToken = await this.storeRefresh(record.userId, record.familyId, orgId, scope);
+    return { payload: await this.build(record.userId, orgId, record.familyId, scope), refreshToken };
   }
 
-  /** Same session (family), different organisation. */
-  async switchOrg(userId: string, sessionId: string, orgId: string): Promise<SessionPayload> {
-    const membership = await this.prisma.membership.findFirst({
-      where: { userId, orgId, status: 'ACTIVE' },
+  /** Same session (family), different organisation (and optional property). */
+  async switchOrg(
+    userId: string,
+    sessionId: string,
+    orgId: string,
+    propertyId?: string | null,
+    setAsDefault = true,
+  ): Promise<SessionPayload> {
+    return this.switchContext(userId, sessionId, orgId, {
+      organizationId: orgId,
+      propertyId: propertyId ?? null,
+      setAsDefault,
     });
-    if (!membership) throw AppError.notFound('Organisation');
-    // Remember the choice so the next refresh keeps the user in this organisation.
+  }
+
+  /**
+   * Switches active organisation, property, tenant account, or landlord account (or resets to
+   * null for consolidated mode), rotates the JWT access token claims, and optionally persists
+   * the selection as the user's default.
+   */
+  async switchContext(
+    userId: string,
+    sessionId: string,
+    currentOrgId: string | null,
+    opts: {
+      organizationId?: string;
+      propertyId?: string | null;
+      tenantId?: string | null;
+      landlordId?: string | null;
+      setAsDefault?: boolean;
+    },
+  ): Promise<SessionPayload> {
+    const liveToken = await this.prisma.refreshToken.findFirst({
+      where: { familyId: sessionId, revokedAt: null, usedAt: null },
+      select: { orgId: true, propertyId: true, tenantId: true, landlordId: true },
+    });
+
+    let targetOrgId = opts.organizationId ?? currentOrgId ?? liveToken?.orgId ?? null;
+    if (opts.organizationId) {
+      const membership = await this.prisma.membership.findFirst({
+        where: { userId, orgId: opts.organizationId, status: 'ACTIVE' },
+      });
+      if (!membership) throw AppError.notFound('Organisation');
+      targetOrgId = opts.organizationId;
+    }
+
+    let targetPropertyId =
+      opts.propertyId !== undefined
+        ? opts.propertyId
+        : opts.organizationId && opts.organizationId !== currentOrgId
+          ? null
+          : (liveToken?.propertyId ?? null);
+
+    if (targetPropertyId) {
+      const prop = await this.prisma.property.findFirst({
+        where: {
+          id: targetPropertyId,
+          ...(targetOrgId ? { orgId: targetOrgId } : {}),
+        },
+        select: { id: true, orgId: true },
+      });
+      if (!prop) throw AppError.notFound('Property');
+      const m = await this.prisma.membership.findFirst({
+        where: { userId, orgId: prop.orgId, status: 'ACTIVE' },
+         include: { role: true },
+      });
+      if (m) {
+        const isOwner = m.role.systemKey === 'OWNER';
+        if (!isOwner && m.propertyIds.length > 0 && !m.propertyIds.includes(prop.id)) {
+          throw AppError.notFound('Property');
+        }
+        targetOrgId = prop.orgId;
+      }
+    }
+
+    const targetTenantId =
+      opts.tenantId !== undefined ? opts.tenantId : (liveToken?.tenantId ?? null);
+    if (targetTenantId) {
+      const t = await this.prisma.tenant.findFirst({
+        where: { id: targetTenantId, userId, organization: { status: { not: 'CLOSED' } } },
+        select: { id: true },
+      });
+      if (!t) throw AppError.notFound('Account');
+    }
+
+    const targetLandlordId =
+      opts.landlordId !== undefined ? opts.landlordId : (liveToken?.landlordId ?? null);
+    if (targetLandlordId) {
+      const l = await this.prisma.landlord.findFirst({
+        where: {
+          id: targetLandlordId,
+          userId,
+          status: 'ACTIVE',
+          organization: { kind: 'AGENCY', status: { not: 'CLOSED' } },
+        },
+        select: { id: true },
+      });
+      if (!l) throw AppError.notFound('Landlord');
+    }
+
     await this.prisma.refreshToken.updateMany({
       where: { familyId: sessionId, revokedAt: null, usedAt: null },
-      data: { orgId },
+      data: {
+        orgId: targetOrgId,
+        propertyId: targetPropertyId,
+        tenantId: targetTenantId,
+        landlordId: targetLandlordId,
+      },
     });
-    return this.build(userId, orgId, sessionId);
+
+    if (opts.setAsDefault !== false) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(opts.organizationId !== undefined ? { defaultOrgId: targetOrgId } : {}),
+          ...(opts.propertyId !== undefined ? { defaultPropertyId: targetPropertyId } : {}),
+          ...(opts.tenantId !== undefined ? { defaultTenantId: targetTenantId } : {}),
+          ...(opts.landlordId !== undefined ? { defaultLandlordId: targetLandlordId } : {}),
+        },
+      });
+    }
+
+    return this.build(userId, targetOrgId, sessionId, {
+      propertyId: targetPropertyId,
+      tenantId: targetTenantId,
+      landlordId: targetLandlordId,
+    });
   }
 
   async revokeFamily(familyId: string): Promise<void> {
@@ -164,7 +334,12 @@ export class SessionsService {
   }
 
   /** The session object without tokens (GET /me) or with a new access token. */
-  async build(userId: string, orgId: string | null, sessionId: string): Promise<SessionPayload> {
+  async build(
+    userId: string,
+    orgId: string | null,
+    sessionId: string,
+    scope?: SessionScopeInput,
+  ): Promise<SessionPayload> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       include: {
@@ -176,13 +351,82 @@ export class SessionsService {
       },
     });
     const active = user.memberships.find((m) => m.orgId === orgId) ?? null;
+
+    // Resolve accessible properties in the active organisation
+    let properties: {
+      id: string;
+      code: string;
+      name: string;
+      unitCount: number;
+      occupiedCount: number;
+    }[] = [];
+    if (active) {
+      const isOwner = active.role.systemKey === 'OWNER';
+      const limitIds = !isOwner && active.propertyIds.length > 0 ? active.propertyIds : null;
+      const propRows = await this.prisma.property.findMany({
+        where: {
+          orgId: active.orgId,
+          status: 'ACTIVE',
+          ...(limitIds ? { id: { in: limitIds } } : {}),
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          units: {
+            select: {
+              id: true,
+              tenancies: {
+                where: { status: { in: ['ACTIVE', 'NOTICE'] } },
+                select: { id: true },
+              },
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+      properties = propRows.map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        unitCount: p.units.length,
+        occupiedCount: p.units.filter((u) => u.tenancies.length > 0).length,
+      }));
+    }
+
+    const liveToken =
+      scope === undefined
+        ? await this.prisma.refreshToken.findFirst({
+            where: { familyId: sessionId, revokedAt: null, usedAt: null },
+            select: { propertyId: true, tenantId: true, landlordId: true },
+          })
+        : null;
+
+    const wantedPropertyId =
+      scope !== undefined
+        ? scope.propertyId
+        : (liveToken?.propertyId ?? user.defaultPropertyId ?? null);
+    const activePropertyId =
+      wantedPropertyId && properties.some((p) => p.id === wantedPropertyId)
+        ? wantedPropertyId
+        : null;
+
     const landlords = await this.prisma.landlord.findMany({
       where: {
         userId,
         status: 'ACTIVE',
         organization: { kind: 'AGENCY', status: { not: 'CLOSED' } },
       },
-      select: { id: true, name: true, organization: { select: { id: true, name: true } } },
+      select: {
+        id: true,
+        name: true,
+        organization: { select: { id: true, name: true } },
+        properties: {
+          where: { status: 'ACTIVE' },
+          select: { id: true, code: true, name: true },
+          orderBy: { name: 'asc' },
+        },
+      },
       orderBy: { name: 'asc' },
     });
     const tenancies = await this.prisma.tenant.findMany({
@@ -192,14 +436,46 @@ export class SessionsService {
         firstName: true,
         lastName: true,
         organization: { select: { id: true, name: true } },
+        tenancies: {
+          where: { status: { not: 'ENDED' } },
+          select: {
+            id: true,
+            unit: {
+              select: {
+                id: true,
+                number: true,
+                property: { select: { id: true, name: true } },
+              },
+            },
+          },
+          orderBy: { startDate: 'desc' },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
+
+    const wantedTenantId =
+      scope !== undefined ? scope.tenantId : (liveToken?.tenantId ?? user.defaultTenantId ?? null);
+    const activeTenantId =
+      wantedTenantId && tenancies.some((t) => t.id === wantedTenantId) ? wantedTenantId : null;
+
+    const wantedLandlordId =
+      scope !== undefined
+        ? scope.landlordId
+        : (liveToken?.landlordId ?? user.defaultLandlordId ?? null);
+    const activeLandlordId =
+      wantedLandlordId && landlords.some((l) => l.id === wantedLandlordId)
+        ? wantedLandlordId
+        : null;
+
     const platformRole = user.platformRole ?? (user.isPlatformAdmin ? 'SUPERADMIN' : null);
     const isPlatformAdmin = platformRole === 'SUPERADMIN';
     const access = await this.tokens.signAccess({
       userId,
       orgId: active?.orgId ?? null,
+      propertyId: activePropertyId,
+      tenantId: activeTenantId,
+      landlordId: activeLandlordId,
       sessionId,
       isPlatformAdmin,
     });
@@ -214,6 +490,10 @@ export class SessionsService {
         phone: user.phone,
         isPlatformAdmin,
         platformRole,
+        defaultOrgId: user.defaultOrgId ?? null,
+        defaultPropertyId: user.defaultPropertyId ?? null,
+        defaultTenantId: user.defaultTenantId ?? null,
+        defaultLandlordId: user.defaultLandlordId ?? null,
       },
       organizations: user.memberships.map((m) => ({
         id: m.orgId,
@@ -230,6 +510,10 @@ export class SessionsService {
             status: active.organization.status,
           }
         : null,
+      activePropertyId,
+      properties,
+      activeTenantId,
+      activeLandlordId,
       permissions: active
         ? active.role.systemKey === 'OWNER'
           ? [...ALL_PERMISSIONS]
@@ -239,11 +523,19 @@ export class SessionsService {
         landlordId: l.id,
         name: l.name,
         organization: l.organization,
+        properties: l.properties,
       })),
       tenantOf: tenancies.map((t) => ({
         tenantId: t.id,
         name: `${t.firstName} ${t.lastName}`,
         organization: t.organization,
+        units: t.tenancies.map((tc) => ({
+          tenancyId: tc.id,
+          unitId: tc.unit.id,
+          unitNumber: tc.unit.number,
+          propertyId: tc.unit.property.id,
+          propertyName: tc.unit.property.name,
+        })),
       })),
     };
   }
@@ -262,6 +554,7 @@ export class SessionsService {
     userId: string,
     familyId: string,
     orgId: string | null,
+    scope?: SessionScopeInput,
   ): Promise<string> {
     const ctx = currentContext();
     const raw = randomToken();
@@ -270,6 +563,9 @@ export class SessionsService {
         userId,
         familyId,
         orgId,
+        propertyId: scope?.propertyId ?? null,
+        tenantId: scope?.tenantId ?? null,
+        landlordId: scope?.landlordId ?? null,
         tokenHash: sha256(raw),
         expiresAt: new Date(Date.now() + REFRESH_TTL_DAYS * 24 * 3600 * 1000),
         userAgent: ctx?.userAgent ?? null,

@@ -18,258 +18,471 @@ class TenantHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(tenantOverviewProvider);
+    final selectedHomeKey = ref.watch(selectedTenantHomeKeyProvider);
+    final accounts =
+        ref.watch(sessionProvider).valueOrNull?.tenantOf ?? const [];
+
     return RefreshIndicator(
       onRefresh: () => ref.refresh(tenantOverviewProvider.future),
       child: AsyncBody(
         value: overview,
         onRetry: () => ref.invalidate(tenantOverviewProvider),
-        data: (o) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _OwedCard(o: o),
-            if (o.openInvoices.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              SectionCard(
-                title: 'Open invoices',
-                trailing: GestureDetector(
-                  onTap: () => context.go('/tenant/invoices'),
-                  child: const Text(
-                    'See all',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: HodiColors.limeText,
+        data: (o) {
+          final selectedHome = selectedHomeKey == null
+              ? null
+              : o.homes.where((h) => h.key == selectedHomeKey).firstOrNull;
+          final visibleHomes = selectedHome != null ? [selectedHome] : o.homes;
+          final visibleInvoices = selectedHome != null
+              ? [
+                  for (final i in o.openInvoices)
+                    if (i.unit == null ||
+                        i.unit!.isEmpty ||
+                        i.unit == selectedHome.unit)
+                      i,
+                ]
+              : o.openInvoices;
+          final showSwitcher = o.homes.length > 1 || accounts.length > 1;
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (showSwitcher)
+                _TenantUnitSwitcher(overview: o, selectedHome: selectedHome),
+              _OwedCard(o: o, selectedHome: selectedHome),
+              if (selectedHome == null && o.homes.length > 1) ...[
+                const SizedBox(height: 14),
+                _TenantConsolidatedUnitsCard(overview: o),
+              ],
+              if (visibleInvoices.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                SectionCard(
+                  title: selectedHome != null
+                      ? 'Open invoices · ${selectedHome.unit}'
+                      : 'Open invoices',
+                  trailing: GestureDetector(
+                    onTap: () => context.go('/tenant/invoices'),
+                    child: const Text(
+                      'See all',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: HodiColors.limeText,
+                      ),
                     ),
                   ),
-                ),
-                children: [
-                  for (final (idx, i) in o.openInvoices.indexed) ...[
-                    if (idx > 0) const Divider(height: 16),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => context.push('/tenant/invoices/${i.id}'),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final (idx, i) in visibleInvoices.indexed) ...[
+                      if (idx > 0) const Divider(height: 16),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => context.push('/tenant/invoices/${i.id}'),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      formatPeriod(i.period),
+                                      style: const TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${i.number}${i.unit != null && i.unit!.isNotEmpty ? ' · ${i.unit}' : ''} · due ${formatDay(i.dueDate)}',
+                                      style: TextStyle(
+                                        fontFamily: 'JetBrainsMono',
+                                        fontSize: 11.5,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    formatPeriod(i.period),
+                                    formatKes(i.balance),
                                     style: const TextStyle(
                                       fontSize: 14.5,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(
-                                    '${i.number} · due ${formatDay(i.dueDate)}',
-                                    style: TextStyle(
-                                      fontFamily: 'JetBrainsMono',
-                                      fontSize: 11.5,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
+                                  if (i.overdue)
+                                    const StatusChip('Overdue', tone: Tone.bad)
+                                  else
+                                    StatusChip(
+                                      'Due ${formatDay(i.dueDate)}',
+                                      tone: Tone.warn,
                                     ),
-                                  ),
                                 ],
                               ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  formatKes(i.balance),
-                                  style: const TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                if (i.overdue)
-                                  const StatusChip('Overdue', tone: Tone.bad)
-                                else
-                                  StatusChip(
-                                    'Due ${formatDay(i.dueDate)}',
-                                    tone: Tone.warn,
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.chevron_right,
-                              size: 18,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-            if (o.howToPay.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              SectionCard(
-                title: 'How to pay',
-                children: [
-                  for (final (index, w) in o.howToPay.indexed) ...[
-                    if (index > 0) const Divider(height: 24),
-                    _PayWayView(w),
-                  ],
-                ],
-              ),
-            ],
-            for (final h in o.homes) ...[
-              const SizedBox(height: 14),
-              SectionCard(
-                title: o.homes.length > 1
-                    ? 'Your home · ${h.unit}'
-                    : 'Your home',
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? const Color(0xFF122438)
-                          : HodiColors.paper2,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerLowest,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.home_outlined,
-                            color: HodiColors.navy,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${h.unit}, ${h.property}',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${formatKes(h.rent)} a month',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.chevron_right,
+                                size: 18,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  FactRow('Rent a month', formatKes(h.rent)),
-                  FactRow(
-                    'Billed on',
-                    'the ${_ordinal(h.billingDay)} of each month',
-                  ),
-                  FactRow('Since', formatDay(h.startDate)),
-                  if (h.endDate != null) FactRow('Until', formatDay(h.endDate)),
-                  if (h.id.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          icon: const Icon(
-                            Icons.picture_as_pdf_outlined,
-                            size: 18,
-                          ),
-                          label: const Text('Lease agreement PDF'),
-                          onPressed: () => openApiPdf(
-                            ref.read(apiClientProvider),
-                            '${ref.read(tenantApiProvider).base(o.tenantId)}/tenancies/${h.id}/lease/pdf',
-                            'Lease-${h.unit}.pdf',
-                          ),
-                        ),
-                        if (h.hasSignedLease)
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.verified_outlined, size: 18),
-                            label: const Text('Signed lease'),
-                            onPressed: () => openApiPdf(
-                              ref.read(apiClientProvider),
-                              '${ref.read(tenantApiProvider).base(o.tenantId)}/tenancies/${h.id}/lease-document',
-                              'Signed-Lease-${h.unit}.pdf',
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+              if (o.howToPay.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                SectionCard(
+                  title: 'How to pay',
+                  children: [
+                    for (final (index, w) in o.howToPay.indexed) ...[
+                      if (index > 0) const Divider(height: 24),
+                      _PayWayView(w),
+                    ],
+                  ],
+                ),
+              ],
+              for (final h in visibleHomes) ...[
+                const SizedBox(height: 14),
+                SectionCard(
+                  title: visibleHomes.length > 1 || selectedHome != null
+                      ? 'Your home · ${h.unit}'
+                      : 'Your home',
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF122438)
+                            : HodiColors.paper2,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerLowest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.home_outlined,
+                              color: HodiColors.navy,
                             ),
                           ),
-                      ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${h.unit}, ${h.property}',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '${formatKes(h.rent)} a month',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    FactRow('Rent a month', formatKes(h.rent)),
+                    FactRow(
+                      'Billed on',
+                      'the ${_ordinal(h.billingDay)} of each month',
+                    ),
+                    FactRow('Since', formatDay(h.startDate)),
+                    if (h.endDate != null)
+                      FactRow('Until', formatDay(h.endDate)),
+                    if (h.id.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(
+                              Icons.picture_as_pdf_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Lease agreement PDF'),
+                            onPressed: () => openApiPdf(
+                              ref.read(apiClientProvider),
+                              '${ref.read(tenantApiProvider).base(h.tenantId.isNotEmpty ? h.tenantId : o.tenantId)}/tenancies/${h.id}/lease/pdf',
+                              'Lease-${h.unit}.pdf',
+                            ),
+                          ),
+                          if (h.hasSignedLease)
+                            OutlinedButton.icon(
+                              icon: const Icon(
+                                Icons.verified_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('Signed lease'),
+                              onPressed: () => openApiPdf(
+                                ref.read(apiClientProvider),
+                                '${ref.read(tenantApiProvider).base(h.tenantId.isNotEmpty ? h.tenantId : o.tenantId)}/tenancies/${h.id}/lease-document',
+                                'Signed-Lease-${h.unit}.pdf',
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+              if (o.depositHeld > 0) ...[
+                const SizedBox(height: 12),
+                SectionCard(
+                  children: [
+                    FactRow(
+                      'Deposit held',
+                      formatKes(
+                        selectedHome != null && selectedHome.depositHeld > 0
+                            ? selectedHome.depositHeld
+                            : o.depositHeld,
+                      ),
+                      bold: true,
                     ),
                   ],
-                ],
-              ),
-            ],
-            if (o.depositHeld > 0) ...[
+                ),
+              ],
               const SizedBox(height: 12),
               SectionCard(
+                title: 'Contact ${o.orgName}',
                 children: [
-                  FactRow('Deposit held', formatKes(o.depositHeld), bold: true),
+                  if (o.orgPhone != null)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.call_outlined),
+                      title: Text(o.orgPhone!),
+                      onTap: () =>
+                          launchUrl(Uri(scheme: 'tel', path: o.orgPhone)),
+                    ),
+                  if (o.orgEmail != null)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.mail_outline),
+                      title: Text(o.orgEmail!),
+                      onTap: () =>
+                          launchUrl(Uri(scheme: 'mailto', path: o.orgEmail)),
+                    ),
                 ],
               ),
             ],
-            const SizedBox(height: 12),
-            SectionCard(
-              title: 'Contact ${o.orgName}',
-              children: [
-                if (o.orgPhone != null)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.call_outlined),
-                    title: Text(o.orgPhone!),
-                    onTap: () =>
-                        launchUrl(Uri(scheme: 'tel', path: o.orgPhone)),
-                  ),
-                if (o.orgEmail != null)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.mail_outline),
-                    title: Text(o.orgEmail!),
-                    onTap: () =>
-                        launchUrl(Uri(scheme: 'mailto', path: o.orgEmail)),
-                  ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
+Future<void> _switchTenantUnit(
+  BuildContext context,
+  WidgetRef ref, {
+  required Home? home,
+  required String fallbackTenantId,
+}) async {
+  ref.read(selectedTenantHomeKeyProvider.notifier).state = home?.key;
+  if (home == null) {
+    ref.read(chosenTenantProvider.notifier).state = null;
+    await ref.read(sessionProvider.notifier).switchContext(tenantId: null);
+  } else {
+    final targetTenantId = home.tenantId.isNotEmpty
+        ? home.tenantId
+        : fallbackTenantId;
+    ref.read(chosenTenantProvider.notifier).state = targetTenantId;
+    await ref
+        .read(sessionProvider.notifier)
+        .switchContext(tenantId: targetTenantId);
+  }
+  if (context.mounted) {
+    showMessage(
+      context,
+      home == null
+          ? 'Consolidated units view active (saved as default)'
+          : 'Switched to ${home.unit} · ${home.property} (saved as default)',
+    );
+  }
+}
+
+class _TenantUnitSwitcher extends ConsumerWidget {
+  const _TenantUnitSwitcher({
+    required this.overview,
+    required this.selectedHome,
+  });
+
+  final TenantOverview overview;
+  final Home? selectedHome;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final homes = overview.homes;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Kicker(
+                  selectedHome == null
+                      ? 'YOUR UNITS · CONSOLIDATED (${homes.length} UNITS)'
+                      : 'ACTIVE UNIT · DEFAULT SAVED',
+                ),
+              ),
+              if (selectedHome != null)
+                GestureDetector(
+                  onTap: () => _switchTenantUnit(
+                    context,
+                    ref,
+                    home: null,
+                    fallbackTenantId: overview.tenantId,
+                  ),
+                  child: Text(
+                    'All units ↺',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: dark ? HodiColors.lime : HodiColors.navy,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ChoiceChip(
+                  label: Text('All units (${homes.length})'),
+                  selected: selectedHome == null,
+                  onSelected: (_) => _switchTenantUnit(
+                    context,
+                    ref,
+                    home: null,
+                    fallbackTenantId: overview.tenantId,
+                  ),
+                ),
+                for (final h in homes) ...[
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: Text('${h.unit} · ${h.property}'),
+                    selected: selectedHome?.key == h.key,
+                    selectedColor: dark ? HodiColors.lime : HodiColors.navy,
+                    labelStyle: TextStyle(
+                      color: selectedHome?.key == h.key
+                          ? (dark ? HodiColors.navy : Colors.white)
+                          : scheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    onSelected: (_) => _switchTenantUnit(
+                      context,
+                      ref,
+                      home: h,
+                      fallbackTenantId: overview.tenantId,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TenantConsolidatedUnitsCard extends ConsumerWidget {
+  const _TenantConsolidatedUnitsCard({required this.overview});
+  final TenantOverview overview;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    return SectionCard(
+      title: 'Your units breakdown (${overview.homes.length})',
+      trailing: Text(
+        'Tap to switch →',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+      children: [
+        for (final (idx, h) in overview.homes.indexed) ...[
+          if (idx > 0) const Divider(height: 1),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: UnitBadge(h.unit, width: 52),
+            title: Text(
+              '${h.unit} · ${h.property}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              '${formatKes(h.rent)} / mo · Billed ${_ordinal(h.billingDay)}',
+            ),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () => _switchTenantUnit(
+              context,
+              ref,
+              home: h,
+              fallbackTenantId: overview.tenantId,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _OwedCard extends ConsumerWidget {
-  const _OwedCard({required this.o});
+  const _OwedCard({required this.o, this.selectedHome});
   final TenantOverview o;
+  final Home? selectedHome;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final owes = o.owed > 0;
+    final kicker = selectedHome != null
+        ? '${selectedHome!.unit.toUpperCase()} · ${selectedHome!.property.toUpperCase()}'
+        : (o.homes.length > 1
+              ? 'CONSOLIDATED (${o.homes.length} UNITS)'
+              : null);
     return CurvedHeroCard(
+      kicker: kicker,
       label: owes ? 'You owe' : 'Nothing to pay',
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

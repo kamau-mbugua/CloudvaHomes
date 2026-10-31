@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -10,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 const CLIENTS = ['web', 'mobile'] as const;
@@ -130,6 +132,56 @@ export class SwitchOrgDto {
   @ApiProperty()
   @IsUUID()
   organizationId!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  propertyId?: string | null;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  setAsDefault?: boolean;
+}
+
+export class SwitchContextDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Active property ID, or null for consolidated view across all properties',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  propertyId?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Active tenant account ID, or null for consolidated view across all units',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  tenantId?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Active landlord account ID, or null for consolidated view across all properties',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  landlordId?: string | null;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  setAsDefault?: boolean;
 }
 
 export class ForgotPasswordDto {

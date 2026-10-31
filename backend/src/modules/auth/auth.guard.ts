@@ -88,6 +88,7 @@ export class AuthGuard implements CanActivate {
         // Owners always see everything; an empty list means "all properties".
         ctx.propertyIds =
           ctx.isOwner || membership.propertyIds.length === 0 ? null : membership.propertyIds;
+        ctx.activePropertyId = claims.propertyId ?? null;
       }
     }
 

@@ -69,6 +69,12 @@ export interface TenantOf {
   organization: { id: string; name: string };
 }
 
+export interface SessionProperty {
+  id: string;
+  code: string;
+  name: string;
+}
+
 /** The session object as the API returns it (login, OTP verify, refresh, switch-org, …). */
 export interface SessionPayload {
   accessToken?: string;
@@ -78,6 +84,10 @@ export interface SessionPayload {
   user: SessionUser;
   organizations: OrganizationMembership[];
   activeOrganization: ActiveOrganization | null;
+  activePropertyId?: string | null;
+  properties?: SessionProperty[];
+  activeTenantId?: string | null;
+  activeLandlordId?: string | null;
   permissions: string[];
   /** Phase 6b. Absent from older servers; read as none. */
   ownerOf?: OwnerOf[];
@@ -90,6 +100,10 @@ export interface Session {
   user: SessionUser;
   organizations: OrganizationMembership[];
   activeOrganization: ActiveOrganization | null;
+  activePropertyId: string | null;
+  properties: SessionProperty[];
+  activeTenantId: string | null;
+  activeLandlordId: string | null;
   permissions: string[];
   ownerOf: OwnerOf[];
   tenantOf: TenantOf[];

@@ -4,7 +4,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/api/api_error.dart';
+import '../../core/auth/session_controller.dart';
 import '../../core/config.dart';
+import '../../core/money.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/stk_sheet.dart';
 import 'staff_models.dart';
@@ -24,8 +27,72 @@ class StaffApi {
   ];
 
   // ── dashboard
-  Future<Dashboard> dashboard() async =>
-      Dashboard.fromJson(_data(await _api.get('/reports/dashboard')));
+  Future<Dashboard> dashboard({String? propertyId}) async {
+    try {
+      final res = await _api.get(
+        '/reports/dashboard',
+        query: {'propertyId': ?propertyId},
+      );
+      return Dashboard.fromJson(_data(res));
+    } on ApiError catch (e) {
+      // Fallback if the server hasn't deployed ?propertyId= on /reports/dashboard yet.
+      if (propertyId != null && e.status == 422) {
+        final period = nairobiPeriod();
+        final results = await Future.wait([
+          reportPl(period, propertyId: propertyId),
+          reportArrears(propertyId: propertyId),
+          reportOccupancy(propertyId: propertyId),
+        ]);
+        final pnl = results[0];
+        final arr = results[1];
+        final occ = results[2];
+        final pnlTotals = pnl['totals'] as Json? ?? const {};
+        final invObj = pnlTotals['invoiced'];
+        final inv = invObj is Map
+            ? centsFrom(invObj['total'])
+            : centsFrom(invObj);
+        final col = centsFrom(pnlTotals['collected']);
+        final expObj = pnlTotals['expenses'];
+        final exp = expObj is Map
+            ? centsFrom(expObj['total'])
+            : centsFrom(expObj);
+        final net = centsFrom(pnlTotals['net']);
+        final arrTotals = arr['totals'] as Json? ?? const {};
+        final arrearsOverdue =
+            centsFrom(arrTotals['total']) - centsFrom(arrTotals['current']);
+        final occTotals = occ['totals'] as Json? ?? const {};
+        final arrRows = (arr['rows'] as List? ?? const []).whereType<Json>();
+        return Dashboard(
+          period: period,
+          propertyId: propertyId,
+          asOf: arr['asOf'] as String?,
+          invoiced: inv,
+          collected: col,
+          collectionRate: inv > 0 ? (col / inv).clamp(0.0, 1.0) : null,
+          expenses: exp,
+          net: net,
+          arrears: arrearsOverdue > 0 ? arrearsOverdue : 0,
+          units: (occTotals['units'] as num?)?.toInt() ?? 0,
+          occupied: (occTotals['occupied'] as num?)?.toInt() ?? 0,
+          notice: (occTotals['notice'] as num?)?.toInt() ?? 0,
+          vacant: (occTotals['vacant'] as num?)?.toInt() ?? 0,
+          unavailable: (occTotals['unavailable'] as num?)?.toInt() ?? 0,
+          occupancyRate: (occTotals['rate'] as num?)?.toDouble(),
+          unmatchedMpesa: null,
+          topOverdue: [
+            for (final r in arrRows.take(5))
+              if ((centsFrom(r['total']) - centsFrom(r['current'])) > 0)
+                (
+                  tenant: TenantRef.fromJson(r['tenant'] as Json),
+                  overdue: centsFrom(r['total']) - centsFrom(r['current']),
+                  oldestDueDate: r['oldestDueDate'] as String?,
+                ),
+          ],
+        );
+      }
+      rethrow;
+    }
+  }
 
   // ── properties (for pickers; paged, 100 is the most per page)
   Future<List<PropertyOption>> properties() async {
@@ -389,18 +456,20 @@ class StaffApi {
       _data(await _api.post('/maintenance-requests/$id/expense', body: body));
 
   // ── reports, channels, agency, users & roles
-  Future<Json> reportPl(String period) async => _data(
+  Future<Json> reportPl(String period, {String? propertyId}) async => _data(
     await _api.get(
       '/reports/property-pnl',
-      query: {'from': period, 'to': period},
+      query: {'from': period, 'to': period, 'propertyId': ?propertyId},
     ),
   );
 
-  Future<Json> reportArrears() async =>
-      _data(await _api.get('/reports/arrears'));
+  Future<Json> reportArrears({String? propertyId}) async => _data(
+    await _api.get('/reports/arrears', query: {'propertyId': ?propertyId}),
+  );
 
-  Future<Json> reportOccupancy() async =>
-      _data(await _api.get('/reports/occupancy'));
+  Future<Json> reportOccupancy({String? propertyId}) async => _data(
+    await _api.get('/reports/occupancy', query: {'propertyId': ?propertyId}),
+  );
 
   Future<List<Channel>> allChannels() async => [
     for (final r in _rows(await _api.get('/payment-channels')))
@@ -459,9 +528,12 @@ DateTime nairobiToday([DateTime? now]) {
 
 // ───────────────────────────────────────────── providers (one per screen read)
 
-final dashboardProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(staffApiProvider).dashboard(),
-);
+final dashboardProvider = FutureProvider.autoDispose((ref) {
+  final activePropertyId = ref.watch(
+    sessionProvider.select((s) => s.valueOrNull?.activePropertyId),
+  );
+  return ref.watch(staffApiProvider).dashboard(propertyId: activePropertyId);
+});
 
 final propertiesProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(staffApiProvider).properties(),

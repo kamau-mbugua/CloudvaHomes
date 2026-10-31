@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/api/api_error.dart';
+import '../../../core/auth/session.dart';
+import '../../../core/auth/session_controller.dart';
 import '../../../core/dates.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/common.dart';
 import '../staff_api.dart';
+import '../staff_models.dart';
 import '../staff_widgets.dart';
 import '../tenants/record_payment_sheet.dart';
 
-/// Home: this month's figures from `GET /reports/dashboard`, and quick actions.
+/// Home: this month's figures from `GET /reports/dashboard`, portfolio/property
+/// switcher (consolidated + single-property default), and quick actions.
 class StaffHomeScreen extends ConsumerWidget {
   const StaffHomeScreen({super.key});
 
@@ -21,6 +26,7 @@ class StaffHomeScreen extends ConsumerWidget {
       title: 'Home',
       body: RefreshIndicator(
         onRefresh: () async {
+          ref.invalidate(propertiesProvider);
           ref.invalidate(dashboardProvider);
           try {
             await ref.read(dashboardProvider.future);
@@ -31,6 +37,7 @@ class StaffHomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            const _PortfolioSwitcherBar(),
             const _QuickActions(),
             const SizedBox(height: 16),
             if (canReports)
@@ -42,6 +49,316 @@ class StaffHomeScreen extends ConsumerWidget {
                 body: 'Use the tabs below to find units, tenants and payments.',
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _switchStaffProperty(
+  BuildContext context,
+  WidgetRef ref, {
+  required String? propertyId,
+  String? propertyName,
+}) async {
+  try {
+    await ref
+        .read(sessionProvider.notifier)
+        .switchContext(propertyId: propertyId);
+    ref.invalidate(dashboardProvider);
+    ref.read(listsVersionProvider.notifier).state++;
+    if (context.mounted) {
+      showMessage(
+        context,
+        propertyId == null
+            ? 'Consolidated view active (saved as default)'
+            : 'Switched to ${propertyName ?? 'property'} (saved as default)',
+      );
+    }
+  } catch (e) {
+    if (context.mounted) showMessage(context, messageOf(e));
+  }
+}
+
+class _PortfolioSwitcherBar extends ConsumerStatefulWidget {
+  const _PortfolioSwitcherBar();
+
+  @override
+  ConsumerState<_PortfolioSwitcherBar> createState() =>
+      _PortfolioSwitcherBarState();
+}
+
+class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
+  var _switching = false;
+
+  Future<void> _onSelectProperty(String? id, String? name) async {
+    if (_switching) return;
+    setState(() => _switching = true);
+    try {
+      await _switchStaffProperty(
+        context,
+        ref,
+        propertyId: id,
+        propertyName: name,
+      );
+    } finally {
+      if (mounted) setState(() => _switching = false);
+    }
+  }
+
+  Future<void> _onSelectOrg(OrgMembership org) async {
+    if (_switching) return;
+    setState(() => _switching = true);
+    try {
+      await ref
+          .read(sessionProvider.notifier)
+          .switchContext(organizationId: org.id);
+      ref.invalidate(propertiesProvider);
+      ref.invalidate(dashboardProvider);
+      ref.read(listsVersionProvider.notifier).state++;
+      if (mounted) {
+        showMessage(context, 'Switched to ${org.name} (saved as default)');
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, messageOf(e));
+    } finally {
+      if (mounted) setState(() => _switching = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = ref.watch(sessionProvider).valueOrNull;
+    if (session == null) return const SizedBox.shrink();
+
+    final canProps = can(ref, 'properties:view');
+    final fetchedProps = canProps
+        ? ref.watch(propertiesProvider).valueOrNull
+        : null;
+    final props = (fetchedProps != null && fetchedProps.isNotEmpty)
+        ? fetchedProps
+        : [
+            for (final p in session.properties)
+              PropertyOption(id: p.id, code: p.code, name: p.name),
+          ];
+    final orgs = session.organizations;
+    if (props.length <= 1 && orgs.length <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    final activePropertyId = session.activePropertyId;
+    final totalUnits = props.fold<int>(0, (sum, p) => sum + p.unitCount);
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Kicker(
+                  activePropertyId == null
+                      ? 'PORTFOLIO SCOPE · CONSOLIDATED (${props.length} PROPERTIES)'
+                      : 'ACTIVE PROPERTY SCOPE · DEFAULT SAVED',
+                ),
+              ),
+              if (_switching)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (activePropertyId != null)
+                GestureDetector(
+                  onTap: () => _onSelectProperty(null, null),
+                  child: Text(
+                    'All properties ↺',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: dark ? HodiColors.lime : HodiColors.navy,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                if (orgs.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: PopupMenuButton<OrgMembership>(
+                      tooltip: 'Switch organisation',
+                      onSelected: _onSelectOrg,
+                      itemBuilder: (_) => [
+                        for (final o in orgs)
+                          PopupMenuItem(
+                            value: o,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  o.id == session.activeOrganization?.id
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_off,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(o.name)),
+                              ],
+                            ),
+                          ),
+                      ],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: dark
+                              ? scheme.surfaceContainerLowest
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: scheme.outlineVariant),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.domain_outlined, size: 15),
+                            const SizedBox(width: 6),
+                            Text(
+                              session.activeOrganization?.name ??
+                                  'Organisation',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.expand_more, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (props.length > 1) ...[
+                  _ScopePill(
+                    icon: Icons.dashboard_customize_outlined,
+                    label: 'All properties',
+                    badge: totalUnits > 0
+                        ? '$totalUnits units'
+                        : '${props.length}',
+                    selected: activePropertyId == null,
+                    onTap: () => _onSelectProperty(null, null),
+                  ),
+                  for (final p in props) ...[
+                    const SizedBox(width: 8),
+                    _ScopePill(
+                      icon: Icons.apartment_outlined,
+                      label: p.name,
+                      badge: p.unitCount > 0
+                          ? '${p.occupiedCount}/${p.unitCount}'
+                          : (p.code.isNotEmpty ? p.code : null),
+                      selected: activePropertyId == p.id,
+                      onTap: () => _onSelectProperty(p.id, p.name),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScopePill extends StatelessWidget {
+  const _ScopePill({
+    required this.icon,
+    required this.label,
+    this.badge,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? badge;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final bg = selected
+        ? HodiColors.navy
+        : (dark ? scheme.surfaceContainerLowest : Colors.white);
+    final fg = selected
+        ? Colors.white
+        : (dark ? Colors.white : HodiColors.navy);
+
+    return Material(
+      color: bg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: BorderSide(
+          color: selected ? HodiColors.lime : scheme.outlineVariant,
+          width: selected ? 1.5 : 1,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: selected ? HodiColors.lime : fg),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+              if (badge != null && badge!.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Colors.white.withValues(alpha: 0.16)
+                        : scheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badge!,
+                    style: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? HodiColors.lime
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -156,17 +473,51 @@ class _DashboardBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dash = ref.watch(dashboardProvider);
+    final session = ref.watch(sessionProvider).valueOrNull;
+    final canProps = can(ref, 'properties:view');
+    final props = canProps
+        ? (ref.watch(propertiesProvider).valueOrNull ??
+              const <PropertyOption>[])
+        : const <PropertyOption>[];
+    final activePropId = session?.activePropertyId;
+    String? activePropName;
+    if (activePropId != null) {
+      for (final p in props) {
+        if (p.id == activePropId) {
+          activePropName = p.name;
+          break;
+        }
+      }
+      if (activePropName == null && session != null) {
+        for (final p in session.properties) {
+          if (p.id == activePropId) {
+            activePropName = p.name;
+            break;
+          }
+        }
+      }
+    }
+
     final dark = Theme.of(context).brightness == Brightness.dark;
     return AsyncBody(
       value: dash,
       onRetry: () => ref.invalidate(dashboardProvider),
       data: (d) {
         final progress = (d.collectionRate ?? 0).clamp(0.0, 1.0);
+        final propCount = d.byProperty.isNotEmpty
+            ? d.byProperty.length
+            : props.length;
+        final heroKicker = activePropName != null
+            ? '${activePropName.toUpperCase()} · ${formatPeriod(d.period)}'
+            : (propCount > 1
+                  ? 'CONSOLIDATED ($propCount PROPERTIES) · ${formatPeriod(d.period)}'
+                  : 'COLLECTED · ${formatPeriod(d.period)}');
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             CurvedHeroCard(
-              kicker: 'COLLECTED · ${formatPeriod(d.period)}',
+              kicker: heroKicker,
               trailing: GestureDetector(
                 onTap: () => context.push('/staff/more/reports'),
                 child: Container(
@@ -301,6 +652,14 @@ class _DashboardBody extends ConsumerWidget {
                 ),
               ],
             ),
+            if (activePropId == null &&
+                (d.byProperty.length > 1 || props.length > 1)) ...[
+              const SizedBox(height: 12),
+              _ConsolidatedPropertiesCard(
+                byProperty: d.byProperty,
+                properties: props,
+              ),
+            ],
             if (d.trend.isNotEmpty) ...[
               const SizedBox(height: 12),
               _TrendChartCard(trend: d.trend),
@@ -641,4 +1000,105 @@ class _LegendDot extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _ConsolidatedPropertiesCard extends ConsumerWidget {
+  const _ConsolidatedPropertiesCard({
+    required this.byProperty,
+    required this.properties,
+  });
+
+  final List<DashboardPropertyRow> byProperty;
+  final List<PropertyOption> properties;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final count = byProperty.isNotEmpty ? byProperty.length : properties.length;
+
+    return SectionCard(
+      title: 'Properties breakdown ($count)',
+      trailing: Text(
+        'Tap to switch →',
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+      children: [
+        if (byProperty.isNotEmpty)
+          for (final (idx, p) in byProperty.indexed) ...[
+            if (idx > 0) const Divider(height: 1),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: UnitBadge(
+                p.property.code.isNotEmpty ? p.property.code : 'P${idx + 1}',
+                width: 52,
+              ),
+              title: Text(
+                p.property.name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                '${p.occupied + p.notice}/${p.units} let (${_percent(p.rate)})'
+                '${p.expenses > 0 ? ' · ${formatKes(p.expenses)} exp.' : ''}',
+              ),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    formatKes(p.collected),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                  Text(
+                    'of ${formatKes(p.invoiced)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              onTap: () => _switchStaffProperty(
+                context,
+                ref,
+                propertyId: p.property.id,
+                propertyName: p.property.name,
+              ),
+            ),
+          ]
+        else
+          for (final (idx, p) in properties.indexed) ...[
+            if (idx > 0) const Divider(height: 1),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: UnitBadge(
+                p.code.isNotEmpty ? p.code : 'P${idx + 1}',
+                width: 52,
+              ),
+              title: Text(
+                p.name,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                '${p.occupiedCount}/${p.unitCount} let · ${p.vacantCount} vacant'
+                '${p.location != null && p.location!.isNotEmpty ? ' · ${p.location}' : ''}',
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              onTap: () => _switchStaffProperty(
+                context,
+                ref,
+                propertyId: p.id,
+                propertyName: p.name,
+              ),
+            ),
+          ],
+      ],
+    );
+  }
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { switchContext } from '../../lib/auth/session';
 import { useAuthState, useCan } from '../../lib/auth/useAuth';
 import { formatDay, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
@@ -50,22 +51,54 @@ function Welcome() {
 }
 
 function DashboardFigures() {
+  const { session } = useAuthState();
   const filters = useListFilters();
   const thisMonth = currentPeriod();
   const wanted = filters.get('period');
   const period = isPeriod(wanted) && wanted <= thisMonth ? wanted : thisMonth;
-  const dashboard = useDashboard(period);
+  const activePropertyId = session?.activePropertyId ?? null;
+  const dashboard = useDashboard(period, true, activePropertyId);
+  const properties = session?.properties ?? [];
+
+  const handlePropertySwitch = (nextPropertyId: string | null) => {
+    void switchContext({ propertyId: nextPropertyId });
+  };
 
   return (
     <div className="pg">
       <div className="ad__filters">
         <MonthPicker value={period} max={thisMonth} onChange={(p) => filters.setFilter({ period: p === thisMonth ? '' : p })} />
+        {properties.length > 1 ? (
+          <label className="ad__field ad__field--inline">
+            <span className="ad__label">Property scope</span>
+            <select
+              className="nx-input"
+              aria-label="Property scope"
+              value={activePropertyId ?? ''}
+              onChange={(e) => handlePropertySwitch(e.target.value ? e.target.value : null)}
+            >
+              <option value="">All properties (Consolidated · {properties.length})</option>
+              {properties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.code})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {dashboard.isFetching && !dashboard.isPending ? <span className="ad__muted" role="status">Updating…</span> : null}
       </div>
 
       {dashboard.isError ? <p className="ad__error" role="alert">{reportsErrorMessage(dashboard.error)}</p> : null}
       {dashboard.isPending ? <CardSkeleton count={4} /> : null}
-      {dashboard.data ? <Figures data={dashboard.data} period={period} /> : null}
+      {dashboard.data ? (
+        <Figures
+          data={dashboard.data}
+          period={period}
+          activePropertyId={activePropertyId}
+          onSwitchProperty={handlePropertySwitch}
+        />
+      ) : null}
     </div>
   );
 }
@@ -83,7 +116,17 @@ function Tile({ label, value, sub, to }: { label: string; value: ReactNode; sub?
     : <div className="ad__stat rp__tile">{body}</div>;
 }
 
-function Figures({ data, period }: { data: Dashboard; period: string }) {
+function Figures({
+  data,
+  period,
+  activePropertyId,
+  onSwitchProperty,
+}: {
+  data: Dashboard;
+  period: string;
+  activePropertyId: string | null;
+  onSwitchProperty: (propertyId: string | null) => void;
+}) {
   const canExpenses = useCan('expenses:view');
   const canReconcile = useCan('reconciliation:view');
   const canTenants = useCan('tenants:view');
@@ -92,6 +135,7 @@ function Figures({ data, period }: { data: Dashboard; period: string }) {
   const occ = data.occupancy;
   const today = data.asOf ?? todayInNairobi();
   const expensesLink = canExpenses ? `/app/expenses?from=${range.from}&to=${range.to > today ? today : range.to}` : undefined;
+  const byProperty = data.byProperty ?? [];
 
   return (
     <>
@@ -123,6 +167,58 @@ function Figures({ data, period }: { data: Dashboard; period: string }) {
           />
         ) : null}
       </div>
+
+      {activePropertyId === null && byProperty.length > 1 ? (
+        <section className="rp__panel">
+          <div className="rp__panelhead">
+            <h2 className="ad__h2">Properties breakdown ({byProperty.length})</h2>
+          </div>
+          <div className="ad__tablewrap">
+            <table className="ad__table rp__table rp__table--compact">
+              <thead>
+                <tr>
+                  <th>Property</th>
+                  <th>Occupancy</th>
+                  <th className="num">Invoiced</th>
+                  <th className="num">Collected</th>
+                  <th className="num">Expenses</th>
+                  <th className="num">Net</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {byProperty.map((row) => (
+                  <tr key={row.property.id}>
+                    <td>
+                      <strong>{row.property.name}</strong>
+                      <span className="ad__sub num">{row.property.code}</span>
+                    </td>
+                    <td>
+                      {formatRate(row.rate)}
+                      <span className="ad__sub">
+                        {row.occupied + row.notice} of {row.units} let · {row.vacant} vacant
+                      </span>
+                    </td>
+                    <td className="num">{formatKES(row.invoiced)}</td>
+                    <td className="num">{formatKES(row.collected)}</td>
+                    <td className="num">{formatKES(row.expenses)}</td>
+                    <td className="num"><SignedAmount minor={row.net} /></td>
+                    <td className="num">
+                      <button
+                        type="button"
+                        className="nx-btn nx-btn--sm"
+                        onClick={() => onSwitchProperty(row.property.id)}
+                      >
+                        Switch
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       {data.trend.length > 0 ? (
         <section className="rp__panel"><TrendChart points={data.trend} /></section>

@@ -209,6 +209,56 @@ export class OwnerController {
     return ok(await this.owner.mine());
   }
 
+  @Get('overview')
+  async consolidatedOverview() {
+    const list = await this.owner.mine();
+    const accounts = await Promise.all(
+      list.map((item) =>
+        this.owner.as(item.landlordId, async () => {
+          const account = await this.admin.summary(item.landlordId);
+          const month = await this.statements.statement(item.landlordId, {});
+          return {
+            landlord: month.landlord,
+            organization: {
+              id: item.organization.id,
+              name: month.organization.name,
+              phone: month.organization.phone,
+              email: month.organization.email,
+            },
+            balances: account.balances,
+            payout: account.payout
+              ? { method: account.payout.method, masked: account.payout.masked }
+              : null,
+            occupancy: month.occupancy,
+            arrears: month.arrears,
+          };
+        }),
+      ),
+    );
+    let payable = 0n;
+    let depositHeld = 0n;
+    let units = 0;
+    let occupied = 0;
+    let notice = 0;
+    let vacant = 0;
+    let arrearsTotal = 0n;
+    for (const a of accounts) {
+      payable += BigInt(a.balances.payable);
+      depositHeld += BigInt(a.balances.depositHeld);
+      units += a.occupancy.totals.units;
+      occupied += a.occupancy.totals.occupied;
+      notice += a.occupancy.totals.notice;
+      vacant += a.occupancy.totals.vacant;
+      arrearsTotal += BigInt(a.arrears.totals.total);
+    }
+    return ok({
+      balances: { payable, depositHeld },
+      occupancy: { units, occupied, notice, vacant },
+      arrears: { total: arrearsTotal },
+      accounts,
+    });
+  }
+
   @Get(':id')
   async overview(@Param('id', ParseUUIDPipe) id: string) {
     return ok(

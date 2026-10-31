@@ -52,12 +52,14 @@ class TenantOverview {
     final t = j['tenant'] as Map<String, dynamic>;
     final org = j['organization'] as Map<String, dynamic>;
     final balance = centsFrom(j['balance']);
+    final tenantId = t['id'] as String;
+    final orgName = org['name'] as String;
     return TenantOverview(
-      tenantId: t['id'] as String,
+      tenantId: tenantId,
       code: t['code'] as String,
       firstName: t['firstName'] as String? ?? '',
       phone: t['phone'] as String?,
-      orgName: org['name'] as String,
+      orgName: orgName,
       orgPhone: org['phone'] as String?,
       orgEmail: org['email'] as String?,
       owed: balance > 0 ? balance : 0,
@@ -65,7 +67,11 @@ class TenantOverview {
       depositHeld: centsFrom(j['depositHeld']),
       homes: [
         for (final h in j['tenancies'] as List? ?? const [])
-          Home.fromJson(h as Map<String, dynamic>),
+          Home.fromJson(
+            h as Map<String, dynamic>,
+            tenantId: tenantId,
+            orgName: orgName,
+          ),
       ],
       openInvoices: [
         for (final i in j['openInvoices'] as List? ?? const [])
@@ -83,9 +89,12 @@ class TenantOverview {
 class Home {
   Home({
     this.id = '',
+    this.tenantId = '',
+    this.orgName = '',
     required this.unit,
     required this.property,
     required this.rent,
+    this.depositHeld = 0,
     required this.billingDay,
     required this.status,
     required this.startDate,
@@ -93,20 +102,32 @@ class Home {
     this.hasSignedLease = false,
   });
   final String id;
+  final String tenantId;
+  final String orgName;
   final String unit;
   final String property;
   final int rent;
+  final int depositHeld;
   final int billingDay;
   final String status;
   final String startDate;
   final String? endDate;
   final bool hasSignedLease;
 
-  factory Home.fromJson(Map<String, dynamic> j) => Home(
+  String get key => id.isNotEmpty ? id : '$tenantId:$unit:$property';
+
+  factory Home.fromJson(
+    Map<String, dynamic> j, {
+    String tenantId = '',
+    String orgName = '',
+  }) => Home(
     id: j['id'] as String? ?? '',
+    tenantId: j['tenantId'] as String? ?? tenantId,
+    orgName: j['orgName'] as String? ?? orgName,
     unit: _name(j['unit'], 'number'),
     property: _name(j['property'], 'name'),
     rent: centsFrom(j['rentAmount']),
+    depositHeld: centsFrom(j['depositHeld']),
     billingDay: (j['billingDay'] as num?)?.toInt() ?? 1,
     status: j['status'] as String? ?? 'ACTIVE',
     startDate: j['startDate'] as String,
@@ -374,6 +395,30 @@ class TenantApi {
     (await _api.get(_base(id)))['data'] as Map<String, dynamic>,
   );
 
+  Future<TenantOverview> consolidatedOverview(List<String> ids) async {
+    if (ids.length == 1) return overview(ids.first);
+    final list = await Future.wait([for (final id in ids) overview(id)]);
+    final first = list.first;
+    return TenantOverview(
+      tenantId: first.tenantId,
+      code: first.code,
+      firstName: first.firstName,
+      phone: first.phone,
+      orgName: list.map((e) => e.orgName).toSet().length == 1
+          ? first.orgName
+          : '${list.length} accounts',
+      orgPhone: first.orgPhone,
+      orgEmail: first.orgEmail,
+      owed: list.fold<int>(0, (s, e) => s + e.owed),
+      credit: list.fold<int>(0, (s, e) => s + e.credit),
+      depositHeld: list.fold<int>(0, (s, e) => s + e.depositHeld),
+      homes: [for (final e in list) ...e.homes],
+      openInvoices: [for (final e in list) ...e.openInvoices],
+      howToPay: first.howToPay,
+      canPayInApp: list.any((e) => e.canPayInApp),
+    );
+  }
+
   Future<Page<T>> _page<T>(
     String path,
     Map<String, Object?> query,
@@ -472,12 +517,16 @@ final tenantApiProvider = Provider(
   (ref) => TenantApi(ref.watch(apiClientProvider)),
 );
 
-/// The tenant account being shown; null = the first one in the session.
+/// The tenant account being shown; null = follow session.activeTenantId (or consolidated on Home).
 final chosenTenantProvider = StateProvider<String?>((ref) => null);
 
+/// Selected unit/tenancy key on Tenant Home; null = Consolidated across all units.
+final selectedTenantHomeKeyProvider = StateProvider<String?>((ref) => null);
+
 final currentTenantIdProvider = Provider<String?>((ref) {
-  final accounts = ref.watch(sessionProvider).valueOrNull?.tenantOf ?? const [];
-  final chosen = ref.watch(chosenTenantProvider);
+  final session = ref.watch(sessionProvider).valueOrNull;
+  final accounts = session?.tenantOf ?? const [];
+  final chosen = ref.watch(chosenTenantProvider) ?? session?.activeTenantId;
   if (accounts.isEmpty) return null;
   return accounts.any((a) => a.tenantId == chosen)
       ? chosen
@@ -487,9 +536,19 @@ final currentTenantIdProvider = Provider<String?>((ref) {
 final tenantOverviewProvider = FutureProvider.autoDispose<TenantOverview>((
   ref,
 ) {
-  final id = ref.watch(currentTenantIdProvider);
-  if (id == null) throw StateError('No tenant account');
-  return ref.watch(tenantApiProvider).overview(id);
+  final session = ref.watch(sessionProvider).valueOrNull;
+  final accounts = session?.tenantOf ?? const [];
+  final chosen = ref.watch(chosenTenantProvider) ?? session?.activeTenantId;
+  final selectedHomeKey = ref.watch(selectedTenantHomeKeyProvider);
+  if (accounts.isEmpty) throw StateError('No tenant account');
+  final api = ref.watch(tenantApiProvider);
+  if (accounts.length > 1 && chosen == null && selectedHomeKey == null) {
+    return api.consolidatedOverview([for (final a in accounts) a.tenantId]);
+  }
+  final id = accounts.any((a) => a.tenantId == chosen)
+      ? chosen!
+      : accounts.first.tenantId;
+  return api.overview(id);
 });
 
 final tenantInvoiceProvider = FutureProvider.autoDispose

@@ -5,6 +5,10 @@ class Session {
     required this.user,
     required this.organizations,
     required this.activeOrganization,
+    this.activePropertyId,
+    this.properties = const [],
+    this.activeTenantId,
+    this.activeLandlordId,
     required this.permissions,
     required this.tenantOf,
     required this.ownerOf,
@@ -14,6 +18,10 @@ class Session {
   final SessionUser user;
   final List<OrgMembership> organizations;
   final ActiveOrg? activeOrganization;
+  final String? activePropertyId;
+  final List<SessionProperty> properties;
+  final String? activeTenantId;
+  final String? activeLandlordId;
   final Set<String> permissions;
   final List<TenantAccountRef> tenantOf;
   final List<({String landlordId, String name, String orgName})> ownerOf;
@@ -23,6 +31,32 @@ class Session {
   bool get isTenant => tenantOf.isNotEmpty;
   bool get isOwner => ownerOf.isNotEmpty;
   bool get isPlatformAdmin => user.isPlatformAdmin;
+
+  Session copyWith({
+    String? accessToken,
+    Object? activePropertyId = _keep,
+    Object? activeTenantId = _keep,
+    Object? activeLandlordId = _keep,
+    List<SessionProperty>? properties,
+  }) => Session(
+    accessToken: accessToken ?? this.accessToken,
+    user: user,
+    organizations: organizations,
+    activeOrganization: activeOrganization,
+    activePropertyId: identical(activePropertyId, _keep)
+        ? this.activePropertyId
+        : activePropertyId as String?,
+    properties: properties ?? this.properties,
+    activeTenantId: identical(activeTenantId, _keep)
+        ? this.activeTenantId
+        : activeTenantId as String?,
+    activeLandlordId: identical(activeLandlordId, _keep)
+        ? this.activeLandlordId
+        : activeLandlordId as String?,
+    permissions: permissions,
+    tenantOf: tenantOf,
+    ownerOf: ownerOf,
+  );
 
   factory Session.fromJson(Map<String, dynamic> j) {
     final active = j['activeOrganization'];
@@ -36,6 +70,13 @@ class Session {
       activeOrganization: active is Map<String, dynamic>
           ? ActiveOrg.fromJson(active)
           : null,
+      activePropertyId: j['activePropertyId'] as String?,
+      properties: [
+        for (final p in (j['properties'] as List? ?? const []))
+          if (p is Map<String, dynamic>) SessionProperty.fromJson(p),
+      ],
+      activeTenantId: j['activeTenantId'] as String?,
+      activeLandlordId: j['activeLandlordId'] as String?,
       permissions: {
         for (final p in (j['permissions'] as List? ?? const [])) p as String,
       },
@@ -53,6 +94,31 @@ class Session {
       ],
     );
   }
+}
+
+const Object _keep = Object();
+
+class SessionProperty {
+  SessionProperty({
+    required this.id,
+    required this.code,
+    required this.name,
+    this.unitCount = 0,
+    this.occupiedCount = 0,
+  });
+  final String id;
+  final String code;
+  final String name;
+  final int unitCount;
+  final int occupiedCount;
+
+  factory SessionProperty.fromJson(Map<String, dynamic> j) => SessionProperty(
+    id: j['id'] as String,
+    code: j['code'] as String? ?? '',
+    name: j['name'] as String? ?? '',
+    unitCount: (j['unitCount'] as num?)?.toInt() ?? 0,
+    occupiedCount: (j['occupiedCount'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class SessionUser {

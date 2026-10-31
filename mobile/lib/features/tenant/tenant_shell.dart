@@ -28,9 +28,19 @@ class TenantShell extends ConsumerWidget {
         title: accounts.length > 1
             ? PopupMenuButton<String>(
                 tooltip: 'Switch account',
-                onSelected: (id) =>
-                    ref.read(chosenTenantProvider.notifier).state = id,
+                onSelected: (id) {
+                  final next = id.isEmpty ? null : id;
+                  ref.read(chosenTenantProvider.notifier).state = next;
+                  ref.read(selectedTenantHomeKeyProvider.notifier).state = null;
+                  ref
+                      .read(sessionProvider.notifier)
+                      .switchContext(tenantId: next);
+                },
                 itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: '',
+                    child: Text('All units (Consolidated)'),
+                  ),
                   for (final a in accounts)
                     PopupMenuItem(
                       value: a.tenantId,

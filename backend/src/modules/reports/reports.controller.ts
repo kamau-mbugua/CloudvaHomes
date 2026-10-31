@@ -25,6 +25,11 @@ class DashboardQueryDto {
   @IsPeriod({ optional: true })
   @IsOptional()
   period?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  propertyId?: string;
 }
 
 class PnlQueryDto extends FormatDto {
@@ -46,7 +51,7 @@ export class ReportsController {
   @Get('dashboard')
   @RequirePermission('reports:view')
   async dashboard(@Query() q: DashboardQueryDto) {
-    return ok(await this.reports.dashboard(q.period));
+    return ok(await this.reports.dashboard(q.period, q.propertyId));
   }
 
   /** Months `from`–`to` (default: this month). `?format=csv` downloads it. */

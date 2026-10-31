@@ -35,13 +35,11 @@ class TwoFactorChallenge {
 
 /// The session: restored from the stored refresh token at launch, null when signed out.
 class SessionController extends AsyncNotifier<Session?> {
-  late ApiClient _api;
-  late TokenStore _store;
+  ApiClient get _api => ref.read(apiClientProvider);
+  TokenStore get _store => ref.read(tokenStoreProvider);
 
   @override
   Future<Session?> build() async {
-    _api = ref.read(apiClientProvider);
-    _store = ref.read(tokenStoreProvider);
     _api
       ..onRefresh = _refresh
       ..onAuthLost = _lost
@@ -159,12 +157,81 @@ class SessionController extends AsyncNotifier<Session?> {
     },
   );
 
-  Future<void> switchOrganization(String organizationId) async {
-    final res = await _api.post(
-      '/auth/switch-org',
-      body: {'organizationId': organizationId},
+  Future<void> switchOrganization(
+    String organizationId, {
+    String? propertyId,
+  }) async {
+    await switchContext(
+      organizationId: organizationId,
+      propertyId: propertyId,
+      setAsDefault: true,
     );
-    state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
+  }
+
+  /// Switches the active organisation, property, tenant account, or landlord account
+  /// (`null` = consolidated view across all properties/units), rotates the JWT access token,
+  /// and saves the choice as the user's default on the server.
+  Future<void> switchContext({
+    String? organizationId,
+    Object? propertyId = _omit,
+    Object? tenantId = _omit,
+    Object? landlordId = _omit,
+    bool setAsDefault = true,
+  }) async {
+    final body = <String, dynamic>{
+      'organizationId': ?organizationId,
+      if (!identical(propertyId, _omit)) 'propertyId': propertyId,
+      if (!identical(tenantId, _omit)) 'tenantId': tenantId,
+      if (!identical(landlordId, _omit)) 'landlordId': landlordId,
+      'setAsDefault': setAsDefault,
+    };
+    try {
+      final res = await _api.post('/auth/switch-context', body: body);
+      state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
+    } on ApiError catch (e) {
+      // Graceful fallback if the server hasn't deployed /auth/switch-context yet.
+      if (e.status == 404) {
+        if (organizationId != null) {
+          final res = await _api.post(
+            '/auth/switch-org',
+            body: {'organizationId': organizationId},
+          );
+          final next = await _accept(res['data'] as Map<String, dynamic>);
+          state = AsyncData(
+            next.copyWith(
+              activePropertyId: identical(propertyId, _omit)
+                  ? next.activePropertyId
+                  : propertyId as String?,
+              activeTenantId: identical(tenantId, _omit)
+                  ? next.activeTenantId
+                  : tenantId as String?,
+              activeLandlordId: identical(landlordId, _omit)
+                  ? next.activeLandlordId
+                  : landlordId as String?,
+            ),
+          );
+        } else {
+          final current = state.valueOrNull;
+          if (current != null) {
+            state = AsyncData(
+              current.copyWith(
+                activePropertyId: identical(propertyId, _omit)
+                    ? current.activePropertyId
+                    : propertyId as String?,
+                activeTenantId: identical(tenantId, _omit)
+                    ? current.activeTenantId
+                    : tenantId as String?,
+                activeLandlordId: identical(landlordId, _omit)
+                    ? current.activeLandlordId
+                    : landlordId as String?,
+              ),
+            );
+          }
+        }
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<void> registerOrganization(Map<String, dynamic> body) async {
@@ -220,6 +287,8 @@ class SessionController extends AsyncNotifier<Session?> {
     state = const AsyncData(null);
   }
 }
+
+const Object _omit = Object();
 
 final sessionProvider = AsyncNotifierProvider<SessionController, Session?>(
   SessionController.new,

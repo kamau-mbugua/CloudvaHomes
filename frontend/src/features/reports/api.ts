@@ -12,10 +12,13 @@ import type { ArrearsReport, Dashboard, OccupancyReport, PnlReport } from './typ
 
 type Params = Record<string, string | undefined>;
 
-export function useDashboard(period: string, enabled = true) {
+export function useDashboard(period: string, enabled = true, propertyId?: string | null) {
   return useQuery({
-    queryKey: [...reportKeys, 'dashboard', period],
-    queryFn: () => api.get<unknown>('/reports/dashboard', { period }).then((body) => unwrap<Dashboard>(body)),
+    queryKey: [...reportKeys, 'dashboard', period, propertyId ?? 'all'],
+    queryFn: () =>
+      api
+        .get<unknown>('/reports/dashboard', { period, ...(propertyId ? { propertyId } : {}) })
+        .then((body) => unwrap<Dashboard>(body)),
     enabled,
     placeholderData: keepPreviousData,
     staleTime: 30_000,

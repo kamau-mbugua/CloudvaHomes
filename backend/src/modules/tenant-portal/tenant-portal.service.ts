@@ -132,6 +132,7 @@ export class TenantPortalService {
           unit: { id: x.unit.id, number: x.unit.number },
           property: x.unit.property,
           rentAmount: x.rentAmount,
+          depositHeld: x.depositHeld,
           billingDay: x.billingDay,
           status: x.status,
           startDate: formatDateOnly(x.startDate),
@@ -143,6 +144,42 @@ export class TenantPortalService {
         canPayInApp: !!this.tenantAccounts.stkChannel(channels),
       };
     });
+  }
+
+  async consolidatedOverview() {
+    const accounts = await this.mine();
+    const overviews = await Promise.all(accounts.map((a) => this.overview(a.tenantId)));
+    let balance = 0n;
+    let credit = 0n;
+    let depositHeld = 0n;
+    for (const o of overviews) {
+      balance += BigInt(o.balance);
+      credit += BigInt(o.credit);
+      depositHeld += BigInt(o.depositHeld);
+    }
+    const tenancies = overviews.flatMap((o) =>
+      o.tenancies.map((t) => ({
+        ...t,
+        tenantId: o.tenant.id,
+        tenantCode: o.tenant.code,
+        orgName: o.organization.name,
+      })),
+    );
+    const openInvoices = overviews.flatMap((o) =>
+      o.openInvoices.map((i) => ({
+        ...i,
+        tenantId: o.tenant.id,
+        orgName: o.organization.name,
+      })),
+    );
+    return {
+      balance,
+      credit,
+      depositHeld,
+      tenancies,
+      openInvoices,
+      accounts: overviews,
+    };
   }
 
   invoicesList(tenantId: string, q: TenantInvoicesQueryDto) {

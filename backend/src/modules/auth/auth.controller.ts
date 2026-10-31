@@ -34,6 +34,7 @@ import {
   RegisterOrganizationDto,
   ResetPasswordDto,
   StepUpVerifyDto,
+  SwitchContextDto,
   SwitchOrgDto,
   UpdateMeDto,
 } from './auth.dto.js';
@@ -164,7 +165,31 @@ export class AuthController {
   @HttpCode(200)
   async switchOrg(@Body() dto: SwitchOrgDto) {
     const ctx = authContext();
-    return ok(await this.sessions.switchOrg(ctx.userId, ctx.sessionId, dto.organizationId));
+    return ok(
+      await this.sessions.switchOrg(
+        ctx.userId,
+        ctx.sessionId,
+        dto.organizationId,
+        dto.propertyId,
+        dto.setAsDefault ?? true,
+      ),
+    );
+  }
+
+  @ApiBearerAuth()
+  @Post('switch-context')
+  @HttpCode(200)
+  async switchContext(@Body() dto: SwitchContextDto) {
+    const ctx = authContext();
+    return ok(
+      await this.sessions.switchContext(ctx.userId, ctx.sessionId, ctx.orgId, {
+        organizationId: dto.organizationId,
+        propertyId: dto.propertyId,
+        tenantId: dto.tenantId,
+        landlordId: dto.landlordId,
+        setAsDefault: dto.setAsDefault,
+      }),
+    );
   }
 
   @Public()

@@ -26,8 +26,12 @@ model User {
   lastName        String
   isPlatformAdmin Boolean       @default(false)
   platformRole    PlatformRole?
-  status          UserStatus    @default(ACTIVE)
-  lastLoginAt     DateTime?
+  status            UserStatus    @default(ACTIVE)
+  defaultOrgId      String?       @db.Uuid
+  defaultPropertyId String?       @db.Uuid
+  defaultTenantId   String?       @db.Uuid
+  defaultLandlordId String?       @db.Uuid
+  lastLoginAt       DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -173,9 +177,12 @@ model Invitation {
 model RefreshToken {
   id        String    @id @default(uuid(7)) @db.Uuid
   userId    String    @db.Uuid
-  familyId  String    @db.Uuid
-  orgId     String?   @db.Uuid // organisation the session is currently acting in
-  tokenHash String    @unique
+  familyId   String    @db.Uuid
+  orgId      String?   @db.Uuid // organisation the session is currently acting in
+  propertyId String?   @db.Uuid // property the session is currently scoped to (null = consolidated)
+  tenantId   String?   @db.Uuid // tenant account the session is currently focused on (null = consolidated)
+  landlordId String?   @db.Uuid // landlord account the session is currently focused on (null = consolidated)
+  tokenHash  String    @unique
   expiresAt DateTime
   usedAt    DateTime? // set when rotated; a second use means the token was stolen
   revokedAt DateTime?

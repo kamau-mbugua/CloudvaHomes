@@ -25,6 +25,8 @@ export interface RequestContext {
    * Enforced by the portfolio services (src/modules/portfolio/property-scope.ts).
    */
   propertyIds: readonly string[] | null;
+  /** Optional property the user has actively focused on via the property switcher (null = consolidated). */
+  activePropertyId: string | null;
   /** Set when the request carried a valid `X-Step-Up` token for this session. */
   stepUpVerified: boolean;
 }
@@ -45,6 +47,7 @@ export function emptyContext(partial: Partial<RequestContext> = {}): RequestCont
     isOwner: false,
     permissions: new Set(),
     propertyIds: null,
+    activePropertyId: null,
     stepUpVerified: false,
     ...partial,
   };

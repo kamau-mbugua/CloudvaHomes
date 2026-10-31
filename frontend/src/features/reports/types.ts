@@ -22,8 +22,17 @@ export interface TrendPoint {
   expenses: number;
 }
 
+export interface DashboardPropertyBreakdown extends OccupancyFigures {
+  property: CodedRef;
+  invoiced: number;
+  collected: number;
+  expenses: number;
+  net: number;
+}
+
 export interface Dashboard {
   period: string;
+  propertyId?: string | null;
   /** Today — arrears and occupancy are as of now, whatever the month. */
   asOf?: string;
   invoiced: number;
@@ -39,6 +48,8 @@ export interface Dashboard {
   topOverdue: { tenant: TenantRef; overdue: number; oldestDueDate: string }[];
   /** 12 months, oldest first. */
   trend: TrendPoint[];
+  /** Per-property breakdown when in consolidated portfolio mode. */
+  byProperty?: DashboardPropertyBreakdown[];
 }
 
 export interface PnlFigures {

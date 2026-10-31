@@ -73,9 +73,48 @@ class TenantRef {
 
 // ───────────────────────────────────────────── dashboard
 
+class DashboardPropertyRow {
+  DashboardPropertyRow({
+    required this.property,
+    required this.units,
+    required this.occupied,
+    required this.notice,
+    required this.vacant,
+    this.rate,
+    this.invoiced = 0,
+    this.collected = 0,
+    this.expenses = 0,
+    this.net = 0,
+  });
+  final CodedRef property;
+  final int units;
+  final int occupied;
+  final int notice;
+  final int vacant;
+  final double? rate;
+  final int invoiced;
+  final int collected;
+  final int expenses;
+  final int net;
+
+  factory DashboardPropertyRow.fromJson(Json j) => DashboardPropertyRow(
+    property: CodedRef.fromJson(j['property'] as Json),
+    units: _i(j['units']),
+    occupied: _i(j['occupied']),
+    notice: _i(j['notice']),
+    vacant: _i(j['vacant']),
+    rate: (j['rate'] as num?)?.toDouble(),
+    invoiced: centsFrom(j['invoiced']),
+    collected: centsFrom(j['collected']),
+    expenses: centsFrom(j['expenses']),
+    net: centsFrom(j['net']),
+  );
+}
+
 class Dashboard {
   Dashboard({
     required this.period,
+    this.propertyId,
     this.asOf,
     required this.invoiced,
     required this.collected,
@@ -92,8 +131,10 @@ class Dashboard {
     required this.unmatchedMpesa,
     required this.topOverdue,
     this.trend = const [],
+    this.byProperty = const [],
   });
   final String period;
+  final String? propertyId;
   final String? asOf;
   final int invoiced;
   final int collected;
@@ -112,6 +153,7 @@ class Dashboard {
   topOverdue;
   final List<({String period, int invoiced, int collected, int expenses})>
   trend;
+  final List<DashboardPropertyRow> byProperty;
 
   factory Dashboard.fromJson(Json j) {
     final occ = j['occupancy'] as Map<String, dynamic>? ?? const {};
@@ -121,6 +163,7 @@ class Dashboard {
     final net = j['net'] == null ? (collected - expenses) : centsFrom(j['net']);
     return Dashboard(
       period: _s(j['period']) ?? '',
+      propertyId: _s(j['propertyId']),
       asOf: _s(j['asOf']),
       invoiced: invoiced,
       collected: collected,
@@ -153,6 +196,10 @@ class Dashboard {
             collected: centsFrom(t['collected']),
             expenses: centsFrom(t['expenses']),
           ),
+      ],
+      byProperty: [
+        for (final p in _list(j['byProperty']))
+          DashboardPropertyRow.fromJson(p),
       ],
     );
   }

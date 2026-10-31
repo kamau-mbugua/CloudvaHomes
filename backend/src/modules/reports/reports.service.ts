@@ -64,56 +64,60 @@ export class ReportsService {
 
   // ── Monthly series (dashboard trend) ──
 
-  private async invoicedByMonth(from: Date, to: Date) {
+  private async invoicedByMonth(from: Date, to: Date, propertyId?: string) {
     const rows = await this.db.$queryRaw<{ m: string; v: bigint }[]>`
       SELECT to_char(i."issueDate", 'YYYY-MM') AS m, sum(i."total")::bigint AS v
         FROM "invoices" i
        WHERE i."orgId" = ${this.org()}::uuid AND i."status" <> 'VOID'
-         AND i."issueDate" BETWEEN ${from} AND ${to} ${this.scope(Prisma.sql`i."propertyId"`)}
+         AND i."issueDate" BETWEEN ${from} AND ${to} ${this.scope(Prisma.sql`i."propertyId"`, propertyId)}
        GROUP BY 1`;
     return new Map(rows.map((r) => [r.m, BigInt(r.v)]));
   }
 
-  private async collectedByMonth(from: Date, to: Date) {
+  private async collectedByMonth(from: Date, to: Date, propertyId?: string) {
     const rows = await this.db.$queryRaw<{ m: string; v: bigint }[]>`
       SELECT to_char(p."receivedAt", 'YYYY-MM') AS m, sum(a."amount")::bigint AS v
         FROM "payment_allocations" a
         JOIN "payments" p ON p."id" = a."paymentId"
         JOIN "invoices" i ON i."id" = a."invoiceId"
        WHERE a."orgId" = ${this.org()}::uuid
-         AND p."receivedAt" BETWEEN ${from} AND ${to} ${this.scope(Prisma.sql`i."propertyId"`)}
+         AND p."receivedAt" BETWEEN ${from} AND ${to} ${this.scope(Prisma.sql`i."propertyId"`, propertyId)}
        GROUP BY 1`;
     return new Map(rows.map((r) => [r.m, BigInt(r.v)]));
   }
 
-  private async expensesByMonth(from: Date, to: Date) {
+  private async expensesByMonth(from: Date, to: Date, propertyId?: string) {
     const rows = await this.db.$queryRaw<{ m: string; v: bigint }[]>`
       SELECT to_char(e."incurredOn", 'YYYY-MM') AS m, sum(e."amount")::bigint AS v
         FROM "expenses" e
        WHERE e."orgId" = ${this.org()}::uuid AND e."voidedAt" IS NULL
-         AND e."incurredOn" BETWEEN ${from} AND ${to} ${this.scope(Prisma.sql`e."propertyId"`)}
+         AND e."incurredOn" BETWEEN ${from} AND ${to} ${this.scope(Prisma.sql`e."propertyId"`, propertyId)}
        GROUP BY 1`;
     return new Map(rows.map((r) => [r.m, BigInt(r.v)]));
   }
 
   // ── Dashboard ──
 
-  async dashboard(period = periodOf(todayInNairobi())) {
+  async dashboard(period = periodOf(todayInNairobi()), propertyId?: string) {
     const today = todayInNairobi();
     const months = lastMonths(period, 12);
     const from = monthBounds(months[0]!).start;
     const { start, end } = monthBounds(period);
     const [invoiced, collected, expenses] = await Promise.all([
-      this.invoicedByMonth(from, end),
-      this.collectedByMonth(from, end),
-      this.expensesByMonth(from, end),
+      this.invoicedByMonth(from, end, propertyId),
+      this.collectedByMonth(from, end, propertyId),
+      this.expensesByMonth(from, end, propertyId),
     ]);
     const paidOnMonth = await this.db.$queryRaw<{ v: bigint | null }[]>`
       SELECT sum(a."amount")::bigint AS v
         FROM "payment_allocations" a JOIN "invoices" i ON i."id" = a."invoiceId"
        WHERE a."orgId" = ${this.org()}::uuid AND i."status" <> 'VOID'
-         AND i."issueDate" BETWEEN ${start} AND ${end} ${this.scope(Prisma.sql`i."propertyId"`)}`;
-    const arrears = await this.arrears({});
+         AND i."issueDate" BETWEEN ${start} AND ${end} ${this.scope(Prisma.sql`i."propertyId"`, propertyId)}`;
+    const [arrears, occupancy, pnl] = await Promise.all([
+      this.arrears({ propertyId }),
+      this.occupancy({ propertyId }),
+      this.propertyPnl({ from: period, to: period, propertyId }),
+    ]);
     const overdue = arrears.rows
       .map((r) => ({
         tenant: r.tenant,
@@ -123,13 +127,28 @@ export class ReportsService {
       .filter((r) => r.overdue > 0n)
       .sort((a, b) => (b.overdue > a.overdue ? 1 : b.overdue < a.overdue ? -1 : 0))
       .slice(0, 5);
-    const occupancy = await this.occupancy({});
     const canReconcile = !!currentContext()?.permissions.has('reconciliation:view');
     const inv = invoiced.get(period) ?? 0n;
     const col = collected.get(period) ?? 0n;
     const exp = expenses.get(period) ?? 0n;
+    const byProperty = occupancy.rows.map((occ) => {
+      const p = pnl.rows.find((r) => r.property.id === occ.property.id);
+      return {
+        property: occ.property,
+        units: occ.units,
+        occupied: occ.occupied,
+        notice: occ.notice,
+        vacant: occ.vacant,
+        rate: occ.rate,
+        invoiced: p?.invoiced.total ?? 0n,
+        collected: p?.collected ?? 0n,
+        expenses: p?.expenses.total ?? 0n,
+        net: p?.net ?? 0n,
+      };
+    });
     return {
       period,
+      propertyId: propertyId ?? currentContext()?.activePropertyId ?? null,
       invoiced: inv,
       collected: col,
       collectionRate: ratio(paidOnMonth[0]?.v ?? 0n, inv),
@@ -137,6 +156,7 @@ export class ReportsService {
       expenses: exp,
       net: col - exp,
       occupancy: occupancy.totals,
+      byProperty,
       unmatchedMpesa: canReconcile
         ? await this.db.inboundTransaction.count({ where: { matchStatus: 'UNMATCHED' } })
         : null,

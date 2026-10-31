@@ -13,6 +13,9 @@ const AUDIENCE = 'hodi-api';
 export interface AccessClaims {
   userId: string;
   orgId: string | null;
+  propertyId?: string | null;
+  tenantId?: string | null;
+  landlordId?: string | null;
   sessionId: string;
   isPlatformAdmin: boolean;
 }
@@ -31,6 +34,9 @@ export class TokensService {
     const token = await new SignJWT({
       typ: 'access',
       org: c.orgId,
+      prop: c.propertyId ?? null,
+      ten: c.tenantId ?? null,
+      lan: c.landlordId ?? null,
       sid: c.sessionId,
       pa: c.isPlatformAdmin,
     })
@@ -50,6 +56,9 @@ export class TokensService {
     return {
       userId: payload.sub!,
       orgId: typeof payload.org === 'string' ? payload.org : null,
+      propertyId: typeof payload.prop === 'string' ? payload.prop : null,
+      tenantId: typeof payload.ten === 'string' ? payload.ten : null,
+      landlordId: typeof payload.lan === 'string' ? payload.lan : null,
       sessionId: String(payload.sid),
       isPlatformAdmin: payload.pa === true,
     };

@@ -36,6 +36,10 @@ export function toSession(payload: SessionPayload): Session {
     user: payload.user,
     organizations: payload.organizations ?? [],
     activeOrganization: payload.activeOrganization ?? null,
+    activePropertyId: payload.activePropertyId ?? null,
+    properties: Array.isArray(payload.properties) ? payload.properties : [],
+    activeTenantId: payload.activeTenantId ?? null,
+    activeLandlordId: payload.activeLandlordId ?? null,
     permissions: payload.permissions ?? [],
     ownerOf: Array.isArray(payload.ownerOf) ? payload.ownerOf : [],
     tenantOf: Array.isArray(payload.tenantOf) ? payload.tenantOf : [],
@@ -119,6 +123,27 @@ export async function switchOrganization(organizationId: string): Promise<Sessio
   const result = await request<DataEnvelope<SessionPayload>>('/auth/switch-org', {
     method: 'POST',
     body: { organizationId },
+  });
+  setStepUpGrant(null);
+  queryClient.clear();
+  return acceptSession(result.data);
+}
+
+/**
+ * Switch active context (organisation, property, tenant account, or landlord account;
+ * `null` = consolidated view across all properties/units), rotate the JWT access token,
+ * and save the user's default on the server.
+ */
+export async function switchContext(input: {
+  organizationId?: string;
+  propertyId?: string | null;
+  tenantId?: string | null;
+  landlordId?: string | null;
+  setAsDefault?: boolean;
+}): Promise<Session> {
+  const result = await request<DataEnvelope<SessionPayload>>('/auth/switch-context', {
+    method: 'POST',
+    body: { ...input, setAsDefault: input.setAsDefault ?? true },
   });
   setStepUpGrant(null);
   queryClient.clear();

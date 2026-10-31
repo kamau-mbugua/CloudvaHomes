@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_error.dart';
+import '../../../core/auth/session_controller.dart';
 import '../../../core/dates.dart';
 import '../../../core/files.dart';
 import '../../../core/money.dart';
@@ -53,11 +54,29 @@ class UnitsScreen extends ConsumerStatefulWidget {
 
 class _UnitsScreenState extends ConsumerState<UnitsScreen> {
   var _filter = const UnitFilter();
+  var _initializedFromSession = false;
 
   @override
   Widget build(BuildContext context) {
     final api = ref.watch(staffApiProvider);
     final version = ref.watch(listsVersionProvider);
+    final activePropId = ref.watch(
+      sessionProvider.select((s) => s.valueOrNull?.activePropertyId),
+    );
+    if (!_initializedFromSession) {
+      _initializedFromSession = true;
+      if (activePropId != null) {
+        _filter = _filter.copy(propertyId: () => activePropId);
+      }
+    }
+    ref.listen<String?>(
+      sessionProvider.select((s) => s.valueOrNull?.activePropertyId),
+      (prev, next) {
+        if (prev != next && _filter.propertyId != next) {
+          setState(() => _filter = _filter.copy(propertyId: () => next));
+        }
+      },
+    );
     final canProperties = can(ref, 'properties:view');
     final properties = canProperties
         ? ref.watch(propertiesProvider).valueOrNull

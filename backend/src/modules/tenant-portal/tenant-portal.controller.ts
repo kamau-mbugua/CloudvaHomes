@@ -126,6 +126,11 @@ export class TenantPortalController {
     return ok(await this.portal.mine());
   }
 
+  @Get('overview')
+  async consolidatedOverview() {
+    return ok(await this.portal.consolidatedOverview());
+  }
+
   @Get(':id')
   async overview(@Param('id', ParseUUIDPipe) id: string) {
     return ok(await this.portal.overview(id));

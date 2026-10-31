@@ -13,7 +13,15 @@ import type { Prisma } from '../../generated/prisma/client.js';
  * - landlords who own one of those properties.
  */
 export function allowedPropertyIds(): readonly string[] | null {
-  return currentContext()?.propertyIds ?? null;
+  const ctx = currentContext();
+  if (!ctx) return null;
+  if (ctx.activePropertyId) {
+    if (ctx.propertyIds && !ctx.propertyIds.includes(ctx.activePropertyId)) {
+      return ['00000000-0000-0000-0000-000000000000'];
+    }
+    return [ctx.activePropertyId];
+  }
+  return ctx.propertyIds ?? null;
 }
 
 const inList = (ids: readonly string[]) => ({ in: [...ids] });
@@ -52,7 +60,7 @@ export function landlordScope(): Prisma.LandlordWhereInput {
 
 /** For actions that only make sense with the whole portfolio in view (adding a property). */
 export function requireAllProperties(): void {
-  if (allowedPropertyIds()) {
+  if (currentContext()?.propertyIds) {
     throw AppError.forbidden(
       'PROPERTY_SCOPE',
       'You can only work with the properties assigned to you',
