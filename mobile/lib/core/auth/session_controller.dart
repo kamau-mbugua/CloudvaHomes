@@ -114,7 +114,7 @@ class SessionController extends AsyncNotifier<Session?> {
 
   Future<void> verifyTwoFactor(String challengeToken, String code) async {
     final res = await _api.post(
-      '/auth/login/verify-2fa',
+      '/auth/login/2fa',
       body: {
         'challengeToken': challengeToken.trim(),
         'code': code.trim(),
@@ -190,7 +190,7 @@ class SessionController extends AsyncNotifier<Session?> {
     required String currentPassword,
     required String newPassword,
   }) => _api.post(
-    '/auth/password/change',
+    '/me/password',
     body: {'currentPassword': currentPassword, 'newPassword': newPassword},
   );
 

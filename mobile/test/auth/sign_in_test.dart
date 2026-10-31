@@ -140,7 +140,7 @@ void main() {
             },
           },
         ),
-        '/auth/login/verify-2fa' => (
+        '/auth/login/2fa' => (
           200,
           {'data': sessionJson(refreshToken: 'r-2fa')},
         ),
@@ -167,7 +167,7 @@ void main() {
       tester,
       find.widgetWithText(FilledButton, 'Verify & sign in'),
     );
-    expect(adapter.calls.last.path, '/auth/login/verify-2fa');
+    expect(adapter.calls.last.path, '/auth/login/2fa');
     expect(adapter.calls.last.body, {
       'challengeToken': 'ch-token-12345',
       'code': '654321',
