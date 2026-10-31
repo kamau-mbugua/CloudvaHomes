@@ -331,10 +331,7 @@ class _StatusView extends StatelessWidget {
                   color: HodiColors.lime,
                   shape: BoxShape.circle,
                   boxShadow: [
-                    BoxShadow(
-                      color: HodiColors.limeSoft,
-                      spreadRadius: 5,
-                    ),
+                    BoxShadow(color: HodiColors.limeSoft, spreadRadius: 5),
                   ],
                 ),
               )

@@ -141,13 +141,20 @@ class StaffTabScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final orgName =
-        ref.watch(sessionProvider).valueOrNull?.activeOrganization?.name;
+    final orgName = ref
+        .watch(sessionProvider)
+        .valueOrNull
+        ?.activeOrganization
+        ?.name;
     return Scaffold(
       appBar: KodiHubAppBar(
         title: Text(title),
         subtitle: orgName,
-        actions: [...actions, const NotificationButton(), const AccountButton()],
+        actions: [
+          ...actions,
+          const NotificationButton(),
+          const AccountButton(),
+        ],
         bottom: bottom,
       ),
       floatingActionButton: floatingActionButton,

@@ -114,12 +114,7 @@ export function drawTopBrandBar(doc: PDFKit.PDFDocument): void {
 }
 
 /** Draws the C2.1 "Ledger roof, refined" vector mark at (x, y) within a `size x size` box. */
-export function drawC21Mark(
-  doc: PDFKit.PDFDocument,
-  x: number,
-  y: number,
-  size = 10,
-): void {
+export function drawC21Mark(doc: PDFKit.PDFDocument, x: number, y: number, size = 10): void {
   const s = size / 48;
   doc.save();
   doc
@@ -131,15 +126,9 @@ export function drawC21Mark(
     .lineJoin('round')
     .strokeColor(PDF_BRAND.brandDark)
     .stroke();
-  doc
-    .roundedRect(x + 12 * s, y + 25 * s, 24 * s, 3.2 * s, 1.6 * s)
-    .fill(PDF_BRAND.brandAccent);
-  doc
-    .roundedRect(x + 12 * s, y + 31 * s, 18 * s, 3.2 * s, 1.6 * s)
-    .fill(PDF_BRAND.brandDark);
-  doc
-    .roundedRect(x + 12 * s, y + 37 * s, 24 * s, 3.2 * s, 1.6 * s)
-    .fill(PDF_BRAND.brandDark);
+  doc.roundedRect(x + 12 * s, y + 25 * s, 24 * s, 3.2 * s, 1.6 * s).fill(PDF_BRAND.brandAccent);
+  doc.roundedRect(x + 12 * s, y + 31 * s, 18 * s, 3.2 * s, 1.6 * s).fill(PDF_BRAND.brandDark);
+  doc.roundedRect(x + 12 * s, y + 37 * s, 24 * s, 3.2 * s, 1.6 * s).fill(PDF_BRAND.brandDark);
   doc.restore();
 }
 

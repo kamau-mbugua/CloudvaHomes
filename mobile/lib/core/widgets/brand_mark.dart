@@ -101,9 +101,7 @@ class _C21MarkPainter extends CustomPainter {
 
     // Tile background (#002B4D on light, translucent white on navy)
     final tilePaint = Paint()
-      ..color = isNavy
-          ? Colors.white.withValues(alpha: 0.1)
-          : HodiColors.navy
+      ..color = isNavy ? Colors.white.withValues(alpha: 0.1) : HodiColors.navy
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(

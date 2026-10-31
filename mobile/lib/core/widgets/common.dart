@@ -21,9 +21,8 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
   final PreferredSizeWidget? bottom;
 
   @override
-  Size get preferredSize => Size.fromHeight(
-    kToolbarHeight + 3 + (bottom?.preferredSize.height ?? 0),
-  );
+  Size get preferredSize =>
+      Size.fromHeight(kToolbarHeight + 3 + (bottom?.preferredSize.height ?? 0));
 
   @override
   Widget build(BuildContext context) {
