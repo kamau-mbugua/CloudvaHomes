@@ -166,8 +166,11 @@ class AccountSheet extends ConsumerWidget {
                 subtitle: session.tenantOf.first.orgName,
                 selected: mode == AppMode.tenant,
                 onTap: () {
-                  ref.read(chosenTenantProvider.notifier).state =
-                      session.tenantOf.first.tenantId;
+                  final tid = session.tenantOf.first.tenantId;
+                  ref.read(chosenTenantProvider.notifier).state = tid;
+                  ref
+                      .read(sessionProvider.notifier)
+                      .switchContext(tenantId: tid);
                   ref.read(appModeProvider.notifier).state = AppMode.tenant;
                   Navigator.of(context).pop();
                 },
@@ -196,6 +199,9 @@ class AccountSheet extends ConsumerWidget {
                       mode == AppMode.tenant && activeTenantId == t.tenantId,
                   onTap: () {
                     ref.read(chosenTenantProvider.notifier).state = t.tenantId;
+                    ref
+                        .read(sessionProvider.notifier)
+                        .switchContext(tenantId: t.tenantId);
                     ref.read(appModeProvider.notifier).state = AppMode.tenant;
                     Navigator.of(context).pop();
                   },
@@ -228,6 +234,9 @@ class AccountSheet extends ConsumerWidget {
                     ref.watch(currentOwnerIdProvider) == o.landlordId,
                 onTap: () {
                   ref.read(chosenOwnerProvider.notifier).state = o.landlordId;
+                  ref
+                      .read(sessionProvider.notifier)
+                      .switchContext(landlordId: o.landlordId);
                   ref.read(appModeProvider.notifier).state = AppMode.owner;
                   Navigator.of(context).pop();
                 },

@@ -237,6 +237,14 @@ export class AuthService {
           },
         });
 
+        await tx.tenant.updateMany({
+          where: {
+            userId: null,
+            OR: [{ phone }, { email: { equals: email, mode: 'insensitive' } }],
+          },
+          data: { userId: user.id, portalInvitedAt: new Date() },
+        });
+
         await this.audit.record(
           {
             action: 'organization.register',

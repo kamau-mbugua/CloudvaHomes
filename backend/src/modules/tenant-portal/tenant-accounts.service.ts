@@ -163,8 +163,15 @@ export class TenantAccountsService {
     const phone = normalizePhone(t.phone);
     if (!phone) throw AppError.conflict('This tenant has no phone number', 'NO_CONTACT');
     const email = t.email ? normalizeEmail(t.email) : null;
-    // Users are global: look them up unscoped. A tenant may already be staff or a landlord.
-    let user = await this.prisma.user.findFirst({ where: { phone } });
+    // Users are global: look them up unscoped by phone OR email. A tenant may already be staff or a landlord.
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { phone },
+          ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
+        ],
+      },
+    });
     if (!user) {
       const emailFree = email ? !(await this.prisma.user.count({ where: { email } })) : false;
       user = await this.prisma.user.create({
@@ -175,12 +182,24 @@ export class TenantAccountsService {
           lastName: t.lastName,
         },
       });
-    } else if (!user.email && email) {
-      const emailFree = !(await this.prisma.user.count({ where: { email } }));
-      if (emailFree) {
+    } else {
+      const fill: { email?: string; phone?: string } = {};
+      if (!user.email && email) {
+        const emailFree = !(await this.prisma.user.count({
+          where: { email: { equals: email, mode: 'insensitive' }, id: { not: user.id } },
+        }));
+        if (emailFree) fill.email = email;
+      }
+      if (!user.phone && phone) {
+        const phoneFree = !(await this.prisma.user.count({
+          where: { phone, id: { not: user.id } },
+        }));
+        if (phoneFree) fill.phone = phone;
+      }
+      if (Object.keys(fill).length > 0) {
         user = await this.prisma.user.update({
           where: { id: user.id },
-          data: { email },
+          data: fill,
         });
       }
     }

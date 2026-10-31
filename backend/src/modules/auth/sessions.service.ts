@@ -429,6 +429,17 @@ export class SessionsService {
       },
       orderBy: { name: 'asc' },
     });
+    // Auto-link any unlinked Tenant records matching this user's phone or email (e.g. a team member who is also a tenant).
+    const tenantOr: { phone?: string; email?: { equals: string; mode: 'insensitive' } }[] = [];
+    if (user.phone) tenantOr.push({ phone: user.phone });
+    if (user.email) tenantOr.push({ email: { equals: user.email, mode: 'insensitive' } });
+    if (tenantOr.length > 0) {
+      await this.prisma.tenant.updateMany({
+        where: { userId: null, OR: tenantOr },
+        data: { userId, portalInvitedAt: new Date() },
+      });
+    }
+
     const tenancies = await this.prisma.tenant.findMany({
       where: { userId, organization: { status: { not: 'CLOSED' } } },
       select: {

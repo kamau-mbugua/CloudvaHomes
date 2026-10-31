@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/auth/session_controller.dart';
 import '../../core/dates.dart';
 import '../../core/files.dart';
 import '../../core/money.dart';
@@ -19,8 +20,8 @@ class TenantHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final overview = ref.watch(tenantOverviewProvider);
     final selectedHomeKey = ref.watch(selectedTenantHomeKeyProvider);
-    final accounts =
-        ref.watch(sessionProvider).valueOrNull?.tenantOf ?? const [];
+    final session = ref.watch(sessionProvider).valueOrNull;
+    final accounts = session?.tenantOf ?? const [];
 
     return RefreshIndicator(
       onRefresh: () => ref.refresh(tenantOverviewProvider.future),
@@ -41,7 +42,11 @@ class TenantHomeScreen extends ConsumerWidget {
                       i,
                 ]
               : o.openInvoices;
-          final showSwitcher = o.homes.length > 1 || accounts.length > 1;
+          final showSwitcher =
+              o.homes.length > 1 ||
+              accounts.length > 1 ||
+              (session?.isStaff ?? false) ||
+              (session?.isOwner ?? false);
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -346,6 +351,7 @@ class _TenantUnitSwitcher extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final homes = overview.homes;
+    final session = ref.watch(sessionProvider).valueOrNull;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -356,9 +362,11 @@ class _TenantUnitSwitcher extends ConsumerWidget {
             children: [
               Expanded(
                 child: Kicker(
-                  selectedHome == null
-                      ? 'YOUR UNITS · CONSOLIDATED (${homes.length} UNITS)'
-                      : 'ACTIVE UNIT · DEFAULT SAVED',
+                  homes.length > 1
+                      ? (selectedHome == null
+                            ? 'YOUR UNITS · CONSOLIDATED (${homes.length} UNITS)'
+                            : 'ACTIVE UNIT · DEFAULT SAVED')
+                      : 'PORTAL & UNIT SWITCHER',
                 ),
               ),
               if (selectedHome != null)
@@ -385,34 +393,48 @@ class _TenantUnitSwitcher extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                ChoiceChip(
-                  label: Text('All units (${homes.length})'),
-                  selected: selectedHome == null,
-                  onSelected: (_) => _switchTenantUnit(
-                    context,
-                    ref,
-                    home: null,
-                    fallbackTenantId: overview.tenantId,
-                  ),
-                ),
-                for (final h in homes) ...[
-                  const SizedBox(width: 8),
+                if (homes.length > 1) ...[
                   ChoiceChip(
-                    label: Text('${h.unit} · ${h.property}'),
-                    selected: selectedHome?.key == h.key,
-                    selectedColor: dark ? HodiColors.lime : HodiColors.navy,
-                    labelStyle: TextStyle(
-                      color: selectedHome?.key == h.key
-                          ? (dark ? HodiColors.navy : Colors.white)
-                          : scheme.onSurface,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    label: Text('All units (${homes.length})'),
+                    selected: selectedHome == null,
                     onSelected: (_) => _switchTenantUnit(
                       context,
                       ref,
-                      home: h,
+                      home: null,
                       fallbackTenantId: overview.tenantId,
                     ),
+                  ),
+                  for (final h in homes) ...[
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: Text('${h.unit} · ${h.property}'),
+                      selected: selectedHome?.key == h.key,
+                      selectedColor: dark ? HodiColors.lime : HodiColors.navy,
+                      labelStyle: TextStyle(
+                        color: selectedHome?.key == h.key
+                            ? (dark ? HodiColors.navy : Colors.white)
+                            : scheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      onSelected: (_) => _switchTenantUnit(
+                        context,
+                        ref,
+                        home: h,
+                        fallbackTenantId: overview.tenantId,
+                      ),
+                    ),
+                  ],
+                ],
+                if (session?.isStaff ?? false) ...[
+                  if (homes.length > 1) const SizedBox(width: 8),
+                  ActionChip(
+                    avatar: const Icon(Icons.work_outline, size: 15),
+                    label: Text(
+                      'Work (${session?.activeOrganization?.name ?? 'Staff'}) →',
+                    ),
+                    onPressed: () {
+                      ref.read(appModeProvider.notifier).state = AppMode.staff;
+                    },
                   ),
                 ],
               ],

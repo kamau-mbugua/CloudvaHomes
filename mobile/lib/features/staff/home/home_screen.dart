@@ -142,7 +142,10 @@ class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
               PropertyOption(id: p.id, code: p.code, name: p.name),
           ];
     final orgs = session.organizations;
-    if (props.length <= 1 && orgs.length <= 1) {
+    if (props.length <= 1 &&
+        orgs.length <= 1 &&
+        !session.isTenant &&
+        !session.isOwner) {
       return const SizedBox.shrink();
     }
 
@@ -160,9 +163,11 @@ class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
             children: [
               Expanded(
                 child: Kicker(
-                  activePropertyId == null
-                      ? 'PORTFOLIO SCOPE · CONSOLIDATED (${props.length} PROPERTIES)'
-                      : 'ACTIVE PROPERTY SCOPE · DEFAULT SAVED',
+                  props.length > 1
+                      ? (activePropertyId == null
+                            ? 'PORTFOLIO SCOPE · CONSOLIDATED (${props.length} PROPERTIES)'
+                            : 'ACTIVE PROPERTY SCOPE · DEFAULT SAVED')
+                      : 'WORKSPACE & PORTAL SWITCHER',
                 ),
               ),
               if (_switching)
@@ -268,6 +273,31 @@ class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
                       onTap: () => _onSelectProperty(p.id, p.name),
                     ),
                   ],
+                ],
+                if (session.isTenant) ...[
+                  if (props.length > 1 || orgs.length > 1)
+                    const SizedBox(width: 8),
+                  _ScopePill(
+                    icon: Icons.home_outlined,
+                    label: 'My rent (Tenant)',
+                    badge: '${session.tenantOf.length}',
+                    selected: false,
+                    onTap: () {
+                      ref.read(appModeProvider.notifier).state = AppMode.tenant;
+                    },
+                  ),
+                ],
+                if (session.isOwner) ...[
+                  const SizedBox(width: 8),
+                  _ScopePill(
+                    icon: Icons.real_estate_agent_outlined,
+                    label: 'Owner portal',
+                    badge: '${session.ownerOf.length}',
+                    selected: false,
+                    onTap: () {
+                      ref.read(appModeProvider.notifier).state = AppMode.owner;
+                    },
+                  ),
                 ],
               ],
             ),

@@ -86,6 +86,19 @@ export class InvitationsService {
       });
     }
 
+    // If this team member is also a tenant (in this org or another) whose tenant record wasn't linked yet, link it.
+    const tenantMatchOr: { phone?: string; email?: { equals: string; mode: 'insensitive' } }[] = [];
+    if (user.phone) tenantMatchOr.push({ phone: user.phone });
+    if (user.email) tenantMatchOr.push({ email: { equals: user.email, mode: 'insensitive' } });
+    if (tenantMatchOr.length > 0) {
+      await withoutOrgScope(() =>
+        tx.tenant.updateMany({
+          where: { userId: null, OR: tenantMatchOr },
+          data: { userId: user.id, portalInvitedAt: new Date() },
+        }),
+      );
+    }
+
     const existing = await tx.membership.findFirst({ where: { orgId: p.orgId, userId: user.id } });
     if (existing)
       throw AppError.conflict(
