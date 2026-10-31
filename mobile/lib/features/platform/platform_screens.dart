@@ -15,6 +15,7 @@ import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
 import '../../core/widgets/paged_list.dart';
+import '../../core/widgets/side_drawer.dart';
 
 typedef PlatformJson = Map<String, dynamic>;
 
@@ -215,6 +216,7 @@ class PlatformShell extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final role = session.valueOrNull?.user.platformRole ?? 'ADMIN';
     return Scaffold(
+      drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         loading: session.isLoading,
         title: const Text('KodiHub Platform'),

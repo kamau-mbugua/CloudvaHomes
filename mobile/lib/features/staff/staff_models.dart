@@ -681,14 +681,46 @@ class Inbound {
 // ───────────────────────────────────────────── meters, expenses
 
 class PropertyOption {
-  PropertyOption({required this.id, required this.name, required this.code});
+  PropertyOption({
+    required this.id,
+    required this.name,
+    required this.code,
+    this.location,
+    this.county,
+    this.floors,
+    this.status = 'ACTIVE',
+    this.landlordName,
+    this.unitCount = 0,
+    this.occupiedCount = 0,
+    this.noticeCount = 0,
+    this.vacantCount = 0,
+  });
   final String id;
   final String name;
   final String code;
+  final String? location;
+  final String? county;
+  final int? floors;
+  final String status;
+  final String? landlordName;
+  final int unitCount;
+  final int occupiedCount;
+  final int noticeCount;
+  final int vacantCount;
+
   factory PropertyOption.fromJson(Json j) => PropertyOption(
     id: j['id'] as String,
     name: _s(j['name']) ?? '',
     code: _s(j['code']) ?? '',
+    location: _s(j['location']),
+    county: _s(j['county']),
+    floors: j['floors'] is num ? (j['floors'] as num).toInt() : null,
+    status: _s(j['status']) ?? 'ACTIVE',
+    landlordName: _s((j['landlord'] as Map?)?['name']),
+    unitCount: _i(j['unitCount']),
+    occupiedCount: _i(j['occupiedCount']),
+    noticeCount: _i(j['noticeCount']),
+    vacantCount: _i(j['vacantCount']),
   );
 }
 

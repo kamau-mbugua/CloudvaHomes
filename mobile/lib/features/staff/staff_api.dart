@@ -307,13 +307,17 @@ class StaffApi {
         _data(await _api.post('/tenancies/$tenancyId/notice', body: body)),
       );
 
+  Future<void> withdrawNotice(String tenancyId) =>
+      _api.delete('/tenancies/$tenancyId/notice');
+
   Future<Tenancy> endTenancy(String tenancyId, Json body) async =>
       Tenancy.fromJson(
-        _data(await _api.post('/tenancies/$tenancyId/end', body: body)),
+        _data(await _api.post('/tenancies/$tenancyId/move-out', body: body)),
       );
 
-  Future<Json> settleDeposit(String tenancyId, Json body) async =>
-      _data(await _api.post('/tenancies/$tenancyId/deposit', body: body));
+  Future<Json> settleDeposit(String tenancyId, Json body) async => _data(
+    await _api.post('/tenancies/$tenancyId/deposit/settle', body: body),
+  );
 
   // ── billing & invoices actions
   Future<Json> runInvoices(Json body) async =>
@@ -386,7 +390,10 @@ class StaffApi {
 
   // ── reports, channels, agency, users & roles
   Future<Json> reportPl(String period) async => _data(
-    await _api.get('/reports/pl', query: {'from': period, 'to': period}),
+    await _api.get(
+      '/reports/property-pnl',
+      query: {'from': period, 'to': period},
+    ),
   );
 
   Future<Json> reportArrears() async =>

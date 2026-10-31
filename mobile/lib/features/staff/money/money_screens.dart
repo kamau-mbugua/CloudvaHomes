@@ -461,7 +461,7 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                       invoiceStatusChip(i),
                     ],
                   ),
-                  if (i.status != 'VOID' && can(ref, 'invoices:update')) ...[
+                  if (i.status != 'VOID' && can(ref, 'invoices:void')) ...[
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -1076,13 +1076,13 @@ class _InvoiceRunSheet extends ConsumerStatefulWidget {
 }
 
 class _InvoiceRunSheetState extends ConsumerState<_InvoiceRunSheet> {
-  late final _period = TextEditingController(text: nairobiPeriod());
+  late final _date = TextEditingController(text: toDay(nairobiToday()));
   bool _running = false;
   String? _error;
 
   @override
   void dispose() {
-    _period.dispose();
+    _date.dispose();
     super.dispose();
   }
 
@@ -1092,8 +1092,9 @@ class _InvoiceRunSheetState extends ConsumerState<_InvoiceRunSheet> {
       _error = null;
     });
     try {
+      final d = _date.text.trim();
       final res = await ref.read(staffApiProvider).runInvoices({
-        'period': _period.text.trim(),
+        if (d.isNotEmpty) 'date': d,
       });
       ref.read(listsVersionProvider.notifier).state++;
       ref.invalidate(dashboardProvider);
@@ -1128,9 +1129,9 @@ class _InvoiceRunSheetState extends ConsumerState<_InvoiceRunSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: _period,
+            controller: _date,
             decoration: const InputDecoration(
-              labelText: 'Billing period (YYYY-MM)',
+              labelText: 'Billing date (YYYY-MM-DD)',
             ),
           ),
           if (_error != null) ...[
@@ -1140,7 +1141,12 @@ class _InvoiceRunSheetState extends ConsumerState<_InvoiceRunSheet> {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _running ? null : _run,
-            child: Text(_running ? 'Running…' : 'Generate invoices'),
+            child: KodiHubButtonChild(
+              loading: _running,
+              label: 'Generate invoices',
+              loadingLabel: 'Running…',
+              tone: SpinnerTone.navy,
+            ),
           ),
         ],
       ),
@@ -1205,11 +1211,7 @@ class _AdHocInvoiceSheetState extends ConsumerState<_AdHocInvoiceSheet> {
         'tenancyId': t.units.first.tenancyId,
         'dueDate': toDay(_dueDate),
         'lines': [
-          {
-            'description': _desc.text.trim(),
-            'quantity': '1',
-            'unitAmount': cents,
-          },
+          {'description': _desc.text.trim(), 'amount': cents},
         ],
       });
       invalidateAfterPayment(ref, tenantId: _tenant!.id);

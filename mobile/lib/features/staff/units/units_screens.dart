@@ -536,6 +536,17 @@ class _CurrentTenancy extends ConsumerWidget {
                   ),
                   child: const Text('Give notice'),
                 ),
+              if (can(ref, 'tenancies:update') && t.status == 'NOTICE')
+                OutlinedButton(
+                  onPressed: () => _TenancyLifecycleSheet.withdrawNotice(
+                    context,
+                    ref,
+                    tenancyId: t.id,
+                    unitId: u.id,
+                    tenantId: t.tenant.id,
+                  ),
+                  child: const Text('Withdraw notice'),
+                ),
               if (can(ref, 'tenancies:update') &&
                   (t.status == 'ACTIVE' || t.status == 'NOTICE'))
                 OutlinedButton(
@@ -548,7 +559,8 @@ class _CurrentTenancy extends ConsumerWidget {
                   ),
                   child: const Text('Move out'),
                 ),
-              if (can(ref, 'tenancies:update') &&
+              if ((can(ref, 'payments:create') ||
+                      can(ref, 'payments:refund')) &&
                   (tenancy?.depositHeld ?? 0) > 0)
                 OutlinedButton(
                   onPressed: () => _TenancyLifecycleSheet.settleDeposit(
@@ -812,7 +824,7 @@ class _MoveInSheetState extends ConsumerState<_MoveInSheet> {
         'tenantId': _tenant!.id,
         'startDate': toDay(_startDate),
         'rentAmount': rentCents,
-        'depositRequired': depositCents,
+        if (depositCents > 0) 'depositHeld': depositCents,
         'billingDay': day.clamp(1, 28),
       });
       ref.invalidate(unitProvider(widget.unit.id));
@@ -968,7 +980,6 @@ class _TenancyLifecycleSheet {
     if (picked == null || !context.mounted) return;
     try {
       await ref.read(staffApiProvider).giveNotice(tenancyId, {
-        'noticeDate': toDay(nairobiToday()),
         'endDate': toDay(picked),
       });
       ref.invalidate(unitProvider(unitId));
@@ -976,6 +987,25 @@ class _TenancyLifecycleSheet {
       ref.invalidate(tenantProvider(tenantId));
       ref.read(listsVersionProvider.notifier).state++;
       if (context.mounted) showMessage(context, 'Notice recorded.');
+    } on ApiError catch (e) {
+      if (context.mounted) showMessage(context, staffErrorMessage(e));
+    }
+  }
+
+  static Future<void> withdrawNotice(
+    BuildContext context,
+    WidgetRef ref, {
+    required String tenancyId,
+    required String unitId,
+    required String tenantId,
+  }) async {
+    try {
+      await ref.read(staffApiProvider).withdrawNotice(tenancyId);
+      ref.invalidate(unitProvider(unitId));
+      ref.invalidate(tenancyProvider(tenancyId));
+      ref.invalidate(tenantProvider(tenantId));
+      ref.read(listsVersionProvider.notifier).state++;
+      if (context.mounted) showMessage(context, 'Notice withdrawn.');
     } on ApiError catch (e) {
       if (context.mounted) showMessage(context, staffErrorMessage(e));
     }
@@ -1021,7 +1051,8 @@ class _TenancyLifecycleSheet {
   }) async {
     final applyCtrl = TextEditingController(text: '0');
     final refundCtrl = TextEditingController(text: '${depositHeld ~/ 100}');
-    final forfeitCtrl = TextEditingController(text: '0');
+    final refCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1046,11 +1077,15 @@ class _TenancyLifecycleSheet {
             ),
             const SizedBox(height: 8),
             TextField(
-              controller: forfeitCtrl,
-              keyboardType: TextInputType.number,
+              controller: refCtrl,
               decoration: const InputDecoration(
-                labelText: 'Retain / forfeit for repairs (KES)',
+                labelText: 'Refund reference (optional)',
               ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(labelText: 'Note (optional)'),
             ),
           ],
         ),
@@ -1069,9 +1104,11 @@ class _TenancyLifecycleSheet {
     if (ok != true || !context.mounted) return;
     try {
       await ref.read(staffApiProvider).settleDeposit(tenancyId, {
-        'applyToInvoices': parseKes(applyCtrl.text) ?? 0,
-        'refunded': parseKes(refundCtrl.text) ?? 0,
-        'forfeited': parseKes(forfeitCtrl.text) ?? 0,
+        'applyAmount': parseKes(applyCtrl.text) ?? 0,
+        'refundAmount': parseKes(refundCtrl.text) ?? 0,
+        if (refCtrl.text.trim().isNotEmpty)
+          'refundReference': refCtrl.text.trim(),
+        if (noteCtrl.text.trim().isNotEmpty) 'note': noteCtrl.text.trim(),
       });
       ref.invalidate(unitProvider(unitId));
       ref.invalidate(tenancyProvider(tenancyId));

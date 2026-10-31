@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
+import '../../core/widgets/side_drawer.dart';
 import 'tenant_api.dart';
 
 /// Tenant mode: bottom tabs, the organisation's name on top, account switch when they rent
@@ -20,6 +21,7 @@ class TenantShell extends ConsumerWidget {
     final currentId = ref.watch(currentTenantIdProvider);
     final current = accounts.where((a) => a.tenantId == currentId).firstOrNull;
     return Scaffold(
+      drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         loading: session.isLoading,
         subtitle: current?.name,

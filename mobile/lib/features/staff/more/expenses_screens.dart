@@ -65,7 +65,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final api = ref.watch(staffApiProvider);
     final version = ref.watch(listsVersionProvider);
     return Scaffold(
-      appBar: AppBar(
+      appBar: KodiHubAppBar(
         title: const Text('Expenses'),
         actions: [
           TextButton.icon(
@@ -119,7 +119,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                               semanticLabel: 'Has a receipt',
                             )
                           : null,
-                      onLongPress: !e.voided && can(ref, 'expenses:update')
+                      onLongPress: !e.voided && can(ref, 'expenses:delete')
                           ? () => _voidExpense(context, e)
                           : null,
                     ),
@@ -238,7 +238,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
   Widget build(BuildContext context) {
     final properties = ref.watch(propertiesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Add expense')),
+      appBar: const KodiHubAppBar(title: Text('Add expense')),
       body: !can(ref, 'expenses:create')
           ? const NoPermission('adding expenses')
           : AsyncBody(
@@ -365,7 +365,12 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _saving ? null : () => _save(list),
-                    child: Text(_saving ? 'Saving…' : 'Save expense'),
+                    child: KodiHubButtonChild(
+                      loading: _saving,
+                      label: 'Save expense',
+                      loadingLabel: 'Saving…',
+                      tone: SpinnerTone.navy,
+                    ),
                   ),
                 ],
               ),
@@ -425,7 +430,7 @@ class _RecurringExpensesSheet extends ConsumerWidget {
                             '${r['name'] ?? ''} · ${formatKes(centsFrom(r['amount']))}',
                           ),
                           subtitle: Text(
-                            '${expenseCategoryLabel[r['category']] ?? r['category'] ?? ''} · Day ${r['dayOfMonth'] ?? 1}',
+                            '${expenseCategoryLabel[r['category']] ?? r['category'] ?? ''} · Every ${r['everyMonths'] ?? 1} mo · Next ${formatDay('${r['nextDate'] ?? r['startDate'] ?? ''}')}',
                           ),
                         );
                       },

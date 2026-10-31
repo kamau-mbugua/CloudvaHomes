@@ -7,6 +7,7 @@ import '../../core/auth/session_controller.dart';
 import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
+import '../../core/widgets/side_drawer.dart';
 import '../billing/billing_banner.dart';
 import 'staff_models.dart';
 
@@ -147,6 +148,7 @@ class StaffTabScaffold extends ConsumerWidget {
         ?.activeOrganization
         ?.name;
     return Scaffold(
+      drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         title: Text(title),
         subtitle: orgName,

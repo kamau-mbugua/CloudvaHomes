@@ -10,6 +10,7 @@ import '../../core/providers.dart';
 import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
+import '../../core/widgets/side_drawer.dart';
 import '../staff/staff_api.dart';
 
 final chosenOwnerProvider = StateProvider<String?>((ref) => null);
@@ -97,6 +98,7 @@ class OwnerShell extends ConsumerWidget {
     final currentId = ref.watch(currentOwnerIdProvider);
     final current = owners.where((o) => o.landlordId == currentId).firstOrNull;
     return Scaffold(
+      drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         subtitle: current?.name,
         title: owners.length > 1
