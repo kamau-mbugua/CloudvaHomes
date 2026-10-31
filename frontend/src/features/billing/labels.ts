@@ -5,7 +5,7 @@ import type { ChargeKind, InvoiceKind, InvoiceStatus, LineKind, MoveInKind } fro
 
 export const INVOICE_STATUS: Record<InvoiceStatus, Label> = {
   ISSUED: { label: 'Issued', tone: 'ad__badge--info' },
-  PARTIALLY_PAID: { label: 'Part paid', tone: 'ad__badge--warn' },
+  PARTIALLY_PAID: { label: 'Part paid', tone: 'ad__badge--part' },
   PAID: { label: 'Paid', tone: 'ad__badge--ok' },
   VOID: { label: 'Void', tone: 'ad__badge--off' },
 };

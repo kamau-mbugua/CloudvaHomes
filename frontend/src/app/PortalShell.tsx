@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
+import { BrandLockup } from '../components/BrandMark';
+import { TopRouteProgress } from '../components/Loading';
 import { MoonIcon, SignOutIcon, SunIcon } from './icons';
 import { portalsOf } from '../lib/auth/portals';
 import { logout } from '../lib/auth/session';
@@ -73,6 +75,7 @@ export function PortalShell({
     <div className={`ow ow--${portal}`}>
       <header className="ow__top">
         <div className="ow__who">
+          {portal === 'owner' ? <BrandLockup tone="navy" size="sm" /> : null}
           <span className="ow__org">{orgName}</span>
           {accounts.length > 1 ? (
             <select className="ow__switch" aria-label={switchLabel} value={currentId} onChange={(e) => onSwitch(e.target.value)}>
@@ -89,6 +92,7 @@ export function PortalShell({
             <SignOutIcon /> <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
           </button>
         </div>
+        <TopRouteProgress />
       </header>
 
       <nav className="ow__tabs" aria-label={label}>
@@ -102,7 +106,12 @@ export function PortalShell({
       </main>
 
       <footer className="ow__foot">
-        <span>{footer}</span>
+        <span className="ow__foot-brand">
+          <span>{footer}</span>
+          <span className="ow__powered">
+            Powered by <BrandLockup tone="light" size="xs" />
+          </span>
+        </span>
         <span className="ow__places">
           {places.staff ? <Link to="/app">Staff app</Link> : null}
           {places.owner && portal !== 'owner' ? <Link to="/owner">Owner portal</Link> : null}

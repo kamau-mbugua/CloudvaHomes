@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/config.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/brand_mark.dart';
 
 /// Curved dark-blue hero header with the wordmark, then the form on a crisp light canvas.
 class AuthScaffold extends StatelessWidget {
@@ -77,23 +78,10 @@ class AuthScaffold extends StatelessWidget {
                         ),
                       Row(
                         children: [
-                          const Text(
-                            'hodi',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.6,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF60A5FA),
-                              shape: BoxShape.circle,
-                            ),
+                          const KodiHubLockup(
+                            tone: BrandTone.navy,
+                            iconSize: 34,
+                            fontSize: 24,
                           ),
                           const Spacer(),
                           if (!AppConfig.isProd)

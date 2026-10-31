@@ -147,7 +147,7 @@ export function renderPlatformInvoicePdf({
   doc.restore();
 
   const headerTextY = y + 7;
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.tableHeaderFg);
   doc.text('Description', cols.desc, headerTextY, { width: 255, lineBreak: false });
   doc.text('Let units', cols.units, headerTextY, { width: 55, align: 'right', lineBreak: false });
   doc.text('Rate (KES)', cols.rate, headerTextY, { width: 70, align: 'right', lineBreak: false });
@@ -248,7 +248,7 @@ export function renderPlatformInvoicePdf({
   doc
     .rect(totalsX, totalsY, totalsWidth, balBoxH)
     .lineWidth(1)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.ruleHeavy);
+    .fillAndStroke(PDF_BRAND.brandSoft, PDF_BRAND.ruleHeavy);
   doc.restore();
   doc
     .font('Helvetica-Bold')

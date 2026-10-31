@@ -55,7 +55,7 @@ export function ConfirmDelete({
                   <button type="button" className="nx-btn" onClick={close}>Keep it</button>
                   <button
                     type="button"
-                    className="nx-btn nx-btn--danger"
+                    className="nx-btn nx-btn--danger-solid"
                     disabled={busy}
                     onClick={() => { close(); onConfirm(); }}
                   >

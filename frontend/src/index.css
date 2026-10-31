@@ -1,5 +1,6 @@
 @import './styles/fonts.css';
 @import './styles/tokens.css';
+@import './styles/loading.css';
 @import './styles/auth.css';
 @import './styles/shell.css';
 @import './styles/admin.css';

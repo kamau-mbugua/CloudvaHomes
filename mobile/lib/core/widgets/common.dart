@@ -5,6 +5,69 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_error.dart';
 import '../theme.dart';
 
+/// C2.1 AppBar (`#002B4D` navy + `3dp` `#84BD00` bottom stripe) used across Staff, Tenant, and Owner shells (§06 Mobile).
+class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const KodiHubAppBar({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.actions,
+    this.bottom,
+  });
+
+  final Widget title;
+  final String? subtitle;
+  final List<Widget>? actions;
+  final PreferredSizeWidget? bottom;
+
+  @override
+  Size get preferredSize => Size.fromHeight(
+    kToolbarHeight + 3 + (bottom?.preferredSize.height ?? 0),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomHeight = 3.0 + (bottom?.preferredSize.height ?? 0);
+    return AppBar(
+      backgroundColor: HodiColors.navy,
+      foregroundColor: Colors.white,
+      title: subtitle == null
+          ? title
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                title,
+                Text(
+                  subtitle!,
+                  style: const TextStyle(
+                    fontFamily: 'Lufga',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF9EAEC4),
+                  ),
+                ),
+              ],
+            ),
+      actions: actions,
+      bottom: PreferredSize(
+        preferredSize: Size.fromHeight(bottomHeight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ?bottom,
+            const SizedBox(
+              height: 3,
+              width: double.infinity,
+              child: ColoredBox(color: HodiColors.lime),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Signature dark-blue curved hero card used at the top of home, tenant, and billing screens.
 class CurvedHeroCard extends StatelessWidget {
   const CurvedHeroCard({

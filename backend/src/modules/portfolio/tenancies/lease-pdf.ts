@@ -205,7 +205,7 @@ export function renderLeasePdf({
   doc
     .font('Helvetica-Bold')
     .fontSize(8)
-    .fillColor(PDF_BRAND.ink)
+    .fillColor(PDF_BRAND.tableHeaderFg)
     .text('SCHEDULE OF FINANCIAL & TENANCY TERMS', left + 8, y + 6, { width: 300 });
   doc.text('VALUE / SPECIFICATION', left + 300, y + 6, {
     width: width - 308,

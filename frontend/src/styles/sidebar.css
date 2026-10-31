@@ -1,8 +1,9 @@
 /*
- * App shell and sidebar — ported from UltimatePOS pos-react (src/styles/sidebar.css).
+ * App shell and sidebar — C2.1 "Ledger roof, refined" (§05 Web Portal).
  *
- * 252px navy sidebar with expandable groups, collapsible to 68px icons; 64px top bar;
- * below 860px the sidebar becomes an overlay drawer.
+ * Top bar: 56px in #002B4D navy with a 3px solid #84BD00 bottom stripe.
+ * Sidebar: 220px on #FAFAF7 paper (64px collapsed); active item uses #EEF6DB fill,
+ * #3D5509 text and a 3px #4D6B10 left inset bar.
  */
 
 .ms {
@@ -26,28 +27,54 @@
   padding: 24px 24px 40px;
 }
 
-/* ── Top bar ────────────────────────────────────────────────────────────── */
+/* ── Top bar (#002B4D navy + 3px #84BD00 bottom stripe) ─────────────────── */
 
 .ms__top {
-  height: 64px;
+  position: relative;
+  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 0 20px;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
+  background: var(--nav-background);
+  color: #ffffff;
+  border-bottom: 3px solid var(--lime, #84bd00);
+}
+
+.ms__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.ms__org-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ms__title {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .ms__title strong {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
+  color: #ffffff;
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
@@ -55,38 +82,42 @@
 }
 
 .ms__title span {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 11.5px;
+  color: #9eaec4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .ms__search {
-  flex: 1 1 0;
-  max-width: 420px;
-  height: 36px;
+  flex: 0 1 240px;
+  margin-left: auto;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 0 12px;
-  border: 1px solid var(--input);
-  border-radius: var(--radius);
-  background: var(--background);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
   font-family: inherit;
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  color: #d7e0ec;
   cursor: pointer;
 }
 
-.ms__search:hover { background: var(--secondary); }
+.ms__search:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
 
 .ms__kbd {
   font-size: 11px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 5px;
   padding: 1px 5px;
+  color: #9eaec4;
 }
 
 .ms__right {
@@ -96,18 +127,27 @@
   gap: 9px;
 }
 
+.ms__search + .ms__right {
+  margin-left: 0;
+}
+
 /* A page's own actions. In the header on a wide screen; on a phone they move to a
    bar pinned to the top of the page, because the header row has no room left. */
 .ms__actions { display: contents; }
 .ms__pagebar { display: none; }
 
+@media (max-width: 720px) {
+  .ms__title { display: none; }
+}
+
 @media (max-width: 560px) {
   .ms__top { gap: 8px; padding: 0 12px; }
+  .ms__org-pill { display: none; }
   .ms__right { min-width: 0; gap: 6px; }
   .ms__actions { display: none; }
   .ms__pagebar {
     position: sticky;
-    top: -16px; /* flush with the scroll box, past .ms__page's top padding */
+    top: -16px;
     z-index: 5;
     display: flex;
     flex-wrap: wrap;
@@ -129,28 +169,32 @@
   justify-content: center;
   border: 0;
   border-radius: var(--radius);
-  background: transparent;
-  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+  color: #d7e0ec;
   cursor: pointer;
+}
+
+.ms__burger:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
 }
 
 .ms__burger svg { width: 20px; height: 20px; }
 
-/* ── Sidebar ────────────────────────────────────────────────────────────── */
+/* ── Sidebar (220px on #FAFAF7 paper) ───────────────────────────────────── */
 
 .sb {
-  width: 252px;
+  width: 220px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  /* --nav-background, NOT --primary: primary flips to lime in dark mode, which would
-     paint the whole column a colour text cannot sit on. */
-  background: var(--nav-background);
-  color: #fff;
+  background: var(--background);
+  color: var(--text-secondary);
+  border-right: 1px solid var(--border-soft);
   transition: width 140ms ease;
 }
 
-.sb.is-collapsed { width: 68px; }
+.sb.is-collapsed { width: 64px; }
 
 /* Whose organisation this is, at the top of the menu where it is always in view. */
 .sb__brand {
@@ -158,7 +202,7 @@
   align-items: center;
   gap: 10px;
   padding: 12px 12px 10px;
-  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  border-bottom: 1px solid var(--border-soft);
   margin-bottom: 6px;
 }
 
@@ -168,8 +212,8 @@
   height: 30px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--accent);
-  color: var(--accent-foreground);
+  background: var(--navy, #002b4d);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -184,7 +228,7 @@
   min-width: 0;
   font-size: 13.5px;
   font-weight: 600;
-  color: #fff;
+  color: var(--foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -201,62 +245,73 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 0;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
-  background: rgb(255 255 255 / 10%);
-  color: #fff;
+  background: var(--card);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
-.sb__collapse:hover { background: rgb(255 255 255 / 20%); }
+.sb__collapse:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
 .sb__collapse svg { width: 16px; height: 16px; }
 
 .sb__scroll {
   flex: 1 1 0;
   overflow-y: auto;
-  padding: 4px 8px 16px;
-  /* A thin light scrollbar; the default dark one is invisible on this surface. */
+  padding: 6px 10px 16px;
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 25%) transparent;
+  scrollbar-color: var(--border) transparent;
 }
 
 .sb__item {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 9px 10px;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   font-family: inherit;
   font-size: 13.5px;
   text-align: left;
-  color: rgb(255 255 255 / 78%);
+  color: var(--text-secondary);
   text-decoration: none;
   cursor: pointer;
 }
 
-.sb__item:hover { background: rgb(255 255 255 / 9%); color: #fff; }
+.sb__item:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
 
-.sb__item.is-active,
 .sb__item.is-current {
-  background: rgb(255 255 255 / 14%);
-  color: #fff;
-  font-weight: 500;
+  background: var(--secondary);
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.sb__item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .sb__icon {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.sb__icon svg { width: 20px; height: 20px; }
+.sb__icon svg { width: 19px; height: 19px; }
 
 .sb__label {
   flex: 1 1 0;
@@ -269,57 +324,60 @@
 .sb__chevron {
   flex-shrink: 0;
   display: flex;
+  color: var(--text-subtle);
   transition: transform 140ms ease;
 }
 
 .sb__chevron svg { width: 15px; height: 15px; }
 .sb__chevron.is-open { transform: rotate(90deg); }
 
-/* Collapsed: icons only. The title attribute carries the label on hover, so the narrow
-   mode stays navigable instead of becoming a column of guesses. */
+/* Collapsed: icons only. */
 .sb.is-collapsed .sb__label,
 .sb.is-collapsed .sb__chevron { display: none; }
 
 .sb.is-collapsed .sb__item { justify-content: center; padding: 10px 0; }
 
 .sb__children {
-  padding: 2px 0 6px 34px;
+  padding: 2px 0 6px 26px;
   display: flex;
   flex-direction: column;
+  gap: 1px;
 }
 
 .sb__child {
   padding: 7px 10px;
   border-radius: 8px;
   font-size: 13px;
-  color: rgb(255 255 255 / 66%);
+  color: var(--text-muted);
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.sb__child:hover { background: rgb(255 255 255 / 9%); color: #fff; }
+.sb__child:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
 
 .sb__child.is-active {
-  background: rgb(255 255 255 / 16%);
-  color: #fff;
-  font-weight: 500;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 /* A child with a live count (Reconciliation): label left, count right. */
 .sb__child--count { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sb__childlabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* A number the menu answers before a page is opened: how many tenants, how many
-   invoices are late. Two tones only — a plain tally, and one that wants doing something
-   about. Anything more and the menu starts competing with the dashboard. */
 .sb__count {
   flex-shrink: 0;
   min-width: 20px;
-  padding: 1px 6px;
+  padding: 1px 7px;
   border-radius: 999px;
-  background: rgb(255 255 255 / 14%);
+  background: var(--secondary);
+  color: var(--text-secondary);
   font-family: var(--font-num);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
@@ -327,13 +385,11 @@
 }
 
 .sb__count--alert {
-  background: var(--destructive);
-  color: #fff;
-  font-weight: 600;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-weight: 700;
 }
 
-/* Collapsed there is no room for a tally beside a 20px icon; the alarm still shows,
-   shrunk to a dot in the corner, because a late invoice must not vanish with the labels. */
 .sb.is-collapsed .sb__count { display: none; }
 
 .sb.is-collapsed .sb__count--alert {
@@ -345,6 +401,7 @@
   height: 8px;
   padding: 0;
   font-size: 0;
+  background: var(--warning);
 }
 
 .sb.is-collapsed .sb__item { position: relative; }
@@ -358,16 +415,16 @@
     position: fixed;
     inset: 0 auto 0 0;
     z-index: 50;
-    width: 268px;
+    width: 260px;
     transform: translateX(-100%);
     transition: transform 160ms ease;
+    box-shadow: var(--shadow-lg);
   }
 
   .ms.is-drawer-open .sb { transform: translateX(0); }
 
-  /* Collapsing is a desktop affordance; on a phone the drawer is already the answer. */
   .sb__collapse { display: none; }
-  .sb.is-collapsed { width: 268px; }
+  .sb.is-collapsed { width: 260px; }
   .sb.is-collapsed .sb__label,
   .sb.is-collapsed .sb__chevron { display: revert; }
   .sb.is-collapsed .sb__item { justify-content: flex-start; padding: 9px 10px; }

@@ -13,6 +13,8 @@ import 'api/api_error.dart';
 import 'auth/session.dart';
 import 'auth/session_controller.dart';
 import 'navigation.dart';
+import 'theme.dart';
+import 'widgets/brand_mark.dart';
 import 'widgets/common.dart';
 
 const _public = {'/sign-in', '/sign-in/code', '/forgot', '/register'};
@@ -87,8 +89,21 @@ final routerProvider = Provider<GoRouter>((ref) {
 class _Splash extends StatelessWidget {
   const _Splash();
   @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) => const Scaffold(
+    body: Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          KodiHubLockup(iconSize: 44, fontSize: 26, animated: true),
+          SizedBox(height: 16),
+          Text(
+            'Checking your session…',
+            style: TextStyle(color: HodiColors.inkSubtle, fontSize: 13.5),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _Offline extends ConsumerWidget {
@@ -116,9 +131,9 @@ class _NoAccess extends ConsumerWidget {
         children: [
           const EmptyState(
             icon: Icons.web_outlined,
-            title: 'Use Hodi on the web',
+            title: 'Use KodiHub on the web',
             body:
-                'This account has nothing to show in the app yet. Owners and Hodi admins use the web app.',
+                'This account has nothing to show in the app yet. Owners and KodiHub admins use the web app.',
           ),
           TextButton(
             onPressed: () => ref.read(sessionProvider.notifier).signOut(),

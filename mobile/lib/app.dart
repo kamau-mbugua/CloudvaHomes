@@ -11,7 +11,7 @@ class HodiApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Hodi',
+      title: 'KodiHub',
       debugShowCheckedModeBanner: false,
       theme: hodiTheme(Brightness.light),
       darkTheme: hodiTheme(Brightness.dark),

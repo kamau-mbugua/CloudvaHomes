@@ -65,53 +65,72 @@ details[open] > .ag__line--sub .ag__linelabel::before { content: '▾ '; }
 .ag__payouthead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .ag__payoutamt { font-size: 18px; font-weight: 600; }
 
-/* ---- owner portal shell ---------------------------------------------------- */
+/* ---- owner & tenant portal shell ------------------------------------------- */
 .ow { min-height: 100%; display: flex; flex-direction: column; background: var(--background); }
 .ow__top {
   position: sticky; top: 0; z-index: 10;
+  min-height: 56px;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px max(16px, env(safe-area-inset-left)) 10px max(16px, env(safe-area-inset-right));
-  background: var(--card); border-bottom: 1px solid var(--border);
+  padding: 8px max(16px, env(safe-area-inset-left)) 8px max(16px, env(safe-area-inset-right));
+  background: var(--nav-background);
+  color: #ffffff;
+  border-bottom: 3px solid var(--lime, #84bd00);
 }
-.ow__who { display: flex; flex-direction: column; min-width: 0; }
-.ow__org { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ow__name { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ow__who { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.ow__org {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ow__name { font-size: 14px; font-weight: 600; color: #d7e0ec; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ow__switch {
-  max-width: 100%; height: 36px; padding: 0 8px;
-  border: 1px solid var(--input); border-radius: var(--radius);
-  background: var(--input-background); color: var(--foreground);
-  font: inherit; font-size: 14px; font-weight: 600;
+  max-width: 100%; height: 32px; padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1); color: #ffffff;
+  font: inherit; font-size: 12.5px; font-weight: 600;
 }
+.ow__switch option { background: #ffffff; color: #0a2540; }
 .ow__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .ow__signout {
   display: inline-flex; align-items: center; gap: 6px;
-  min-height: 36px; padding: 0 10px;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--card); color: var(--text-secondary);
-  font: inherit; font-size: 13px; cursor: pointer;
+  min-height: 34px; padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08); color: #d7e0ec;
+  font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer;
 }
 .ow__signout svg { width: 16px; height: 16px; }
-.ow__signout:hover:not(:disabled) { background: var(--secondary); }
+.ow__signout:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); color: #ffffff; }
 .ow__tabs {
   display: flex; gap: 4px; overflow-x: auto;
-  padding: 8px 16px 0; border-bottom: 1px solid var(--border); background: var(--card);
+  padding: 6px 16px 0; border-bottom: 1px solid var(--border); background: var(--card);
 }
 .ow__tab {
   min-height: var(--touch-min); display: inline-flex; align-items: center;
   padding: 0 14px; border-bottom: 2px solid transparent;
   color: var(--text-muted); text-decoration: none; font-weight: 500; white-space: nowrap;
 }
-.ow__tab.is-on { color: var(--foreground); border-bottom-color: var(--accent); }
+.ow__tab.is-on { color: var(--foreground); font-weight: 600; border-bottom-color: var(--accent); }
 .ow__page { flex: 1; width: 100%; max-width: 860px; margin: 0 auto; padding: 16px; }
+.ow--tenant .ow__page { max-width: 640px; }
 .ow__stack { display: flex; flex-direction: column; gap: 14px; }
-.ow__h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+.ow__h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.025em; }
 .ow__contact { display: flex; flex-direction: column; gap: 4px; }
 .ow__contact a { color: var(--foreground); }
 .ow__foot {
-  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px;
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px;
   padding: 16px; font-size: 12px; color: var(--text-muted);
   max-width: 860px; width: 100%; margin: 0 auto;
 }
+.ow--tenant .ow__foot { max-width: 640px; }
+.ow__foot-brand { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.ow__powered { display: inline-flex; align-items: center; gap: 6px; color: var(--text-subtle); }
 .ow__foot a { color: var(--text-secondary); }
 
 /* The owner-portal link on the "no organisation" screen is a link styled as the button. */

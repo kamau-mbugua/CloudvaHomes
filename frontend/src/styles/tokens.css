@@ -24,6 +24,16 @@
   --primary-foreground: #ffffff;
   --primary-hover: #0a3a66;
 
+  --navy: #002b4d;
+  --navy-deep: #0a1f36;
+  --navy-mid: #0a3a66;
+  --lime: #84bd00;
+  --lime-text: #4d6b10;
+  --lime-hover: #3d5509;
+  --lime-soft: #eef6db;
+  --paper: #fafaf7;
+  --paper-2: #f1efe9;
+
   --accent: #4d6b10;
   --accent-foreground: #ffffff;
   --accent-hover: #3d5509;
@@ -35,9 +45,9 @@
   --tertiary: #2b404b;
   --tertiary-foreground: #ffffff;
 
-  /* Large navy chrome (sidebar, auth brand panel). NOT --primary: the design system flips
+  /* Large navy chrome (top bar, auth brand panel). NOT --primary: the design system flips
      primary to lime in dark mode, which is right for buttons and wrong for a full-width
-     surface. --nav-background stays dark in both themes. */
+     surface. --nav-background stays #002b4d in both themes. */
   --nav-background: #002b4d;
   --nav-foreground: #ffffff;
 
@@ -47,11 +57,14 @@
   --muted-foreground: #52647e;
 
   --destructive: #dc2626;
+  --destructive-text: #b91c1c;
   --destructive-foreground: #ffffff;
   --destructive-soft: #fdecec;
   --success: #1f7a4f;
   --success-foreground: #ffffff;
   --success-soft: #e6f4ec;
+  --part-paid: #3d5509;
+  --part-paid-soft: #eef6db;
   --warning: #9a5b00;
   --warning-foreground: #ffffff;
   --warning-soft: #fdf3e3;
@@ -60,6 +73,7 @@
   --info-text: #28618f;
 
   --border: rgba(10, 37, 64, 0.12);
+  --border-soft: rgba(10, 37, 64, 0.08);
   --input: rgba(10, 37, 64, 0.18);
   --input-background: #ffffff;
   --ring: #4d6b10;
@@ -70,12 +84,15 @@
   --text-subtle: #5b6b82;
 
   --radius: 0.625rem;
-  --radius-card: 14px;
+  --radius-input: 10px;
+  --radius-dialog: 12px;
+  --radius-card: 16px;
+  --radius-sheet: 24px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px rgba(10, 37, 64, 0.06);
+  --shadow-sm: 0 1px 3px rgba(10, 37, 64, 0.06);
   --shadow-md: 0 6px 18px rgba(10, 37, 64, 0.08);
-  --shadow-lg: 0 24px 60px rgba(10, 37, 64, 0.28);
+  --shadow-lg: 0 20px 60px -24px rgba(10, 37, 64, 0.3);
 
   --font: Lufga, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-num: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -105,7 +122,7 @@
     --accent-default: #9dd000;
 
     --tertiary: #1a3050;
-    --nav-background: #001628;
+    --nav-background: #002b4d;
     --nav-foreground: #f2f5f9;
     --secondary: #122438;
     --secondary-foreground: #f2f5f9;
@@ -113,9 +130,12 @@
     --muted-foreground: #9eaec4;
 
     --destructive: #ef4444;
+    --destructive-text: #ef4444;
     --destructive-soft: #2a1414;
     --success: #34d399;
     --success-soft: #0d2a1e;
+    --part-paid: #9dd000;
+    --part-paid-soft: #1c2e14;
     --warning: #fbbf24;
     --warning-soft: #332100;
     --info: #5f9fd8;
@@ -123,6 +143,7 @@
     --info-text: #8fbce4;
 
     --border: rgba(255, 255, 255, 0.12);
+    --border-soft: rgba(255, 255, 255, 0.08);
     --input: rgba(255, 255, 255, 0.16);
     --input-background: #0a1b2e;
     --ring: #84bd00;
@@ -132,9 +153,9 @@
     --text-muted: #b7c4d6;
     --text-subtle: #9eaec4;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 20px 60px -24px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -160,7 +181,7 @@
   --accent-default: #9dd000;
 
   --tertiary: #1a3050;
-  --nav-background: #001628;
+  --nav-background: #002b4d;
   --nav-foreground: #f2f5f9;
   --secondary: #122438;
   --secondary-foreground: #f2f5f9;
@@ -168,9 +189,12 @@
   --muted-foreground: #9eaec4;
 
   --destructive: #ef4444;
+  --destructive-text: #ef4444;
   --destructive-soft: #2a1414;
   --success: #34d399;
   --success-soft: #0d2a1e;
+  --part-paid: #9dd000;
+  --part-paid-soft: #1c2e14;
   --warning: #fbbf24;
   --warning-soft: #332100;
   --info: #5f9fd8;
@@ -178,6 +202,7 @@
   --info-text: #8fbce4;
 
   --border: rgba(255, 255, 255, 0.12);
+  --border-soft: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.16);
   --input-background: #0a1b2e;
   --ring: #84bd00;
@@ -187,7 +212,7 @@
   --text-muted: #b7c4d6;
   --text-subtle: #9eaec4;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 20px 60px -24px rgba(0, 0, 0, 0.55);
 }

@@ -91,7 +91,7 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
       .strokeColor(PDF_BRAND.ruleHeavy)
       .stroke();
     doc.restore();
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.tableHeaderFg);
     const ty = y + 6;
     doc.text('Date', cols.date, ty, { width: 58, lineBreak: false });
     doc.text('Item', cols.what, ty, { width: 72, lineBreak: false });
@@ -118,7 +118,7 @@ export function renderOwnerStatementPdf(s: Statement): Promise<Buffer> {
 
     if (bold) {
       doc.save();
-      doc.rect(left, y, width, rowH).fill(PDF_BRAND.surface);
+      doc.rect(left, y, width, rowH).fill(PDF_BRAND.brandSoft);
       doc.restore();
     } else if (rowIdx % 2 === 1) {
       doc.save();

@@ -1,0 +1,231 @@
+/**
+ * Loading & waiting states — C2.1 "Ledger roof, refined" (§08 Loading).
+ * Six patterns:
+ *  1. Branded C2.1 sequential 3-bar splash loader (.kh-bar-1..3)
+ *  2. Inline spinner ring (.kh-spinner)
+ *  3. Warm paper skeleton shimmer (.kh-skel)
+ *  4. Determinate progress bar (.kh-batch)
+ *  5. 3px top-bar route progress (.kh-topbar)
+ *  6. Pending M-Pesa STK pulse dot (.kh-stk-dot)
+ */
+
+@keyframes khBar {
+  0%, 10% {
+    transform: scaleX(0);
+    opacity: 0.35;
+  }
+  45%, 80% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  95%, 100% {
+    transform: scaleX(0);
+    opacity: 0.35;
+  }
+}
+
+@keyframes khSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes khPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes khShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes khTopbar {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(-15%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.kh-bar-1,
+.kh-bar-2,
+.kh-bar-3 {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: khBar 1.6s ease-in-out infinite;
+}
+
+.kh-bar-1 {
+  animation-delay: 0s;
+}
+
+.kh-bar-2 {
+  animation-delay: 0.18s;
+}
+
+.kh-bar-3 {
+  animation-delay: 0.36s;
+}
+
+.kh-spin {
+  animation: khSpin 0.9s linear infinite;
+}
+
+.kh-pulse {
+  animation: khPulse 1.6s ease-in-out infinite;
+}
+
+.kh-skel {
+  background: linear-gradient(90deg, var(--muted) 0%, var(--paper-2, #f1efe9) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: khShimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+.kh-skel-table {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.kh-skel-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 120px 80px;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.kh-skel-row:last-child {
+  border-bottom: 0;
+}
+
+.kh-skel-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.kh-skel-card {
+  padding: 18px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--card);
+  display: grid;
+  gap: 10px;
+}
+
+/* Pattern 4 — Determinate batch progress */
+.kh-batch {
+  padding: 16px 18px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--card);
+  display: grid;
+  gap: 8px;
+}
+
+.kh-batch__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.kh-batch__title {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.kh-batch__count {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.kh-batch__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.kh-batch__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--lime, #84bd00);
+  transition: width 180ms ease-out;
+}
+
+.kh-batch__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+/* Pattern 5 — Top route loader along the 3px lime stripe */
+.kh-topbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.kh-topbar__bar {
+  width: 45%;
+  height: 100%;
+  background: #ffffff;
+  opacity: 0.75;
+  border-radius: 999px;
+  animation: khTopbar 1.2s ease-in-out infinite;
+}
+
+/* Pattern 6 — M-Pesa STK pulse dot & card */
+.kh-stk-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--lime, #84bd00);
+  box-shadow: 0 0 0 5px var(--lime-soft, #eef6db);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kh-bar-1,
+  .kh-bar-2,
+  .kh-bar-3,
+  .kh-spin,
+  .kh-pulse,
+  .kh-skel,
+  .kh-topbar__bar {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

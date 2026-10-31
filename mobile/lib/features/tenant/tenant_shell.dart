@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/widgets/account_sheet.dart';
+import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
 import 'tenant_api.dart';
 
@@ -20,7 +21,8 @@ class TenantShell extends ConsumerWidget {
     final currentId = ref.watch(currentTenantIdProvider);
     final current = accounts.where((a) => a.tenantId == currentId).firstOrNull;
     return Scaffold(
-      appBar: AppBar(
+      appBar: KodiHubAppBar(
+        subtitle: current?.name,
         title: accounts.length > 1
             ? PopupMenuButton<String>(
                 tooltip: 'Switch account',
@@ -38,7 +40,7 @@ class TenantShell extends ConsumerWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        current?.orgName ?? 'Hodi',
+                        current?.orgName ?? 'KodiHub',
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -46,7 +48,7 @@ class TenantShell extends ConsumerWidget {
                   ],
                 ),
               )
-            : Text(current?.orgName ?? 'Hodi'),
+            : Text(current?.orgName ?? 'KodiHub'),
         actions: const [NotificationButton(), AccountButton()],
       ),
       body: shell,

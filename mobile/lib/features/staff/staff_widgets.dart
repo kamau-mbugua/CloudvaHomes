@@ -124,7 +124,7 @@ String staffErrorMessage(Object error) {
 // ───────────────────────────────────────────── layout
 
 /// A tab's page: app bar with the account button, the Hodi bill banner, then the body.
-class StaffTabScaffold extends StatelessWidget {
+class StaffTabScaffold extends ConsumerWidget {
   const StaffTabScaffold({
     super.key,
     required this.title,
@@ -140,20 +140,25 @@ class StaffTabScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(title),
-      actions: [...actions, const NotificationButton(), const AccountButton()],
-      bottom: bottom,
-    ),
-    floatingActionButton: floatingActionButton,
-    body: Column(
-      children: [
-        const BillingBanner(),
-        Expanded(child: body),
-      ],
-    ),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final orgName =
+        ref.watch(sessionProvider).valueOrNull?.activeOrganization?.name;
+    return Scaffold(
+      appBar: KodiHubAppBar(
+        title: Text(title),
+        subtitle: orgName,
+        actions: [...actions, const NotificationButton(), const AccountButton()],
+        bottom: bottom,
+      ),
+      floatingActionButton: floatingActionButton,
+      body: Column(
+        children: [
+          const BillingBanner(),
+          Expanded(child: body),
+        ],
+      ),
+    );
+  }
 }
 
 /// Shown instead of a screen the person's role can't see.

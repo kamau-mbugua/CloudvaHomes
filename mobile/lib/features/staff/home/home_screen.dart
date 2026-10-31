@@ -95,14 +95,14 @@ class _QuickActions extends ConsumerWidget {
                         height: 38,
                         decoration: BoxDecoration(
                           color: dark
-                              ? HodiColors.limeSoft
-                              : HodiColors.skySoft,
+                              ? HodiColors.limeSoftDark
+                              : HodiColors.limeSoft,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           a.$1,
                           size: 20,
-                          color: dark ? HodiColors.lime : HodiColors.navy,
+                          color: dark ? HodiColors.lime : HodiColors.limeHover,
                         ),
                       ),
                       const SizedBox(height: 8),

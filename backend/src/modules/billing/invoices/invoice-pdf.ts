@@ -161,7 +161,7 @@ export function renderInvoicePdf({
   doc.restore();
 
   const headerTextY = y + 7;
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.tableHeaderFg);
   doc.text('Description', cols.desc, headerTextY, { width: 255, lineBreak: false });
   doc.text('Qty', cols.qty, headerTextY, { width: 52, align: 'right', lineBreak: false });
   doc.text('Unit price', cols.unit, headerTextY, { width: 72, align: 'right', lineBreak: false });
@@ -251,7 +251,7 @@ export function renderInvoicePdf({
   doc
     .rect(totalsX, totalsY, totalsWidth, balBoxH)
     .lineWidth(1)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.ruleHeavy);
+    .fillAndStroke(PDF_BRAND.brandSoft, PDF_BRAND.ruleHeavy);
   doc.restore();
   doc
     .font('Helvetica-Bold')

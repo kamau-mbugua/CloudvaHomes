@@ -13,6 +13,7 @@ import { formatPeriod } from '../../lib/periods';
 import { trimQuantity } from '../../lib/quantity';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { INVOICE_STATUS } from '../billing/labels';
 import type { Invoice } from '../billing/types';
@@ -90,7 +91,7 @@ function useTenantContext(): TenantContext {
 }
 
 function Loading() {
-  return <p className="ad__muted" role="status">Loading…</p>;
+  return <CardSkeleton count={2} />;
 }
 
 function Problem({ error, orgName }: { error: unknown; orgName: string }) {
@@ -145,7 +146,7 @@ export function TenantHomePage() {
         <DueLine open={open} />
         {o.credit > 0 ? <span className="tp__duenote">{formatKES(o.credit)} in credit — used on your next invoice</span> : null}
         {o.canPayInApp ? (
-          <button type="button" className={`nx-btn nx-btn--lg tp__paybtn ${owed > 0 ? 'nx-btn--primary' : ''}`} onClick={() => setPaying(true)}>
+          <button type="button" className="nx-btn nx-btn--lg nx-btn--money tp__paybtn" onClick={() => setPaying(true)}>
             {owed > 0 ? 'Pay now' : 'Pay in advance'}
           </button>
         ) : owed > 0 && o.howToPay.length > 0 ? (
@@ -388,7 +389,7 @@ export function TenantInvoicePage() {
         <span className={`tp__duenote ${inv.overdue && inv.status !== 'VOID' ? 'tp__overdue' : ''}`}>
           {inv.status === 'VOID' ? 'This invoice was cancelled and isn’t owed.' : `${inv.overdue ? 'Was due' : 'Due'} ${formatDay(inv.dueDate)}`}
         </span>
-        {canPay ? <button type="button" className="nx-btn nx-btn--lg nx-btn--primary tp__paybtn" onClick={() => setPaying(true)}>Pay now</button> : null}
+        {canPay ? <button type="button" className="nx-btn nx-btn--lg nx-btn--money tp__paybtn" onClick={() => setPaying(true)}>Pay now</button> : null}
       </section>
 
       <section className="ag__card">

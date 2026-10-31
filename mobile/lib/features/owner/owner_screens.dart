@@ -97,7 +97,8 @@ class OwnerShell extends ConsumerWidget {
     final currentId = ref.watch(currentOwnerIdProvider);
     final current = owners.where((o) => o.landlordId == currentId).firstOrNull;
     return Scaffold(
-      appBar: AppBar(
+      appBar: KodiHubAppBar(
+        subtitle: current?.name,
         title: owners.length > 1
             ? PopupMenuButton<String>(
                 tooltip: 'Switch landlord account',

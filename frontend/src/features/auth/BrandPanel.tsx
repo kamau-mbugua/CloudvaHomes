@@ -1,19 +1,15 @@
+import { BrandLockup } from '../../components/BrandMark';
+
 /**
- * The left-hand brand panel on auth screens — ported from pos-react's BrandPanel.
- *
- * Deliberately quiet: wordmark, one headline, one line of copy. The panel sits beside a
- * form whose whole job is one decision. Decorative — hidden below 900px, where a compact
- * brand row in the form panel's header takes over.
+ * The left-hand brand panel on auth screens — C2.1 "Ledger roof, refined".
  */
-// Read once at module load, not during render.
 const YEAR = new Date().getFullYear();
 
 export function BrandPanel() {
   return (
     <div className="au__brand">
       <div className="au__brandmark">
-        <img className="au__logo" src="/favicon.svg" alt="" aria-hidden="true" />
-        <span className="au__wordmark">KodiHub</span>
+        <BrandLockup tone="navy" size="md" />
       </div>
 
       <div className="au__pitch">

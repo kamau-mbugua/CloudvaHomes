@@ -216,14 +216,7 @@ class _OwedCard extends ConsumerWidget {
         if (o.canPayInApp) ...[
           const SizedBox(height: 16),
           FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: HodiColors.navy,
-              minimumSize: const Size.fromHeight(48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
+            style: KodiHubButtonStyles.money(),
             icon: const Icon(Icons.phone_iphone, color: HodiColors.navy),
             label: Text(owes ? 'Pay now' : 'Pay in advance'),
             onPressed: () => showTenantPaySheet(context, ref, o),

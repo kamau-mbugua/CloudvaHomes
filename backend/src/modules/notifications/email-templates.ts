@@ -734,7 +734,7 @@ function escapeHtml(raw: string): string {
 function linkifyHtml(escapedText: string): string {
   return escapedText.replace(
     /(https?:\/\/[^\s<)"']+)/g,
-    '<a href="$1" style="color:#365314;text-decoration:underline;font-weight:500;">$1</a>',
+    '<a href="$1" style="color:#002B4D;text-decoration:underline;font-weight:500;">$1</a>',
   );
 }
 
@@ -746,7 +746,12 @@ export function renderBrandedEmailHtml(opts: {
   text: string;
   brandName?: string;
 }): string {
-  const brand = escapeHtml(opts.brandName?.trim() || 'KodiHub');
+  const rawBrand = opts.brandName?.trim() || 'KodiHub';
+  const brand = escapeHtml(rawBrand);
+  const isDefaultBrand = rawBrand.toLowerCase() === 'kodihub';
+  const brandHtml = isDefaultBrand
+    ? '<span style="font-size:19px;font-weight:700;letter-spacing:-0.03em;color:#ffffff;">kodi<span style="color:#84BD00;">hub</span></span>'
+    : `<span style="font-size:18px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;">${brand}</span>`;
   const subject = escapeHtml(opts.subject);
   const lines = opts.text.replace(/\r\n/g, '\n').split('\n');
   const htmlBlocks: string[] = [];
@@ -760,19 +765,19 @@ export function renderBrandedEmailHtml(opts: {
     const sectionMatch = /^---\s*(.+?)\s*---$/.exec(trimmed);
     if (sectionMatch) {
       htmlBlocks.push(
-        `<div style="margin:18px 0 8px 0;padding-bottom:6px;border-bottom:1px solid #e5e7eb;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#3f6212;">${escapeHtml(sectionMatch[1]!)}</div>`,
+        `<div style="margin:18px 0 8px 0;padding-bottom:6px;border-bottom:1px solid #DCE3ED;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#002B4D;">${escapeHtml(sectionMatch[1]!)}</div>`,
       );
       continue;
     }
     const kvMatch = /^([A-Za-z][A-Za-z0-9 ()/-]{1,36}):\s+(.+)$/.exec(trimmed);
     if (kvMatch) {
       htmlBlocks.push(
-        `<div style="margin:4px 0;font-size:14px;line-height:1.55;color:#1f2937;"><strong style="color:#111827;">${escapeHtml(kvMatch[1]!)}:</strong> ${linkifyHtml(escapeHtml(kvMatch[2]!))}</div>`,
+        `<div style="margin:4px 0;font-size:14px;line-height:1.55;color:#1F3A5C;"><strong style="color:#0A2540;">${escapeHtml(kvMatch[1]!)}:</strong> ${linkifyHtml(escapeHtml(kvMatch[2]!))}</div>`,
       );
       continue;
     }
     htmlBlocks.push(
-      `<p style="margin:0 0 6px 0;font-size:14px;line-height:1.6;color:#1f2937;">${linkifyHtml(escapeHtml(rawLine))}</p>`,
+      `<p style="margin:0 0 6px 0;font-size:14px;line-height:1.6;color:#1F3A5C;">${linkifyHtml(escapeHtml(rawLine))}</p>`,
     );
   }
 
@@ -783,14 +788,14 @@ export function renderBrandedEmailHtml(opts: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${subject}</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f4f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f0;padding:28px 14px;">
+<body style="margin:0;padding:0;background-color:#FAFAF7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0A2540;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAFAF7;padding:28px 14px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background-color:#ffffff;border:1px solid #e5e5e0;border-radius:12px;overflow:hidden;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;background-color:#ffffff;border:1px solid #DCE3ED;border-radius:12px;overflow:hidden;">
           <tr>
-            <td style="background-color:#1a2e05;padding:18px 24px;">
-              <span style="font-size:18px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;">${brand}</span>
+            <td style="background-color:#002B4D;border-bottom:3px solid #84BD00;padding:18px 24px;">
+              ${brandHtml}
             </td>
           </tr>
           <tr>
@@ -799,7 +804,7 @@ export function renderBrandedEmailHtml(opts: {
             </td>
           </tr>
           <tr>
-            <td style="padding:14px 24px;background-color:#fafaf7;border-top:1px solid #ecece6;font-size:12px;color:#6b7280;">
+            <td style="padding:14px 24px;background-color:#FAFAF7;border-top:1px solid #E6E3DA;font-size:12px;color:#5B6B82;">
               Sent by ${brand} · Property Management Platform
             </td>
           </tr>

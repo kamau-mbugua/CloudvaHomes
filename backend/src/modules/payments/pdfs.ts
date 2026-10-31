@@ -106,30 +106,59 @@ export function renderReceiptPdf({
       { width: colW },
     );
 
-  // Right cell: PAYMENT SUMMARY
+  // Right cell: PAYMENT SUMMARY (Navy hero block + rotated PAID stamp per 07 · Print & PDF)
+  if (!reversal) {
+    doc.save();
+    doc.rect(left + halfWidth, gridTop, halfWidth, gridHeight).fill(PDF_BRAND.brandDark);
+    doc.restore();
+  }
   const rightX = left + halfWidth + padX;
   doc
     .font('Helvetica-Bold')
     .fontSize(7)
-    .fillColor(reversal ? PDF_BRAND.dangerText : PDF_BRAND.muted)
+    .fillColor(reversal ? PDF_BRAND.dangerText : PDF_BRAND.brandAccent)
     .text(reversal ? 'REVERSED AMOUNT' : 'AMOUNT RECEIVED', rightX, gridTop + 10, {
       width: colW,
     });
   doc
     .font('Helvetica-Bold')
     .fontSize(16)
-    .fillColor(reversal ? PDF_BRAND.dangerText : PDF_BRAND.ink)
+    .fillColor(reversal ? PDF_BRAND.dangerText : '#FFFFFF')
     .text(`KES ${money(p.amount)}`, rightX, gridTop + 21, { width: colW });
   doc
     .font('Helvetica')
     .fontSize(8.5)
-    .fillColor(PDF_BRAND.inkSecondary)
+    .fillColor(reversal ? PDF_BRAND.inkSecondary : '#DCE3ED')
     .text(
       `${METHOD[p.method]}${p.channel ? ` - ${p.channel.name}` : ''}${p.reference ? `, ref ${p.reference}` : ''}`,
       rightX,
       doc.y + 3,
       { width: colW },
     );
+
+  if (!reversal) {
+    const stampW = 46;
+    const stampH = 18;
+    const stampCx = right - 34;
+    const stampCy = gridTop + 20;
+    doc.save();
+    doc.translate(stampCx, stampCy);
+    doc.rotate(-12);
+    doc
+      .roundedRect(-stampW / 2, -stampH / 2, stampW, stampH, 3)
+      .lineWidth(1.5)
+      .fillAndStroke(PDF_BRAND.brandSoft, PDF_BRAND.brandOlive);
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(8.5)
+      .fillColor(PDF_BRAND.brandOlive)
+      .text('PAID', -stampW / 2, -4, {
+        width: stampW,
+        align: 'center',
+        lineBreak: false,
+      });
+    doc.restore();
+  }
 
   let y = gridTop + gridHeight + 16;
 
@@ -165,7 +194,7 @@ export function renderReceiptPdf({
       .stroke();
     doc.restore();
 
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.tableHeaderFg);
     doc.text(reversal ? 'Taken back from' : 'Paid towards', left + 8, y + 7, {
       width: 240,
       lineBreak: false,
@@ -237,7 +266,7 @@ export function renderReceiptPdf({
   doc
     .rect(left, y, width, standingBoxH)
     .lineWidth(0.75)
-    .fillAndStroke(PDF_BRAND.surface, PDF_BRAND.ruleHeavy);
+    .fillAndStroke(PDF_BRAND.brandSoft, PDF_BRAND.ruleHeavy);
   doc.restore();
   doc
     .font('Helvetica-Bold')
@@ -346,7 +375,7 @@ export function renderStatementPdf({ statement: s, org }: StatementInput): Promi
       .strokeColor(PDF_BRAND.ruleHeavy)
       .stroke();
     doc.restore();
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.ink);
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(PDF_BRAND.tableHeaderFg);
     const ty = y + 6;
     doc.text('Date', cols.date, ty, { width: 58, lineBreak: false });
     doc.text('Reference', cols.ref, ty, { width: 92, lineBreak: false });
@@ -374,7 +403,7 @@ export function renderStatementPdf({ statement: s, org }: StatementInput): Promi
 
     if (bold) {
       doc.save();
-      doc.rect(left, y, width, rowH).fill(PDF_BRAND.surface);
+      doc.rect(left, y, width, rowH).fill(PDF_BRAND.brandSoft);
       doc.restore();
     } else if (rowIdx % 2 === 1) {
       doc.save();

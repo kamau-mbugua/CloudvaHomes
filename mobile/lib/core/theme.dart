@@ -1,65 +1,124 @@
 import 'package:flutter/material.dart';
 
-/// Hodi's dark-blue & light-surface palette.
+/// KodiHub C2.1 "Ledger roof, refined" palette (§02 Colour & §06 Mobile).
 abstract final class HodiColors {
   static const navy = Color(0xFF002B4D);
-  static const navyDeep = Color(0xFF041C34);
-  static const navyMid = Color(0xFF0A3E6B);
-  static const blueAccent = Color(0xFF1D63B8);
-  static const skySoft = Color(0xFFEDF5FF);
-  static const mintSoft = Color(0xFFE7F4E8);
-  static const amberSoft = Color(0xFFFFF4E4);
-  static const roseSoft = Color(0xFFFFE2E5);
-  static const olive = Color(0xFF1D63B8);
-  static const oliveSoft = Color(0xFFEDF5FF);
-  static const lime = Color(0xFF60A5FA);
-  static const limeSoft = Color(0xFF102A45);
-  static const paper = Color(0xFFF4F7FC);
-  static const ink = Color(0xFF091E3A);
-  static const inkMuted = Color(0xFF5A6E85);
-  static const night = Color(0xFF061322);
+  static const navyDeep = Color(0xFF0A1F36);
+  static const navyMid = Color(0xFF0A3A66);
+
+  static const lime = Color(0xFF84BD00);
+  static const limeText = Color(0xFF4D6B10);
+  static const limeHover = Color(0xFF3D5509);
+  static const limeSoft = Color(0xFFEEF6DB);
+  static const limeSoftDark = Color(0xFF1C2E14);
+
+  static const paper = Color(0xFFFAFAF7);
+  static const paper2 = Color(0xFFF1EFE9);
+  static const muted = Color(0xFFECE9E0);
+
+  static const ink = Color(0xFF0A2540);
+  static const inkSecondary = Color(0xFF1F3A5C);
+  static const inkMuted = Color(0xFF52647E);
+  static const inkSubtle = Color(0xFF5B6B82);
+
+  static const night = Color(0xFF06121F);
   static const nightCard = Color(0xFF0C1E33);
-  static const success = Color(0xFF157347);
-  static const warning = Color(0xFFB45309);
-  static const danger = Color(0xFFDC2626);
+
+  static const success = Color(0xFF1F7A4F);
+  static const successSoft = Color(0xFFE6F4EC);
+  static const warning = Color(0xFF9A5B00);
+  static const warningSoft = Color(0xFFFDF3E3);
+  static const danger = Color(0xFFB91C1C);
+  static const dangerBorder = Color(0xFFDC2626);
+  static const dangerSoft = Color(0xFFFDECEC);
+
+  // Semantic aliases used across staff & portal widgets
+  static const blueAccent = limeText;
+  static const skySoft = limeSoft;
+  static const mintSoft = successSoft;
+  static const amberSoft = warningSoft;
+  static const roseSoft = dangerSoft;
+  static const olive = limeText;
+  static const oliveSoft = limeSoft;
+}
+
+typedef KodiHubColors = HodiColors;
+
+/// Explicit button helpers for C2.1 semantic CTA rules (§04 Components & §06 Mobile).
+abstract final class KodiHubButtonStyles {
+  /// #84BD00 lime pill with #002B4D navy bold text — reserved for money-moving CTAs.
+  static ButtonStyle money({double height = 48}) => FilledButton.styleFrom(
+    backgroundColor: HodiColors.lime,
+    foregroundColor: HodiColors.navy,
+    minimumSize: Size.fromHeight(height),
+    textStyle: const TextStyle(
+      fontFamily: 'Lufga',
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+    ),
+    shape: const StadiumBorder(),
+  );
 }
 
 ThemeData hodiTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
-  final scheme = ColorScheme(
-    brightness: brightness,
-    primary: dark ? HodiColors.lime : HodiColors.navy,
-    onPrimary: dark ? HodiColors.night : Colors.white,
-    secondary: dark ? HodiColors.lime : HodiColors.blueAccent,
-    onSecondary: dark ? HodiColors.night : Colors.white,
-    secondaryContainer: dark ? HodiColors.limeSoft : HodiColors.skySoft,
-    onSecondaryContainer: dark ? const Color(0xFFF2F5F9) : HodiColors.navy,
-    error: dark ? const Color(0xFFEF4444) : HodiColors.danger,
-    onError: Colors.white,
-    surface: dark ? HodiColors.night : HodiColors.paper,
-    onSurface: dark ? const Color(0xFFF2F5F9) : HodiColors.ink,
-    onSurfaceVariant: dark ? const Color(0xFF9EAEC4) : HodiColors.inkMuted,
-    surfaceContainerLowest: dark ? HodiColors.nightCard : Colors.white,
-    surfaceContainerLow: dark ? HodiColors.nightCard : Colors.white,
-    surfaceContainer: dark ? const Color(0xFF122438) : const Color(0xFFE8EFF8),
-    outline: dark ? const Color(0x33FFFFFF) : const Color(0x29002B4D),
-    outlineVariant: dark ? const Color(0x1FFFFFFF) : const Color(0x14002B4D),
-  );
+  final scheme = dark
+      ? const ColorScheme.dark(
+          primary: HodiColors.lime,
+          onPrimary: Color(0xFF001A2E),
+          secondary: Color(0xFF9DD000),
+          onSecondary: Color(0xFF001A2E),
+          secondaryContainer: HodiColors.limeSoftDark,
+          onSecondaryContainer: Color(0xFFF2F5F9),
+          surface: HodiColors.night,
+          onSurface: Color(0xFFF2F5F9),
+          onSurfaceVariant: Color(0xFF9EAEC4),
+          surfaceContainerLowest: HodiColors.nightCard,
+          surfaceContainerLow: HodiColors.nightCard,
+          surfaceContainer: Color(0xFF122438),
+          error: Color(0xFFEF4444),
+          onError: Colors.white,
+          outline: Color(0x1FFFFFFF),
+          outlineVariant: Color(0x14FFFFFF),
+        )
+      : const ColorScheme.light(
+          primary: HodiColors.navy,
+          onPrimary: Colors.white,
+          secondary: HodiColors.limeText,
+          onSecondary: Colors.white,
+          secondaryContainer: HodiColors.limeSoft,
+          onSecondaryContainer: HodiColors.limeHover,
+          surface: HodiColors.paper,
+          onSurface: HodiColors.ink,
+          onSurfaceVariant: HodiColors.inkMuted,
+          surfaceContainerLowest: Colors.white,
+          surfaceContainerLow: Colors.white,
+          surfaceContainer: HodiColors.paper2,
+          error: HodiColors.danger,
+          onError: Colors.white,
+          outline: Color(0x1F0A2540),
+          outlineVariant: Color(0x140A2540),
+        );
+
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Lufga',
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
-    appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surface,
-      foregroundColor: scheme.onSurface,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: HodiColors.navy,
+      foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      scrolledUnderElevation: 0.5,
+      scrolledUnderElevation: 0,
       centerTitle: false,
+      iconTheme: IconThemeData(color: Colors.white),
+      actionsIconTheme: IconThemeData(color: Colors.white),
       titleTextStyle: TextStyle(
-        color: dark ? scheme.onSurface : HodiColors.navy,
-        fontSize: 19,
-        fontWeight: FontWeight.w700,
+        fontFamily: 'Lufga',
+        color: Colors.white,
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
         letterSpacing: -0.3,
       ),
     ),
@@ -69,8 +128,8 @@ ThemeData hodiTheme(Brightness brightness) {
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: scheme.outline),
       ),
     ),
     dividerTheme: DividerThemeData(
@@ -85,16 +144,17 @@ ThemeData hodiTheme(Brightness brightness) {
     chipTheme: ChipThemeData(
       backgroundColor: scheme.surfaceContainerLowest,
       selectedColor: scheme.secondaryContainer,
-      side: BorderSide(color: scheme.outlineVariant),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      side: BorderSide(color: scheme.outline),
+      shape: const StadiumBorder(),
       labelStyle: TextStyle(
+        fontFamily: 'Lufga',
         color: scheme.onSurface,
         fontSize: 13,
         fontWeight: FontWeight.w600,
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: scheme.surface,
+      backgroundColor: scheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -103,46 +163,59 @@ ThemeData hodiTheme(Brightness brightness) {
     dialogTheme: DialogThemeData(
       backgroundColor: scheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: HodiColors.navy,
-      contentTextStyle: const TextStyle(color: Colors.white),
+      contentTextStyle: const TextStyle(
+        fontFamily: 'Lufga',
+        color: Colors.white,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: dark ? HodiColors.lime : HodiColors.navy,
-        foregroundColor: dark ? HodiColors.night : Colors.white,
+        foregroundColor: dark ? const Color(0xFF001A2E) : Colors.white,
         minimumSize: const Size.fromHeight(48),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(
+          fontFamily: 'Lufga',
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: const StadiumBorder(),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: dark ? Colors.white : HodiColors.navy,
         minimumSize: const Size(0, 44),
-        side: BorderSide(color: scheme.outline),
-        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        side: BorderSide(
+          color: dark ? const Color(0x29FFFFFF) : const Color(0x2E0A2540),
+        ),
+        textStyle: const TextStyle(
+          fontFamily: 'Lufga',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: const StadiumBorder(),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: scheme.outline),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: scheme.outline),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(
-          color: dark ? HodiColors.lime : HodiColors.navy,
-          width: 1.5,
+          color: dark ? HodiColors.lime : HodiColors.limeText,
+          width: 1.8,
         ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -150,25 +223,28 @@ ThemeData hodiTheme(Brightness brightness) {
       fillColor: scheme.surfaceContainerLowest,
     ),
     navigationBarTheme: NavigationBarThemeData(
+      height: 64,
+      labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       backgroundColor: scheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: scheme.secondaryContainer,
+      indicatorColor: dark ? HodiColors.limeSoftDark : HodiColors.limeSoft,
       iconTheme: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return IconThemeData(
           color: selected
-              ? (dark ? HodiColors.lime : HodiColors.navy)
-              : scheme.onSurfaceVariant,
+              ? (dark ? HodiColors.lime : HodiColors.limeHover)
+              : (dark ? const Color(0xFF9EAEC4) : HodiColors.inkSubtle),
         );
       }),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          fontFamily: 'Lufga',
+          fontSize: 11,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
           color: selected
-              ? (dark ? Colors.white : HodiColors.navy)
-              : scheme.onSurfaceVariant,
+              ? (dark ? HodiColors.lime : HodiColors.limeHover)
+              : (dark ? const Color(0xFF9EAEC4) : HodiColors.inkSubtle),
         );
       }),
     ),

@@ -75,6 +75,18 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  fonts:
+    - family: Lufga
+      fonts:
+        - asset: assets/fonts/LufgaRegular.ttf
+          weight: 400
+        - asset: assets/fonts/LufgaMedium.ttf
+          weight: 500
+        - asset: assets/fonts/LufgaSemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/LufgaBold.ttf
+          weight: 700
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

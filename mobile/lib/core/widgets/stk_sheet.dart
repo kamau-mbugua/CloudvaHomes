@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../api/api_client.dart';
 import '../api/api_error.dart';
 import '../money.dart';
+import '../theme.dart';
 import 'common.dart';
 
 /// One M-Pesa prompt as the API reports it (rent STK, tenant portal pay, Hodi bill pay).
@@ -95,16 +96,19 @@ class _StkPaySheetState extends State<StkPaySheet> {
         : '',
   );
   late final _phone = TextEditingController(text: widget.defaultPhone ?? '');
-  final _key = ApiClient.newIdempotencyKey();
+  var _key = ApiClient.newIdempotencyKey();
   StkStatus? _status;
   String? _error;
   bool _sending = false;
   Timer? _timer;
+  Timer? _clockTimer;
   int _polls = 0;
+  int _elapsedSeconds = 0;
 
   @override
   void dispose() {
     _timer?.cancel();
+    _clockTimer?.cancel();
     _amount.dispose();
     _phone.dispose();
     super.dispose();
@@ -128,7 +132,12 @@ class _StkPaySheetState extends State<StkPaySheet> {
         _key,
       );
       if (!mounted) return;
-      setState(() => _status = status);
+      setState(() {
+        _status = status;
+        _elapsedSeconds = 0;
+        _polls = 0;
+      });
+      _startClock();
       _follow();
     } on ApiError catch (e) {
       if (mounted) {
@@ -142,10 +151,35 @@ class _StkPaySheetState extends State<StkPaySheet> {
     }
   }
 
+  void _startClock() {
+    _clockTimer?.cancel();
+    if (_status == null || !_status!.pending) return;
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _status == null || !_status!.pending) {
+        _clockTimer?.cancel();
+        return;
+      }
+      setState(() => _elapsedSeconds++);
+    });
+  }
+
+  void _retryPrompt() {
+    _timer?.cancel();
+    _clockTimer?.cancel();
+    setState(() {
+      _status = null;
+      _error = null;
+      _elapsedSeconds = 0;
+      _polls = 0;
+      _key = ApiClient.newIdempotencyKey();
+    });
+  }
+
   /// Every [StkPaySheet.pollEvery] (3 s: up to 3 minutes); the server's sweep settles anything slower.
   void _follow() {
     _timer?.cancel();
     if (_status == null || !_status!.pending) {
+      _clockTimer?.cancel();
       if (_status != null) widget.onFinished?.call(_status!);
       return;
     }
@@ -206,12 +240,15 @@ class _StkPaySheetState extends State<StkPaySheet> {
               ],
               const SizedBox(height: 16),
               FilledButton(
+                style: KodiHubButtonStyles.money(),
                 onPressed: _sending ? null : _send,
                 child: Text(_sending ? 'Sending…' : 'Send M-Pesa prompt'),
               ),
             ] else
               _StatusView(
                 status: status,
+                elapsedSeconds: _elapsedSeconds,
+                onRetry: _retryPrompt,
                 onClose: () => Navigator.of(context).pop(),
               ),
           ],
@@ -221,20 +258,37 @@ class _StkPaySheetState extends State<StkPaySheet> {
   }
 }
 
+String _formatElapsed(int seconds) {
+  final s = seconds < 0 ? 0 : seconds;
+  final mins = s ~/ 60;
+  final rem = (s % 60).toString().padLeft(2, '0');
+  return '$mins:$rem';
+}
+
 class _StatusView extends StatelessWidget {
-  const _StatusView({required this.status, required this.onClose});
+  const _StatusView({
+    required this.status,
+    required this.elapsedSeconds,
+    required this.onRetry,
+    required this.onClose,
+  });
   final StkStatus status;
+  final int elapsedSeconds;
+  final VoidCallback onRetry;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
+    final timedOut60 = status.pending && elapsedSeconds >= 60;
     final (icon, tone, title, body) = switch (status.state) {
       'PENDING' => (
         Icons.phone_iphone,
         Tone.neutral,
         'Check the phone',
-        'An M-Pesa prompt for ${formatKes(status.amount)} was sent to ${status.phone}. '
-            'Enter the M-Pesa PIN to pay.',
+        timedOut60
+            ? 'Didn’t get the prompt? Check that your phone is unlocked, then send the prompt again or pay manually via M-Pesa Paybill.'
+            : 'An M-Pesa prompt for ${formatKes(status.amount)} was sent to ${status.phone}. '
+                  'Enter the M-Pesa PIN to pay.',
       ),
       'SUCCESS' => (
         Icons.check_circle,
@@ -269,10 +323,20 @@ class _StatusView extends StatelessWidget {
         Row(
           children: [
             if (status.pending)
-              const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 3),
+              Container(
+                width: 12,
+                height: 12,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: const BoxDecoration(
+                  color: HodiColors.lime,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: HodiColors.limeSoft,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
               )
             else
               Icon(icon, size: 28, color: toneColor(context, tone)),
@@ -283,6 +347,17 @@ class _StatusView extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
+            if (status.pending) ...[
+              Text(
+                _formatElapsed(elapsedSeconds),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             StatusChip(
               status.state == 'PENDING' ? 'Waiting' : title,
               tone: tone,
@@ -301,6 +376,14 @@ class _StatusView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
+        if (timedOut60) ...[
+          FilledButton(
+            style: KodiHubButtonStyles.money(),
+            onPressed: onRetry,
+            child: const Text('Send prompt again'),
+          ),
+          const SizedBox(height: 8),
+        ],
         OutlinedButton(onPressed: onClose, child: const Text('Close')),
       ],
     );

@@ -59,13 +59,13 @@
 .ad__table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 720px; }
 .ad__table th, .ad__table td {
   text-align: left; padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
   vertical-align: top;
 }
 .ad__table th {
   font-size: 11.5px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
 .ad__table tbody tr:last-child td { border-bottom: 0; }
 .ad__table td.num, .ad__table th.num { text-align: right; font-family: var(--font-num); }
@@ -81,18 +81,21 @@
 
 .ad__badge {
   display: inline-flex; align-items: center;
-  padding: 3px 9px; border-radius: var(--radius-pill);
-  font-size: 11.5px; font-weight: 600;
+  padding: 3px 10px; border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 600;
 }
 .ad__badge.is-on { background: var(--success-soft); color: var(--success); }
 .ad__badge.is-off { background: var(--muted); color: var(--text-muted); }
 
-/* Status tones. The design system pairs each semantic colour with a soft ground, so
-   these read correctly on a card in both themes. */
-.ad__badge--ok    { background: var(--success-soft); color: var(--success); }
-.ad__badge--warn  { background: var(--warning-soft); color: var(--warning); }
-.ad__badge--alert { background: var(--destructive-soft); color: var(--destructive); }
-.ad__badge--off   { background: var(--muted); color: var(--text-muted); }
+/* Status tones — C2.1 semantic pills (§04 Components). */
+.ad__badge--ok      { background: var(--success-soft); color: var(--success); }
+.ad__badge--part    { background: var(--part-paid-soft); color: var(--part-paid); }
+.ad__badge--warn    { background: var(--warning-soft); color: var(--warning); }
+.ad__badge--alert,
+.ad__badge--bad     { background: var(--destructive-soft); color: var(--destructive-text, var(--destructive)); }
+.ad__badge--info    { background: var(--info-soft); color: var(--info-text); }
+.ad__badge--off,
+.ad__badge--neutral { background: var(--muted); color: var(--text-muted); }
 
 /* Money: tabular so columns of digits line up. */
 .ad__money { font-family: var(--font-num); font-variant-numeric: tabular-nums; }

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import { formatDateTime } from '../../lib/dates';
 import { formatKES, parseAmount } from '../../lib/money';
+import { Spinner } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { STK_STATE } from '../mpesa/labels';
 import { describeStk, keyFor, newKey, signatureOf, suggestStkAmount } from '../mpesa/rules';
@@ -92,8 +93,17 @@ export function PaySheet({ tenantId, orgName, owed, ownPhone, title = 'Pay with 
       footer={(
         <>
           <button type="button" className="nx-btn" onClick={onClose} disabled={send.isPending}>Cancel</button>
-          <button type="submit" form="tp-pay" className="nx-btn nx-btn--primary nx-btn--lg tp__paysubmit" disabled={send.isPending}>
-            {send.isPending ? 'Sending…' : parsed.ok && parsed.minor > 0 ? `Pay ${formatKES(parsed.minor)}` : 'Pay'}
+          <button type="submit" form="tp-pay" className="nx-btn nx-btn--money nx-btn--lg tp__paysubmit" disabled={send.isPending}>
+            {send.isPending ? (
+              <>
+                <Spinner size={15} tone="money" />
+                <span>Sending STK…</span>
+              </>
+            ) : parsed.ok && parsed.minor > 0 ? (
+              `Pay ${formatKES(parsed.minor)}`
+            ) : (
+              'Pay'
+            )}
           </button>
         </>
       )}
@@ -117,6 +127,13 @@ export function PaySheet({ tenantId, orgName, owed, ownPhone, title = 'Pay with 
   );
 }
 
+function formatElapsed(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const mins = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${mins}:${String(rem).padStart(2, '0')}`;
+}
+
 function PayProgress({ tenantId, first, startedAt, onAgain, onClose }: {
   tenantId: string;
   first: StkRequest;
@@ -132,6 +149,16 @@ function PayProgress({ tenantId, first, startedAt, onAgain, onClose }: {
     startedAt,
   });
 
+  const [elapsedSec, setElapsedSec] = useState(() => Math.floor((Date.now() - startedAt) / 1000));
+
+  useEffect(() => {
+    if (!waiting) return;
+    const id = window.setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [waiting, startedAt]);
+
   // Paid: balance, invoices, statement and payments of this account have all changed.
   useEffect(() => {
     if (stk.state !== 'SUCCESS') return;
@@ -141,6 +168,8 @@ function PayProgress({ tenantId, first, startedAt, onAgain, onClose }: {
     });
   }, [stk.state, queryClient, tenantId]);
 
+  const timedOutAt60 = waiting && (elapsedSec >= 60 || gaveUp);
+
   return (
     <Sheet
       title="M-Pesa payment"
@@ -148,20 +177,33 @@ function PayProgress({ tenantId, first, startedAt, onAgain, onClose }: {
       footer={(
         <>
           {!waiting ? <button type="button" className="nx-btn" onClick={onAgain}>{stk.state === 'SUCCESS' ? 'Pay more' : 'Try again'}</button> : null}
+          {timedOutAt60 ? <button type="button" className="nx-btn" onClick={onAgain}>Send prompt again</button> : null}
           {waiting && gaveUp ? <button type="button" className="nx-btn" onClick={checkAgain} disabled={status.isFetching}>Check again</button> : null}
           <button type="button" className="nx-btn nx-btn--primary" onClick={onClose}>{waiting ? 'Close' : 'Done'}</button>
         </>
       )}
     >
       <div className={`mp__stk mp__stk--${stk.state.toLowerCase()}`} role="status" aria-live="polite">
-        <div className="mp__stkhead">
-          {waiting && !gaveUp ? <span className="mp__spinner" aria-hidden="true" /> : null}
-          <Badge table={STK_STATE} value={stk.state} />
-          <strong className="num">{formatKES(stk.amount)}</strong>
+        <div className="mp__stkhead" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {waiting && !timedOutAt60 ? <span className="kh-stk-dot kh-pulse" aria-hidden="true" /> : null}
+            <Badge table={STK_STATE} value={stk.state} />
+            <strong className="num">{formatKES(stk.amount)}</strong>
+          </div>
+          {waiting ? (
+            <span className="num ad__muted" aria-label={`Elapsed time ${formatElapsed(elapsedSec)}`}>
+              {formatElapsed(elapsedSec)}
+            </span>
+          ) : null}
         </div>
+        {waiting && !timedOutAt60 ? (
+          <div style={{ fontFamily: 'var(--font-num)', fontSize: 10, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--accent)' }}>
+            WAITING FOR M-PESA · CHECK YOUR PHONE
+          </div>
+        ) : null}
         <p className="mp__stkmsg">
-          {waiting && gaveUp
-            ? 'Still waiting for M-Pesa. If you paid, it will show on your account shortly — you don’t need to pay again.'
+          {timedOutAt60
+            ? 'Didn’t get the prompt? Check that your phone is unlocked, then send the prompt again or pay manually via M-Pesa Paybill. If you already entered your PIN, your payment will show shortly.'
             : describeStk(stk, 'tenant')}
         </p>
         <dl className="pf__facts mp__stkfacts">
@@ -170,7 +212,7 @@ function PayProgress({ tenantId, first, startedAt, onAgain, onClose }: {
           <div><dt>Sent</dt><dd>{formatDateTime(stk.createdAt)}</dd></div>
         </dl>
         {stk.state === 'SUCCESS' ? <p className="ad__muted">Your receipt is under Payments.</p> : null}
-        {waiting && !gaveUp ? <p className="ad__muted">You can close this. The payment is recorded automatically when you pay.</p> : null}
+        {waiting && !timedOutAt60 ? <p className="ad__muted">You can close this. The payment is recorded automatically when you pay.</p> : null}
         {status.isError ? <p className="fld__err">Couldn’t check just now: {tenantErrorMessage(status.error)}</p> : null}
       </div>
     </Sheet>

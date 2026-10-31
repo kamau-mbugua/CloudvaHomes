@@ -9,30 +9,33 @@ import PDFDocument from 'pdfkit';
  */
 
 export const PDF_BRAND = {
-  brandDark: '#111827',
-  brandAccent: '#1F2937',
-  brandSoft: '#F9FAFB',
-  brandBorder: '#D1D5DB',
-  ink: '#111827',
-  inkSecondary: '#374151',
-  muted: '#6B7280',
-  surface: '#F9FAFB',
-  tableHeaderBg: '#F3F4F6',
-  tableZebraBg: '#FAFAFA',
-  border: '#E5E7EB',
-  borderStrong: '#9CA3AF',
-  ruleHeavy: '#111827',
-  successText: '#14532D',
-  successBg: '#F0FDF4',
+  brandDark: '#002B4D',
+  brandAccent: '#84BD00',
+  brandOlive: '#4D6B10',
+  brandSoft: '#EEF6DB',
+  brandBorder: '#B7C4D6',
+  ink: '#0A2540',
+  inkSecondary: '#1F3A5C',
+  muted: '#5B6B82',
+  surface: '#FAFAF7',
+  surface2: '#F1EFE9',
+  tableHeaderBg: '#002B4D',
+  tableHeaderFg: '#FFFFFF',
+  tableZebraBg: '#FFFFFF',
+  border: '#DCE3ED',
+  borderStrong: '#B7C4D6',
+  ruleHeavy: '#002B4D',
+  successText: '#1F7A4F',
+  successBg: '#E6F4EC',
   successBorder: '#86EFAC',
-  warnText: '#7C2D12',
-  warnBg: '#FFF7ED',
+  warnText: '#9A5B00',
+  warnBg: '#FDF3E3',
   warnBorder: '#FDBA74',
-  dangerText: '#7F1D1D',
-  dangerBg: '#FEF2F2',
+  dangerText: '#B91C1C',
+  dangerBg: '#FDECEC',
   dangerBorder: '#FCA5A5',
-  neutralText: '#1F2937',
-  neutralBg: '#F3F4F6',
+  neutralText: '#52647E',
+  neutralBg: '#ECE9E0',
   neutralBorder: '#D1D5DB',
 } as const;
 
@@ -101,11 +104,42 @@ export function money(minor: bigint): string {
   return `${neg ? '-' : ''}${whole}.${(abs % 100n).toString().padStart(2, '0')}`;
 }
 
-/** Draws a crisp top architectural rule across the page. */
+/** Draws a crisp top architectural rule across the page (5pt Navy + 2pt Lime per 07 · Print & PDF). */
 export function drawTopBrandBar(doc: PDFKit.PDFDocument): void {
   const pageWidth = doc.page.width;
   doc.save();
-  doc.rect(0, 0, pageWidth, 4).fill(PDF_BRAND.ruleHeavy);
+  doc.rect(0, 0, pageWidth, 5).fill(PDF_BRAND.brandDark);
+  doc.rect(0, 5, pageWidth, 2).fill(PDF_BRAND.brandAccent);
+  doc.restore();
+}
+
+/** Draws the C2.1 "Ledger roof, refined" vector mark at (x, y) within a `size x size` box. */
+export function drawC21Mark(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  size = 10,
+): void {
+  const s = size / 48;
+  doc.save();
+  doc
+    .moveTo(x + 7 * s, y + 23 * s)
+    .lineTo(x + 24 * s, y + 9 * s)
+    .lineTo(x + 41 * s, y + 23 * s)
+    .lineWidth(3.5 * s)
+    .lineCap('round')
+    .lineJoin('round')
+    .strokeColor(PDF_BRAND.brandDark)
+    .stroke();
+  doc
+    .roundedRect(x + 12 * s, y + 25 * s, 24 * s, 3.2 * s, 1.6 * s)
+    .fill(PDF_BRAND.brandAccent);
+  doc
+    .roundedRect(x + 12 * s, y + 31 * s, 18 * s, 3.2 * s, 1.6 * s)
+    .fill(PDF_BRAND.brandDark);
+  doc
+    .roundedRect(x + 12 * s, y + 37 * s, 24 * s, 3.2 * s, 1.6 * s)
+    .fill(PDF_BRAND.brandDark);
   doc.restore();
 }
 
@@ -496,11 +530,18 @@ export function footer(doc: PDFKit.PDFDocument, centerNote?: string, reference?:
       lineBreak: false,
     });
 
+  const coBrandText = 'Powered by kodihub';
+  doc.font('Helvetica').fontSize(7.5);
+  const textWidth = doc.widthOfString(coBrandText);
+  const markSize = 10;
+  const markX = right - textWidth - markSize - 4;
+  drawC21Mark(doc, markX, footerLineY + 4.5, markSize);
+
   doc
     .font('Helvetica')
     .fontSize(7.5)
     .fillColor(PDF_BRAND.muted)
-    .text('KodiHub Financial Ledger', left + width * 0.72, footerLineY + 6, {
+    .text(coBrandText, left + width * 0.72, footerLineY + 6, {
       width: width * 0.28,
       align: 'right',
       lineBreak: false,

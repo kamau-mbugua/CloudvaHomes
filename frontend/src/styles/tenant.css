@@ -4,18 +4,28 @@
  * pieces. Built only from existing tokens, so light and dark both follow.
  */
 
-/* ---- balance and Pay now --------------------------------------------------- */
+/* ---- balance and Pay now (#002B4D navy balance card) ----------------------- */
 .tp__due {
   display: flex; flex-direction: column; align-items: stretch; gap: 6px;
-  padding: 18px 16px;
-  border: 1px solid var(--border); border-radius: var(--radius-card);
-  background: var(--card); box-shadow: var(--shadow-sm);
+  padding: 20px;
+  border: 0; border-radius: 20px;
+  background: var(--nav-background);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
 }
-.tp__due--owed { border-color: var(--accent); background: var(--accent-soft); }
-.tp__duelabel { font-size: 13px; color: var(--text-muted); font-weight: 500; }
-.tp__dueamt { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--foreground); }
-.tp__duenote { font-size: 13.5px; color: var(--text-secondary); }
-.tp__overdue { color: var(--destructive); font-weight: 600; }
+.tp__due--owed { background: var(--nav-background); }
+.tp__duelabel {
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9eaec4;
+}
+.tp__dueamt { font-size: 32px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; color: #ffffff; }
+.tp__duenote { font-size: 13.5px; color: #d7e0ec; }
+.tp__overdue { color: var(--destructive-text, #b91c1c); font-weight: 600; }
+.tp__due .tp__overdue { color: #fbbf24; font-weight: 600; }
 .tp__paybtn { margin-top: 8px; width: 100%; }
 .tp__paysubmit { flex: 1 1 auto; }
 .tp__bigin { min-height: 48px; font-size: 18px !important; }

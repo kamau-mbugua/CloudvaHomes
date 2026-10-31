@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../../app/Sidebar';
 import { AccountMenu } from '../../app/AccountMenu';
+import { BrandLockup } from '../../components/BrandMark';
+import { TopRouteProgress } from '../../components/Loading';
 import { MenuIcon, MoonIcon, SunIcon } from '../../app/icons';
 import { ADMIN_ACCOUNT_ENTRY, ADMIN_NAV, bestEntry, filterAdminNav, matchScore } from '../../app/navigation';
 import { errorMessage } from '../../lib/api/client';
@@ -109,13 +111,17 @@ export function AdminShell() {
             <MenuIcon />
           </button>
 
+          <div className="ms__brand">
+            <BrandLockup tone="navy" size="sm" />
+            <span className="ms__org-pill">{roleLabel}</span>
+          </div>
+
           <div className="ms__title">
             <strong>{title}</strong>
             <span>{subtitle}</span>
           </div>
 
           <div className="ms__right">
-            <span className="ad__badge ad__badge--info adm__tag">{roleLabel}</span>
             <button type="button" className="sh__icon" onClick={() => setTheme(nextTheme)}
               aria-label={`Switch to ${nextTheme} theme`} title={`Switch to ${nextTheme} theme`}>
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
@@ -136,6 +142,7 @@ export function AdminShell() {
               accountPath={ADMIN_ACCOUNT_ENTRY.to}
             />
           </div>
+          <TopRouteProgress />
         </header>
 
         <main className="ms__page">

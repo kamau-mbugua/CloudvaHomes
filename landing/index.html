@@ -10,6 +10,7 @@
     content="KodiHub runs monthly rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, and pays landlords their net remittance. Built for Kenyan landlords and letting agencies."
   />
   <meta name="theme-color" content="#002b4d" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%23002b4d'/%3E%3Cpath d='M9 22 24 10l15 12' fill='none' stroke='%23ffffff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Crect x='13' y='27' width='22' height='5.5' rx='2.75' fill='%23ffffff'/%3E%3Crect x='13' y='35' width='11' height='5.5' rx='2.75' fill='%2384bd00'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -239,11 +240,13 @@
   <header style="position: sticky; top: 0; z-index: 30; background: rgba(250, 250, 247, 0.92); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(10, 37, 64, 0.1)">
     <nav class="kh-nav" aria-label="Main" style="max-width: 1240px; margin: 0 auto; padding: 0 24px; height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px">
       <a href="#top" aria-label="KodiHub home" style="display: inline-flex; align-items: center; gap: 10px; color: #002b4d">
-        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
-          <rect width="34" height="34" rx="10" fill="#002b4d"></rect>
-          <path d="M9 17.5 17 11l8 6.5V25h-5.5v-5h-5v5H9z" fill="none" stroke="#84bd00" stroke-width="2" stroke-linejoin="round"></path>
+        <svg width="34" height="34" viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M6 20 24 6l18 14" fill="none" stroke="#002b4d" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          <rect x="12" y="24" width="24" height="4.4" rx="2.2" fill="#002b4d"></rect>
+          <rect x="12" y="31.5" width="17" height="4.4" rx="2.2" fill="#002b4d"></rect>
+          <rect x="12" y="39" width="10" height="4.4" rx="2.2" fill="#84bd00"></rect>
         </svg>
-        <span id="nav-brand" style="font-size: 21px; font-weight: 700; letter-spacing: -0.03em">KodiHub</span>
+        <span id="nav-brand" style="font-size: 22px; font-weight: 600; letter-spacing: -0.04em; line-height: 1"><span style="color: #002b4d">kodi</span><span style="color: #4d6b10">hub</span></span>
       </a>
       <div style="display: flex; align-items: center; gap: 28px">
         <a class="kh-hide-sm kh-nav-link" href="#how" style="font-size: 15px; font-weight: 500; color: #1f3a5c">How it works</a>
@@ -877,11 +880,13 @@
     <div style="max-width: 1240px; margin: 0 auto; padding: 64px 24px 40px; display: flex; flex-wrap: wrap; gap: 48px; justify-content: space-between">
       <div style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 14px; max-width: 360px">
         <span style="display: inline-flex; align-items: center; gap: 10px; color: #ffffff">
-          <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
-            <rect width="34" height="34" rx="10" fill="#0c1e33"></rect>
-            <path d="M9 17.5 17 11l8 6.5V25h-5.5v-5h-5v5H9z" fill="none" stroke="#84bd00" stroke-width="2" stroke-linejoin="round"></path>
+          <svg width="34" height="34" viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M6 20 24 6l18 14" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            <rect x="12" y="24" width="24" height="4.4" rx="2.2" fill="#ffffff"></rect>
+            <rect x="12" y="31.5" width="17" height="4.4" rx="2.2" fill="#ffffff"></rect>
+            <rect x="12" y="39" width="10" height="4.4" rx="2.2" fill="#84bd00"></rect>
           </svg>
-          <span id="footer-brand" style="font-size: 21px; font-weight: 700; letter-spacing: -0.03em">KodiHub</span>
+          <span id="footer-brand" style="font-size: 22px; font-weight: 600; letter-spacing: -0.04em; line-height: 1"><span style="color: #ffffff">kodi</span><span style="color: #84bd00">hub</span></span>
         </span>
         <p id="footer-tagline" style="margin: 0; font-size: 14px; color: #9eaec4">
           Rent, utilities, M-Pesa and landlord payouts in one place. Built in Nairobi for landlords and letting agencies across Kenya.
@@ -952,6 +957,24 @@
     function setText(id, text) {
       var el = document.getElementById(id);
       if (el && typeof text === 'string') el.textContent = text;
+    }
+
+    function setBrand(id, text, isNavy) {
+      var el = document.getElementById(id);
+      if (!el || typeof text !== 'string' || !text.trim()) return;
+      if (text.trim().toLowerCase() === 'kodihub') {
+        el.innerHTML = '';
+        var s1 = document.createElement('span');
+        s1.style.color = isNavy ? '#ffffff' : '#002b4d';
+        s1.textContent = 'kodi';
+        var s2 = document.createElement('span');
+        s2.style.color = isNavy ? '#84bd00' : '#4d6b10';
+        s2.textContent = 'hub';
+        el.appendChild(s1);
+        el.appendChild(s2);
+      } else {
+        el.textContent = text.trim();
+      }
     }
 
     function setHighlightedHeading(id, text, highlightPhrase) {
@@ -1160,8 +1183,8 @@
         }
       }
 
-      setText('nav-brand', c.brandName);
-      setText('footer-brand', c.brandName);
+      setBrand('nav-brand', c.brandName, false);
+      setBrand('footer-brand', c.brandName, true);
       setText('nav-signin', c.signInLabel);
       setText('footer-signin', c.signInLabel);
       setText('nav-register', c.registerLabel);
