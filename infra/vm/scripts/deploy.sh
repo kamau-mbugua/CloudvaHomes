@@ -9,9 +9,10 @@
 # Images were built in CI: nothing is built here, so a broken build never reaches a server.
 # =============================================================================
 set -euo pipefail
-ENV="${1:?usage: deploy.sh dev|prod <sha> <image-prefix>}"
+ENV="${1:?usage: deploy.sh dev|prod <sha> <image-prefix> [landing-only]}"
 SHA="${2:?commit sha}"
 export IMAGE_PREFIX="${3:?image prefix, e.g. ghcr.io/owner/repo}"
+LANDING_ONLY="${4:-false}"
 export RELEASE="$SHA"
 # shellcheck source=lib.sh
 source "$(dirname "$0")/lib.sh"
@@ -22,13 +23,27 @@ take_lock
 [ -f "$ROOT/envs/$ENV/stack.env" ] || fail "This server isn't set up for '$ENV' (run server-setup.sh)."
 [ -d "$ROOT/infra.new" ] || fail "No uploaded bundle at $ROOT/infra.new."
 PREVIOUS="$(cat "$ROOT/releases/current" 2>/dev/null || true)"
-log "Deploying $ENV: ${PREVIOUS:-nothing} → $SHA"
+log "Deploying $ENV: ${PREVIOUS:-nothing} → $SHA (landing_only=$LANDING_ONLY)"
 
 # ── 2. Install the new bundle (compose files, Caddyfile, scripts) ─────────────
 # The old one is kept as infra.prev for rollback.sh.
 rm -rf "$ROOT/infra.prev"
 [ -d "$ROOT/infra" ] && mv "$ROOT/infra" "$ROOT/infra.prev"
 mv "$ROOT/infra.new" "$ROOT/infra"
+
+if [ "$LANDING_ONLY" = "true" ] && [ -n "$PREVIOUS" ]; then
+  export RELEASE="$PREVIOUS"
+  edge_up
+  if [ -d "$ROOT/landing-releases/$SHA" ]; then
+    cur="$(readlink "$ROOT/landing-releases/current" 2>/dev/null || true)"
+    [ -n "$cur" ] && [ "$cur" != "$SHA" ] && echo "$cur" > "$ROOT/releases/landing-previous"
+    ln -sfn "$SHA" "$ROOT/landing-releases/current.tmp"
+    mv -T "$ROOT/landing-releases/current.tmp" "$ROOT/landing-releases/current"
+    log "Landing site (fast-path) → $SHA"
+    ls -dt "$ROOT"/landing-releases/*/ | grep -v '/current/$' | tail -n +4 | xargs -r rm -rf
+  fi
+  exit 0
+fi
 
 # ── 3. Pull the images before anything changes ───────────────────────────────
 # A missing image fails here, while the old release is still serving.
