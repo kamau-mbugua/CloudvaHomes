@@ -7,7 +7,7 @@ import {
   BuildingIcon, CashIcon, ChartIcon, ChevronIcon, CogIcon, HomeIcon, InvoiceIcon, KeyIcon,
   PeopleIcon, ReceiptIcon,
 } from './icons';
-import { initials } from '../lib/text';
+import { BrandIcon } from '../components/BrandMark';
 
 /**
  * The org app's sidebar — ported from pos-react's merchant Sidebar.
@@ -77,7 +77,9 @@ export function Sidebar({
   return (
     <nav className={`sb ${collapsed ? 'is-collapsed' : ''}`} aria-label={label}>
       <div className="sb__brand">
-        <span className="sb__mark" aria-hidden="true">{initials(orgName)}</span>
+        <span className="sb__mark" aria-hidden="true">
+          <BrandIcon tone="navy" size={22} />
+        </span>
         <span className="sb__brandname" title={orgName}>{orgName}</span>
 
         <button

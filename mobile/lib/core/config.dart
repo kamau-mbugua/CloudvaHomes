@@ -8,6 +8,10 @@ abstract final class AppConfig {
   static const prodApiUrl = 'https://api.kodihub.co.ke/api/v1';
   static const localApiUrl = 'http://localhost:8080/api/v1';
 
+  static const devWebUrl = 'https://dev.kodihub.co.ke';
+  static const prodWebUrl = 'https://app.kodihub.co.ke';
+  static const localWebUrl = 'http://localhost:5173';
+
   static const _envFlavor = String.fromEnvironment('FLAVOR');
   static const _envApiUrl = String.fromEnvironment('API_URL');
 
@@ -30,11 +34,17 @@ abstract final class AppConfig {
     return 'dev';
   }
 
+  static String _normalizeApiUrl(String url) {
+    if (url.contains('dev.34-35-37-207.sslip.io')) return devApiUrl;
+    if (url.contains('app.34-35-173-255.sslip.io')) return prodApiUrl;
+    return url;
+  }
+
   /// The API base URL, ending in `/api/v1`.
   static String get apiUrl {
-    if (_envApiUrl.isNotEmpty) return _envApiUrl;
+    if (_envApiUrl.isNotEmpty) return _normalizeApiUrl(_envApiUrl);
     if (_configuredApiUrl != null && _configuredApiUrl!.isNotEmpty) {
-      return _configuredApiUrl!;
+      return _normalizeApiUrl(_configuredApiUrl!);
     }
     return switch (flavor) {
       'prod' => prodApiUrl,
@@ -42,6 +52,13 @@ abstract final class AppConfig {
       _ => devApiUrl,
     };
   }
+
+  /// The matching web app URL (`https://dev.kodihub.co.ke` for dev, `https://app.kodihub.co.ke` for prod).
+  static String get webUrl => switch (flavor) {
+    'prod' => prodWebUrl,
+    'local' => localWebUrl,
+    _ => devWebUrl,
+  };
 
   static bool get isProd => flavor == 'prod';
 }

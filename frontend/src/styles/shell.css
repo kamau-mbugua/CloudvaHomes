@@ -174,13 +174,11 @@
 .sh__icon:hover { background: var(--secondary); color: var(--foreground); }
 .sh__icon svg { width: 18px; height: 18px; }
 
-.ms__top .sh__icon,
 .ow__top .sh__icon {
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.08);
   color: #d7e0ec;
 }
-.ms__top .sh__icon:hover,
 .ow__top .sh__icon:hover {
   background: rgba(255, 255, 255, 0.16);
   color: #ffffff;

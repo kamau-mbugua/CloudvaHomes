@@ -425,13 +425,17 @@ final staffApiProvider = Provider(
   (ref) => StaffApi(ref.watch(apiClientProvider)),
 );
 
-/// The web app's origin: the API base without `/api/v1`.
+/// The web app's origin: maps `dapi.kodihub.co.ke` -> `dev.kodihub.co.ke` and
+/// `api.kodihub.co.ke` -> `app.kodihub.co.ke`, or strips `/api/v1` for custom origins.
 String webOrigin([String? apiUrl]) {
   final raw = apiUrl ?? AppConfig.apiUrl;
   final trimmed = raw.replaceFirst(RegExp(r'/+$'), '');
-  return trimmed.endsWith('/api/v1')
+  final origin = trimmed.endsWith('/api/v1')
       ? trimmed.substring(0, trimmed.length - '/api/v1'.length)
       : trimmed;
+  if (origin == 'https://dapi.kodihub.co.ke') return AppConfig.devWebUrl;
+  if (origin == 'https://api.kodihub.co.ke') return AppConfig.prodWebUrl;
+  return origin;
 }
 
 /// "2026-10" in Nairobi (UTC+3, no daylight saving), the month the server bills.

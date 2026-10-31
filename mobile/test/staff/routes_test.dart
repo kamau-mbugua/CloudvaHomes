@@ -9,7 +9,15 @@ import 'package:hodi/features/staff/staff_routes.dart';
 import 'helpers.dart';
 
 void main() {
-  test('webOrigin strips /api/v1', () {
+  test('webOrigin strips /api/v1 and maps API hosts to web origins', () {
+    expect(
+      webOrigin('https://dapi.kodihub.co.ke/api/v1'),
+      'https://dev.kodihub.co.ke',
+    );
+    expect(
+      webOrigin('https://api.kodihub.co.ke/api/v1'),
+      'https://app.kodihub.co.ke',
+    );
     expect(
       webOrigin('https://app.example.invalid/api/v1'),
       'https://app.example.invalid',

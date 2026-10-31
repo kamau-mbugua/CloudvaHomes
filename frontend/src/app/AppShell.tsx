@@ -5,7 +5,6 @@ import { Sidebar } from './Sidebar';
 import { AccountMenu } from './AccountMenu';
 import { CommandPalette } from './CommandPalette';
 import { NotificationBell } from './NotificationBell';
-import { BrandLockup } from '../components/BrandMark';
 import { TopRouteProgress } from '../components/Loading';
 import { MenuIcon, MoonIcon, SunIcon } from './icons';
 import { ACCOUNT_ENTRY, ORG_NAV, bestEntry, destinations, filterNav, matchScore } from './navigation';
@@ -161,15 +160,6 @@ export function AppShell() {
           >
             <MenuIcon />
           </button>
-
-          <div className="ms__brand">
-            <BrandLockup tone="navy" size="sm" />
-            {org ? (
-              <span className="ms__org-pill" title={org.name}>
-                {org.name}
-              </span>
-            ) : null}
-          </div>
 
           <div className="ms__title">
             <strong>{title}</strong>
