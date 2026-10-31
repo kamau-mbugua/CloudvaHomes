@@ -1,4 +1,6 @@
-# Hosts come from /opt/hodi/edge/edge.env (APP_HOST, APP_STACK, LANDING_HOST).
+# Hosts come from /opt/hodi/edge/edge.env:
+#   prod : APP_HOST=app.kodihub.co.ke  API_HOST=api.kodihub.co.ke   LANDING_HOST=kodihub.co.ke
+#   dev  : APP_HOST=dev.kodihub.co.ke  API_HOST=dapi.kodihub.co.ke  LANDING_HOST=landing.kodihub.co.ke
 # Let's Encrypt account e-mail (expiry notices) is optional; to add one, put
 #   { email you@yourdomain }
 # at the top of this file.
@@ -14,9 +16,7 @@
 	encode zstd gzip
 }
 
-{$APP_HOST} {
-	import security
-
+(api_guard) {
 	# Job endpoints are for cron inside the server only. handle blocks are exclusive and
 	# tried in order: this one must come first.
 	handle /api/v1/internal/* {
@@ -41,6 +41,12 @@
 			status 503
 		}
 	}
+}
+
+# Web application (app.kodihub.co.ke on prod, dev.kodihub.co.ke on dev)
+{$APP_HOST} {
+	import security
+	import api_guard
 
 	handle /api/* {
 		reverse_proxy {$APP_STACK}-api:8080
@@ -50,5 +56,32 @@
 	}
 }
 
-# Per-VM extras (production: the landing page).
+# Dedicated API host (api.kodihub.co.ke on prod, dapi.kodihub.co.ke on dev)
+{$API_HOST} {
+	import security
+	import api_guard
+
+	handle {
+		reverse_proxy {$APP_STACK}-api:8080
+	}
+}
+
+# Marketing landing page (kodihub.co.ke on prod, landing.kodihub.co.ke on dev)
+{$LANDING_HOST} {
+	import security
+
+	handle /api/v1/internal/* {
+		respond 404
+	}
+	handle /api/* {
+		reverse_proxy {$APP_STACK}-api:8080
+	}
+	handle {
+		root * /srv/landing/current
+		try_files {path} {path}.html /index.html
+		file_server
+	}
+}
+
+# Per-VM extras (production: www redirect).
 import sites/*.caddy

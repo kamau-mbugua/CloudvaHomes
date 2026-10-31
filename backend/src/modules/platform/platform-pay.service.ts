@@ -29,7 +29,12 @@ import {
 import { AT_API_KEY_CONTEXT } from '../notifications/notifications.service.js';
 import { requiredPhone } from '../portfolio/fields.js';
 import { PlatformBillingService } from './platform-billing.service.js';
-import type { BillingPayDto, PlatformSettingsDto } from './platform.dto.js';
+import {
+  type LandingPageContent,
+  mergeLandingPageContent,
+  readLandingPageContent,
+} from './landing-page.js';
+import type { BillingPayDto, PlatformSettingsDto, UpdateLandingPageDto } from './platform.dto.js';
 
 const SECRETS_CONTEXT = 'platform.daraja.secrets';
 
@@ -102,12 +107,108 @@ export class PlatformPayService {
       maintenanceMessage: s.maintenanceMessage,
       invoiceInstructions: sysInstructions.invoiceInstructions,
       receiptInstructions: sysInstructions.receiptInstructions,
+      landingPage: readLandingPageContent(s.emailTemplates),
       updatedAt: s.updatedAt,
     };
   }
 
   async getSettings() {
     return this.view(await this.billing.settings());
+  }
+
+  async getLandingPage(): Promise<LandingPageContent> {
+    const s = await this.billing.settings();
+    return readLandingPageContent(s.emailTemplates);
+  }
+
+  async getPublicLanding() {
+    return withoutOrgScope(async () => {
+      const [settings, plans] = await Promise.all([
+        this.billing.settings(),
+        this.db.plan.findMany({
+          where: { active: true },
+          orderBy: [{ isDefault: 'desc' }, { pricePerUnit: 'asc' }],
+        }),
+      ]);
+      const defaultPlanRow =
+        (settings.defaultPlanId ? plans.find((p) => p.id === settings.defaultPlanId) : undefined) ??
+        plans.find((p) => p.isDefault) ??
+        plans[0] ??
+        null;
+
+      return {
+        appUrl: this.env.APP_URL.replace(/\/$/, ''),
+        apiUrl: (this.env.PUBLIC_API_URL ?? this.env.APP_URL).replace(/\/$/, ''),
+        allowPublicSignup: settings.allowPublicSignup,
+        maintenanceMode: settings.maintenanceMode,
+        maintenanceMessage: settings.maintenanceMessage,
+        defaultPlan: defaultPlanRow
+          ? {
+              id: defaultPlanRow.id,
+              name: defaultPlanRow.name,
+              description: defaultPlanRow.description,
+              pricePerUnit: defaultPlanRow.pricePerUnit,
+              minimumMonthly: defaultPlanRow.minimumMonthly,
+              trialDays: defaultPlanRow.trialDays,
+            }
+          : null,
+        plans: plans.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          pricePerUnit: p.pricePerUnit,
+          minimumMonthly: p.minimumMonthly,
+          trialDays: p.trialDays,
+          isDefault: p.isDefault,
+        })),
+        content: readLandingPageContent(settings.emailTemplates),
+        updatedAt: settings.updatedAt,
+      };
+    });
+  }
+
+  async updateLandingPage(dto: UpdateLandingPageDto): Promise<LandingPageContent> {
+    return withoutOrgScope(async () => {
+      const before = await this.billing.settings();
+      const beforeLanding = readLandingPageContent(before.emailTemplates);
+      const { reset, features, ...patch } = dto;
+      const nextContainer = mergeLandingPageContent(
+        before.emailTemplates,
+        {
+          ...patch,
+          ...(features
+            ? {
+                features: features.map((f) => ({
+                  tag: f.tag ?? '',
+                  title: f.title,
+                  description: f.description,
+                })),
+              }
+            : {}),
+        },
+        reset,
+      );
+      const after = await this.db.$transaction(async (tx) => {
+        const row = await tx.platformSettings.update({
+          where: { id: 1 },
+          data: { emailTemplates: nextContainer as Prisma.InputJsonValue },
+        });
+        const afterLanding = readLandingPageContent(row.emailTemplates);
+        await this.audit.record(
+          {
+            action: 'platform.landing_update',
+            entity: 'platform_settings',
+            entityId: '1',
+            orgId: null,
+            before: beforeLanding,
+            after: afterLanding,
+          },
+          tx,
+        );
+        return afterLanding;
+      });
+      return after;
+    });
   }
 
   async updateSettings(dto: PlatformSettingsDto) {

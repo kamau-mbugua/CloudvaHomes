@@ -466,6 +466,39 @@ describe('Platform billing (e2e)', () => {
     expect((await get(owner, '/billing')).data.balance).toBe(0);
     expect((await get(admin, '/platform/payments')).meta.total).toBe(1);
   });
+
+  it('superadmin controls the public landing page content and reset restores defaults', async () => {
+    await setUp();
+    const initialRes = await t.http().get('/api/v1/public/landing').expect(200);
+    expect(initialRes.body.data.content.brandName).toBe('KodiHub');
+    expect(initialRes.body.data.defaultPlan).toMatchObject({
+      name: 'Standard',
+      pricePerUnit: KES(100),
+      minimumMonthly: KES(1000),
+    });
+
+    const updated = (
+      await put(admin, '/platform/landing', {
+        brandName: 'KodiHub Kenya',
+        heroTitle: 'Modern Property Management for Nairobi Estates.',
+        heroStats: [{ label: 'Active estates', value: '120+' }],
+        contactEmail: 'support@kodihub.co.ke',
+      })
+    ).data;
+    expect(updated.brandName).toBe('KodiHub Kenya');
+    expect(updated.heroTitle).toBe('Modern Property Management for Nairobi Estates.');
+    expect(updated.heroStats).toEqual([{ label: 'Active estates', value: '120+' }]);
+
+    const publicAfter = await t.http().get('/api/v1/public/landing').expect(200);
+    expect(publicAfter.body.data.content).toMatchObject({
+      brandName: 'KodiHub Kenya',
+      heroTitle: 'Modern Property Management for Nairobi Estates.',
+      contactEmail: 'support@kodihub.co.ke',
+    });
+
+    const reset = (await put(admin, '/platform/landing', { reset: true })).data;
+    expect(reset.brandName).toBe('KodiHub');
+  });
 });
 
 function periodOf(date: string) {

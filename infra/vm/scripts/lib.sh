@@ -34,6 +34,40 @@ wait_healthy() {
 
 # Points the edge proxy at the current infra bundle and reloads it (no dropped connections).
 edge_up() {
+  if [ -f "$ROOT/edge/edge.env" ]; then
+    # shellcheck disable=SC1091
+    source "$ROOT/edge/edge.env"
+  fi
+  # Migrate legacy sslip.io hosts or empty hosts to the canonical kodihub.co.ke domains.
+  if [ "$ENV" = prod ]; then
+    [[ -z "${APP_HOST:-}" || "${APP_HOST:-}" == *.sslip.io ]] && APP_HOST="app.kodihub.co.ke"
+    [[ -z "${API_HOST:-}" || "${API_HOST:-}" == *.sslip.io ]] && API_HOST="api.kodihub.co.ke"
+    [[ -z "${LANDING_HOST:-}" || "${LANDING_HOST:-}" == *.sslip.io ]] && LANDING_HOST="kodihub.co.ke"
+  else
+    [[ -z "${APP_HOST:-}" || "${APP_HOST:-}" == *.sslip.io ]] && APP_HOST="dev.kodihub.co.ke"
+    [[ -z "${API_HOST:-}" || "${API_HOST:-}" == *.sslip.io ]] && API_HOST="dapi.kodihub.co.ke"
+    [[ -z "${LANDING_HOST:-}" || "${LANDING_HOST:-}" == *.sslip.io ]] && LANDING_HOST="landing.kodihub.co.ke"
+  fi
+  cat > "$ROOT/edge/edge.env" <<EDGE
+APP_HOST=$APP_HOST
+API_HOST=$API_HOST
+LANDING_HOST=$LANDING_HOST
+APP_STACK=hodi-$ENV
+EDGE
+
+  # Keep APP_URL, PUBLIC_API_URL, and CORS_ORIGINS in api.env aligned with the active hosts.
+  local api_env="$ROOT/envs/$ENV/api.env"
+  if [ -f "$api_env" ]; then
+    grep -vE '^(APP_URL|PUBLIC_API_URL|CORS_ORIGINS)=' "$api_env" > "$api_env.tmp" || true
+    cat >> "$api_env.tmp" <<EOF
+APP_URL=https://$APP_HOST
+PUBLIC_API_URL=https://$API_HOST
+CORS_ORIGINS=https://$APP_HOST,https://$LANDING_HOST
+EOF
+    chmod 600 "$api_env.tmp"
+    mv "$api_env.tmp" "$api_env"
+  fi
+
   rm -rf "$ROOT/infra/edge/sites"; mkdir -p "$ROOT/infra/edge/sites"
   if [ "$ENV" = prod ]; then cp "$ROOT"/infra/edge/sites-prod/*.caddy "$ROOT/infra/edge/sites/"; fi
   cp "$ROOT/infra/edge/maintenance.html" "$ROOT/maintenance/index.html"

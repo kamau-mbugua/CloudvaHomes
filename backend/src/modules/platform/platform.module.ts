@@ -13,6 +13,7 @@ import {
   BillingController,
   PlatformController,
   PlatformJobsController,
+  PublicLandingController,
 } from './platform.controller.js';
 
 /** Hodi billing organisations (phase 8) and platform admin suite (phase 11). */
@@ -23,6 +24,7 @@ import {
     PlatformController,
     PlatformJobsController,
     PlatformHooksController,
+    PublicLandingController,
   ],
   providers: [
     PlatformBillingService,

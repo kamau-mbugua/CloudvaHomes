@@ -15,14 +15,29 @@ import { Badge, Field } from '../portfolio/ui';
 import { keys, platformErrorMessage, usePlans, usePlatformLocks, usePlatformSettings } from '../platform/api';
 import { checkSettings, darajaSettingsBody, settingsDraft } from '../platform/rules';
 import type { SettingsBody, SettingsDraft } from '../platform/rules';
-import type { PlatformSettings } from '../platform/types';
+import type {
+  LandingFeatureItem,
+  LandingHeroStat,
+  LandingPageContent,
+  LandingPortalItem,
+  PlatformSettings,
+} from '../platform/types';
 
-type SettingsTab = 'billing' | 'documents' | 'mpesa' | 'security' | 'locks' | 'sms' | 'app';
+type SettingsTab =
+  | 'billing'
+  | 'documents'
+  | 'landing'
+  | 'mpesa'
+  | 'security'
+  | 'locks'
+  | 'sms'
+  | 'app';
 
 /**
  * Admin → Settings (`/admin/settings`):
  * - Billing rules: due days, grace days, default plan, KodiHub's paybill.
  * - Document instructions: system-wide footer/notice instructions for invoices and receipts.
+ * - Landing page: environment-specific marketing site content (`kodihub.co.ke` in prod, `landing.kodihub.co.ke` in dev).
  * - M-Pesa (Daraja): KodiHub's Daraja keys & callback URLs.
  * - Admin 2FA: require 2FA for platform operators & channel (Email/SMS).
  * - Rate-limit locks: active OTP & login rate-limit lockouts.
@@ -34,6 +49,7 @@ export function AdminSettingsPage() {
   const rawTab = filters.get('tab');
   const tab: SettingsTab =
     rawTab === 'documents' ||
+    rawTab === 'landing' ||
     rawTab === 'mpesa' ||
     rawTab === 'security' ||
     rawTab === 'locks' ||
@@ -57,6 +73,9 @@ export function AdminSettingsPage() {
           </button>
           <button type="button" role="tab" aria-selected={tab === 'documents'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'documents' })}>
             Document instructions
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'landing'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'landing' })}>
+            Landing page
           </button>
           <button type="button" role="tab" aria-selected={tab === 'mpesa'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'mpesa' })}>
             M-Pesa (Daraja)
@@ -84,6 +103,8 @@ export function AdminSettingsPage() {
             key={`${s.invoiceInstructions ?? ''}-${s.receiptInstructions ?? ''}`}
             settings={s}
           />
+        ) : tab === 'landing' ? (
+          <LandingPageForm key={s.updatedAt ?? 'landing'} settings={s} />
         ) : tab === 'mpesa' ? (
           <DarajaSection settings={s} />
         ) : tab === 'security' ? (
@@ -697,6 +718,574 @@ function DocumentInstructionsForm({ settings }: { settings: PlatformSettings }) 
           disabled={!dirty || save.isPending}
         >
           {save.isPending ? 'Saving…' : 'Save document instructions'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const DEFAULT_LANDING_PAGE: LandingPageContent = {
+  brandName: 'KodiHub',
+  pageTitle: 'KodiHub — Property, Rent & M-Pesa Management for Kenyan Landlords & Agencies',
+  metaDescription:
+    'KodiHub helps Kenyan landlords and letting agencies automate rent invoicing, collect payments via M-Pesa Paybill/Till and bank, track water & power meters, manage unit maintenance, and remit to property owners.',
+  signInLabel: 'Sign in',
+  registerLabel: 'Create account',
+  heroBadge: 'Built for Kenyan Landlords & Letting Agencies',
+  heroTitle: 'Every unit, invoice, M-Pesa payment and payout in one place.',
+  heroSubtitle:
+    'Automate monthly rent and metered utility billing, reconcile M-Pesa Paybill/Till and bank statements automatically, track unit maintenance, and send branded PDF invoices and receipts.',
+  heroPrimaryCta: 'Start free trial',
+  heroSecondaryCta: 'Sign in to your account',
+  heroStatsTitle: 'Sample portfolio snapshot',
+  heroStats: [
+    { label: 'Collected this month', value: 'KES 1,840,000.00' },
+    { label: 'M-Pesa C2B auto-matched', value: '98.4%' },
+    { label: 'Occupancy across 64 units', value: '95.3%' },
+    { label: 'Receipts & PDF statements', value: 'Instant SMS + Email' },
+  ],
+  featuresTitle: 'Everything your property operations need',
+  featuresSubtitle:
+    'No spreadsheets or manual receipt books. KodiHub handles the full lifecycle from move-in to landlord remittance.',
+  features: [
+    {
+      tag: 'M-Pesa & Banks',
+      title: 'Real-time M-Pesa C2B, STK Push & Bank Imports',
+      description:
+        'Connect your Safaricom Paybill or Till. Payments match tenants by account reference or phone number automatically and allocate oldest-due first.',
+    },
+    {
+      tag: 'Billing & Meters',
+      title: 'Monthly Rent, Water & Power Meter Readings',
+      description:
+        'Record meter readings with photo proof and run an entire property’s monthly invoices in one click, complete with custom payment instructions.',
+    },
+    {
+      tag: 'Communications',
+      title: 'Branded PDF Invoices, Receipts & Reminders',
+      description:
+        'Every payment and invoice triggers an SMS and a detailed email with an official branded PDF receipt or invoice attached.',
+    },
+    {
+      tag: 'Maintenance',
+      title: 'Unit Repair Requests & Expense Conversion',
+      description:
+        'Tenants report issues with photos from their phone. Staff track progress, resolve tickets, and convert repair costs directly into property expenses.',
+    },
+    {
+      tag: 'Letting Agencies',
+      title: 'Management Agreements & Landlord Payouts',
+      description:
+        'Calculate agency commission, deduct approved property expenses, generate owner statements, and disburse net remittances via M-Pesa B2C.',
+    },
+    {
+      tag: 'Web & Mobile',
+      title: 'Staff, Owner & Tenant Portals',
+      description:
+        'Dedicated web and Android/iOS experiences for property managers, caretakers, landlords, and tenants—all backed by role-based permissions and audit logs.',
+    },
+  ],
+  portalsTitle: 'Three tailored experiences',
+  portalsSubtitle: 'Everyone sees only what belongs to them, on web or mobile.',
+  portals: [
+    {
+      title: 'For Landlords & Property Staff',
+      description:
+        'Manage properties, units, tenancies, meter readings, invoice runs, payment reconciliation, maintenance tickets, and P&L reports.',
+    },
+    {
+      title: 'For Tenants',
+      description:
+        'Sign in with a one-time SMS/email code, check current balance, trigger an M-Pesa STK prompt, download PDF receipts, and submit maintenance requests.',
+    },
+    {
+      title: 'For Property Owners (Agencies)',
+      description:
+        'Read-only owner portal showing live occupancy, monthly owner statements, commission breakdowns, and remittance payout history.',
+    },
+  ],
+  pricingBadge: 'Transparent per-unit pricing',
+  pricingTitle: 'Pay only for occupied units',
+  pricingSubtitle:
+    'Vacant units are free. Every plan includes unlimited staff accounts, M-Pesa integration, PDF invoices & receipts, tenant and owner portals, and mobile app access.',
+  pricingNote: 'Includes free trial for new organisations.',
+  defaultSliderUnits: 25,
+  fallbackRatePerUnit: 10000,
+  fallbackMinimumMonthly: 150000,
+  contactEmail: 'hello@kodihub.co.ke',
+  contactPhone: null,
+  footerCopyright: 'KodiHub Property Management. All rights reserved.',
+  footerTagline: 'Built in Nairobi for landlords and letting agencies across Kenya.',
+};
+
+function LandingPageForm({ settings }: { settings: PlatformSettings }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const initial: LandingPageContent = settings.landingPage ?? DEFAULT_LANDING_PAGE;
+  const [draft, setDraft] = useState<LandingPageContent>(() => ({
+    ...initial,
+    heroStats: initial.heroStats.map((x) => ({ ...x })),
+    features: initial.features.map((x) => ({ ...x })),
+    portals: initial.portals.map((x) => ({ ...x })),
+  }));
+
+  const save = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.put<unknown>('/platform/landing', body),
+    onSuccess: async () => {
+      toast.saved('Landing page content published for this environment.');
+      await queryClient.invalidateQueries({ queryKey: keys.platform });
+    },
+    onError: (error) => toast.failed(platformErrorMessage(error)),
+  });
+
+  const setField = <K extends keyof LandingPageContent>(key: K, value: LandingPageContent[K]) => {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateHeroStat = (idx: number, patch: Partial<LandingHeroStat>) => {
+    setDraft((prev) => ({
+      ...prev,
+      heroStats: prev.heroStats.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+    }));
+  };
+
+  const updateFeature = (idx: number, patch: Partial<LandingFeatureItem>) => {
+    setDraft((prev) => ({
+      ...prev,
+      features: prev.features.map((f, i) => (i === idx ? { ...f, ...patch } : f)),
+    }));
+  };
+
+  const updatePortal = (idx: number, patch: Partial<LandingPortalItem>) => {
+    setDraft((prev) => ({
+      ...prev,
+      portals: prev.portals.map((p, i) => (i === idx ? { ...p, ...patch } : p)),
+    }));
+  };
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate({
+      ...draft,
+      contactEmail: draft.contactEmail?.trim() || null,
+      contactPhone: draft.contactPhone?.trim() || null,
+    });
+  };
+
+  return (
+    <form className="fm__section" onSubmit={submit} noValidate>
+      <h2>Landing page content</h2>
+      <p>
+        Controls the public marketing site for this environment (
+        <strong>kodihub.co.ke</strong> in production, <strong>landing.kodihub.co.ke</strong> in
+        development). Changes take effect immediately on the landing page.
+      </p>
+
+      <div className="fm__grid">
+        <Field id="lp-brand" label="Brand name">
+          <input
+            id="lp-brand"
+            value={draft.brandName}
+            onChange={(e) => setField('brandName', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-signin" label="Nav sign-in button label">
+          <input
+            id="lp-signin"
+            value={draft.signInLabel}
+            onChange={(e) => setField('signInLabel', e.target.value)}
+          />
+        </Field>
+        <Field
+          id="lp-register"
+          label="Nav sign-up button label"
+          hint="Shown when public sign-up is enabled under App & Maintenance."
+        >
+          <input
+            id="lp-register"
+            value={draft.registerLabel}
+            onChange={(e) => setField('registerLabel', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-title" label="Browser page title (SEO)" wide>
+          <input
+            id="lp-title"
+            value={draft.pageTitle}
+            onChange={(e) => setField('pageTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-desc" label="Meta description (SEO)" wide>
+          <textarea
+            id="lp-desc"
+            rows={2}
+            value={draft.metaDescription}
+            onChange={(e) => setField('metaDescription', e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <h3 style={{ marginTop: 24 }}>Hero section</h3>
+      <div className="fm__grid">
+        <Field id="lp-hbadge" label="Hero badge" wide>
+          <input
+            id="lp-hbadge"
+            value={draft.heroBadge}
+            onChange={(e) => setField('heroBadge', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-htitle" label="Hero headline" wide>
+          <input
+            id="lp-htitle"
+            value={draft.heroTitle}
+            onChange={(e) => setField('heroTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-hsub" label="Hero subtitle" wide>
+          <textarea
+            id="lp-hsub"
+            rows={3}
+            value={draft.heroSubtitle}
+            onChange={(e) => setField('heroSubtitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-hpcta" label="Primary CTA label">
+          <input
+            id="lp-hpcta"
+            value={draft.heroPrimaryCta}
+            onChange={(e) => setField('heroPrimaryCta', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-hscta" label="Secondary CTA label">
+          <input
+            id="lp-hscta"
+            value={draft.heroSecondaryCta}
+            onChange={(e) => setField('heroSecondaryCta', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-hstitle" label="Snapshot card heading" wide>
+          <input
+            id="lp-hstitle"
+            value={draft.heroStatsTitle}
+            onChange={(e) => setField('heroStatsTitle', e.target.value)}
+          />
+        </Field>
+      </div>
+
+      {draft.heroStats.map((stat, idx) => (
+        <div key={idx} className="fm__grid" style={{ marginTop: 10 }}>
+          <Field id={`lp-stat-l-${idx}`} label={`Stat ${idx + 1} label`}>
+            <input
+              id={`lp-stat-l-${idx}`}
+              value={stat.label}
+              onChange={(e) => updateHeroStat(idx, { label: e.target.value })}
+            />
+          </Field>
+          <Field id={`lp-stat-v-${idx}`} label={`Stat ${idx + 1} value`}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id={`lp-stat-v-${idx}`}
+                value={stat.value}
+                onChange={(e) => updateHeroStat(idx, { value: e.target.value })}
+              />
+              {draft.heroStats.length > 1 ? (
+                <button
+                  type="button"
+                  className="nx-btn nx-btn--sm"
+                  onClick={() =>
+                    setDraft((p) => ({
+                      ...p,
+                      heroStats: p.heroStats.filter((_, i) => i !== idx),
+                    }))
+                  }
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          </Field>
+        </div>
+      ))}
+      {draft.heroStats.length < 8 ? (
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            className="nx-btn nx-btn--sm"
+            onClick={() =>
+              setDraft((p) => ({
+                ...p,
+                heroStats: [...p.heroStats, { label: 'New metric', value: '100%' }],
+              }))
+            }
+          >
+            + Add hero stat
+          </button>
+        </div>
+      ) : null}
+
+      <h3 style={{ marginTop: 28 }}>Features section</h3>
+      <div className="fm__grid">
+        <Field id="lp-ftitle" label="Section heading" wide>
+          <input
+            id="lp-ftitle"
+            value={draft.featuresTitle}
+            onChange={(e) => setField('featuresTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-fsub" label="Section subtitle" wide>
+          <textarea
+            id="lp-fsub"
+            rows={2}
+            value={draft.featuresSubtitle}
+            onChange={(e) => setField('featuresSubtitle', e.target.value)}
+          />
+        </Field>
+      </div>
+      {draft.features.map((feat, idx) => (
+        <div
+          key={idx}
+          className="fm__grid"
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--nx-border, #e2e8f0)',
+          }}
+        >
+          <Field id={`lp-ft-tag-${idx}`} label={`Feature ${idx + 1} tag`}>
+            <input
+              id={`lp-ft-tag-${idx}`}
+              value={feat.tag}
+              onChange={(e) => updateFeature(idx, { tag: e.target.value })}
+            />
+          </Field>
+          <Field id={`lp-ft-t-${idx}`} label={`Feature ${idx + 1} title`}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id={`lp-ft-t-${idx}`}
+                value={feat.title}
+                onChange={(e) => updateFeature(idx, { title: e.target.value })}
+              />
+              {draft.features.length > 1 ? (
+                <button
+                  type="button"
+                  className="nx-btn nx-btn--sm"
+                  onClick={() =>
+                    setDraft((p) => ({
+                      ...p,
+                      features: p.features.filter((_, i) => i !== idx),
+                    }))
+                  }
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          </Field>
+          <Field id={`lp-ft-d-${idx}`} label={`Feature ${idx + 1} description`} wide>
+            <textarea
+              id={`lp-ft-d-${idx}`}
+              rows={2}
+              value={feat.description}
+              onChange={(e) => updateFeature(idx, { description: e.target.value })}
+            />
+          </Field>
+        </div>
+      ))}
+      {draft.features.length < 12 ? (
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            className="nx-btn nx-btn--sm"
+            onClick={() =>
+              setDraft((p) => ({
+                ...p,
+                features: [
+                  ...p.features,
+                  { tag: 'Feature', title: 'New feature', description: 'Describe this feature.' },
+                ],
+              }))
+            }
+          >
+            + Add feature card
+          </button>
+        </div>
+      ) : null}
+
+      <h3 style={{ marginTop: 28 }}>Portals section</h3>
+      <div className="fm__grid">
+        <Field id="lp-ptitle" label="Portals heading" wide>
+          <input
+            id="lp-ptitle"
+            value={draft.portalsTitle}
+            onChange={(e) => setField('portalsTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-psub" label="Portals subtitle" wide>
+          <input
+            id="lp-psub"
+            value={draft.portalsSubtitle}
+            onChange={(e) => setField('portalsSubtitle', e.target.value)}
+          />
+        </Field>
+      </div>
+      {draft.portals.map((portal, idx) => (
+        <div
+          key={idx}
+          className="fm__grid"
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--nx-border, #e2e8f0)',
+          }}
+        >
+          <Field id={`lp-pt-t-${idx}`} label={`Portal ${idx + 1} title`} wide>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id={`lp-pt-t-${idx}`}
+                value={portal.title}
+                onChange={(e) => updatePortal(idx, { title: e.target.value })}
+              />
+              {draft.portals.length > 1 ? (
+                <button
+                  type="button"
+                  className="nx-btn nx-btn--sm"
+                  onClick={() =>
+                    setDraft((p) => ({
+                      ...p,
+                      portals: p.portals.filter((_, i) => i !== idx),
+                    }))
+                  }
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          </Field>
+          <Field id={`lp-pt-d-${idx}`} label={`Portal ${idx + 1} description`} wide>
+            <textarea
+              id={`lp-pt-d-${idx}`}
+              rows={2}
+              value={portal.description}
+              onChange={(e) => updatePortal(idx, { description: e.target.value })}
+            />
+          </Field>
+        </div>
+      ))}
+      {draft.portals.length < 6 ? (
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            className="nx-btn nx-btn--sm"
+            onClick={() =>
+              setDraft((p) => ({
+                ...p,
+                portals: [
+                  ...p.portals,
+                  { title: 'New experience', description: 'Describe who this portal serves.' },
+                ],
+              }))
+            }
+          >
+            + Add portal card
+          </button>
+        </div>
+      ) : null}
+
+      <h3 style={{ marginTop: 28 }}>Pricing & footer</h3>
+      <div className="fm__grid">
+        <Field id="lp-prbadge" label="Pricing badge">
+          <input
+            id="lp-prbadge"
+            value={draft.pricingBadge}
+            onChange={(e) => setField('pricingBadge', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-prunits" label="Calculator default occupied units">
+          <input
+            id="lp-prunits"
+            inputMode="numeric"
+            value={String(draft.defaultSliderUnits)}
+            onChange={(e) =>
+              setField('defaultSliderUnits', Math.max(1, Number.parseInt(e.target.value, 10) || 1))
+            }
+          />
+        </Field>
+        <Field id="lp-prtitle" label="Pricing heading" wide>
+          <input
+            id="lp-prtitle"
+            value={draft.pricingTitle}
+            onChange={(e) => setField('pricingTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-prsub" label="Pricing description" wide>
+          <textarea
+            id="lp-prsub"
+            rows={2}
+            value={draft.pricingSubtitle}
+            onChange={(e) => setField('pricingSubtitle', e.target.value)}
+          />
+        </Field>
+        <Field
+          id="lp-prnote"
+          label="Pricing calculator footnote"
+          wide
+          hint="The calculator automatically uses your active Default Plan’s per-unit rate and monthly minimum."
+        >
+          <input
+            id="lp-prnote"
+            value={draft.pricingNote}
+            onChange={(e) => setField('pricingNote', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-cemail" label="Public contact email" optional>
+          <input
+            id="lp-cemail"
+            type="email"
+            value={draft.contactEmail ?? ''}
+            onChange={(e) => setField('contactEmail', e.target.value || null)}
+          />
+        </Field>
+        <Field id="lp-cphone" label="Public contact phone" optional>
+          <input
+            id="lp-cphone"
+            value={draft.contactPhone ?? ''}
+            onChange={(e) => setField('contactPhone', e.target.value || null)}
+          />
+        </Field>
+        <Field id="lp-fcopy" label="Footer copyright text" wide>
+          <input
+            id="lp-fcopy"
+            value={draft.footerCopyright}
+            onChange={(e) => setField('footerCopyright', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-ftag" label="Footer tagline" wide>
+          <input
+            id="lp-ftag"
+            value={draft.footerTagline}
+            onChange={(e) => setField('footerTagline', e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <div className="pg-actions">
+        <button
+          type="button"
+          className="nx-btn"
+          disabled={save.isPending}
+          onClick={() => {
+            setDraft({
+              ...DEFAULT_LANDING_PAGE,
+              heroStats: DEFAULT_LANDING_PAGE.heroStats.map((x) => ({ ...x })),
+              features: DEFAULT_LANDING_PAGE.features.map((x) => ({ ...x })),
+              portals: DEFAULT_LANDING_PAGE.portals.map((x) => ({ ...x })),
+            });
+            save.mutate({ reset: true });
+          }}
+        >
+          Reset to defaults
+        </button>
+        <button type="submit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
+          {save.isPending ? 'Publishing…' : 'Publish landing page'}
         </button>
       </div>
     </form>

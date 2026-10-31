@@ -1,7 +1,5 @@
-# Production only: the marketing site. scripts/deploy.sh points `current` at the release.
-{$LANDING_HOST} {
+# Production: redirect www.kodihub.co.ke to the canonical apex landing page.
+www.{$LANDING_HOST} {
 	import security
-	root * /srv/landing/current
-	try_files {path} {path}.html /index.html
-	file_server
+	redir https://{$LANDING_HOST}{uri} permanent
 }

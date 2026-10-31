@@ -83,8 +83,8 @@ trap - EXIT
 echo "$SHA" > "$ROOT/releases/current"
 echo "$(date -Iseconds) $SHA" >> "$ROOT/releases/history"
 
-# ── 9. Publish the landing site (production) — atomic symlink swap ────────────
-if [ "$ENV" = prod ] && [ -d "$ROOT/landing-releases/$SHA" ]; then
+# ── 9. Publish the landing site (prod & dev) — atomic symlink swap ────────────
+if [ -d "$ROOT/landing-releases/$SHA" ]; then
   cur="$(readlink "$ROOT/landing-releases/current" 2>/dev/null || true)"
   [ -n "$cur" ] && [ "$cur" != "$SHA" ] && echo "$cur" > "$ROOT/releases/landing-previous"
   ln -sfn "$SHA" "$ROOT/landing-releases/current.tmp"

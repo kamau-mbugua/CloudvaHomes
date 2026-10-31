@@ -1,18 +1,27 @@
 #!/usr/bin/env bash
 # One-time setup of a Hodi server (run as root on the VM). One environment per VM:
 #
-#   sudo bash server-setup.sh prod <app-host> [landing-host]   < deploy-key.pub
-#   sudo bash server-setup.sh dev  <app-host>                   < deploy-key.pub
+#   sudo bash server-setup.sh prod [app.kodihub.co.ke] [api.kodihub.co.ke]  [kodihub.co.ke]         < deploy-key.pub
+#   sudo bash server-setup.sh dev  [dev.kodihub.co.ke] [dapi.kodihub.co.ke] [landing.kodihub.co.ke] < deploy-key.pub
 #
 # - Docker + Compose, 2 GB swap (skipped if present)
 # - user `deploy`: SSH with the given public key only (GitHub Actions), in the docker group
 # - /opt/hodi owned by deploy; secrets generated HERE and never leave the server
-# Safe to re-run: existing secrets are kept; the key is replaced.
+# Safe to re-run: existing secrets are kept; the key and host domains are updated.
 set -euo pipefail
-ENV="${1:?usage: server-setup.sh dev|prod <app-host> [landing-host] < key.pub}"
-APP_HOST="${2:?app host, e.g. app.example.com}"
-LANDING_HOST="${3:-}"
+ENV="${1:?usage: server-setup.sh dev|prod [app-host] [api-host] [landing-host] < key.pub}"
 [[ "$ENV" =~ ^(dev|prod)$ ]] || { echo "env must be dev or prod"; exit 1; }
+
+if [ "$ENV" = prod ]; then
+  APP_HOST="${2:-app.kodihub.co.ke}"
+  API_HOST="${3:-api.kodihub.co.ke}"
+  LANDING_HOST="${4:-kodihub.co.ke}"
+else
+  APP_HOST="${2:-dev.kodihub.co.ke}"
+  API_HOST="${3:-dapi.kodihub.co.ke}"
+  LANDING_HOST="${4:-landing.kodihub.co.ke}"
+fi
+
 PUBKEY="$(cat)"
 [[ "$PUBKEY" == ssh-* ]] || { echo "Pipe the deploy public key on stdin"; exit 1; }
 ROOT=/opt/hodi
@@ -53,8 +62,9 @@ docker network inspect hodi-edge >/dev/null 2>&1 || docker network create hodi-e
 
 cat > "$ROOT/edge/edge.env" <<EDGE
 APP_HOST=$APP_HOST
-APP_STACK=hodi-$ENV
+API_HOST=$API_HOST
 LANDING_HOST=$LANDING_HOST
+APP_STACK=hodi-$ENV
 EDGE
 
 # ── secrets (generated once) ─────────────────────────────────────────────────
@@ -75,7 +85,8 @@ STACK
 NODE_ENV=$([ "$ENV" = prod ] && echo production || echo development)
 LOG_FORMAT=json
 APP_URL=https://$APP_HOST
-PUBLIC_API_URL=https://$APP_HOST
+PUBLIC_API_URL=https://$API_HOST
+CORS_ORIGINS=https://$APP_HOST,https://$LANDING_HOST
 JWT_SECRET=$(rand 64)
 FIELD_ENCRYPTION_KEYS=k1:$(key32)
 FIELD_INDEX_KEY=$(key32)
@@ -83,7 +94,7 @@ JOBS_SHARED_SECRET=$jobs
 DARAJA_MODE=$([ "$ENV" = prod ] && echo live || echo simulated)
 SMS_PROVIDER=log
 EMAIL_PROVIDER=log
-EMAIL_FROM=Hodi <noreply@example.invalid>
+EMAIL_FROM=KodiHub <noreply@kodihub.co.ke>
 API
   echo "$ENV: secrets generated"
 else
@@ -91,4 +102,4 @@ else
 fi
 chown -R deploy:deploy "$ROOT"
 chmod 600 "$dir"/*.env
-echo "Ready: deploy@$(hostname) for $ENV ($APP_HOST). Keep an offline copy of $dir."
+echo "Ready: deploy@$(hostname) for $ENV (app=$APP_HOST, api=$API_HOST, landing=$LANDING_HOST). Keep an offline copy of $dir."

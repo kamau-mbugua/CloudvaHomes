@@ -178,6 +178,54 @@ export interface PlatformOrganization {
   createdAt?: string;
 }
 
+export interface LandingHeroStat {
+  label: string;
+  value: string;
+}
+
+export interface LandingFeatureItem {
+  tag: string;
+  title: string;
+  description: string;
+}
+
+export interface LandingPortalItem {
+  title: string;
+  description: string;
+}
+
+export interface LandingPageContent {
+  brandName: string;
+  pageTitle: string;
+  metaDescription: string;
+  signInLabel: string;
+  registerLabel: string;
+  heroBadge: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroPrimaryCta: string;
+  heroSecondaryCta: string;
+  heroStatsTitle: string;
+  heroStats: LandingHeroStat[];
+  featuresTitle: string;
+  featuresSubtitle: string;
+  features: LandingFeatureItem[];
+  portalsTitle: string;
+  portalsSubtitle: string;
+  portals: LandingPortalItem[];
+  pricingBadge: string;
+  pricingTitle: string;
+  pricingSubtitle: string;
+  pricingNote: string;
+  defaultSliderUnits: number;
+  fallbackRatePerUnit: number;
+  fallbackMinimumMonthly: number;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  footerCopyright: string;
+  footerTagline: string;
+}
+
 export interface PlatformSettings {
   dueDays: number;
   suspendAfterDays: number;
@@ -210,6 +258,7 @@ export interface PlatformSettings {
   maintenanceMessage?: string | null;
   invoiceInstructions?: string | null;
   receiptInstructions?: string | null;
+  landingPage?: LandingPageContent;
   updatedAt?: string;
 }
 

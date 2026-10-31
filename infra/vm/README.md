@@ -4,14 +4,14 @@ Hodi runs on two Compute Engine VMs with Docker, one per environment, deployed b
 Actions on push, the same way as UltimatePOS. There is no Cloud Run: the app will use
 WebSockets, and Caddy in front of a long-running server passes them through as-is.
 
-| | VM | IP | Serves |
-|---|---|---|---|
-| Production | `hodi-server` (e2-medium) | 34.35.173.255 | https://app.34-35-173-255.sslip.io and the landing page https://34-35-173-255.sslip.io |
-| Development | `hodi-dev-server` (e2-small) | 34.35.37.207 | https://dev.34-35-37-207.sslip.io |
+| | VM | IP | Landing Page | Web App | API |
+|---|---|---|---|---|---|
+| Production | `hodi-server` (e2-medium) | 34.35.173.255 | https://kodihub.co.ke | https://app.kodihub.co.ke | https://api.kodihub.co.ke |
+| Development | `hodi-dev-server` (e2-small) | 34.35.37.207 | https://landing.kodihub.co.ke | https://dev.kodihub.co.ke | https://dapi.kodihub.co.ke |
 
 Both are in project `cloudvalabs-mdm`, zone `africa-south1-a`, on the isolated network
-`hodi-net` (`infra/gcp/README.md` §15). The `sslip.io` names are used until real domains
-exist: they resolve to the IP inside them and get real Let's Encrypt certificates.
+`hodi-net` (`infra/gcp/README.md` §15). Landing page content is controlled dynamically by each
+environment's superadmin via `/admin/settings?tab=landing` (`GET /api/v1/public/landing`).
 
 ## How a deploy works
 
@@ -106,8 +106,8 @@ Running it again for an existing email or phone promotes that user and resets th
 `/opt/hodi`, writes `edge.env`, and generates that environment's secrets:
 
 ```bash
-sudo bash server-setup.sh prod app.example.com example.com < deploy-key.pub
-sudo bash server-setup.sh dev  dev.example.com             < deploy-key.pub
+sudo bash server-setup.sh prod app.kodihub.co.ke api.kodihub.co.ke kodihub.co.ke         < deploy-key.pub
+sudo bash server-setup.sh dev  dev.kodihub.co.ke dapi.kodihub.co.ke landing.kodihub.co.ke < deploy-key.pub
 ```
 
 To move to real domains:

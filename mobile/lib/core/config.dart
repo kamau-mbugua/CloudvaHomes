@@ -4,8 +4,8 @@ import 'package:flutter/services.dart' show appFlavor;
 /// Can be set via `--dart-define=FLAVOR=dev|prod --dart-define=API_URL=...`,
 /// native `--flavor dev|prod`, or the entrypoint (`lib/main_dev.dart`, `lib/main_prod.dart`).
 abstract final class AppConfig {
-  static const devApiUrl = 'https://dev.34-35-37-207.sslip.io/api/v1';
-  static const prodApiUrl = 'https://app.34-35-173-255.sslip.io/api/v1';
+  static const devApiUrl = 'https://dapi.kodihub.co.ke/api/v1';
+  static const prodApiUrl = 'https://api.kodihub.co.ke/api/v1';
   static const localApiUrl = 'http://localhost:8080/api/v1';
 
   static const _envFlavor = String.fromEnvironment('FLAVOR');

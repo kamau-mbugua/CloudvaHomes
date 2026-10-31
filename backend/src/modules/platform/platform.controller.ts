@@ -59,6 +59,7 @@ import {
   SendTestEmailTemplateDto,
   UpdateEmailSettingsDto,
   UpdateEmailTemplateDto,
+  UpdateLandingPageDto,
   UpdateOperatorDto,
   UpdateOrgBillingDto,
   UpdatePlanDto,
@@ -331,6 +332,18 @@ export class PlatformController {
     return ok(await this.pay.updateSettings(dto));
   }
 
+  @Get('landing')
+  @PlatformAdminOnly()
+  async landing() {
+    return ok(await this.pay.getLandingPage());
+  }
+
+  @Put('landing')
+  @PlatformAdminOnly()
+  async updateLanding(@Body() dto: UpdateLandingPageDto) {
+    return ok(await this.pay.updateLandingPage(dto));
+  }
+
   // ── Operators (Superadmins & Salespeople) ──
 
   @Get('operators')
@@ -516,5 +529,19 @@ export class PlatformJobsController {
   @ApiExcludeEndpoint()
   async status() {
     return { data: await this.billing.refreshAll() };
+  }
+}
+
+/** Public landing page content controlled by the environment's superadmin. */
+@ApiTags('Public')
+@Public()
+@AllowWhenSuspended()
+@Controller('public')
+export class PublicLandingController {
+  constructor(private readonly pay: PlatformPayService) {}
+
+  @Get('landing')
+  async landing() {
+    return ok(await this.pay.getPublicLanding());
   }
 }

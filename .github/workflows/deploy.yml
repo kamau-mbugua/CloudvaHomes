@@ -127,17 +127,16 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_PREFIX }}/hodi-cron:${{ github.sha }}
 
-      # The marketing site (phase 11) is built when it exists; until then the static
-      # placeholder in infra/vm/landing is published. Detected rather than assumed, so this
-      # workflow needs no edit when landing/ lands.
+      # The marketing site is published to both production (kodihub.co.ke) and development
+      # (landing.kodihub.co.ke), and its content is loaded dynamically from each environment's
+      # superadmin settings via GET /api/v1/public/landing.
       - name: Build the landing site
-        if: env.DEPLOY_ENV == 'prod'
         run: |
           if [ -f landing/package.json ]; then
             (cd landing && npm ci && npm run build)
             echo "LANDING_DIR=landing/dist" >> "$GITHUB_ENV"
           else
-            echo "No landing/ yet — publishing infra/vm/landing."
+            echo "Publishing infra/vm/landing."
             echo "LANDING_DIR=infra/vm/landing" >> "$GITHUB_ENV"
           fi
 
@@ -169,7 +168,6 @@ jobs:
             infra/vm/ hodi:/opt/hodi/infra.new/
 
       - name: Upload the landing site
-        if: env.DEPLOY_ENV == 'prod'
         run: |
           rsync -az --no-owner --no-group --omit-dir-times --delete \
             "$LANDING_DIR/" "hodi:/opt/hodi/landing-releases/$GITHUB_SHA/"

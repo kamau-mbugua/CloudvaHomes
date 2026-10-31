@@ -17,6 +17,7 @@ import {
   Min,
   MinLength,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import { IsDateOnly } from '../../common/dates/date-only.js';
 import { PaginationQueryDto } from '../../common/http/pagination.js';
@@ -477,4 +478,115 @@ export class PlatformAuditQueryDto extends PaginationQueryDto {
 export class BillingPayDto {
   @IsMinorAmount({ description: 'Whole shillings, in cents' }) amount!: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(20) phone?: string;
+}
+
+export class LandingHeroStatDto {
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(100) label!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(80) value!: string;
+}
+
+export class LandingFeatureItemDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) tag?: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(140) title!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(500) description!: string;
+}
+
+export class LandingPortalItemDto {
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(140) title!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(500) description!: string;
+}
+
+export class UpdateLandingPageDto {
+  @ApiPropertyOptional({ description: 'When true, resets all landing page content to defaults' })
+  @IsOptional()
+  @IsBoolean()
+  reset?: boolean;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) brandName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) pageTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) metaDescription?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) signInLabel?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) registerLabel?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) heroBadge?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) heroTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) heroSubtitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) heroPrimaryCta?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) heroSecondaryCta?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) heroStatsTitle?: string;
+
+  @ApiPropertyOptional({ type: [LandingHeroStatDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => LandingHeroStatDto)
+  heroStats?: LandingHeroStatDto[];
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) featuresTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) featuresSubtitle?: string;
+
+  @ApiPropertyOptional({ type: [LandingFeatureItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => LandingFeatureItemDto)
+  features?: LandingFeatureItemDto[];
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) portalsTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) portalsSubtitle?: string;
+
+  @ApiPropertyOptional({ type: [LandingPortalItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => LandingPortalItemDto)
+  portals?: LandingPortalItemDto[];
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) pricingBadge?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) pricingTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) pricingSubtitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(300) pricingNote?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  defaultSliderUnits?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  fallbackRatePerUnit?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  fallbackMinimumMonthly?: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @IsEmail()
+  contactEmail?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(40)
+  contactPhone?: string | null;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) footerCopyright?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) footerTagline?: string;
 }
