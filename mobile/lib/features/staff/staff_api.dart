@@ -535,9 +535,32 @@ final dashboardProvider = FutureProvider.autoDispose((ref) {
   return ref.watch(staffApiProvider).dashboard(propertyId: activePropertyId);
 });
 
-final propertiesProvider = FutureProvider.autoDispose(
-  (ref) => ref.watch(staffApiProvider).properties(),
-);
+final propertiesProvider = FutureProvider.autoDispose((ref) async {
+  final sessionProps = ref.watch(
+    sessionProvider.select((s) => s.valueOrNull?.properties ?? const []),
+  );
+  final fetched = await ref.watch(staffApiProvider).properties();
+  if (sessionProps.isEmpty) return fetched;
+  final byId = {for (final p in fetched) p.id: p};
+  final sessionIds = {for (final sp in sessionProps) sp.id};
+  return [
+    for (final sp in sessionProps)
+      byId[sp.id] ??
+          PropertyOption(
+            id: sp.id,
+            code: sp.code,
+            name: sp.name,
+            unitCount: sp.unitCount,
+            occupiedCount: sp.occupiedCount,
+            vacantCount: (sp.unitCount - sp.occupiedCount).clamp(
+              0,
+              sp.unitCount,
+            ),
+          ),
+    for (final p in fetched)
+      if (!sessionIds.contains(p.id)) p,
+  ];
+});
 
 final unitProvider = FutureProvider.autoDispose.family<UnitRow, String>(
   (ref, id) => ref.watch(staffApiProvider).unit(id),

@@ -44,6 +44,7 @@ class TenantHomeScreen extends ConsumerWidget {
               : o.openInvoices;
           final showSwitcher =
               o.homes.length > 1 ||
+              selectedHomeKey != null ||
               accounts.length > 1 ||
               (session?.isStaff ?? false) ||
               (session?.isOwner ?? false);

@@ -115,31 +115,40 @@ class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
     final fetchedProps = canProps
         ? ref.watch(propertiesProvider).valueOrNull
         : null;
-    final props = (fetchedProps != null && fetchedProps.isNotEmpty)
-        ? fetchedProps
-        : [
+    final fetchedById = {
+      if (fetchedProps != null)
+        for (final p in fetchedProps) p.id: p,
+    };
+    final sessionIds = {for (final p in session.properties) p.id};
+    final props = session.properties.isNotEmpty
+        ? [
             for (final p in session.properties)
-              PropertyOption(
-                id: p.id,
-                code: p.code,
-                name: p.name,
-                unitCount: p.unitCount,
-                occupiedCount: p.occupiedCount,
-                vacantCount: (p.unitCount - p.occupiedCount).clamp(
-                  0,
-                  p.unitCount,
-                ),
-              ),
-          ];
+              fetchedById[p.id] ??
+                  PropertyOption(
+                    id: p.id,
+                    code: p.code,
+                    name: p.name,
+                    unitCount: p.unitCount,
+                    occupiedCount: p.occupiedCount,
+                    vacantCount: (p.unitCount - p.occupiedCount).clamp(
+                      0,
+                      p.unitCount,
+                    ),
+                  ),
+            if (fetchedProps != null)
+              for (final p in fetchedProps)
+                if (!sessionIds.contains(p.id)) p,
+          ]
+        : (fetchedProps ?? const <PropertyOption>[]);
     final orgs = session.organizations;
+    final activePropertyId = session.activePropertyId;
     if (props.length <= 1 &&
+        activePropertyId == null &&
         orgs.length <= 1 &&
         !session.isTenant &&
         !session.isOwner) {
       return const SizedBox.shrink();
     }
-
-    final activePropertyId = session.activePropertyId;
     PropertyOption? activeProp;
     if (activePropertyId != null) {
       for (final p in props) {

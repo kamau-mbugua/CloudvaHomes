@@ -34,12 +34,10 @@ final ownerOverviewProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
 ) async {
   final session = ref.watch(sessionProvider).valueOrNull;
   final owners = session?.ownerOf ?? const [];
-  final chosen = ref.watch(chosenOwnerProvider) ?? session?.activeLandlordId;
-  final selectedPropId = ref.watch(selectedOwnerPropertyIdProvider);
   if (owners.isEmpty) throw StateError('No landlord account');
   final api = ref.watch(apiClientProvider);
 
-  if (owners.length > 1 && chosen == null && selectedPropId == null) {
+  if (owners.length > 1) {
     final results = await Future.wait([
       for (final o in owners)
         api.get('/owner/landlords/${Uri.encodeComponent(o.landlordId)}'),
@@ -67,9 +65,7 @@ final ownerOverviewProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
     };
   }
 
-  final id = owners.any((o) => o.landlordId == chosen)
-      ? chosen!
-      : owners.first.landlordId;
+  final id = owners.first.landlordId;
   final res = await api.get('/owner/landlords/${Uri.encodeComponent(id)}');
   return res['data'] as Map<String, dynamic>;
 });
@@ -247,7 +243,10 @@ class OwnerOverviewScreen extends ConsumerWidget {
           final selectedPropName =
               (selectedRow?['property'] as Map<String, dynamic>?)?['name']
                   as String?;
-          final showSwitcher = propRows.length > 1 || owners.length > 1;
+          final showSwitcher =
+              propRows.length > 1 ||
+              selectedPropId != null ||
+              owners.length > 1;
 
           Future<void> switchProperty(
             String? propId,

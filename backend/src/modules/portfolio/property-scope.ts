@@ -31,6 +31,17 @@ export function propertyScope(): Prisma.PropertyWhereInput {
   return ids ? { id: inList(ids) } : {};
 }
 
+/**
+ * Scope for `GET /properties` and `PropertiesService.find`: filters only by the staff
+ * member's assigned properties (`Membership.propertyIds`), ignoring the active UI
+ * single-property filter (`ctx.activePropertyId`) so property pickers and the
+ * Properties directory always list all properties the caller is allowed to access.
+ */
+export function assignedPropertyScope(): Prisma.PropertyWhereInput {
+  const ids = currentContext()?.propertyIds ?? null;
+  return ids ? { id: inList(ids) } : {};
+}
+
 export function unitScope(): Prisma.UnitWhereInput {
   const ids = allowedPropertyIds();
   return ids ? { propertyId: inList(ids) } : {};

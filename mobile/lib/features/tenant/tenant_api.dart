@@ -538,17 +538,12 @@ final tenantOverviewProvider = FutureProvider.autoDispose<TenantOverview>((
 ) {
   final session = ref.watch(sessionProvider).valueOrNull;
   final accounts = session?.tenantOf ?? const [];
-  final chosen = ref.watch(chosenTenantProvider) ?? session?.activeTenantId;
-  final selectedHomeKey = ref.watch(selectedTenantHomeKeyProvider);
   if (accounts.isEmpty) throw StateError('No tenant account');
   final api = ref.watch(tenantApiProvider);
-  if (accounts.length > 1 && chosen == null && selectedHomeKey == null) {
+  if (accounts.length > 1) {
     return api.consolidatedOverview([for (final a in accounts) a.tenantId]);
   }
-  final id = accounts.any((a) => a.tenantId == chosen)
-      ? chosen!
-      : accounts.first.tenantId;
-  return api.overview(id);
+  return api.overview(accounts.first.tenantId);
 });
 
 final tenantInvoiceProvider = FutureProvider.autoDispose

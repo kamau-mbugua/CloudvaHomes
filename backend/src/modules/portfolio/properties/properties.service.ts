@@ -8,7 +8,7 @@ import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
 import { isAgency, optionalText } from '../fields.js';
-import { propertyScope, requireAllProperties } from '../property-scope.js';
+import { assignedPropertyScope, requireAllProperties } from '../property-scope.js';
 import type {
   CreatePropertyDto,
   ListPropertiesQueryDto,
@@ -69,7 +69,7 @@ export class PropertiesService {
     const term = q.q?.trim();
     const where: Prisma.PropertyWhereInput = {
       AND: [
-        propertyScope(),
+        assignedPropertyScope(),
         q.status ? { status: q.status } : {},
         q.landlordId ? { landlordId: q.landlordId } : {},
         term
@@ -189,7 +189,7 @@ export class PropertiesService {
   /** A property the caller may see, or 404. Used by units and tenancies too. */
   async find(id: string): Promise<PropertyRow> {
     const p = await this.db.property.findFirst({
-      where: { AND: [{ id }, propertyScope()] },
+      where: { AND: [{ id }, assignedPropertyScope()] },
       include: INCLUDE,
     });
     if (!p) throw AppError.notFound('Property');
