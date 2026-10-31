@@ -54,7 +54,7 @@ stack up -d --remove-orphans api web cron
 wait_healthy || fail "The previous release didn't become healthy either — check: docker compose -p hodi-$ENV logs api"
 edge_up
 
-if [ "$ENV" = prod ] && [ -f "$ROOT/releases/landing-previous" ]; then
+if [ -f "$ROOT/releases/landing-previous" ]; then
   lp="$(cat "$ROOT/releases/landing-previous")"
   if [ -d "$ROOT/landing-releases/$lp" ]; then
     ln -sfn "$lp" "$ROOT/landing-releases/current.tmp" && mv -T "$ROOT/landing-releases/current.tmp" "$ROOT/landing-releases/current"

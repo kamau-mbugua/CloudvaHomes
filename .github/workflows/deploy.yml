@@ -136,8 +136,8 @@ jobs:
             (cd landing && npm ci && npm run build)
             echo "LANDING_DIR=landing/dist" >> "$GITHUB_ENV"
           else
-            echo "Publishing infra/vm/landing."
-            echo "LANDING_DIR=infra/vm/landing" >> "$GITHUB_ENV"
+            echo "Publishing landing/."
+            echo "LANDING_DIR=landing" >> "$GITHUB_ENV"
           fi
 
       # ── Ship (to the server) ─────────────────────────────────────────────────
@@ -169,7 +169,7 @@ jobs:
 
       - name: Upload the landing site
         run: |
-          rsync -az --no-owner --no-group --omit-dir-times --delete \
+          rsync -az --no-owner --no-group --omit-dir-times --delete --exclude='README.md' \
             "$LANDING_DIR/" "hodi:/opt/hodi/landing-releases/$GITHUB_SHA/"
 
       # The server pulls the images with THIS run's short-lived token, then logs out. The

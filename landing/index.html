@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title id="doc-title">KodiHub: rent and M-Pesa management for Kenyan landlords</title>
+  <meta
+    id="doc-description"
+    name="description"
+    content="KodiHub runs monthly rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, and pays landlords their net remittance. Built for Kenyan landlords and letting agencies."
+  />
+  <meta name="theme-color" content="#002b4d" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&display=swap"
+  />
+  <style>
+    :root {
+      --bg: #fafaf7;
+      --bg-2: #f1efe9;
+      --paper: #ffffff;
+      --ink: #0a2540;
+      --ink-2: #1f3a5c;
+      --hairline: rgba(10, 37, 64, 0.1);
+      --hairline-2: rgba(10, 37, 64, 0.06);
+      --accent-deep: #5f8a00;
+      --navy: #002b4d;
+      --navy-2: #0a1f36;
+      --primary: #002b4d;
+      --primary-foreground: #ffffff;
+      --primary-hover: #0a3a66;
+      --accent: #4d6b10;
+      --accent-foreground: #ffffff;
+      --accent-hover: #3d5509;
+      --accent-soft: #eef6db;
+      --accent-safe: #4d6b10;
+      --secondary: #f1efe9;
+      --secondary-foreground: #1f3a5c;
+      --muted: #ece9e0;
+      --muted-foreground: #52647e;
+      --success: #1f7a4f;
+      --warning: #9a5b00;
+      --info: #337abf;
+      --info-soft: rgba(51, 122, 191, 0.12);
+      --info-text: #28618f;
+      --border: rgba(10, 37, 64, 0.12);
+      --text-subtle: #5b6b82;
+      --brand-stripe: #84bd00;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: #fafaf7;
+      color: #0a2540;
+      font-family: Lufga, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: #0a2540;
+      transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+    }
+    a:hover {
+      color: #4d6b10;
+    }
+
+    .kh-kicker {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #4d6b10;
+    }
+
+    .kh-hl {
+      font-style: normal;
+      background: linear-gradient(transparent 62%, #d9ec9f 62%, #d9ec9f 92%, transparent 92%);
+      padding: 0 2px;
+    }
+
+    .kh-nav a {
+      text-decoration: none;
+    }
+    .kh-nav .kh-nav-link:hover {
+      color: #4d6b10 !important;
+    }
+
+    /* NEXAIUI Button equivalents */
+    .kh-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      height: 36px;
+      padding: 0 20px;
+      border: 1px solid transparent;
+      user-select: none;
+    }
+    .kh-btn:active {
+      transform: translateY(1px);
+    }
+    .kh-btn-lg {
+      height: 40px;
+      padding: 0 24px;
+    }
+    .kh-btn-primary {
+      background: #002b4d;
+      color: #ffffff !important;
+    }
+    .kh-btn-primary:hover {
+      background: #0a3a66;
+      color: #ffffff !important;
+    }
+    .kh-btn-outline {
+      background: #fafaf7;
+      color: #0a2540 !important;
+      border-color: rgba(10, 37, 64, 0.12);
+    }
+    .kh-btn-outline:hover {
+      background: #4d6b10;
+      border-color: #4d6b10;
+      color: #ffffff !important;
+    }
+    .kh-btn-ghost {
+      background: transparent;
+      color: #0a2540 !important;
+    }
+    .kh-btn-ghost:hover {
+      background: #4d6b10;
+      color: #ffffff !important;
+    }
+
+    /* NEXAIUI Badge equivalents */
+    .kh-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.4;
+      width: fit-content;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .kh-badge-success {
+      background: rgba(31, 122, 79, 0.15);
+      color: #1f7a4f;
+    }
+    .kh-badge-accent {
+      background: #eef6db;
+      color: #4d6b10;
+    }
+    .kh-badge-info {
+      background: rgba(51, 122, 191, 0.12);
+      color: #28618f;
+    }
+    .kh-badge-outline {
+      border-color: rgba(10, 37, 64, 0.12);
+      background: transparent;
+      color: #0a2540;
+    }
+
+    .kh-faq summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .kh-faq summary::-webkit-details-marker {
+      display: none;
+    }
+    .kh-faq details[open] .kh-plus {
+      transform: rotate(45deg);
+    }
+
+    input[type="range"].kh-range {
+      accent-color: #4d6b10;
+      cursor: pointer;
+    }
+
+    .kh-maintenance {
+      display: none;
+      background: #9a5b00;
+      color: #ffffff;
+      font-size: 13px;
+      text-align: center;
+      padding: 8px 24px;
+      font-weight: 500;
+    }
+    .kh-maintenance.visible {
+      display: block;
+    }
+
+    @media (max-width: 720px) {
+      .kh-hide-sm {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div>
+
+  <!-- Top bar -->
+  <div id="top-bar" style="background: #002b4d; color: #d7e0ec; font-size: 13px; border-bottom: 3px solid #84bd00">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 8px 24px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; text-align: center">
+      <span id="top-bar-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #84bd00"></span>
+      <span id="top-bar-text">New organisations start with a free trial. Vacant units are never billed.</span>
+    </div>
+  </div>
+
+  <!-- Optional maintenance banner -->
+  <div id="maintenance-bar" class="kh-maintenance" role="status"></div>
+
+  <!-- Header -->
+  <header style="position: sticky; top: 0; z-index: 30; background: rgba(250, 250, 247, 0.92); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(10, 37, 64, 0.1)">
+    <nav class="kh-nav" aria-label="Main" style="max-width: 1240px; margin: 0 auto; padding: 0 24px; height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 16px">
+      <a href="#top" aria-label="KodiHub home" style="display: inline-flex; align-items: center; gap: 10px; color: #002b4d">
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+          <rect width="34" height="34" rx="10" fill="#002b4d"></rect>
+          <path d="M9 17.5 17 11l8 6.5V25h-5.5v-5h-5v5H9z" fill="none" stroke="#84bd00" stroke-width="2" stroke-linejoin="round"></path>
+        </svg>
+        <span id="nav-brand" style="font-size: 21px; font-weight: 700; letter-spacing: -0.03em">KodiHub</span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 28px">
+        <a class="kh-hide-sm kh-nav-link" href="#how" style="font-size: 15px; font-weight: 500; color: #1f3a5c">How it works</a>
+        <a class="kh-hide-sm kh-nav-link" href="#features" style="font-size: 15px; font-weight: 500; color: #1f3a5c">Features</a>
+        <a class="kh-hide-sm kh-nav-link" href="#app" style="font-size: 15px; font-weight: 500; color: #1f3a5c">Mobile app</a>
+        <a class="kh-hide-sm kh-nav-link" href="#agencies" style="font-size: 15px; font-weight: 500; color: #1f3a5c">For agencies</a>
+        <a class="kh-hide-sm kh-nav-link" href="#pricing" style="font-size: 15px; font-weight: 500; color: #1f3a5c">Pricing</a>
+        <a class="kh-hide-sm kh-nav-link" href="#faq" style="font-size: 15px; font-weight: 500; color: #1f3a5c">FAQ</a>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <a id="nav-signin" href="/login" class="kh-btn kh-btn-ghost kh-hide-sm">Sign in</a>
+        <a id="nav-register" href="/register" class="kh-btn kh-btn-primary">Start free trial</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+
+    <!-- Hero -->
+    <section aria-labelledby="hero-title" style="max-width: 1240px; margin: 0 auto; padding: 72px 24px 56px; display: flex; flex-wrap: wrap; gap: 56px; align-items: center">
+      <div style="flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+        <div style="display: inline-flex; align-self: flex-start; align-items: center; gap: 10px; padding: 6px 14px 6px 10px; border-radius: 999px; background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.1)">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #84bd00; box-shadow: 0 0 0 4px #eef6db"></span>
+          <span id="hero-badge" class="kh-kicker" style="color: #1f3a5c">Rent management software for Kenya</span>
+        </div>
+        <h1 id="hero-title" style="margin: 0; font-size: clamp(38px, 5vw, 64px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 600; color: #002b4d">
+          Collect rent on M-Pesa. Let the books <em class="kh-hl">reconcile themselves.</em>
+        </h1>
+        <p id="hero-subtitle" style="margin: 0; font-size: 19px; line-height: 1.6; color: #52647e; max-width: 560px">
+          KodiHub runs monthly rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, and pays landlords their net remittance. Built for Kenyan landlords and letting agencies.
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px">
+          <a id="hero-register" href="/register" class="kh-btn kh-btn-primary kh-btn-lg">Start your free trial</a>
+          <a id="hero-secondary" href="#how" class="kh-btn kh-btn-outline kh-btn-lg">See how it works</a>
+        </div>
+        <ul style="list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 14px; color: #1f3a5c">
+          <li style="display: flex; align-items: center; gap: 8px">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            Pay only for occupied units
+          </li>
+          <li style="display: flex; align-items: center; gap: 8px">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            Unlimited staff accounts
+          </li>
+          <li style="display: flex; align-items: center; gap: 8px">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            Web, Android and iOS
+          </li>
+        </ul>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13px; color: #52647e">
+          <span>Also on mobile:</span>
+          <a id="hero-play-pill" href="#app" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.12); color: #0a2540; font-weight: 600; text-decoration: none; min-height: 32px; box-sizing: border-box">Google Play</a>
+          <a id="hero-store-pill" href="#app" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.12); color: #0a2540; font-weight: 600; text-decoration: none; min-height: 32px; box-sizing: border-box">App Store</a>
+        </div>
+      </div>
+
+      <!-- Hero visual -->
+      <div aria-label="Sample portfolio snapshot" role="img" style="flex: 1 1 460px; min-width: 0; position: relative; border-radius: 24px; padding: 28px; background: radial-gradient(120% 90% at 85% 10%, #e3f1bf 0%, rgba(238, 246, 219, 0.6) 35%, #f1efe9 75%); border: 1px solid rgba(10, 37, 64, 0.08); display: flex; flex-direction: column; gap: 14px">
+        <div style="background: #ffffff; border-radius: 20px; padding: 22px 24px; box-shadow: 0 20px 60px -24px rgba(10, 37, 64, 0.18); border: 1px solid rgba(10, 37, 64, 0.06); display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+            <span id="hero-stats-title" class="kh-kicker" style="color: #5b6b82">Sample portfolio · October</span>
+            <span class="kh-badge kh-badge-success">Live</span>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap">
+            <span id="hero-stat-0-value" style="font-size: 36px; font-weight: 600; letter-spacing: -0.03em; color: #002b4d; font-variant-numeric: tabular-nums">KES 1,840,000</span>
+            <span id="hero-stat-0-label" style="font-size: 14px; color: #52647e">collected this month</span>
+          </div>
+          <div style="height: 8px; border-radius: 999px; background: #ece9e0; overflow: hidden">
+            <div style="width: 92%; height: 100%; background: #84bd00; border-radius: 999px"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span id="hero-stat-1-value" style="font-size: 20px; font-weight: 600; color: #0a2540">98.4%</span>
+              <span id="hero-stat-1-label" style="font-size: 12px; color: #52647e">M-Pesa auto-matched</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span id="hero-stat-2-value" style="font-size: 20px; font-weight: 600; color: #0a2540">95.3%</span>
+              <span id="hero-stat-2-label" style="font-size: 12px; color: #52647e">Occupancy, 64 units</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span id="hero-stat-3-value" style="font-size: 20px; font-weight: 600; color: #0a2540">0</span>
+              <span id="hero-stat-3-label" style="font-size: 12px; color: #52647e">Receipt books</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="background: #ffffff; border-radius: 20px; padding: 8px 20px; border: 1px solid rgba(10, 37, 64, 0.06); box-shadow: 0 1px 3px rgba(10, 37, 64, 0.06); margin-left: 32px">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(10, 37, 64, 0.06)">
+            <span style="width: 36px; height: 36px; border-radius: 10px; background: #eef6db; display: grid; place-items: center; flex: none">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="5" y="2" width="8" height="14" rx="2" fill="none" stroke="#4d6b10" stroke-width="1.6"></rect><path d="M8 13h2" stroke="#4d6b10" stroke-width="1.6" stroke-linecap="round"></path></svg>
+            </span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <span style="font-size: 14px; font-weight: 600">KES 18,500 · Paybill</span>
+              <span style="font-size: 12px; color: #52647e">Ref B4 · matched to Unit B4</span>
+            </div>
+            <span class="kh-badge kh-badge-success">Matched</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(10, 37, 64, 0.06)">
+            <span style="width: 36px; height: 36px; border-radius: 10px; background: #eef6db; display: grid; place-items: center; flex: none">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2v9m0 0 3.5-3.5M9 11 5.5 7.5M3 15h12" fill="none" stroke="#4d6b10" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <span style="font-size: 14px; font-weight: 600">KES 22,000 · STK Push</span>
+              <span style="font-size: 12px; color: #52647e">Tenant paid from the portal · Unit A2</span>
+            </div>
+            <span class="kh-badge kh-badge-success">Matched</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 0">
+            <span style="width: 36px; height: 36px; border-radius: 10px; background: rgba(51, 122, 191, 0.12); display: grid; place-items: center; flex: none">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 7h14M3 7v7m4-7v7m4-7v7m4-7v7M2 15h14M9 2l7 4H2z" fill="none" stroke="#28618f" stroke-width="1.5" stroke-linejoin="round"></path></svg>
+            </span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <span style="font-size: 14px; font-weight: 600">KES 45,000 · Bank import</span>
+              <span style="font-size: 12px; color: #52647e">No reference · queued for review</span>
+            </div>
+            <span class="kh-badge kh-badge-info">Review</span>
+          </div>
+        </div>
+
+        <div style="align-self: flex-end; display: inline-flex; align-items: center; gap: 10px; background: #002b4d; color: #ffffff; border-radius: 999px; padding: 10px 16px 10px 12px; font-size: 13px; font-weight: 500">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="#84bd00"></circle><path d="M5.5 9.2 8 11.5l4.5-5" fill="none" stroke="#002b4d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          Receipt sent by SMS and email
+        </div>
+      </div>
+    </section>
+
+    <!-- Rails strip -->
+    <section aria-label="Payment rails supported" style="border-top: 1px solid rgba(10, 37, 64, 0.1); border-bottom: 1px solid rgba(10, 37, 64, 0.1); background: #ffffff">
+      <div style="max-width: 1240px; margin: 0 auto; padding: 22px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 28px">
+        <span class="kh-kicker" style="color: #5b6b82">Money moves on the rails Kenya uses</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px 26px; font-size: 15px; font-weight: 600; color: #1f3a5c">
+          <span>M-Pesa Paybill</span>
+          <span>M-Pesa Till</span>
+          <span>STK Push</span>
+          <span>B2C payouts</span>
+          <span>Bank statement imports</span>
+          <span>Cash and cheque</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how" aria-labelledby="how-title" style="max-width: 1240px; margin: 0 auto; padding: 104px 24px 40px">
+      <div style="max-width: 680px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 48px">
+        <span class="kh-kicker">How it works</span>
+        <h2 id="how-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
+          From move-in to landlord payout, one continuous ledger.
+        </h2>
+        <p id="how-subtitle" style="margin: 0; font-size: 17px; color: #52647e">
+          No spreadsheets, no manual receipt books. Each step feeds the next, so the numbers in your reports are the numbers in M-Pesa.
+        </p>
+      </div>
+      <ol id="how-steps-grid" style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px">
+        <li style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+          <span class="kh-kicker">01 · Move in</span>
+          <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #002b4d">Add units and tenants</h3>
+          <p style="margin: 0; font-size: 14px; color: #52647e">Set rent, deposits and move-in fees per unit. Tenancies keep the full history.</p>
+        </li>
+        <li style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+          <span class="kh-kicker">02 · Bill</span>
+          <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #002b4d">Run invoices in one click</h3>
+          <p style="margin: 0; font-size: 14px; color: #52647e">Rent, water and power for a whole property, with meter photos as proof.</p>
+        </li>
+        <li style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+          <span class="kh-kicker">03 · Collect</span>
+          <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #002b4d">Tenants pay how they like</h3>
+          <p style="margin: 0; font-size: 14px; color: #52647e">Paybill, Till, an STK prompt from the portal, bank transfer or cash.</p>
+        </li>
+        <li style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px">
+          <span class="kh-kicker">04 · Reconcile</span>
+          <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #002b4d">Payments find their invoice</h3>
+          <p style="margin: 0; font-size: 14px; color: #52647e">Matched by account reference or phone, allocated oldest-due first.</p>
+        </li>
+        <li style="background: #002b4d; border: 1px solid #002b4d; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px; color: #ffffff">
+          <span class="kh-kicker" style="color: #84bd00">05 · Remit</span>
+          <h3 style="margin: 0; font-size: 19px; font-weight: 600; color: #ffffff">Pay the owner</h3>
+          <p style="margin: 0; font-size: 14px; color: #d7e0ec">Commission and expenses deducted, net sent to the landlord by M-Pesa B2C.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- Features -->
+    <section id="features" aria-labelledby="features-title" style="max-width: 1240px; margin: 0 auto; padding: 80px 24px">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 48px">
+        <div style="max-width: 640px; display: flex; flex-direction: column; gap: 14px">
+          <span class="kh-kicker">Features</span>
+          <h2 id="features-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
+            Everything your property operations need, nothing they don't.
+          </h2>
+        </div>
+        <p id="features-subtitle" style="margin: 0; font-size: 16px; color: #52647e; max-width: 400px">
+          One system for property managers, accountants, caretakers, landlords and tenants, each with exactly the access their role needs.
+        </p>
+      </div>
+      <div id="features-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px">
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+          <span style="width: 44px; height: 44px; border-radius: 12px; background: #eef6db; display: grid; place-items: center">
+            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="6" y="2" width="10" height="18" rx="2.5" fill="none" stroke="#4d6b10" stroke-width="1.7"></rect><path d="M9.5 16.5h3M9 8l1.7 1.7L13.5 6.5" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </span>
+          <span class="kh-kicker" style="color: #5b6b82">M-Pesa and banks</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #002b4d; line-height: 1.3">Real-time C2B, STK Push and bank imports</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Connect your Safaricom Paybill or Till. Payments land against the right tenant automatically, and anything unclear waits in a review queue.</p>
+        </article>
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+          <span style="width: 44px; height: 44px; border-radius: 12px; background: #eef6db; display: grid; place-items: center">
+            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M11 3c3 4 5 6.5 5 9a5 5 0 0 1-10 0c0-2.5 2-5 5-9z" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round"></path></svg>
+          </span>
+          <span class="kh-kicker" style="color: #5b6b82">Billing and meters</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #002b4d; line-height: 1.3">Rent, water and power on one invoice</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Caretakers record meter readings with a photo. Fixed, variable and metered charges roll into each month's invoice run.</p>
+        </article>
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+          <span style="width: 44px; height: 44px; border-radius: 12px; background: #eef6db; display: grid; place-items: center">
+            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M5 2h9l3 3v15H5z M14 2v3h3M8 10h6M8 13.5h6M8 17h3.5" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"></path></svg>
+          </span>
+          <span class="kh-kicker" style="color: #5b6b82">Communications</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #002b4d; line-height: 1.3">Branded PDF invoices, receipts and reminders</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Every invoice and payment sends an SMS and an email with an official PDF attached. Reminders go out before rent is due.</p>
+        </article>
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+          <span style="width: 44px; height: 44px; border-radius: 12px; background: #eef6db; display: grid; place-items: center">
+            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M13.5 4.5a4 4 0 0 0-5 5L3 15l3 3 5.5-5.5a4 4 0 0 0 5-5L14 10l-2-2z" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round"></path></svg>
+          </span>
+          <span class="kh-kicker" style="color: #5b6b82">Maintenance</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #002b4d; line-height: 1.3">Repair requests that close the loop</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Tenants report issues with photos from their phone. Staff track each ticket and turn repair costs into property expenses.</p>
+        </article>
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+          <span style="width: 44px; height: 44px; border-radius: 12px; background: #eef6db; display: grid; place-items: center">
+            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 18V9m5.5 9V4m5.5 14v-6m5 6V7M2 19.5h18" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linecap="round"></path></svg>
+          </span>
+          <span class="kh-kicker" style="color: #5b6b82">Reports</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #002b4d; line-height: 1.3">Arrears, occupancy and P&amp;L per property</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">See who owes what, which units sit empty, and what each property actually earns after expenses.</p>
+        </article>
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px">
+          <span style="width: 44px; height: 44px; border-radius: 12px; background: #eef6db; display: grid; place-items: center">
+            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M11 2.5 4 5v5.5c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9V5z M8 11l2.2 2.2L14.5 9" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"></path></svg>
+          </span>
+          <span class="kh-kicker" style="color: #5b6b82">Access and audit</span>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 600; color: #002b4d; line-height: 1.3">Roles, permissions and a full audit log</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Caretakers never touch money settings. Accountants see the ledger. Every change is recorded with who made it and when.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Reconciliation spotlight -->
+    <section aria-labelledby="recon-title" style="background: #f1efe9; border-top: 1px solid rgba(10, 37, 64, 0.06); border-bottom: 1px solid rgba(10, 37, 64, 0.06)">
+      <div style="max-width: 1240px; margin: 0 auto; padding: 96px 24px; display: flex; flex-wrap: wrap; gap: 56px; align-items: center">
+        <div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+          <span class="kh-kicker">Reconciliation</span>
+          <h2 id="recon-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
+            Month-end close in minutes, not a weekend.
+          </h2>
+          <p id="recon-subtitle" style="margin: 0; font-size: 17px; color: #52647e">
+            Every shilling that arrives is logged as it lands, then matched and allocated. Your team only handles the exceptions.
+          </p>
+          <ul style="list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column">
+            <li style="display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(10, 37, 64, 0.1)">
+              <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span><strong style="color: #0a2540">Matched on reference or phone.</strong> <span style="color: #52647e">Unit numbers and registered phone numbers both work.</span></span>
+            </li>
+            <li style="display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(10, 37, 64, 0.1)">
+              <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span><strong style="color: #0a2540">Oldest balance cleared first.</strong> <span style="color: #52647e">Part payments and overpayments are handled correctly.</span></span>
+            </li>
+            <li style="display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); border-bottom: 1px solid rgba(10, 37, 64, 0.1)">
+              <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span><strong style="color: #0a2540">Nothing silently disappears.</strong> <span style="color: #52647e">Unmatched payments wait in a queue until someone assigns them.</span></span>
+            </li>
+          </ul>
+        </div>
+        <div style="flex: 1 1 560px; min-width: 0; background: #ffffff; border-radius: 24px; border: 1px solid rgba(10, 37, 64, 0.08); box-shadow: 0 20px 60px -24px rgba(10, 37, 64, 0.18); overflow: hidden">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid rgba(10, 37, 64, 0.08); flex-wrap: wrap">
+            <span style="font-size: 16px; font-weight: 600; color: #002b4d">Inbound payments</span>
+            <span class="kh-kicker" style="color: #5b6b82">Sample data</span>
+          </div>
+          <div style="overflow-x: auto">
+            <table style="width: 100%; min-width: 520px; border-collapse: collapse; font-size: 14px">
+              <thead>
+                <tr style="text-align: left; color: #52647e; font-size: 12px">
+                  <th scope="col" style="padding: 12px 24px; font-weight: 500">Channel</th>
+                  <th scope="col" style="padding: 12px 12px; font-weight: 500">Reference</th>
+                  <th scope="col" style="padding: 12px 12px; font-weight: 500">Allocated to</th>
+                  <th scope="col" style="padding: 12px 12px; font-weight: 500; text-align: right">Amount</th>
+                  <th scope="col" style="padding: 12px 24px; font-weight: 500">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-top: 1px solid rgba(10, 37, 64, 0.06)">
+                  <td style="padding: 14px 24px">Paybill</td>
+                  <td style="padding: 14px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px">B4</td>
+                  <td style="padding: 14px 12px">Unit B4 · Oct rent</td>
+                  <td style="padding: 14px 12px; text-align: right; font-variant-numeric: tabular-nums">18,500</td>
+                  <td style="padding: 14px 24px"><span class="kh-badge kh-badge-success">Matched</span></td>
+                </tr>
+                <tr style="border-top: 1px solid rgba(10, 37, 64, 0.06)">
+                  <td style="padding: 14px 24px">STK Push</td>
+                  <td style="padding: 14px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px">A2</td>
+                  <td style="padding: 14px 12px">Unit A2 · Oct rent</td>
+                  <td style="padding: 14px 12px; text-align: right; font-variant-numeric: tabular-nums">22,000</td>
+                  <td style="padding: 14px 24px"><span class="kh-badge kh-badge-success">Matched</span></td>
+                </tr>
+                <tr style="border-top: 1px solid rgba(10, 37, 64, 0.06)">
+                  <td style="padding: 14px 24px">Till</td>
+                  <td style="padding: 14px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px">07•• ••• 412</td>
+                  <td style="padding: 14px 12px">Unit C7 · Sep water, Oct rent</td>
+                  <td style="padding: 14px 12px; text-align: right; font-variant-numeric: tabular-nums">16,200</td>
+                  <td style="padding: 14px 24px"><span class="kh-badge kh-badge-accent">Split</span></td>
+                </tr>
+                <tr style="border-top: 1px solid rgba(10, 37, 64, 0.06)">
+                  <td style="padding: 14px 24px">Bank</td>
+                  <td style="padding: 14px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px">TRF 88213</td>
+                  <td style="padding: 14px 12px; color: #52647e">Awaiting review</td>
+                  <td style="padding: 14px 12px; text-align: right; font-variant-numeric: tabular-nums">45,000</td>
+                  <td style="padding: 14px 24px"><span class="kh-badge kh-badge-info">Review</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Portals -->
+    <section id="portals" aria-labelledby="portals-title" style="max-width: 1240px; margin: 0 auto; padding: 104px 24px 80px">
+      <div style="max-width: 680px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 48px">
+        <span class="kh-kicker">Portals</span>
+        <h2 id="portals-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
+          Three tailored experiences. Everyone sees only what is theirs.
+        </h2>
+      </div>
+      <div id="portals-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px">
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 14px">
+          <span class="kh-kicker">For landlords and staff</span>
+          <h3 style="margin: 0; font-size: 22px; font-weight: 600; color: #002b4d">Run the whole portfolio</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Properties, units, tenancies, meter readings, invoice runs, reconciliation, maintenance and P&amp;L, with menus filtered by role.</p>
+          <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(10, 37, 64, 0.08); display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="kh-badge kh-badge-outline">Owner</span>
+            <span class="kh-badge kh-badge-outline">Manager</span>
+            <span class="kh-badge kh-badge-outline">Accountant</span>
+            <span class="kh-badge kh-badge-outline">Caretaker</span>
+          </div>
+        </article>
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 14px">
+          <span class="kh-kicker">For tenants</span>
+          <h3 style="margin: 0; font-size: 22px; font-weight: 600; color: #002b4d">Pay rent in two taps</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Sign in with a one-time code by SMS or email, check the balance, trigger an M-Pesa prompt, download receipts and raise repair requests.</p>
+          <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(10, 37, 64, 0.08); display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="kh-badge kh-badge-outline">No password needed</span>
+            <span class="kh-badge kh-badge-outline">Android and iOS</span>
+          </div>
+        </article>
+        <article style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 14px">
+          <span class="kh-kicker">For property owners</span>
+          <h3 style="margin: 0; font-size: 22px; font-weight: 600; color: #002b4d">See your money, read-only</h3>
+          <p style="margin: 0; font-size: 15px; color: #52647e">Owners of agency-managed properties see live occupancy, monthly owner statements, commission breakdowns and every remittance paid.</p>
+          <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(10, 37, 64, 0.08); display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="kh-badge kh-badge-outline">Owner statements</span>
+            <span class="kh-badge kh-badge-outline">Payout history</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Mobile app -->
+    <section id="app" aria-labelledby="app-title" style="max-width: 1240px; margin: 0 auto; padding: 24px 24px 112px">
+      <div style="background: #f1efe9; border: 1px solid rgba(10, 37, 64, 0.06); border-radius: 28px; padding: clamp(32px, 5vw, 64px); display: flex; flex-wrap: wrap; gap: 48px; align-items: center; overflow: hidden">
+        <div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+          <span class="kh-kicker">Mobile app · Android and iOS</span>
+          <h2 id="app-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
+            Your properties in your pocket. Your tenants' rent in theirs.
+          </h2>
+          <p id="app-subtitle" style="margin: 0; font-size: 17px; color: #52647e">
+            One app, two experiences. Tenants see what they owe and pay in seconds. Staff and caretakers run the day from the compound, not the office.
+          </p>
+          <ul style="list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column">
+            <li style="display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(10, 37, 64, 0.1)">
+              <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span><strong style="color: #0a2540">Tenants:</strong> <span style="color: #52647e">balance, Pay now by M-Pesa, invoices, statement, receipts and repair requests.</span></span>
+            </li>
+            <li style="display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(10, 37, 64, 0.1)">
+              <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span><strong style="color: #0a2540">Staff:</strong> <span style="color: #52647e">collections today, most overdue tenants, record a cash payment, assign unmatched M-Pesa.</span></span>
+            </li>
+            <li style="display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); border-bottom: 1px solid rgba(10, 37, 64, 0.1)">
+              <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span><strong style="color: #0a2540">Caretakers:</strong> <span style="color: #52647e">meter readings with a photo, unit status, move-ins and move-outs.</span></span>
+            </li>
+          </ul>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px">
+            <a id="mobile-play-link" href="#app" aria-label="Get KodiHub on Google Play" style="display: inline-flex; align-items: center; gap: 12px; background: #0a2540; color: #ffffff; border-radius: 14px; padding: 10px 20px 10px 16px; min-height: 56px; box-sizing: border-box; text-decoration: none">
+              <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3" fill="none" stroke="#84bd00" stroke-width="1.8"></rect><path d="M12 7v7m0 0 3-3m-3 3-3-3" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span style="display: flex; flex-direction: column; line-height: 1.15"><span style="font-size: 11px; letter-spacing: .04em; color: #d7e0ec">GET IT ON</span><span style="font-size: 18px; font-weight: 600">Google Play</span></span>
+            </a>
+            <a id="mobile-store-link" href="#app" aria-label="Download KodiHub on the App Store" style="display: inline-flex; align-items: center; gap: 12px; background: #0a2540; color: #ffffff; border-radius: 14px; padding: 10px 20px 10px 16px; min-height: 56px; box-sizing: border-box; text-decoration: none">
+              <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3" fill="none" stroke="#84bd00" stroke-width="1.8"></rect><path d="M12 7v7m0 0 3-3m-3 3-3-3" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span style="display: flex; flex-direction: column; line-height: 1.15"><span style="font-size: 11px; letter-spacing: .04em; color: #d7e0ec">DOWNLOAD ON THE</span><span style="font-size: 18px; font-weight: 600">App Store</span></span>
+            </a>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 520px; min-width: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 24px">
+
+          <!-- Phone: tenant -->
+          <div role="img" aria-label="Tenant app home screen showing balance and Pay now" style="width: 272px; flex: none; border-radius: 44px; background: #0a1f36; padding: 10px; box-shadow: 0 30px 70px -28px rgba(10, 37, 64, 0.45)">
+            <div style="border-radius: 35px; overflow: hidden; background: #fafaf7; height: 560px; display: flex; flex-direction: column">
+              <div style="background: #002b4d; color: #ffffff; padding: 34px 18px 16px; display: flex; flex-direction: column; gap: 2px">
+                <span style="font-size: 11px; color: #9eaec4">Riverside Apartments · B4</span>
+                <span style="font-size: 17px; font-weight: 600">Home</span>
+              </div>
+              <div style="flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+                <div style="background: #002b4d; color: #ffffff; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px">
+                  <span style="font-size: 11px; color: #d7e0ec">You owe</span>
+                  <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.02em">KES 18,500</span>
+                  <span style="font-size: 11px; color: #9eaec4">November rent · due 5 Nov</span>
+                  <span style="margin-top: 6px; align-self: flex-start; background: #84bd00; color: #002b4d; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 8px 16px">Pay now</span>
+                </div>
+                <div style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+                  <span style="font-size: 12px; font-weight: 600; color: #002b4d">Pay rent by M-Pesa</span>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px"><span style="color: #52647e">Paybill</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 600">4108291</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px"><span style="color: #52647e">Account number</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 600">B4</span></div>
+                  <span style="font-size: 10px; color: #5b6b82">M-Pesa → Lipa na M-Pesa → Pay Bill</span>
+                </div>
+                <div style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+                  <span style="font-size: 12px; font-weight: 600; color: #002b4d">Recent payments</span>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px"><span>RCT-0418 · 3 Oct</span><span style="color: #1f7a4f; font-weight: 600">18,500</span></div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px"><span>RCT-0291 · 4 Sep</span><span style="color: #1f7a4f; font-weight: 600">18,500</span></div>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid rgba(10, 37, 64, 0.08); background: #ffffff; padding: 10px 4px 18px; font-size: 9px; text-align: center; color: #5b6b82">
+                <span style="color: #4d6b10; font-weight: 600">Home</span><span>Invoices</span><span>Payments</span><span>Statement</span><span>Repairs</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phone: staff -->
+          <div role="img" aria-label="Staff app home screen showing collections and most overdue tenants" style="width: 272px; flex: none; margin-top: 56px; border-radius: 44px; background: #0a1f36; padding: 10px; box-shadow: 0 30px 70px -28px rgba(10, 37, 64, 0.45)">
+            <div style="border-radius: 35px; overflow: hidden; background: #fafaf7; height: 560px; display: flex; flex-direction: column">
+              <div style="background: #002b4d; color: #ffffff; padding: 34px 18px 16px; display: flex; flex-direction: column; gap: 2px">
+                <span style="font-size: 11px; color: #9eaec4">Staff · October</span>
+                <span style="font-size: 17px; font-weight: 600">Home</span>
+              </div>
+              <div style="flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+                <div style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+                  <span style="font-size: 11px; color: #52647e">Collected</span>
+                  <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: #002b4d">KES 1,840,000</span>
+                  <div style="height: 6px; border-radius: 999px; background: #ece9e0; overflow: hidden"><div style="width: 92%; height: 100%; background: #84bd00"></div></div>
+                  <span style="font-size: 10px; color: #5b6b82">92% of invoiced · 64 units</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+                  <span style="background: #eef6db; color: #3d5509; border-radius: 12px; padding: 10px; font-size: 11px; font-weight: 600; text-align: center">Meter reading</span>
+                  <span style="background: #eef6db; color: #3d5509; border-radius: 12px; padding: 10px; font-size: 11px; font-weight: 600; text-align: center">Record payment</span>
+                </div>
+                <div style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px">
+                  <span style="font-size: 12px; font-weight: 600; color: #002b4d">Most overdue</span>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px"><span>Tenant · A3</span><span style="color: #9a5b00; font-weight: 600">36,000</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px"><span>Tenant · C1</span><span style="color: #9a5b00; font-weight: 600">22,500</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px"><span>Tenant · B7</span><span style="color: #9a5b00; font-weight: 600">9,800</span></div>
+                </div>
+                <div style="background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 16px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px">
+                  <span style="font-size: 11px; color: #1f3a5c">1 unmatched M-Pesa payment</span>
+                  <span style="font-size: 11px; font-weight: 600; color: #4d6b10">Assign</span>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid rgba(10, 37, 64, 0.08); background: #ffffff; padding: 10px 4px 18px; font-size: 9px; text-align: center; color: #5b6b82">
+                <span style="color: #4d6b10; font-weight: 600">Home</span><span>Tenants</span><span>Units</span><span>Money</span><span>More</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Agencies -->
+    <section id="agencies" aria-labelledby="agencies-title" style="padding: 0 24px">
+      <div style="max-width: 1240px; margin: 0 auto; background: #002b4d; color: #ffffff; border-radius: 28px; padding: clamp(32px, 5vw, 72px); display: flex; flex-wrap: wrap; gap: 48px; align-items: center; border-top: 4px solid #84bd00">
+        <div style="flex: 1 1 400px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+          <span class="kh-kicker" style="color: #84bd00">For letting agencies</span>
+          <h2 id="agencies-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #ffffff">
+            Manage for many landlords. Remit to each one, on time.
+          </h2>
+          <p id="agencies-subtitle" style="margin: 0; font-size: 17px; color: #d7e0ec">
+            Set a management agreement per landlord with commission and remittance day. KodiHub builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px 24px; font-size: 14px; color: #d7e0ec">
+            <span style="display: flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#84bd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>Commission per agreement</span>
+            <span style="display: flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#84bd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>Expense approvals</span>
+            <span style="display: flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#84bd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>Owner portal access</span>
+          </div>
+        </div>
+        <div style="flex: 1 1 400px; min-width: 0; background: #0c1e33; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 4px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap">
+            <span style="font-size: 16px; font-weight: 600">Owner statement · October</span>
+            <span class="kh-kicker" style="color: #9eaec4">Sample</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 15px"><span style="color: #d7e0ec">Gross collections</span><span style="font-variant-numeric: tabular-nums">KES 412,000</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 15px"><span style="color: #d7e0ec">Agency commission (8%)</span><span style="font-variant-numeric: tabular-nums">− 32,960</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 15px"><span style="color: #d7e0ec">Approved expenses</span><span style="font-variant-numeric: tabular-nums">− 14,500</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 16px 0 4px; border-top: 1px solid rgba(255, 255, 255, 0.24)"><span style="font-weight: 600">Net remittance</span><span style="font-size: 28px; font-weight: 600; letter-spacing: -0.02em; color: #84bd00; font-variant-numeric: tabular-nums">KES 364,540</span></div>
+          <span style="font-size: 13px; color: #9eaec4">Paid to the landlord by M-Pesa B2C on remittance day</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section id="pricing" aria-labelledby="pricing-title" style="max-width: 1240px; margin: 0 auto; padding: 112px 24px 80px">
+      <div style="display: flex; flex-wrap: wrap; gap: 48px; align-items: stretch">
+        <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+          <span class="kh-kicker">Pricing</span>
+          <h2 id="pricing-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
+            Pay only for occupied units. Vacant units are free.
+          </h2>
+          <p id="pricing-subtitle" style="margin: 0; font-size: 17px; color: #52647e">
+            One simple rate, whether you own a single block or manage for fifty landlords. Every plan includes:
+          </p>
+          <ul style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 24px">
+            <li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); font-size: 15px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>Unlimited staff accounts</li>
+            <li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); font-size: 15px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>M-Pesa and bank integration</li>
+            <li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); font-size: 15px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>PDF invoices and receipts</li>
+            <li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); font-size: 15px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>Tenant and owner portals</li>
+            <li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); font-size: 15px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>Android and iOS apps</li>
+            <li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(10, 37, 64, 0.1); font-size: 15px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>SMS and email notifications</li>
+          </ul>
+        </div>
+        <div style="flex: 1 1 420px; min-width: 0; background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 24px; padding: 36px; box-shadow: 0 20px 60px -24px rgba(10, 37, 64, 0.18); display: flex; flex-direction: column; gap: 22px">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+            <span style="font-size: 17px; font-weight: 600; color: #002b4d">Estimate your monthly bill</span>
+            <span id="pricing-badge" class="kh-badge kh-badge-success">Free trial included</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <label for="kh-units" style="display: flex; justify-content: space-between; font-size: 15px; font-weight: 500; color: #1f3a5c">
+              <span>Occupied units</span>
+              <span id="kh-units-label" style="font-weight: 600; color: #0a2540; font-variant-numeric: tabular-nums">25 units</span>
+            </label>
+            <input id="kh-units" class="kh-range" type="range" min="1" max="250" value="25" style="width: 100%; height: 28px; margin: 0" />
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #5b6b82"><span>1</span><span>250+</span></div>
+          </div>
+          <div style="background: #f1efe9; border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 4px">
+            <span style="font-size: 13px; color: #52647e">Estimated monthly bill</span>
+            <span style="font-size: 44px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.1; color: #002b4d; font-variant-numeric: tabular-nums">
+              <span id="kh-total-label">KES 2,500</span><span style="font-size: 17px; font-weight: 500; letter-spacing: 0; color: #52647e"> / month</span>
+            </span>
+            <span id="kh-rate-note" style="font-size: 13px; color: #52647e">KES 100 per occupied unit per month, minimum KES 1,500.</span>
+          </div>
+          <a id="price-register" href="/register" class="kh-btn kh-btn-primary kh-btn-lg" style="width: 100%">Create your organisation</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" aria-labelledby="faq-title" style="max-width: 1240px; margin: 0 auto; padding: 48px 24px 104px; display: flex; flex-wrap: wrap; gap: 48px">
+      <div style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <span class="kh-kicker">FAQ</span>
+        <h2 id="faq-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
+          Questions landlords ask us
+        </h2>
+        <p style="margin: 0; font-size: 16px; color: #52647e">
+          Something else on your mind? Write to <a id="faq-email" href="mailto:hello@kodihub.co.ke" style="color: #4d6b10; font-weight: 600">hello@kodihub.co.ke</a>.
+        </p>
+      </div>
+      <div id="faq-list" class="kh-faq" style="flex: 2 1 560px; min-width: 0; display: flex; flex-direction: column; border-top: 1px solid rgba(10, 37, 64, 0.12)">
+        <details open style="border-bottom: 1px solid rgba(10, 37, 64, 0.12)">
+          <summary style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px">
+            Which payment methods can tenants use?
+            <span class="kh-plus" aria-hidden="true" style="font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s">+</span>
+          </summary>
+          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">M-Pesa Paybill and Till, an STK Push prompt sent from the tenant portal, bank transfers through statement imports, plus cash and cheque recorded by your staff. All of them land in the same ledger.</p>
+        </details>
+        <details style="border-bottom: 1px solid rgba(10, 37, 64, 0.12)">
+          <summary style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px">
+            Do I pay for vacant units?
+            <span class="kh-plus" aria-hidden="true" style="font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s">+</span>
+          </summary>
+          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">No. You are billed per occupied unit each month, with a small monthly minimum. Empty units cost nothing.</p>
+        </details>
+        <details style="border-bottom: 1px solid rgba(10, 37, 64, 0.12)">
+          <summary style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px">
+            How does automatic M-Pesa matching work?
+            <span class="kh-plus" aria-hidden="true" style="font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s">+</span>
+          </summary>
+          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">When a payment arrives, KodiHub reads the account reference and the payer's phone number, finds the tenant and clears their oldest unpaid invoice first. Payments it cannot place go to a review queue.</p>
+        </details>
+        <details style="border-bottom: 1px solid rgba(10, 37, 64, 0.12)">
+          <summary style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px">
+            Is KodiHub suitable for letting agencies?
+            <span class="kh-plus" aria-hidden="true" style="font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s">+</span>
+          </summary>
+          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">Yes. Agencies set up management agreements per landlord, earn commission automatically, deduct approved expenses and remit the net to each owner, who gets a read-only portal.</p>
+        </details>
+        <details style="border-bottom: 1px solid rgba(10, 37, 64, 0.12)">
+          <summary style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px">
+            Can caretakers use it from their phone?
+            <span class="kh-plus" aria-hidden="true" style="font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s">+</span>
+          </summary>
+          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">Yes. The Android and iOS app lets caretakers capture meter readings with photos, update unit status and handle move-ins and move-outs, without access to money settings.</p>
+        </details>
+        <details style="border-bottom: 1px solid rgba(10, 37, 64, 0.12)">
+          <summary style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px">
+            Can I bring my existing tenants and balances?
+            <span class="kh-plus" aria-hidden="true" style="font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s">+</span>
+          </summary>
+          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">Yes. Import your units, tenants and opening balances in bulk via CSV, or let our team help your organisation set up properties, units, tenants and opening balances during the free trial.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section aria-labelledby="cta-title" style="padding: 0 24px 96px">
+      <div style="max-width: 1240px; margin: 0 auto; border-radius: 28px; padding: clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px); background: radial-gradient(90% 120% at 100% 0%, #e3f1bf 0%, #eef6db 40%, #f1efe9 85%); border: 1px solid rgba(10, 37, 64, 0.08); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 32px">
+        <div style="flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+          <h2 id="cta-title" style="margin: 0; font-size: clamp(30px, 3.6vw, 48px); line-height: 1.08; letter-spacing: -0.035em; font-weight: 600; color: #002b4d">
+            Close this month's books <em class="kh-hl">before the 5th.</em>
+          </h2>
+          <p id="cta-subtitle" style="margin: 0; font-size: 17px; color: #1f3a5c; max-width: 520px">
+            Set up your first property in an afternoon. Your tenants get receipts the moment they pay.
+          </p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px">
+          <a id="cta-register" href="/register" class="kh-btn kh-btn-primary kh-btn-lg">Start your free trial</a>
+          <a id="cta-talk" href="mailto:hello@kodihub.co.ke" class="kh-btn kh-btn-outline kh-btn-lg">Talk to us</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer style="background: #002b4d; color: #d7e0ec; border-top: 3px solid #84bd00">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 64px 24px 40px; display: flex; flex-wrap: wrap; gap: 48px; justify-content: space-between">
+      <div style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 14px; max-width: 360px">
+        <span style="display: inline-flex; align-items: center; gap: 10px; color: #ffffff">
+          <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+            <rect width="34" height="34" rx="10" fill="#0c1e33"></rect>
+            <path d="M9 17.5 17 11l8 6.5V25h-5.5v-5h-5v5H9z" fill="none" stroke="#84bd00" stroke-width="2" stroke-linejoin="round"></path>
+          </svg>
+          <span id="footer-brand" style="font-size: 21px; font-weight: 700; letter-spacing: -0.03em">KodiHub</span>
+        </span>
+        <p id="footer-tagline" style="margin: 0; font-size: 14px; color: #9eaec4">
+          Rent, utilities, M-Pesa and landlord payouts in one place. Built in Nairobi for landlords and letting agencies across Kenya.
+        </p>
+      </div>
+      <nav aria-label="Product" style="display: flex; flex-direction: column; gap: 10px; font-size: 14px">
+        <span class="kh-kicker" style="color: #84bd00">Product</span>
+        <a href="#how" style="color: #d7e0ec; text-decoration: none">How it works</a>
+        <a href="#features" style="color: #d7e0ec; text-decoration: none">Features</a>
+        <a href="#pricing" style="color: #d7e0ec; text-decoration: none">Pricing</a>
+        <a href="#app" style="color: #d7e0ec; text-decoration: none">Android app</a>
+        <a href="#app" style="color: #d7e0ec; text-decoration: none">iOS app</a>
+        <a href="#faq" style="color: #d7e0ec; text-decoration: none">FAQ</a>
+      </nav>
+      <nav aria-label="Solutions" style="display: flex; flex-direction: column; gap: 10px; font-size: 14px">
+        <span class="kh-kicker" style="color: #84bd00">Who it's for</span>
+        <a href="#portals" style="color: #d7e0ec; text-decoration: none">Landlords</a>
+        <a href="#agencies" style="color: #d7e0ec; text-decoration: none">Letting agencies</a>
+        <a href="#portals" style="color: #d7e0ec; text-decoration: none">Tenants</a>
+        <a href="#portals" style="color: #d7e0ec; text-decoration: none">Property owners</a>
+      </nav>
+      <nav aria-label="Account" style="display: flex; flex-direction: column; gap: 10px; font-size: 14px">
+        <span class="kh-kicker" style="color: #84bd00">Account</span>
+        <a id="footer-signin" href="/login" style="color: #d7e0ec; text-decoration: none">Sign in</a>
+        <a id="footer-register" href="/register" style="color: #d7e0ec; text-decoration: none">Create account</a>
+        <a id="footer-email" href="mailto:hello@kodihub.co.ke" style="color: #d7e0ec; text-decoration: none">hello@kodihub.co.ke</a>
+        <a id="footer-phone" href="tel:" style="color: #d7e0ec; text-decoration: none; display: none"></a>
+      </nav>
+    </div>
+    <div style="max-width: 1240px; margin: 0 auto; padding: 20px 24px 32px; border-top: 1px solid rgba(255, 255, 255, 0.12); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 13px; color: #9eaec4">
+      <span>&copy; <span id="year">2026</span> <span id="footer-copyright">KodiHub Property Management. All rights reserved.</span></span>
+      <span>A CloudvaLabs product</span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var host = location.hostname.replace(/^www\./, '');
+    var isLocal = host === 'localhost' || host === '127.0.0.1';
+    var isDevLanding = host === 'landing.kodihub.co.ke' || host.startsWith('dev.');
+    var fallbackAppOrigin = isLocal
+      ? 'http://localhost:5173'
+      : isDevLanding
+        ? 'https://dev.kodihub.co.ke'
+        : (host && !host.startsWith('app.'))
+          ? 'https://app.' + host
+          : '';
+    var fallbackApiOrigin = isLocal
+      ? 'http://localhost:8080'
+      : isDevLanding
+        ? 'https://dapi.kodihub.co.ke'
+        : (host === 'kodihub.co.ke' ? 'https://api.kodihub.co.ke' : '');
+
+    var ratePerUnitShillings = 100;
+    var minimumMonthlyShillings = 1500;
+
+    var FEATURE_ICONS = [
+      '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="6" y="2" width="10" height="18" rx="2.5" fill="none" stroke="#4d6b10" stroke-width="1.7"></rect><path d="M9.5 16.5h3M9 8l1.7 1.7L13.5 6.5" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+      '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M11 3c3 4 5 6.5 5 9a5 5 0 0 1-10 0c0-2.5 2-5 5-9z" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round"></path></svg>',
+      '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M5 2h9l3 3v15H5z M14 2v3h3M8 10h6M8 13.5h6M8 17h3.5" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"></path></svg>',
+      '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M13.5 4.5a4 4 0 0 0-5 5L3 15l3 3 5.5-5.5a4 4 0 0 0 5-5L14 10l-2-2z" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round"></path></svg>',
+      '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M3 18V9m5.5 9V4m5.5 14v-6m5 6V7M2 19.5h18" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linecap="round"></path></svg>',
+      '<svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><path d="M11 2.5 4 5v5.5c0 4.3 3 7.6 7 9 4-1.4 7-4.7 7-9V5z M8 11l2.2 2.2L14.5 9" fill="none" stroke="#4d6b10" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"></path></svg>'
+    ];
+
+    function setText(id, text) {
+      var el = document.getElementById(id);
+      if (el && typeof text === 'string') el.textContent = text;
+    }
+
+    function setHighlightedHeading(id, text, highlightPhrase) {
+      var el = document.getElementById(id);
+      if (!el || typeof text !== 'string' || !text.trim()) return;
+      var clean = text.trim();
+      var idx = highlightPhrase ? clean.toLowerCase().lastIndexOf(highlightPhrase.toLowerCase()) : -1;
+      el.innerHTML = '';
+      if (idx > 0) {
+        el.appendChild(document.createTextNode(clean.slice(0, idx)));
+        var em = document.createElement('em');
+        em.className = 'kh-hl';
+        em.textContent = clean.slice(idx);
+        el.appendChild(em);
+        return;
+      }
+      var words = clean.split(/\s+/);
+      if (words.length >= 4) {
+        var splitAt = Math.max(2, words.length - 2);
+        el.appendChild(document.createTextNode(words.slice(0, splitAt).join(' ') + ' '));
+        var emLast = document.createElement('em');
+        emLast.className = 'kh-hl';
+        emLast.textContent = words.slice(splitAt).join(' ');
+        el.appendChild(emLast);
+      } else {
+        el.textContent = clean;
+      }
+    }
+
+    function applyLinks(appOrigin, allowSignup) {
+      var cleanOrigin = (appOrigin || fallbackAppOrigin).replace(/\/$/, '');
+      ['nav-signin', 'footer-signin'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.href = cleanOrigin + '/login';
+      });
+      var registerHref = allowSignup === false ? cleanOrigin + '/login' : cleanOrigin + '/register';
+      ['nav-register', 'hero-register', 'price-register', 'cta-register', 'footer-register'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.href = registerHref;
+      });
+    }
+
+    function updateCalculator() {
+      var slider = document.getElementById('kh-units');
+      if (!slider) return;
+      var units = parseInt(slider.value, 10) || 1;
+      var total = Math.max(minimumMonthlyShillings, units * ratePerUnitShillings);
+      var fmt = function (n) { return Number(n).toLocaleString('en-KE'); };
+      setText('kh-units-label', units + (units === 1 ? ' unit' : ' units'));
+      setText('kh-total-label', 'KES ' + fmt(total));
+      setText(
+        'kh-rate-note',
+        'KES ' + fmt(ratePerUnitShillings) + ' per occupied unit per month' +
+          (minimumMonthlyShillings > 0 ? ', minimum KES ' + fmt(minimumMonthlyShillings) + '.' : '.')
+      );
+    }
+
+    function renderHowSteps(steps) {
+      var grid = document.getElementById('how-steps-grid');
+      if (!grid || !Array.isArray(steps) || !steps.length) return;
+      grid.innerHTML = '';
+      steps.forEach(function (item, index) {
+        var isLast = index === steps.length - 1;
+        var li = document.createElement('li');
+        li.style.cssText = isLast
+          ? 'background: #002b4d; border: 1px solid #002b4d; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px; color: #ffffff'
+          : 'background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 10px';
+        var kicker = document.createElement('span');
+        kicker.className = 'kh-kicker';
+        if (isLast) kicker.style.color = '#84bd00';
+        kicker.textContent = item.step || ('0' + (index + 1));
+        var h3 = document.createElement('h3');
+        h3.style.cssText = 'margin: 0; font-size: 19px; font-weight: 600; color: ' + (isLast ? '#ffffff' : '#002b4d');
+        h3.textContent = item.title || '';
+        var p = document.createElement('p');
+        p.style.cssText = 'margin: 0; font-size: 14px; color: ' + (isLast ? '#d7e0ec' : '#52647e');
+        p.textContent = item.description || '';
+        li.appendChild(kicker);
+        li.appendChild(h3);
+        li.appendChild(p);
+        grid.appendChild(li);
+      });
+    }
+
+    function renderFeatures(features) {
+      var grid = document.getElementById('features-grid');
+      if (!grid || !Array.isArray(features) || !features.length) return;
+      grid.innerHTML = '';
+      features.forEach(function (item, idx) {
+        var article = document.createElement('article');
+        article.style.cssText = 'background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px';
+        var iconWrap = document.createElement('span');
+        iconWrap.style.cssText = 'width: 44px; height: 44px; border-radius: 12px; background: #eef6db; display: grid; place-items: center';
+        iconWrap.innerHTML = FEATURE_ICONS[idx % FEATURE_ICONS.length];
+        article.appendChild(iconWrap);
+        if (item.tag) {
+          var tag = document.createElement('span');
+          tag.className = 'kh-kicker';
+          tag.style.color = '#5b6b82';
+          tag.textContent = item.tag;
+          article.appendChild(tag);
+        }
+        var h3 = document.createElement('h3');
+        h3.style.cssText = 'margin: 0; font-size: 20px; font-weight: 600; color: #002b4d; line-height: 1.3';
+        h3.textContent = item.title || '';
+        var p = document.createElement('p');
+        p.style.cssText = 'margin: 0; font-size: 15px; color: #52647e';
+        p.textContent = item.description || '';
+        article.appendChild(h3);
+        article.appendChild(p);
+        grid.appendChild(article);
+      });
+    }
+
+    function renderPortals(portals) {
+      var grid = document.getElementById('portals-grid');
+      if (!grid || !Array.isArray(portals) || !portals.length) return;
+      var defaultKickers = ['For landlords and staff', 'For tenants', 'For property owners'];
+      var defaultBadges = [
+        ['Owner', 'Manager', 'Accountant', 'Caretaker'],
+        ['No password needed', 'Android and iOS'],
+        ['Owner statements', 'Payout history']
+      ];
+      grid.innerHTML = '';
+      portals.forEach(function (item, idx) {
+        var article = document.createElement('article');
+        article.style.cssText = 'background: #ffffff; border: 1px solid rgba(10, 37, 64, 0.08); border-radius: 24px; padding: 32px; display: flex; flex-direction: column; gap: 14px';
+        var kicker = document.createElement('span');
+        kicker.className = 'kh-kicker';
+        kicker.textContent = item.kicker || defaultKickers[idx] || 'Portal';
+        var h3 = document.createElement('h3');
+        h3.style.cssText = 'margin: 0; font-size: 22px; font-weight: 600; color: #002b4d';
+        h3.textContent = item.title || '';
+        var p = document.createElement('p');
+        p.style.cssText = 'margin: 0; font-size: 15px; color: #52647e';
+        p.textContent = item.description || '';
+        article.appendChild(kicker);
+        article.appendChild(h3);
+        article.appendChild(p);
+
+        var badges = Array.isArray(item.badges) && item.badges.length
+          ? item.badges
+          : (defaultBadges[idx] || []);
+        if (badges.length) {
+          var badgeRow = document.createElement('div');
+          badgeRow.style.cssText = 'margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(10, 37, 64, 0.08); display: flex; flex-wrap: wrap; gap: 8px';
+          badges.forEach(function (b) {
+            var span = document.createElement('span');
+            span.className = 'kh-badge kh-badge-outline';
+            span.textContent = b;
+            badgeRow.appendChild(span);
+          });
+          article.appendChild(badgeRow);
+        }
+        grid.appendChild(article);
+      });
+    }
+
+    function renderFaqs(faqs) {
+      var list = document.getElementById('faq-list');
+      if (!list || !Array.isArray(faqs) || !faqs.length) return;
+      list.innerHTML = '';
+      faqs.forEach(function (item, idx) {
+        var details = document.createElement('details');
+        if (idx === 0) details.open = true;
+        details.style.cssText = 'border-bottom: 1px solid rgba(10, 37, 64, 0.12)';
+        var summary = document.createElement('summary');
+        summary.style.cssText = 'display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px';
+        summary.appendChild(document.createTextNode(item.question || ''));
+        var plus = document.createElement('span');
+        plus.className = 'kh-plus';
+        plus.setAttribute('aria-hidden', 'true');
+        plus.style.cssText = 'font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s';
+        plus.textContent = '+';
+        summary.appendChild(plus);
+        var p = document.createElement('p');
+        p.style.cssText = 'margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px';
+        p.textContent = item.answer || '';
+        details.appendChild(summary);
+        details.appendChild(p);
+        list.appendChild(details);
+      });
+    }
+
+    function renderLanding(payload) {
+      if (!payload) return;
+      var c = payload.content || {};
+      if (c.pageTitle) document.title = c.pageTitle;
+      var descMeta = document.getElementById('doc-description');
+      if (descMeta && c.metaDescription) descMeta.setAttribute('content', c.metaDescription);
+
+      if (payload.announcement && (payload.announcement.title || payload.announcement.body)) {
+        var parts = [];
+        if (payload.announcement.title) parts.push(payload.announcement.title);
+        if (payload.announcement.body) parts.push(payload.announcement.body);
+        setText('top-bar-text', parts.join(' — '));
+      } else if (c.topBarText) {
+        setText('top-bar-text', c.topBarText);
+      }
+
+      if (payload.maintenanceMode) {
+        var mb = document.getElementById('maintenance-bar');
+        if (mb) {
+          mb.textContent = payload.maintenanceMessage || 'Scheduled maintenance is in progress.';
+          mb.classList.add('visible');
+        }
+      }
+
+      setText('nav-brand', c.brandName);
+      setText('footer-brand', c.brandName);
+      setText('nav-signin', c.signInLabel);
+      setText('footer-signin', c.signInLabel);
+      setText('nav-register', c.registerLabel);
+
+      setText('hero-badge', c.heroBadge);
+      if (c.heroTitle) {
+        setHighlightedHeading('hero-title', c.heroTitle, 'reconcile themselves.');
+      }
+      setText('hero-subtitle', c.heroSubtitle);
+      setText('hero-register', c.heroPrimaryCta);
+      if (c.heroSecondaryCta) {
+        setText('hero-secondary', c.heroSecondaryCta);
+      }
+      setText('hero-stats-title', c.heroStatsTitle);
+
+      if (Array.isArray(c.heroStats) && c.heroStats.length) {
+        for (var i = 0; i < Math.min(4, c.heroStats.length); i++) {
+          setText('hero-stat-' + i + '-value', c.heroStats[i].value);
+          setText('hero-stat-' + i + '-label', c.heroStats[i].label);
+        }
+      }
+
+      setText('how-title', c.howTitle);
+      setText('how-subtitle', c.howSubtitle);
+      renderHowSteps(c.howSteps);
+
+      setText('features-title', c.featuresTitle);
+      setText('features-subtitle', c.featuresSubtitle);
+      renderFeatures(c.features);
+
+      setText('recon-title', c.reconTitle);
+      setText('recon-subtitle', c.reconSubtitle);
+
+      setText('portals-title', c.portalsTitle);
+      renderPortals(c.portals);
+
+      setText('app-title', c.mobileTitle);
+      setText('app-subtitle', c.mobileSubtitle);
+      if (c.googlePlayUrl) {
+        ['hero-play-pill', 'mobile-play-link'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.href = c.googlePlayUrl;
+        });
+      }
+      if (c.appStoreUrl) {
+        ['hero-store-pill', 'mobile-store-link'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.href = c.appStoreUrl;
+        });
+      }
+
+      setText('agencies-title', c.agenciesTitle);
+      setText('agencies-subtitle', c.agenciesSubtitle);
+
+      setText('pricing-badge', c.pricingBadge);
+      setText('pricing-title', c.pricingTitle);
+      setText('pricing-subtitle', c.pricingSubtitle);
+      if (c.pricingNote) setText('price-register', c.pricingNote);
+
+      var plan = payload.defaultPlan;
+      var priceCents = plan && typeof plan.pricePerUnitCents === 'number'
+        ? plan.pricePerUnitCents
+        : (typeof c.fallbackRatePerUnit === 'number' ? c.fallbackRatePerUnit : 10000);
+      var minCents = plan && typeof plan.minimumMonthlyCents === 'number'
+        ? plan.minimumMonthlyCents
+        : (typeof c.fallbackMinimumMonthly === 'number' ? c.fallbackMinimumMonthly : 150000);
+
+      ratePerUnitShillings = Math.round(priceCents / 100);
+      minimumMonthlyShillings = Math.round(minCents / 100);
+
+      var slider = document.getElementById('kh-units');
+      if (slider && typeof c.defaultSliderUnits === 'number') {
+        slider.value = String(c.defaultSliderUnits);
+      }
+      updateCalculator();
+
+      setText('faq-title', c.faqTitle);
+      renderFaqs(c.faqs);
+
+      if (c.ctaTitle) {
+        setHighlightedHeading('cta-title', c.ctaTitle, 'before the 5th.');
+      }
+      setText('cta-subtitle', c.ctaSubtitle);
+      setText('cta-register', c.heroPrimaryCta || c.registerLabel);
+
+      setText('footer-copyright', c.footerCopyright);
+      setText('footer-tagline', c.footerTagline);
+
+      var emailLink = document.getElementById('footer-email');
+      var faqEmail = document.getElementById('faq-email');
+      var ctaTalk = document.getElementById('cta-talk');
+      if (c.contactEmail) {
+        if (emailLink) {
+          emailLink.href = 'mailto:' + c.contactEmail;
+          emailLink.textContent = c.contactEmail;
+          emailLink.style.display = '';
+        }
+        if (faqEmail) {
+          faqEmail.href = 'mailto:' + c.contactEmail;
+          faqEmail.textContent = c.contactEmail;
+        }
+        if (ctaTalk) {
+          ctaTalk.href = 'mailto:' + c.contactEmail;
+        }
+      } else if (emailLink) {
+        emailLink.style.display = 'none';
+      }
+
+      var phoneLink = document.getElementById('footer-phone');
+      if (phoneLink) {
+        if (c.contactPhone) {
+          phoneLink.href = 'tel:' + c.contactPhone.replace(/\s+/g, '');
+          phoneLink.textContent = c.contactPhone;
+          phoneLink.style.display = '';
+        } else {
+          phoneLink.style.display = 'none';
+        }
+      }
+
+      applyLinks(payload.appUrl, payload.allowPublicSignup);
+    }
+
+    applyLinks(fallbackAppOrigin, true);
+    var slider = document.getElementById('kh-units');
+    if (slider) {
+      slider.addEventListener('input', updateCalculator);
+      updateCalculator();
+    }
+    var yr = document.getElementById('year');
+    if (yr) yr.textContent = String(new Date().getFullYear());
+
+    fetch('/api/v1/public/landing', { credentials: 'omit' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('status ' + r.status);
+        return r.json();
+      })
+      .catch(function () {
+        if (!fallbackApiOrigin) return null;
+        return fetch(fallbackApiOrigin + '/api/v1/public/landing', { credentials: 'omit' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .catch(function () { return null; });
+      })
+      .then(function (body) {
+        if (body && body.data) renderLanding(body.data);
+      });
+  })();
+</script>
+</body>
+</html>

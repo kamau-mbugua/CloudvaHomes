@@ -29,9 +29,8 @@ are pinned (no trust-on-first-use).
 1. **Build on the runner:**
    - the images `hodi-api`, `hodi-migrate`, `hodi-web` and `hodi-cron`, tagged with the commit
      SHA and pushed to `ghcr.io/kamau-mbugua/cloudvahomes`;
-   - for production, also the landing site (`landing/` once phase 11 exists, otherwise
-     `infra/vm/landing`).
-2. **Upload:** `infra/vm/` to `/opt/hodi/infra.new`, and the landing site to
+   - the landing site (`landing/`).
+2. **Upload:** `infra/vm/` to `/opt/hodi/infra.new`, and `landing/` to
    `/opt/hodi/landing-releases/<sha>`.
 3. **On the server**, `scripts/deploy.sh <env> <sha> <registry>` as user `deploy`:
    1. Takes the lock (one deploy at a time).

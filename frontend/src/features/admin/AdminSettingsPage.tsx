@@ -16,8 +16,10 @@ import { keys, platformErrorMessage, usePlans, usePlatformLocks, usePlatformSett
 import { checkSettings, darajaSettingsBody, settingsDraft } from '../platform/rules';
 import type { SettingsBody, SettingsDraft } from '../platform/rules';
 import type {
+  LandingFaqItem,
   LandingFeatureItem,
   LandingHeroStat,
+  LandingHowStepItem,
   LandingPageContent,
   LandingPortalItem,
   PlatformSettings,
@@ -725,97 +727,182 @@ function DocumentInstructionsForm({ settings }: { settings: PlatformSettings }) 
 }
 
 const DEFAULT_LANDING_PAGE: LandingPageContent = {
+  topBarText: 'New organisations start with a free trial. Vacant units are never billed.',
   brandName: 'KodiHub',
-  pageTitle: 'KodiHub — Property, Rent & M-Pesa Management for Kenyan Landlords & Agencies',
+  pageTitle: 'KodiHub: rent and M-Pesa management for Kenyan landlords',
   metaDescription:
-    'KodiHub helps Kenyan landlords and letting agencies automate rent invoicing, collect payments via M-Pesa Paybill/Till and bank, track water & power meters, manage unit maintenance, and remit to property owners.',
+    'KodiHub runs monthly rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, and pays landlords their net remittance. Built for Kenyan landlords and letting agencies.',
   signInLabel: 'Sign in',
-  registerLabel: 'Create account',
-  heroBadge: 'Built for Kenyan Landlords & Letting Agencies',
-  heroTitle: 'Every unit, invoice, M-Pesa payment and payout in one place.',
+  registerLabel: 'Start free trial',
+  heroBadge: 'Rent management software for Kenya',
+  heroTitle: 'Collect rent on M-Pesa. Let the books reconcile themselves.',
   heroSubtitle:
-    'Automate monthly rent and metered utility billing, reconcile M-Pesa Paybill/Till and bank statements automatically, track unit maintenance, and send branded PDF invoices and receipts.',
-  heroPrimaryCta: 'Start free trial',
-  heroSecondaryCta: 'Sign in to your account',
-  heroStatsTitle: 'Sample portfolio snapshot',
+    'KodiHub runs monthly rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, and pays landlords their net remittance. Built for Kenyan landlords and letting agencies.',
+  heroPrimaryCta: 'Start your free trial',
+  heroSecondaryCta: 'See how it works',
+  heroStatsTitle: 'Sample portfolio · October',
   heroStats: [
-    { label: 'Collected this month', value: 'KES 1,840,000.00' },
-    { label: 'M-Pesa C2B auto-matched', value: '98.4%' },
-    { label: 'Occupancy across 64 units', value: '95.3%' },
-    { label: 'Receipts & PDF statements', value: 'Instant SMS + Email' },
+    { label: 'collected this month', value: 'KES 1,840,000' },
+    { label: 'M-Pesa auto-matched', value: '98.4%' },
+    { label: 'Occupancy, 64 units', value: '95.3%' },
+    { label: 'Receipt books', value: '0' },
   ],
-  featuresTitle: 'Everything your property operations need',
-  featuresSubtitle:
-    'No spreadsheets or manual receipt books. KodiHub handles the full lifecycle from move-in to landlord remittance.',
-  features: [
+  howTitle: 'From move-in to landlord payout, one continuous ledger.',
+  howSubtitle:
+    'No spreadsheets, no manual receipt books. Each step feeds the next, so the numbers in your reports are the numbers in M-Pesa.',
+  howSteps: [
     {
-      tag: 'M-Pesa & Banks',
-      title: 'Real-time M-Pesa C2B, STK Push & Bank Imports',
-      description:
-        'Connect your Safaricom Paybill or Till. Payments match tenants by account reference or phone number automatically and allocate oldest-due first.',
+      step: '01 · Move in',
+      title: 'Add units and tenants',
+      description: 'Set rent, deposits and move-in fees per unit. Tenancies keep the full history.',
     },
     {
-      tag: 'Billing & Meters',
-      title: 'Monthly Rent, Water & Power Meter Readings',
+      step: '02 · Bill',
+      title: 'Run invoices in one click',
+      description: 'Rent, water and power for a whole property, with meter photos as proof.',
+    },
+    {
+      step: '03 · Collect',
+      title: 'Tenants pay how they like',
+      description: 'Paybill, Till, an STK prompt from the portal, bank transfer or cash.',
+    },
+    {
+      step: '04 · Reconcile',
+      title: 'Payments find their invoice',
+      description: 'Matched by account reference or phone, allocated oldest-due first.',
+    },
+    {
+      step: '05 · Remit',
+      title: 'Pay the owner',
+      description: 'Commission and expenses deducted, net sent to the landlord by M-Pesa B2C.',
+    },
+  ],
+  featuresTitle: "Everything your property operations need, nothing they don't.",
+  featuresSubtitle:
+    'One system for property managers, accountants, caretakers, landlords and tenants, each with exactly the access their role needs.',
+  features: [
+    {
+      tag: 'M-Pesa and banks',
+      title: 'Real-time C2B, STK Push and bank imports',
       description:
-        'Record meter readings with photo proof and run an entire property’s monthly invoices in one click, complete with custom payment instructions.',
+        'Connect your Safaricom Paybill or Till. Payments land against the right tenant automatically, and anything unclear waits in a review queue.',
+    },
+    {
+      tag: 'Billing and meters',
+      title: 'Rent, water and power on one invoice',
+      description:
+        "Caretakers record meter readings with a photo. Fixed, variable and metered charges roll into each month's invoice run.",
     },
     {
       tag: 'Communications',
-      title: 'Branded PDF Invoices, Receipts & Reminders',
+      title: 'Branded PDF invoices, receipts and reminders',
       description:
-        'Every payment and invoice triggers an SMS and a detailed email with an official branded PDF receipt or invoice attached.',
+        'Every invoice and payment sends an SMS and an email with an official PDF attached. Reminders go out before rent is due.',
     },
     {
       tag: 'Maintenance',
-      title: 'Unit Repair Requests & Expense Conversion',
+      title: 'Repair requests that close the loop',
       description:
-        'Tenants report issues with photos from their phone. Staff track progress, resolve tickets, and convert repair costs directly into property expenses.',
+        'Tenants report issues with photos from their phone. Staff track each ticket and turn repair costs into property expenses.',
     },
     {
-      tag: 'Letting Agencies',
-      title: 'Management Agreements & Landlord Payouts',
+      tag: 'Reports',
+      title: 'Arrears, occupancy and P&L per property',
       description:
-        'Calculate agency commission, deduct approved property expenses, generate owner statements, and disburse net remittances via M-Pesa B2C.',
+        'See who owes what, which units sit empty, and what each property actually earns after expenses.',
     },
     {
-      tag: 'Web & Mobile',
-      title: 'Staff, Owner & Tenant Portals',
+      tag: 'Access and audit',
+      title: 'Roles, permissions and a full audit log',
       description:
-        'Dedicated web and Android/iOS experiences for property managers, caretakers, landlords, and tenants—all backed by role-based permissions and audit logs.',
+        'Caretakers never touch money settings. Accountants see the ledger. Every change is recorded with who made it and when.',
     },
   ],
-  portalsTitle: 'Three tailored experiences',
-  portalsSubtitle: 'Everyone sees only what belongs to them, on web or mobile.',
+  reconTitle: 'Month-end close in minutes, not a weekend.',
+  reconSubtitle:
+    'Every shilling that arrives is logged as it lands, then matched and allocated. Your team only handles the exceptions.',
+  portalsTitle: 'Three tailored experiences. Everyone sees only what is theirs.',
+  portalsSubtitle: 'Each portal shows only what is relevant to that role on web and mobile.',
   portals: [
     {
-      title: 'For Landlords & Property Staff',
+      kicker: 'For landlords and staff',
+      title: 'Run the whole portfolio',
       description:
-        'Manage properties, units, tenancies, meter readings, invoice runs, payment reconciliation, maintenance tickets, and P&L reports.',
+        'Properties, units, tenancies, meter readings, invoice runs, reconciliation, maintenance and P&L, with menus filtered by role.',
+      badges: ['Owner', 'Manager', 'Accountant', 'Caretaker'],
     },
     {
-      title: 'For Tenants',
+      kicker: 'For tenants',
+      title: 'Pay rent in two taps',
       description:
-        'Sign in with a one-time SMS/email code, check current balance, trigger an M-Pesa STK prompt, download PDF receipts, and submit maintenance requests.',
+        'Sign in with a one-time code by SMS or email, check the balance, trigger an M-Pesa prompt, download receipts and raise repair requests.',
+      badges: ['No password needed', 'Android and iOS'],
     },
     {
-      title: 'For Property Owners (Agencies)',
+      kicker: 'For property owners',
+      title: 'See your money, read-only',
       description:
-        'Read-only owner portal showing live occupancy, monthly owner statements, commission breakdowns, and remittance payout history.',
+        'Owners of agency-managed properties see live occupancy, monthly owner statements, commission breakdowns and every remittance paid.',
+      badges: ['Owner statements', 'Payout history'],
     },
   ],
-  pricingBadge: 'Transparent per-unit pricing',
-  pricingTitle: 'Pay only for occupied units',
+  mobileTitle: "Your properties in your pocket. Your tenants' rent in theirs.",
+  mobileSubtitle:
+    'One app, two experiences. Tenants see what they owe and pay in seconds. Staff and caretakers run the day from the compound, not the office.',
+  googlePlayUrl: null,
+  appStoreUrl: null,
+  agenciesTitle: 'Manage for many landlords. Remit to each one, on time.',
+  agenciesSubtitle:
+    'Set a management agreement per landlord with commission and remittance day. KodiHub builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.',
+  pricingBadge: 'Free trial included',
+  pricingTitle: 'Pay only for occupied units. Vacant units are free.',
   pricingSubtitle:
-    'Vacant units are free. Every plan includes unlimited staff accounts, M-Pesa integration, PDF invoices & receipts, tenant and owner portals, and mobile app access.',
-  pricingNote: 'Includes free trial for new organisations.',
+    'One simple rate, whether you own a single block or manage for fifty landlords. Every plan includes:',
+  pricingNote: 'Create your organisation',
   defaultSliderUnits: 25,
   fallbackRatePerUnit: 10000,
   fallbackMinimumMonthly: 150000,
+  faqTitle: 'Questions landlords ask us',
+  faqs: [
+    {
+      question: 'Which payment methods can tenants use?',
+      answer:
+        'M-Pesa Paybill and Till, an STK Push prompt sent from the tenant portal, bank transfers through statement imports, plus cash and cheque recorded by your staff. All of them land in the same ledger.',
+    },
+    {
+      question: 'Do I pay for vacant units?',
+      answer:
+        'No. You are billed per occupied unit each month, with a small monthly minimum. Empty units cost nothing.',
+    },
+    {
+      question: 'How does automatic M-Pesa matching work?',
+      answer:
+        "When a payment arrives, KodiHub reads the account reference and the payer's phone number, finds the tenant and clears their oldest unpaid invoice first. Payments it cannot place go to a review queue.",
+    },
+    {
+      question: 'Is KodiHub suitable for letting agencies?',
+      answer:
+        'Yes. Agencies set up management agreements per landlord, earn commission automatically, deduct approved expenses and remit the net to each owner, who gets a read-only portal.',
+    },
+    {
+      question: 'Can caretakers use it from their phone?',
+      answer:
+        'Yes. The Android and iOS app lets caretakers capture meter readings with photos, update unit status and handle move-ins and move-outs, without access to money settings.',
+    },
+    {
+      question: 'Can I bring my existing tenants and balances?',
+      answer:
+        'Yes. Import your units, tenants and opening balances in bulk via CSV, or let our team help your organisation set up properties, units, tenants and opening balances during the free trial.',
+    },
+  ],
+  ctaTitle: "Close this month's books before the 5th.",
+  ctaSubtitle:
+    'Set up your first property in an afternoon. Your tenants get receipts the moment they pay.',
   contactEmail: 'hello@kodihub.co.ke',
   contactPhone: null,
   footerCopyright: 'KodiHub Property Management. All rights reserved.',
-  footerTagline: 'Built in Nairobi for landlords and letting agencies across Kenya.',
+  footerTagline:
+    'Rent, utilities, M-Pesa and landlord payouts in one place. Built in Nairobi for landlords and letting agencies across Kenya.',
 };
 
 function LandingPageForm({ settings }: { settings: PlatformSettings }) {
@@ -823,10 +910,13 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
   const toast = useToast();
   const initial: LandingPageContent = settings.landingPage ?? DEFAULT_LANDING_PAGE;
   const [draft, setDraft] = useState<LandingPageContent>(() => ({
+    ...DEFAULT_LANDING_PAGE,
     ...initial,
-    heroStats: initial.heroStats.map((x) => ({ ...x })),
-    features: initial.features.map((x) => ({ ...x })),
-    portals: initial.portals.map((x) => ({ ...x })),
+    heroStats: (initial.heroStats ?? DEFAULT_LANDING_PAGE.heroStats).map((x) => ({ ...x })),
+    howSteps: (initial.howSteps ?? DEFAULT_LANDING_PAGE.howSteps ?? []).map((x) => ({ ...x })),
+    features: (initial.features ?? DEFAULT_LANDING_PAGE.features).map((x) => ({ ...x })),
+    portals: (initial.portals ?? DEFAULT_LANDING_PAGE.portals).map((x) => ({ ...x })),
+    faqs: (initial.faqs ?? DEFAULT_LANDING_PAGE.faqs ?? []).map((x) => ({ ...x })),
   }));
 
   const save = useMutation({
@@ -849,6 +939,13 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
     }));
   };
 
+  const updateHowStep = (idx: number, patch: Partial<LandingHowStepItem>) => {
+    setDraft((prev) => ({
+      ...prev,
+      howSteps: (prev.howSteps ?? []).map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+    }));
+  };
+
   const updateFeature = (idx: number, patch: Partial<LandingFeatureItem>) => {
     setDraft((prev) => ({
       ...prev,
@@ -863,10 +960,19 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
     }));
   };
 
+  const updateFaq = (idx: number, patch: Partial<LandingFaqItem>) => {
+    setDraft((prev) => ({
+      ...prev,
+      faqs: (prev.faqs ?? []).map((f, i) => (i === idx ? { ...f, ...patch } : f)),
+    }));
+  };
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     save.mutate({
       ...draft,
+      googlePlayUrl: draft.googlePlayUrl?.trim() || null,
+      appStoreUrl: draft.appStoreUrl?.trim() || null,
       contactEmail: draft.contactEmail?.trim() || null,
       contactPhone: draft.contactPhone?.trim() || null,
     });
@@ -882,6 +988,13 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
       </p>
 
       <div className="fm__grid">
+        <Field id="lp-topbar" label="Top announcement bar text" wide>
+          <input
+            id="lp-topbar"
+            value={draft.topBarText ?? ''}
+            onChange={(e) => setField('topBarText', e.target.value)}
+          />
+        </Field>
         <Field id="lp-brand" label="Brand name">
           <input
             id="lp-brand"
@@ -1022,6 +1135,58 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
         </div>
       ) : null}
 
+      <h3 style={{ marginTop: 28 }}>How it works section</h3>
+      <div className="fm__grid">
+        <Field id="lp-howtitle" label="How it works heading" wide>
+          <input
+            id="lp-howtitle"
+            value={draft.howTitle ?? ''}
+            onChange={(e) => setField('howTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-howsub" label="How it works subtitle" wide>
+          <textarea
+            id="lp-howsub"
+            rows={2}
+            value={draft.howSubtitle ?? ''}
+            onChange={(e) => setField('howSubtitle', e.target.value)}
+          />
+        </Field>
+      </div>
+      {(draft.howSteps ?? []).map((stepItem, idx) => (
+        <div
+          key={idx}
+          className="fm__grid"
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--nx-border, #e2e8f0)',
+          }}
+        >
+          <Field id={`lp-hw-s-${idx}`} label={`Step ${idx + 1} badge`}>
+            <input
+              id={`lp-hw-s-${idx}`}
+              value={stepItem.step}
+              onChange={(e) => updateHowStep(idx, { step: e.target.value })}
+            />
+          </Field>
+          <Field id={`lp-hw-t-${idx}`} label={`Step ${idx + 1} title`}>
+            <input
+              id={`lp-hw-t-${idx}`}
+              value={stepItem.title}
+              onChange={(e) => updateHowStep(idx, { title: e.target.value })}
+            />
+          </Field>
+          <Field id={`lp-hw-d-${idx}`} label={`Step ${idx + 1} description`} wide>
+            <input
+              id={`lp-hw-d-${idx}`}
+              value={stepItem.description}
+              onChange={(e) => updateHowStep(idx, { description: e.target.value })}
+            />
+          </Field>
+        </div>
+      ))}
+
       <h3 style={{ marginTop: 28 }}>Features section</h3>
       <div className="fm__grid">
         <Field id="lp-ftitle" label="Section heading" wide>
@@ -1110,6 +1275,71 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
         </div>
       ) : null}
 
+      <h3 style={{ marginTop: 28 }}>Reconciliation, Mobile App & Agencies</h3>
+      <div className="fm__grid">
+        <Field id="lp-recontitle" label="Reconciliation heading" wide>
+          <input
+            id="lp-recontitle"
+            value={draft.reconTitle ?? ''}
+            onChange={(e) => setField('reconTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-reconsub" label="Reconciliation subtitle" wide>
+          <textarea
+            id="lp-reconsub"
+            rows={2}
+            value={draft.reconSubtitle ?? ''}
+            onChange={(e) => setField('reconSubtitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-mobtitle" label="Mobile app heading" wide>
+          <input
+            id="lp-mobtitle"
+            value={draft.mobileTitle ?? ''}
+            onChange={(e) => setField('mobileTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-mobsub" label="Mobile app subtitle" wide>
+          <textarea
+            id="lp-mobsub"
+            rows={2}
+            value={draft.mobileSubtitle ?? ''}
+            onChange={(e) => setField('mobileSubtitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-playurl" label="Google Play URL" optional>
+          <input
+            id="lp-playurl"
+            value={draft.googlePlayUrl ?? ''}
+            onChange={(e) => setField('googlePlayUrl', e.target.value || null)}
+            placeholder="https://play.google.com/store/apps/details?id=..."
+          />
+        </Field>
+        <Field id="lp-storeurl" label="App Store URL" optional>
+          <input
+            id="lp-storeurl"
+            value={draft.appStoreUrl ?? ''}
+            onChange={(e) => setField('appStoreUrl', e.target.value || null)}
+            placeholder="https://apps.apple.com/app/..."
+          />
+        </Field>
+        <Field id="lp-agtitle" label="Letting agencies heading" wide>
+          <input
+            id="lp-agtitle"
+            value={draft.agenciesTitle ?? ''}
+            onChange={(e) => setField('agenciesTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-agsub" label="Letting agencies subtitle" wide>
+          <textarea
+            id="lp-agsub"
+            rows={2}
+            value={draft.agenciesSubtitle ?? ''}
+            onChange={(e) => setField('agenciesSubtitle', e.target.value)}
+          />
+        </Field>
+      </div>
+
       <h3 style={{ marginTop: 28 }}>Portals section</h3>
       <div className="fm__grid">
         <Field id="lp-ptitle" label="Portals heading" wide>
@@ -1190,7 +1420,80 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
         </div>
       ) : null}
 
-      <h3 style={{ marginTop: 28 }}>Pricing & footer</h3>
+      <h3 style={{ marginTop: 28 }}>FAQ section</h3>
+      <div className="fm__grid">
+        <Field id="lp-faqtitle" label="FAQ heading" wide>
+          <input
+            id="lp-faqtitle"
+            value={draft.faqTitle ?? ''}
+            onChange={(e) => setField('faqTitle', e.target.value)}
+          />
+        </Field>
+      </div>
+      {(draft.faqs ?? []).map((faq, idx) => (
+        <div
+          key={idx}
+          className="fm__grid"
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid var(--nx-border, #e2e8f0)',
+          }}
+        >
+          <Field id={`lp-fq-q-${idx}`} label={`Question ${idx + 1}`} wide>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id={`lp-fq-q-${idx}`}
+                value={faq.question}
+                onChange={(e) => updateFaq(idx, { question: e.target.value })}
+              />
+              {(draft.faqs ?? []).length > 1 ? (
+                <button
+                  type="button"
+                  className="nx-btn nx-btn--sm"
+                  onClick={() =>
+                    setDraft((p) => ({
+                      ...p,
+                      faqs: (p.faqs ?? []).filter((_, i) => i !== idx),
+                    }))
+                  }
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          </Field>
+          <Field id={`lp-fq-a-${idx}`} label={`Answer ${idx + 1}`} wide>
+            <textarea
+              id={`lp-fq-a-${idx}`}
+              rows={2}
+              value={faq.answer}
+              onChange={(e) => updateFaq(idx, { answer: e.target.value })}
+            />
+          </Field>
+        </div>
+      ))}
+      {(draft.faqs ?? []).length < 12 ? (
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            className="nx-btn nx-btn--sm"
+            onClick={() =>
+              setDraft((p) => ({
+                ...p,
+                faqs: [
+                  ...(p.faqs ?? []),
+                  { question: 'New question?', answer: 'Provide a clear answer.' },
+                ],
+              }))
+            }
+          >
+            + Add FAQ item
+          </button>
+        </div>
+      ) : null}
+
+      <h3 style={{ marginTop: 28 }}>Pricing, Final CTA & Footer</h3>
       <div className="fm__grid">
         <Field id="lp-prbadge" label="Pricing badge">
           <input
@@ -1226,7 +1529,7 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
         </Field>
         <Field
           id="lp-prnote"
-          label="Pricing calculator footnote"
+          label="Pricing CTA button label"
           wide
           hint="The calculator automatically uses your active Default Plan’s per-unit rate and monthly minimum."
         >
@@ -1234,6 +1537,20 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
             id="lp-prnote"
             value={draft.pricingNote}
             onChange={(e) => setField('pricingNote', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-ctatitle" label="Final CTA heading" wide>
+          <input
+            id="lp-ctatitle"
+            value={draft.ctaTitle ?? ''}
+            onChange={(e) => setField('ctaTitle', e.target.value)}
+          />
+        </Field>
+        <Field id="lp-ctasub" label="Final CTA subtitle" wide>
+          <input
+            id="lp-ctasub"
+            value={draft.ctaSubtitle ?? ''}
+            onChange={(e) => setField('ctaSubtitle', e.target.value)}
           />
         </Field>
         <Field id="lp-cemail" label="Public contact email" optional>
@@ -1276,8 +1593,10 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
             setDraft({
               ...DEFAULT_LANDING_PAGE,
               heroStats: DEFAULT_LANDING_PAGE.heroStats.map((x) => ({ ...x })),
+              howSteps: (DEFAULT_LANDING_PAGE.howSteps ?? []).map((x) => ({ ...x })),
               features: DEFAULT_LANDING_PAGE.features.map((x) => ({ ...x })),
               portals: DEFAULT_LANDING_PAGE.portals.map((x) => ({ ...x })),
+              faqs: (DEFAULT_LANDING_PAGE.faqs ?? []).map((x) => ({ ...x })),
             });
             save.mutate({ reset: true });
           }}

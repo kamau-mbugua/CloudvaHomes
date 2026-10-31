@@ -171,11 +171,20 @@ export class PlatformPayService {
     return withoutOrgScope(async () => {
       const before = await this.billing.settings();
       const beforeLanding = readLandingPageContent(before.emailTemplates);
-      const { reset, features, ...patch } = dto;
+      const { reset, features, howSteps, ...patch } = dto;
       const nextContainer = mergeLandingPageContent(
         before.emailTemplates,
         {
           ...patch,
+          ...(howSteps
+            ? {
+                howSteps: howSteps.map((s, idx) => ({
+                  step: s.step?.trim() || `0${idx + 1}`,
+                  title: s.title,
+                  description: s.description,
+                })),
+              }
+            : {}),
           ...(features
             ? {
                 features: features.map((f) => ({

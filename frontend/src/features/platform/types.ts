@@ -183,6 +183,12 @@ export interface LandingHeroStat {
   value: string;
 }
 
+export interface LandingHowStepItem {
+  step: string;
+  title: string;
+  description: string;
+}
+
 export interface LandingFeatureItem {
   tag: string;
   title: string;
@@ -190,11 +196,19 @@ export interface LandingFeatureItem {
 }
 
 export interface LandingPortalItem {
+  kicker?: string;
   title: string;
   description: string;
+  badges?: string[];
+}
+
+export interface LandingFaqItem {
+  question: string;
+  answer: string;
 }
 
 export interface LandingPageContent {
+  topBarText?: string;
   brandName: string;
   pageTitle: string;
   metaDescription: string;
@@ -207,12 +221,23 @@ export interface LandingPageContent {
   heroSecondaryCta: string;
   heroStatsTitle: string;
   heroStats: LandingHeroStat[];
+  howTitle?: string;
+  howSubtitle?: string;
+  howSteps?: LandingHowStepItem[];
   featuresTitle: string;
   featuresSubtitle: string;
   features: LandingFeatureItem[];
+  reconTitle?: string;
+  reconSubtitle?: string;
   portalsTitle: string;
   portalsSubtitle: string;
   portals: LandingPortalItem[];
+  mobileTitle?: string;
+  mobileSubtitle?: string;
+  googlePlayUrl?: string | null;
+  appStoreUrl?: string | null;
+  agenciesTitle?: string;
+  agenciesSubtitle?: string;
   pricingBadge: string;
   pricingTitle: string;
   pricingSubtitle: string;
@@ -220,6 +245,10 @@ export interface LandingPageContent {
   defaultSliderUnits: number;
   fallbackRatePerUnit: number;
   fallbackMinimumMonthly: number;
+  faqTitle?: string;
+  faqs?: LandingFaqItem[];
+  ctaTitle?: string;
+  ctaSubtitle?: string;
   contactEmail: string | null;
   contactPhone: string | null;
   footerCopyright: string;

@@ -485,6 +485,12 @@ export class LandingHeroStatDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(80) value!: string;
 }
 
+export class LandingHowStepItemDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) step?: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(140) title!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(500) description!: string;
+}
+
 export class LandingFeatureItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(60) tag?: string;
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(140) title!: string;
@@ -492,8 +498,20 @@ export class LandingFeatureItemDto {
 }
 
 export class LandingPortalItemDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) kicker?: string;
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(140) title!: string;
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(500) description!: string;
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(6)
+  @IsString({ each: true })
+  badges?: string[];
+}
+
+export class LandingFaqItemDto {
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(240) question!: string;
+  @ApiProperty() @IsString() @MinLength(1) @MaxLength(800) answer!: string;
 }
 
 export class UpdateLandingPageDto {
@@ -502,6 +520,7 @@ export class UpdateLandingPageDto {
   @IsBoolean()
   reset?: boolean;
 
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) topBarText?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) brandName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) pageTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) metaDescription?: string;
@@ -523,6 +542,17 @@ export class UpdateLandingPageDto {
   @Type(() => LandingHeroStatDto)
   heroStats?: LandingHeroStatDto[];
 
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) howTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) howSubtitle?: string;
+
+  @ApiPropertyOptional({ type: [LandingHowStepItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => LandingHowStepItemDto)
+  howSteps?: LandingHowStepItemDto[];
+
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) featuresTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) featuresSubtitle?: string;
 
@@ -534,6 +564,9 @@ export class UpdateLandingPageDto {
   @Type(() => LandingFeatureItemDto)
   features?: LandingFeatureItemDto[];
 
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) reconTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) reconSubtitle?: string;
+
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) portalsTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) portalsSubtitle?: string;
 
@@ -544,6 +577,26 @@ export class UpdateLandingPageDto {
   @ValidateNested({ each: true })
   @Type(() => LandingPortalItemDto)
   portals?: LandingPortalItemDto[];
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) mobileTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) mobileSubtitle?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(300)
+  googlePlayUrl?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(300)
+  appStoreUrl?: string | null;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) agenciesTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) agenciesSubtitle?: string;
 
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) pricingBadge?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) pricingTitle?: string;
@@ -573,6 +626,19 @@ export class UpdateLandingPageDto {
   @Min(0)
   @Max(100_000_000)
   fallbackMinimumMonthly?: number;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) faqTitle?: string;
+
+  @ApiPropertyOptional({ type: [LandingFaqItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => LandingFaqItemDto)
+  faqs?: LandingFaqItemDto[];
+
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) ctaTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) ctaSubtitle?: string;
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
