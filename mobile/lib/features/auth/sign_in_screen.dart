@@ -20,8 +20,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _twoFactorCode = TextEditingController();
   TwoFactorChallenge? _challenge;
   bool _busy = false;
+  bool _resending = false;
   bool _hide = true;
   String? _error;
+  String? _notice;
 
   @override
   void dispose() {
@@ -39,6 +41,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _notice = null;
     });
     try {
       final challenge = await ref
@@ -57,6 +60,30 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  Future<void> _resendTwoFactor() async {
+    setState(() {
+      _resending = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      final challenge = await ref
+          .read(sessionProvider.notifier)
+          .signInWithPassword(_id.text, _password.text);
+      if (challenge != null && mounted) {
+        setState(() {
+          _challenge = challenge;
+          _twoFactorCode.clear();
+          _notice = 'A new 6-digit code has been sent.';
+        });
+      }
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
+  }
+
   Future<void> _verifyTwoFactor() async {
     if (_twoFactorCode.text.trim().length != 6) {
       setState(() => _error = 'Enter the 6-digit verification code.');
@@ -65,6 +92,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _notice = null;
     });
     try {
       await ref
@@ -103,24 +131,50 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             onSubmitted: (_) => _verifyTwoFactor(),
           ),
           const SizedBox(height: 16),
+          if (_notice != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF5CC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF84BD00)),
+              ),
+              child: Text(
+                _notice!,
+                style: const TextStyle(color: Color(0xFF3E5E00)),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (_error != null) ...[
             ErrorBox(_error!),
             const SizedBox(height: 12),
           ],
           FilledButton(
-            onPressed: _busy ? null : _verifyTwoFactor,
+            onPressed: (_busy || _resending) ? null : _verifyTwoFactor,
             child: Text(_busy ? 'Verifying…' : 'Verify & sign in'),
           ),
           const SizedBox(height: 8),
-          TextButton(
-            onPressed: _busy
-                ? null
-                : () => setState(() {
-                    _challenge = null;
-                    _error = null;
-                    _twoFactorCode.clear();
-                  }),
-            child: const Text('Use a different account'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: (_busy || _resending) ? null : _resendTwoFactor,
+                child: Text(_resending ? 'Sending…' : 'Resend code'),
+              ),
+              const Text('·'),
+              TextButton(
+                onPressed: (_busy || _resending)
+                    ? null
+                    : () => setState(() {
+                        _challenge = null;
+                        _error = null;
+                        _notice = null;
+                        _twoFactorCode.clear();
+                      }),
+                child: const Text('Use a different account'),
+              ),
+            ],
           ),
         ],
       );

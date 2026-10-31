@@ -134,7 +134,8 @@ export function LoginPage() {
   };
 
   if (mode === 'admin-2fa' && twoFactor) {
-    const error = codeError ?? (verifyAdminTwoFactor.isError ? authErrorMessage(verifyAdminTwoFactor.error) : null);
+    const error = codeError ?? (verifyAdminTwoFactor.isError ? authErrorMessage(verifyAdminTwoFactor.error)
+      : login.isError ? authErrorMessage(login.error) : null);
 
     const submitAdminTwoFactor = (event: FormEvent) => {
       event.preventDefault();
@@ -170,9 +171,24 @@ export function LoginPage() {
 
           {error ? <p className="au__error" role="alert">{error}</p> : null}
 
-          <button className="au__submit" type="submit" disabled={verifyAdminTwoFactor.isPending}>
+          <button className="au__submit" type="submit" disabled={verifyAdminTwoFactor.isPending || login.isPending}>
             {verifyAdminTwoFactor.isPending ? 'Verifying…' : 'Verify & sign in'}
           </button>
+
+          <p className="au__note">
+            <button
+              type="button"
+              className="au__link"
+              disabled={login.isPending || verifyAdminTwoFactor.isPending}
+              onClick={() => {
+                verifyAdminTwoFactor.reset();
+                setCodeError(null);
+                login.mutate({ identifier: identifier.trim(), password });
+              }}
+            >
+              {login.isPending ? 'Sending…' : 'Resend code'}
+            </button>
+          </p>
         </form>
       </AuthLayout>
     );

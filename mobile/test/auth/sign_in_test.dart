@@ -124,55 +124,62 @@ void main() {
     expect(store.token, 'r-otp');
   });
 
-  testWidgets('password sign-in handles 2FA challenge and verifies code', (
-    tester,
-  ) async {
-    final adapter = FakeAdapter(
-      (c) => switch (c.path) {
-        '/auth/login' => (
-          200,
-          {
-            'data': {
-              'requiresTwoFactor': true,
-              'challengeToken': 'ch-token-12345',
-              'channel': 'EMAIL',
-              'destinationMasked': 'o***r@example.invalid',
+  testWidgets(
+    'password sign-in handles 2FA challenge, resends, and verifies code',
+    (tester) async {
+      var loginCount = 0;
+      final adapter = FakeAdapter(
+        (c) => switch (c.path) {
+          '/auth/login' => (
+            200,
+            {
+              'data': {
+                'requiresTwoFactor': true,
+                'challengeToken': 'ch-token-${++loginCount}',
+                'channel': 'EMAIL',
+                'destinationMasked': 'o***r@example.invalid',
+              },
             },
-          },
-        ),
-        '/auth/login/2fa' => (
-          200,
-          {'data': sessionJson(refreshToken: 'r-2fa')},
-        ),
-        _ => (401, errorBody('SESSION_REVOKED', 'x')),
-      },
-    );
-    final store = await _pump(tester, const SignInScreen(), adapter);
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Email or phone'),
-      'owner@example.invalid',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Password'),
-      'secret-password',
-    );
-    await _tapReal(tester, find.widgetWithText(FilledButton, 'Sign in'));
-    expect(find.text('Two-step verification'), findsOneWidget);
-    expect(find.textContaining('o***r@example.invalid'), findsOneWidget);
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Verification code'),
-      '654321',
-    );
-    await _tapReal(
-      tester,
-      find.widgetWithText(FilledButton, 'Verify & sign in'),
-    );
-    expect(adapter.calls.last.path, '/auth/login/2fa');
-    expect(adapter.calls.last.body, {
-      'challengeToken': 'ch-token-12345',
-      'code': '654321',
-      'client': 'mobile',
-    });
-    expect(store.token, 'r-2fa');
-  });
+          ),
+          '/auth/login/2fa' => (
+            200,
+            {'data': sessionJson(refreshToken: 'r-2fa')},
+          ),
+          _ => (401, errorBody('SESSION_REVOKED', 'x')),
+        },
+      );
+      final store = await _pump(tester, const SignInScreen(), adapter);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Email or phone'),
+        'owner@example.invalid',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Password'),
+        'secret-password',
+      );
+      await _tapReal(tester, find.widgetWithText(FilledButton, 'Sign in'));
+      expect(find.text('Two-step verification'), findsOneWidget);
+      expect(find.textContaining('o***r@example.invalid'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Resend code'), findsOneWidget);
+
+      await _tapReal(tester, find.widgetWithText(TextButton, 'Resend code'));
+      expect(find.text('A new 6-digit code has been sent.'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Verification code'),
+        '654321',
+      );
+      await _tapReal(
+        tester,
+        find.widgetWithText(FilledButton, 'Verify & sign in'),
+      );
+      expect(adapter.calls.last.path, '/auth/login/2fa');
+      expect(adapter.calls.last.body, {
+        'challengeToken': 'ch-token-2',
+        'code': '654321',
+        'client': 'mobile',
+      });
+      expect(store.token, 'r-2fa');
+    },
+  );
 }
