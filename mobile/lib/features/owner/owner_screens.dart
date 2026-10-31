@@ -285,89 +285,162 @@ class OwnerOverviewScreen extends ConsumerWidget {
               if (showSwitcher)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Kicker(
-                              selectedPropId == null
-                                  ? 'PORTFOLIO · CONSOLIDATED (${propRows.length} PROPERTIES)'
-                                  : 'ACTIVE PROPERTY · DEFAULT SAVED',
-                            ),
-                          ),
-                          if (selectedPropId != null)
-                            GestureDetector(
-                              onTap: () => switchProperty(null, null, null),
-                              child: Text(
-                                'All properties ↺',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: dark
-                                      ? HodiColors.lime
-                                      : HodiColors.navy,
-                                ),
-                              ),
-                            ),
-                        ],
+                  child: Material(
+                    color: scheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => _OwnerPropertyScopeSheet.show(
+                        context,
+                        propRows: propRows,
+                        selectedPropId: selectedPropId,
+                        onSelect: switchProperty,
                       ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 11,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: selectedPropId != null
+                                ? HodiColors.lime.withValues(alpha: 0.65)
+                                : scheme.outlineVariant,
+                            width: selectedPropId != null ? 1.4 : 1,
+                          ),
+                        ),
                         child: Row(
                           children: [
-                            ChoiceChip(
-                              label: Text(
-                                'All properties (${propRows.length})',
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: selectedPropId == null
+                                    ? (dark
+                                          ? HodiColors.lime.withValues(
+                                              alpha: 0.16,
+                                            )
+                                          : HodiColors.navy)
+                                    : HodiColors.lime.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              selected: selectedPropId == null,
-                              onSelected: (_) =>
-                                  switchProperty(null, null, null),
+                              child: Icon(
+                                selectedPropId == null
+                                    ? Icons.dashboard_customize_outlined
+                                    : Icons.apartment_rounded,
+                                size: 18,
+                                color: selectedPropId == null
+                                    ? HodiColors.lime
+                                    : (dark
+                                          ? HodiColors.lime
+                                          : HodiColors.navy),
+                              ),
                             ),
-                            for (final r in propRows) ...[
-                              const SizedBox(width: 8),
-                              Builder(
-                                builder: (context) {
-                                  final p =
-                                      r['property'] as Map<String, dynamic>? ??
-                                      const {};
-                                  final pid = p['id'] as String? ?? '';
-                                  final pname = p['name'] as String? ?? '';
-                                  final units =
-                                      (r['units'] as num?)?.toInt() ?? 0;
-                                  final occ =
-                                      ((r['occupied'] as num?)?.toInt() ?? 0) +
-                                      ((r['notice'] as num?)?.toInt() ?? 0);
-                                  final isSel = selectedPropId == pid;
-                                  return ChoiceChip(
-                                    label: Text('$pname · $occ/$units'),
-                                    selected: isSel,
-                                    selectedColor: dark
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    selectedPropId == null
+                                        ? 'PORTFOLIO · CONSOLIDATED'
+                                        : 'ACTIVE PROPERTY · DEFAULT SAVED',
+                                    style: TextStyle(
+                                      fontFamily: 'JetBrainsMono',
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.1,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    selectedPropName ??
+                                        'All properties (Consolidated)',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    selectedPropId == null
+                                        ? '${propRows.length} properties · Tap to focus on one'
+                                        : 'Showing single property · Tap to switch',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (selectedPropId != null) ...[
+                              const SizedBox(width: 6),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () =>
+                                    switchProperty(null, null, null),
+                                child: Text(
+                                  'All ↺',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: dark
                                         ? HodiColors.lime
                                         : HodiColors.navy,
-                                    labelStyle: TextStyle(
-                                      color: isSel
-                                          ? (dark
-                                                ? HodiColors.navy
-                                                : Colors.white)
-                                          : scheme.onSurface,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                    onSelected: (_) => switchProperty(
-                                      pid,
-                                      pname,
-                                      r['landlordId'] as String?,
-                                    ),
-                                  );
-                                },
+                                  ),
+                                ),
                               ),
                             ],
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Switch',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: scheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    size: 16,
+                                    color: scheme.onSurface,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               CurvedHeroCard(
@@ -501,6 +574,230 @@ class OwnerOverviewScreen extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _OwnerPropertyScopeSheet extends ConsumerWidget {
+  const _OwnerPropertyScopeSheet({
+    required this.propRows,
+    required this.selectedPropId,
+    required this.onSelect,
+  });
+
+  final List<Map<String, dynamic>> propRows;
+  final String? selectedPropId;
+  final Future<void> Function(
+    String? propId,
+    String? propName,
+    String? landlordId,
+  )
+  onSelect;
+
+  static Future<void> show(
+    BuildContext context, {
+    required List<Map<String, dynamic>> propRows,
+    required String? selectedPropId,
+    required Future<void> Function(
+      String? propId,
+      String? propName,
+      String? landlordId,
+    )
+    onSelect,
+  }) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _OwnerPropertyScopeSheet(
+        propRows: propRows,
+        selectedPropId: selectedPropId,
+        onSelect: onSelect,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final session = ref.watch(sessionProvider).valueOrNull;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Switch property scope',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Your selection updates your active context and is saved as your default.',
+              style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            _OwnerScopeOptionTile(
+              selected: selectedPropId == null,
+              leading: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: dark
+                      ? HodiColors.lime.withValues(alpha: 0.16)
+                      : HodiColors.navy,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.dashboard_customize_outlined,
+                  size: 19,
+                  color: HodiColors.lime,
+                ),
+              ),
+              title: 'All properties (Consolidated)',
+              subtitle: '${propRows.length} properties combined',
+              onTap: () {
+                Navigator.of(context).pop();
+                onSelect(null, null, null);
+              },
+            ),
+            for (final (idx, r) in propRows.indexed)
+              Builder(
+                builder: (context) {
+                  final p = r['property'] as Map<String, dynamic>? ?? const {};
+                  final pid = p['id'] as String? ?? '';
+                  final pcode = p['code'] as String? ?? 'P${idx + 1}';
+                  final pname = p['name'] as String? ?? '';
+                  final units = (r['units'] as num?)?.toInt() ?? 0;
+                  final occ =
+                      ((r['occupied'] as num?)?.toInt() ?? 0) +
+                      ((r['notice'] as num?)?.toInt() ?? 0);
+                  final vacant = (r['vacant'] as num?)?.toInt() ?? 0;
+                  return _OwnerScopeOptionTile(
+                    selected: selectedPropId == pid,
+                    leading: UnitBadge(pcode, width: 46),
+                    title: pname,
+                    subtitle: '$occ/$units let · $vacant vacant',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelect(pid, pname, r['landlordId'] as String?);
+                    },
+                  );
+                },
+              ),
+            if (session != null &&
+                (session.isStaff ||
+                    session.isTenant ||
+                    session.ownerOf.length > 1)) ...[
+              const Divider(height: 20),
+              ListTile(
+                dense: true,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                leading: const Icon(Icons.swap_horiz_rounded, size: 20),
+                title: const Text(
+                  'Switch organisation or portal (Staff / Tenant)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  AccountSheet.show(context);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OwnerScopeOptionTile extends StatelessWidget {
+  const _OwnerScopeOptionTile({
+    required this.selected,
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected
+            ? HodiColors.lime.withValues(alpha: dark ? 0.14 : 0.12)
+            : scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? HodiColors.lime : scheme.outlineVariant,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                leading,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  size: 20,
+                  color: selected
+                      ? (dark ? HodiColors.lime : HodiColors.navy)
+                      : scheme.outline,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

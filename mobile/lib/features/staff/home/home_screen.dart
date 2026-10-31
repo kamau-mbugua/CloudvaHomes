@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_error.dart';
-import '../../../core/auth/session.dart';
 import '../../../core/auth/session_controller.dart';
 import '../../../core/dates.dart';
 import '../../../core/money.dart';
 import '../../../core/theme.dart';
+import '../../../core/widgets/account_sheet.dart';
 import '../../../core/widgets/common.dart';
 import '../staff_api.dart';
 import '../staff_models.dart';
@@ -106,26 +106,6 @@ class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
     }
   }
 
-  Future<void> _onSelectOrg(OrgMembership org) async {
-    if (_switching) return;
-    setState(() => _switching = true);
-    try {
-      await ref
-          .read(sessionProvider.notifier)
-          .switchContext(organizationId: org.id);
-      ref.invalidate(propertiesProvider);
-      ref.invalidate(dashboardProvider);
-      ref.read(listsVersionProvider.notifier).state++;
-      if (mounted) {
-        showMessage(context, 'Switched to ${org.name} (saved as default)');
-      }
-    } catch (e) {
-      if (mounted) showMessage(context, messageOf(e));
-    } finally {
-      if (mounted) setState(() => _switching = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider).valueOrNull;
@@ -139,7 +119,17 @@ class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
         ? fetchedProps
         : [
             for (final p in session.properties)
-              PropertyOption(id: p.id, code: p.code, name: p.name),
+              PropertyOption(
+                id: p.id,
+                code: p.code,
+                name: p.name,
+                unitCount: p.unitCount,
+                occupiedCount: p.occupiedCount,
+                vacantCount: (p.unitCount - p.occupiedCount).clamp(
+                  0,
+                  p.unitCount,
+                ),
+              ),
           ];
     final orgs = session.organizations;
     if (props.length <= 1 &&
@@ -150,176 +140,373 @@ class _PortfolioSwitcherBarState extends ConsumerState<_PortfolioSwitcherBar> {
     }
 
     final activePropertyId = session.activePropertyId;
+    PropertyOption? activeProp;
+    if (activePropertyId != null) {
+      for (final p in props) {
+        if (p.id == activePropertyId) {
+          activeProp = p;
+          break;
+        }
+      }
+    }
     final totalUnits = props.fold<int>(0, (sum, p) => sum + p.unitCount);
+    final totalOccupied = props.fold<int>(
+      0,
+      (sum, p) => sum + p.occupiedCount + p.noticeCount,
+    );
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
 
+    final title = activeProp != null
+        ? activeProp.name
+        : (props.length > 1
+              ? 'All properties (Consolidated)'
+              : (session.activeOrganization?.name ?? 'Portfolio'));
+    final subtitle = activeProp != null
+        ? (activeProp.unitCount > 0
+              ? '${activeProp.occupiedCount + activeProp.noticeCount}/${activeProp.unitCount} units let · Default property'
+              : 'Active property · Default saved')
+        : (props.length > 1
+              ? '${props.length} properties${totalUnits > 0 ? ' · $totalOccupied/$totalUnits units let' : ''}'
+              : 'Tap to switch workspace or portal');
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Kicker(
-                  props.length > 1
-                      ? (activePropertyId == null
-                            ? 'PORTFOLIO SCOPE · CONSOLIDATED (${props.length} PROPERTIES)'
-                            : 'ACTIVE PROPERTY SCOPE · DEFAULT SAVED')
-                      : 'WORKSPACE & PORTAL SWITCHER',
-                ),
-              ),
-              if (_switching)
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else if (activePropertyId != null)
-                GestureDetector(
-                  onTap: () => _onSelectProperty(null, null),
-                  child: Text(
-                    'All properties ↺',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: dark ? HodiColors.lime : HodiColors.navy,
-                    ),
-                  ),
-                ),
-            ],
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: dark ? scheme.surfaceContainerLowest : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _StaffScopeSheet.show(
+            context,
+            properties: props,
+            activePropertyId: activePropertyId,
+            onSelectProperty: _onSelectProperty,
           ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             child: Row(
               children: [
-                if (orgs.length > 1)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: PopupMenuButton<OrgMembership>(
-                      tooltip: 'Switch organisation',
-                      onSelected: _onSelectOrg,
-                      itemBuilder: (_) => [
-                        for (final o in orgs)
-                          PopupMenuItem(
-                            value: o,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  o.id == session.activeOrganization?.id
-                                      ? Icons.radio_button_checked
-                                      : Icons.radio_button_off,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(child: Text(o.name)),
-                              ],
+                if (activeProp != null && activeProp.code.isNotEmpty)
+                  UnitBadge(activeProp.code, width: 44, height: 38)
+                else
+                  Container(
+                    width: 40,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: HodiColors.navy,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.layers_outlined,
+                      size: 19,
+                      color: HodiColors.lime,
+                    ),
+                  ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: dark ? Colors.white : HodiColors.navy,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (_switching)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else ...[
+                  if (activePropertyId != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => _onSelectProperty(null, null),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'All ↺',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: dark ? Colors.white : HodiColors.navy,
                             ),
                           ),
-                      ],
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: dark
-                              ? scheme.surfaceContainerLowest
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: scheme.outlineVariant),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.domain_outlined, size: 15),
-                            const SizedBox(width: 6),
-                            Text(
-                              session.activeOrganization?.name ??
-                                  'Organisation',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.expand_more, size: 16),
-                          ],
                         ),
                       ),
                     ),
-                  ),
-                if (props.length > 1) ...[
-                  _ScopePill(
-                    icon: Icons.dashboard_customize_outlined,
-                    label: 'All properties',
-                    badge: totalUnits > 0
-                        ? '$totalUnits units'
-                        : '${props.length}',
-                    selected: activePropertyId == null,
-                    onTap: () => _onSelectProperty(null, null),
-                  ),
-                  for (final p in props) ...[
-                    const SizedBox(width: 8),
-                    _ScopePill(
-                      icon: Icons.apartment_outlined,
-                      label: p.name,
-                      badge: p.unitCount > 0
-                          ? '${p.occupiedCount}/${p.unitCount}'
-                          : (p.code.isNotEmpty ? p.code : null),
-                      selected: activePropertyId == p.id,
-                      onTap: () => _onSelectProperty(p.id, p.name),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
                     ),
-                  ],
-                ],
-                if (session.isTenant) ...[
-                  if (props.length > 1 || orgs.length > 1)
-                    const SizedBox(width: 8),
-                  _ScopePill(
-                    icon: Icons.home_outlined,
-                    label: 'My rent (Tenant)',
-                    badge: '${session.tenantOf.length}',
-                    selected: false,
-                    onTap: () {
-                      ref.read(appModeProvider.notifier).state = AppMode.tenant;
-                    },
-                  ),
-                ],
-                if (session.isOwner) ...[
-                  const SizedBox(width: 8),
-                  _ScopePill(
-                    icon: Icons.real_estate_agent_outlined,
-                    label: 'Owner portal',
-                    badge: '${session.ownerOf.length}',
-                    selected: false,
-                    onTap: () {
-                      ref.read(appModeProvider.notifier).state = AppMode.owner;
-                    },
+                    decoration: BoxDecoration(
+                      color: dark
+                          ? HodiColors.limeSoftDark
+                          : HodiColors.limeSoft,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Switch',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: dark ? HodiColors.lime : HodiColors.navy,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Icon(
+                          Icons.unfold_more_rounded,
+                          size: 16,
+                          color: dark ? HodiColors.lime : HodiColors.navy,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StaffScopeSheet extends ConsumerStatefulWidget {
+  const _StaffScopeSheet({
+    required this.properties,
+    required this.activePropertyId,
+    required this.onSelectProperty,
+  });
+
+  final List<PropertyOption> properties;
+  final String? activePropertyId;
+  final Future<void> Function(String? id, String? name) onSelectProperty;
+
+  static Future<void> show(
+    BuildContext context, {
+    required List<PropertyOption> properties,
+    required String? activePropertyId,
+    required Future<void> Function(String? id, String? name) onSelectProperty,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => _StaffScopeSheet(
+      properties: properties,
+      activePropertyId: activePropertyId,
+      onSelectProperty: onSelectProperty,
+    ),
+  );
+
+  @override
+  ConsumerState<_StaffScopeSheet> createState() => _StaffScopeSheetState();
+}
+
+class _StaffScopeSheetState extends ConsumerState<_StaffScopeSheet> {
+  var _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final session = ref.watch(sessionProvider).valueOrNull;
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final q = _query.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? widget.properties
+        : [
+            for (final p in widget.properties)
+              if (p.name.toLowerCase().contains(q) ||
+                  p.code.toLowerCase().contains(q) ||
+                  (p.location?.toLowerCase().contains(q) ?? false))
+                p,
+          ];
+    final totalUnits = widget.properties.fold<int>(
+      0,
+      (sum, p) => sum + p.unitCount,
+    );
+    final totalOccupied = widget.properties.fold<int>(
+      0,
+      (sum, p) => sum + p.occupiedCount + p.noticeCount,
+    );
+    final hasOtherWorkspaces =
+        session != null &&
+        (session.organizations.length > 1 ||
+            session.isTenant ||
+            session.isOwner ||
+            session.isPlatformAdmin);
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: widget.properties.length > 4 ? 0.72 : 0.56,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) => ListView(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        children: [
+          const Kicker('PORTFOLIO & PROPERTY SCOPE'),
+          const SizedBox(height: 4),
+          Text(
+            'Switch property view',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
+              color: dark ? Colors.white : HodiColors.navy,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Updates your active session token and saves your default view.',
+            style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+          ),
+          if (widget.properties.length > 4) ...[
+            const SizedBox(height: 12),
+            TextField(
+              onChanged: (v) => setState(() => _query = v),
+              decoration: const InputDecoration(
+                hintText: 'Search property name or code…',
+                prefixIcon: Icon(Icons.search, size: 20),
+                isDense: true,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          if (widget.properties.length > 1) ...[
+            _ScopeSheetTile(
+              leading: Container(
+                width: 44,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: HodiColors.navy,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.layers_outlined,
+                  color: HodiColors.lime,
+                  size: 20,
+                ),
+              ),
+              title: 'All properties (Consolidated)',
+              subtitle:
+                  '${widget.properties.length} properties${totalUnits > 0 ? ' · $totalOccupied/$totalUnits units let' : ''}',
+              selected: widget.activePropertyId == null,
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onSelectProperty(null, null);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+          for (final (idx, p) in filtered.indexed) ...[
+            if (idx > 0) const SizedBox(height: 8),
+            _ScopeSheetTile(
+              leading: UnitBadge(
+                p.code.isNotEmpty ? p.code : 'P${idx + 1}',
+                width: 48,
+                height: 40,
+              ),
+              title: p.name,
+              subtitle: p.unitCount > 0
+                  ? '${p.occupiedCount + p.noticeCount}/${p.unitCount} let · ${p.vacantCount} vacant'
+                        '${p.location != null && p.location!.isNotEmpty ? ' · ${p.location}' : ''}'
+                  : (p.location ?? p.code),
+              selected: widget.activePropertyId == p.id,
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onSelectProperty(p.id, p.name);
+              },
+            ),
+          ],
+          if (hasOtherWorkspaces) ...[
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.swap_horiz_rounded, size: 20),
+              ),
+              title: const Text(
+                'Switch organisation or portal',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+              subtitle: Text(
+                session.isTenant
+                    ? 'Also linked to your personal Tenant portal'
+                    : 'Switch between your organisations and portals',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(context).pop();
+                AccountSheet.show(context);
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ScopePill extends StatelessWidget {
-  const _ScopePill({
-    required this.icon,
-    required this.label,
-    this.badge,
+class _ScopeSheetTile extends StatelessWidget {
+  const _ScopeSheetTile({
+    required this.leading,
+    required this.title,
+    required this.subtitle,
     required this.selected,
     required this.onTap,
   });
 
-  final IconData icon;
-  final String label;
-  final String? badge;
+  final Widget leading;
+  final String title;
+  final String subtitle;
   final bool selected;
   final VoidCallback onTap;
 
@@ -327,66 +514,61 @@ class _ScopePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final bg = selected
-        ? HodiColors.navy
-        : (dark ? scheme.surfaceContainerLowest : Colors.white);
-    final fg = selected
-        ? Colors.white
-        : (dark ? Colors.white : HodiColors.navy);
-
     return Material(
-      color: bg,
+      color: selected
+          ? (dark ? HodiColors.limeSoftDark : HodiColors.limeSoft)
+          : (dark ? scheme.surfaceContainerLowest : Colors.white),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(14),
         side: BorderSide(
           color: selected ? HodiColors.lime : scheme.outlineVariant,
           width: selected ? 1.5 : 1,
         ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 15, color: selected ? HodiColors.lime : fg),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
+              leading,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: dark ? Colors.white : HodiColors.navy,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              if (badge != null && badge!.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 1.5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? Colors.white.withValues(alpha: 0.16)
-                        : scheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    badge!,
-                    style: TextStyle(
-                      fontFamily: 'JetBrainsMono',
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: selected
-                          ? HodiColors.lime
-                          : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked,
+                size: 20,
+                color: selected
+                    ? (dark ? HodiColors.lime : HodiColors.navy)
+                    : scheme.outlineVariant,
+              ),
             ],
           ),
         ),

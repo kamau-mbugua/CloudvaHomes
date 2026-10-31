@@ -384,67 +384,6 @@ class KodiHubSideDrawer extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  if (session != null &&
-                      [
-                            session.isStaff,
-                            session.isTenant,
-                            session.isOwner,
-                            session.isPlatformAdmin,
-                          ].where((x) => x).length >
-                          1) ...[
-                    const SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          if (session.isStaff)
-                            _DrawerModePill(
-                              icon: Icons.work_outline,
-                              label: 'Work (Staff)',
-                              selected: mode == AppMode.staff,
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                ref.read(appModeProvider.notifier).state =
-                                    AppMode.staff;
-                              },
-                            ),
-                          if (session.isTenant)
-                            _DrawerModePill(
-                              icon: Icons.home_outlined,
-                              label: 'My rent (Tenant)',
-                              selected: mode == AppMode.tenant,
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                ref.read(appModeProvider.notifier).state =
-                                    AppMode.tenant;
-                              },
-                            ),
-                          if (session.isOwner)
-                            _DrawerModePill(
-                              icon: Icons.real_estate_agent_outlined,
-                              label: 'Owner',
-                              selected: mode == AppMode.owner,
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                ref.read(appModeProvider.notifier).state =
-                                    AppMode.owner;
-                              },
-                            ),
-                          if (session.isPlatformAdmin)
-                            _DrawerModePill(
-                              icon: Icons.admin_panel_settings_outlined,
-                              label: 'Platform',
-                              selected: mode == AppMode.platform,
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                ref.read(appModeProvider.notifier).state =
-                                    AppMode.platform;
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -633,59 +572,6 @@ class _DrawerNavTile extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                   ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DrawerModePill extends StatelessWidget {
-  const _DrawerModePill({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Material(
-        color: selected
-            ? HodiColors.lime
-            : Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 13.5,
-                  color: selected ? HodiColors.navy : Colors.white,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? HodiColors.navy : Colors.white,
-                  ),
-                ),
               ],
             ),
           ),

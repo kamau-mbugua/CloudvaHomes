@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/auth/session_controller.dart';
 import '../../core/dates.dart';
 import '../../core/files.dart';
 import '../../core/money.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/stk_sheet.dart';
 import 'tenant_api.dart';
@@ -352,95 +352,397 @@ class _TenantUnitSwitcher extends ConsumerWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final homes = overview.homes;
     final session = ref.watch(sessionProvider).valueOrNull;
+    final isConsolidated = selectedHome == null;
+
+    final title = selectedHome != null
+        ? '${selectedHome!.unit} · ${selectedHome!.property}'
+        : (homes.length > 1
+              ? 'All units (Consolidated)'
+              : (homes.isNotEmpty
+                    ? '${homes.first.unit} · ${homes.first.property}'
+                    : 'My Tenancy'));
+    final subtitle = selectedHome != null
+        ? 'Monthly rent ${formatKes(selectedHome!.rent)} · Tap to switch unit'
+        : (homes.length > 1
+              ? '${homes.length} active units · Tap to focus on one unit'
+              : 'Tap to switch workspace or portal');
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Kicker(
-                  homes.length > 1
-                      ? (selectedHome == null
-                            ? 'YOUR UNITS · CONSOLIDATED (${homes.length} UNITS)'
-                            : 'ACTIVE UNIT · DEFAULT SAVED')
-                      : 'PORTAL & UNIT SWITCHER',
-                ),
-              ),
-              if (selectedHome != null)
-                GestureDetector(
-                  onTap: () => _switchTenantUnit(
-                    context,
-                    ref,
-                    home: null,
-                    fallbackTenantId: overview.tenantId,
-                  ),
-                  child: Text(
-                    'All units ↺',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: dark ? HodiColors.lime : HodiColors.navy,
-                    ),
-                  ),
-                ),
-            ],
+      child: Material(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _TenantUnitScopeSheet.show(
+            context,
+            overview: overview,
+            selectedHome: selectedHome,
           ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: !isConsolidated
+                    ? HodiColors.lime.withValues(alpha: 0.65)
+                    : scheme.outlineVariant,
+                width: !isConsolidated ? 1.4 : 1,
+              ),
+            ),
             child: Row(
               children: [
-                if (homes.length > 1) ...[
-                  ChoiceChip(
-                    label: Text('All units (${homes.length})'),
-                    selected: selectedHome == null,
-                    onSelected: (_) => _switchTenantUnit(
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isConsolidated
+                        ? (dark
+                              ? HodiColors.lime.withValues(alpha: 0.16)
+                              : HodiColors.navy)
+                        : HodiColors.lime.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isConsolidated
+                        ? Icons.dashboard_customize_outlined
+                        : Icons.home_outlined,
+                    size: 18,
+                    color: isConsolidated
+                        ? (dark ? HodiColors.lime : HodiColors.lime)
+                        : (dark ? HodiColors.lime : HodiColors.navy),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        homes.length > 1
+                            ? (isConsolidated
+                                  ? 'YOUR UNITS · CONSOLIDATED'
+                                  : 'ACTIVE UNIT · DEFAULT SAVED')
+                            : 'TENANCY SCOPE',
+                        style: TextStyle(
+                          fontFamily: 'JetBrainsMono',
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.1,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isConsolidated && homes.length > 1) ...[
+                  const SizedBox(width: 6),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () => _switchTenantUnit(
                       context,
                       ref,
                       home: null,
                       fallbackTenantId: overview.tenantId,
                     ),
-                  ),
-                  for (final h in homes) ...[
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: Text('${h.unit} · ${h.property}'),
-                      selected: selectedHome?.key == h.key,
-                      selectedColor: dark ? HodiColors.lime : HodiColors.navy,
-                      labelStyle: TextStyle(
-                        color: selectedHome?.key == h.key
-                            ? (dark ? HodiColors.navy : Colors.white)
-                            : scheme.onSurface,
+                    child: Text(
+                      'All ↺',
+                      style: TextStyle(
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w700,
-                      ),
-                      onSelected: (_) => _switchTenantUnit(
-                        context,
-                        ref,
-                        home: h,
-                        fallbackTenantId: overview.tenantId,
+                        color: dark ? HodiColors.lime : HodiColors.navy,
                       ),
                     ),
-                  ],
-                ],
-                if (session?.isStaff ?? false) ...[
-                  if (homes.length > 1) const SizedBox(width: 8),
-                  ActionChip(
-                    avatar: const Icon(Icons.work_outline, size: 15),
-                    label: Text(
-                      'Work (${session?.activeOrganization?.name ?? 'Staff'}) →',
-                    ),
-                    onPressed: () {
-                      ref.read(appModeProvider.notifier).state = AppMode.staff;
-                    },
                   ),
                 ],
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        session != null &&
+                                (session.isStaff || session.isOwner) &&
+                                homes.length <= 1
+                            ? 'Portal'
+                            : 'Switch',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: scheme.onSurface,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TenantUnitScopeSheet extends ConsumerWidget {
+  const _TenantUnitScopeSheet({
+    required this.overview,
+    required this.selectedHome,
+  });
+
+  final TenantOverview overview;
+  final Home? selectedHome;
+
+  static Future<void> show(
+    BuildContext context, {
+    required TenantOverview overview,
+    required Home? selectedHome,
+  }) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) =>
+          _TenantUnitScopeSheet(overview: overview, selectedHome: selectedHome),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final homes = overview.homes;
+    final session = ref.watch(sessionProvider).valueOrNull;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Switch unit or portal',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Your selection updates your active context and is saved as your default.',
+              style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            if (homes.length > 1)
+              _TenantScopeOptionTile(
+                selected: selectedHome == null,
+                leading: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: dark
+                        ? HodiColors.lime.withValues(alpha: 0.16)
+                        : HodiColors.navy,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.dashboard_customize_outlined,
+                    size: 19,
+                    color: HodiColors.lime,
+                  ),
+                ),
+                title: 'All units (Consolidated)',
+                subtitle: '${homes.length} leased units combined',
+                trailingText: formatKes(overview.owed),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _switchTenantUnit(
+                    context,
+                    ref,
+                    home: null,
+                    fallbackTenantId: overview.tenantId,
+                  );
+                },
+              ),
+            for (final h in homes)
+              _TenantScopeOptionTile(
+                selected: selectedHome?.key == h.key,
+                leading: UnitBadge(h.unit),
+                title: '${h.unit} · ${h.property}',
+                subtitle: 'Rent ${formatKes(h.rent)} / mo',
+                trailingText: h.status,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _switchTenantUnit(
+                    context,
+                    ref,
+                    home: h,
+                    fallbackTenantId: overview.tenantId,
+                  );
+                },
+              ),
+            if (session != null &&
+                (session.isStaff ||
+                    session.isOwner ||
+                    session.tenantOf.length > 1)) ...[
+              const Divider(height: 20),
+              ListTile(
+                dense: true,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                leading: const Icon(Icons.swap_horiz_rounded, size: 20),
+                title: const Text(
+                  'Switch organisation or portal (Staff / Owner)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 18),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  AccountSheet.show(context);
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TenantScopeOptionTile extends StatelessWidget {
+  const _TenantScopeOptionTile({
+    required this.selected,
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    this.trailingText,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final String? trailingText;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected
+            ? HodiColors.lime.withValues(alpha: dark ? 0.14 : 0.12)
+            : scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? HodiColors.lime : scheme.outlineVariant,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                leading,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (trailingText != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    trailingText!,
+                    style: const TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  size: 20,
+                  color: selected
+                      ? (dark ? HodiColors.lime : HodiColors.navy)
+                      : scheme.outline,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
