@@ -32,6 +32,7 @@ class _StaffMaintenanceScreenState
       appBar: AppBar(title: const Text('Maintenance & repairs')),
       floatingActionButton: can(ref, 'maintenance:create')
           ? FloatingActionButton.extended(
+              heroTag: 'fab-maintenance',
               icon: const Icon(Icons.add),
               label: const Text('New request'),
               onPressed: () => _CreateMaintenanceSheet.show(context),
@@ -505,6 +506,7 @@ class StaffPropertiesScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Properties')),
       floatingActionButton: can(ref, 'properties:create')
           ? FloatingActionButton.extended(
+              heroTag: 'fab-properties',
               icon: const Icon(Icons.add),
               label: const Text('Add property'),
               onPressed: () => _CreatePropertySheet.show(context, ref),
@@ -783,8 +785,9 @@ class StaffChannelsScreen extends ConsumerWidget {
     final list = ref.watch(_allChannelsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Payment channels')),
-      floatingActionButton: can(ref, 'channels:create')
+      floatingActionButton: can(ref, 'channels:manage')
           ? FloatingActionButton.extended(
+              heroTag: 'fab-channels',
               icon: const Icon(Icons.add),
               label: const Text('Add channel'),
               onPressed: () => _addChannel(context, ref),

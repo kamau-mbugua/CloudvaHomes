@@ -77,6 +77,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       ),
       floatingActionButton: can(ref, 'expenses:create')
           ? FloatingActionButton.extended(
+              heroTag: 'fab-expenses',
               icon: const Icon(Icons.add),
               label: const Text('Add expense'),
               onPressed: () => context.push('/staff/more/expenses/new'),

@@ -66,6 +66,7 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
       title: 'Units',
       floatingActionButton: can(ref, 'units:create')
           ? FloatingActionButton.extended(
+              heroTag: 'fab-units',
               icon: const Icon(Icons.add),
               label: const Text('Add unit'),
               onPressed: () => _UnitFormSheet.show(context),

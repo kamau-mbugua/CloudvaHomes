@@ -33,6 +33,7 @@ class _TenantsScreenState extends ConsumerState<TenantsScreen> {
       title: 'Tenants',
       floatingActionButton: can(ref, 'tenants:create')
           ? FloatingActionButton.extended(
+              heroTag: 'fab-tenants',
               icon: const Icon(Icons.person_add_outlined),
               label: const Text('Add tenant'),
               onPressed: () => _TenantFormSheet.show(context),

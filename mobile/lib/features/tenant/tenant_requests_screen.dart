@@ -25,6 +25,7 @@ class TenantRequestsScreen extends ConsumerWidget {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab-tenant-requests',
         icon: const Icon(Icons.build_outlined),
         label: const Text('Report issue'),
         onPressed: () => _CreateTenantRequestSheet.show(context, tenantId),
