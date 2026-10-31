@@ -169,7 +169,10 @@ export class SessionsService {
       landlordId: record.landlordId ?? user.defaultLandlordId ?? null,
     };
     const refreshToken = await this.storeRefresh(record.userId, record.familyId, orgId, scope);
-    return { payload: await this.build(record.userId, orgId, record.familyId, scope), refreshToken };
+    return {
+      payload: await this.build(record.userId, orgId, record.familyId, scope),
+      refreshToken,
+    };
   }
 
   /** Same session (family), different organisation (and optional property). */
@@ -236,7 +239,7 @@ export class SessionsService {
       if (!prop) throw AppError.notFound('Property');
       const m = await this.prisma.membership.findFirst({
         where: { userId, orgId: prop.orgId, status: 'ACTIVE' },
-         include: { role: true },
+        include: { role: true },
       });
       if (m) {
         const isOwner = m.role.systemKey === 'OWNER';
