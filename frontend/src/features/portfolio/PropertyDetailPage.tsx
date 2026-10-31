@@ -7,6 +7,7 @@ import { useCan, useSession } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { keys, portfolioErrorMessage } from './api';
 import { OCCUPANCY, RECORD_STATUS, optionsOf } from './labels';
@@ -69,7 +70,7 @@ export function PropertyDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
-  if (property.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (property.isPending) return <CardSkeleton count={3} />;
   if (property.isError) {
     return (
       <div className="ph">
@@ -178,7 +179,7 @@ export function PropertyDetailPage() {
             </select>
           </div>
           {units.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(units.error)}</p>
-            : units.isPending ? <p className="ad__muted" role="status">Loading…</p>
+            : units.isPending ? <TableSkeleton />
               : rows.length === 0 ? (
                 q || occupancy
                   ? <EmptyState title="No units match" onClear={() => { setSearch(''); setOccupancy(''); setPage(1); }} />

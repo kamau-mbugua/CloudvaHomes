@@ -9,6 +9,7 @@ import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { UnitInvoices } from '../billing/InvoicesSection';
 import { DepositPanel } from '../payments/DepositPanel';
 import { MoveInSheet } from '../tenants/MoveInSheet';
@@ -59,7 +60,7 @@ export function UnitDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
-  if (unit.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (unit.isPending) return <CardSkeleton count={3} />;
   if (unit.isError) {
     return (
       <div className="ph">
@@ -215,7 +216,7 @@ export function UnitDetailPage() {
         <section className="fm__section">
           <div className="pf__sectionhead"><h2>History</h2></div>
           {history.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(history.error)}</p>
-            : history.isPending ? <p className="ad__muted" role="status">Loading…</p>
+            : history.isPending ? <TableSkeleton rows={2} />
               : rows.length === 0 ? <p className="ad__muted">No one has lived here yet.</p>
                 : <TenancyTable rows={rows} showUnit={false} />}
         </section>

@@ -11,6 +11,7 @@ import { calculateReading, formatQuantity, parseQuantity, trimQuantity } from '.
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { OPTIONS_PAGE_SIZE, keys as portfolioKeys } from '../portfolio/api';
 import { splitFormError } from '../portfolio/formErrors';
@@ -96,7 +97,7 @@ function ReadingsTab({ propertyId }: { propertyId: string }) {
   const period = filters.get('period') || thisMonth;
 
   if (charges.isError) return <p className="ad__error" role="alert">{billingErrorMessage(charges.error)}</p>;
-  if (charges.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (charges.isPending) return <TableSkeleton />;
   if (!charge) {
     return (
       <div className="ad__tablewrap">
@@ -127,7 +128,7 @@ function ReadingSheet({ propertyId, charge, period }: { propertyId: string; char
   });
 
   if (sheet.isError) return <p className="ad__error" role="alert">{billingErrorMessage(sheet.error)}</p>;
-  if (sheet.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (sheet.isPending) return <TableSkeleton />;
   if (sheet.data.length === 0) {
     return (
       <div className="ad__tablewrap">
@@ -393,7 +394,7 @@ function MetersTab({ propertyId }: { propertyId: string }) {
         {canCreate ? <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Add meter</button> : null}
       </div>
       {meters.isError ? <p className="ad__error" role="alert">{billingErrorMessage(meters.error)}</p>
-        : meters.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : meters.isPending ? <TableSkeleton />
           : rows.length === 0 ? (
             <div className="ad__tablewrap">
               <EmptyState title="No meters yet" detail="Add a meter for each unit on a metered charge so its readings can be billed."

@@ -285,6 +285,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       appBar: KodiHubAppBar(
         title: Text('${m.unitNumber} · ${m.chargeName}'),
         subtitle: 'Meter ${m.serialNo}',
+        loading: sheet.isLoading,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -296,6 +297,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 : const StatusChip('Pending', tone: Tone.warn),
             children: [
               FactRow('Meter', m.serialNo),
+              if (sheet.isLoading && row == null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: KodiHubSkeletonList(rows: 1, padding: EdgeInsets.zero),
+                ),
               if (row != null)
                 FactRow(
                   'Previous',
@@ -367,7 +373,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _saving ? null : () => _save(row),
-              child: Text(_saving ? 'Saving…' : 'Save reading'),
+              child: KodiHubButtonChild(
+                loading: _saving,
+                label: 'Save reading',
+                loadingLabel: 'Saving…',
+                tone: SpinnerTone.navy,
+              ),
             ),
           ],
           const SizedBox(height: 24),

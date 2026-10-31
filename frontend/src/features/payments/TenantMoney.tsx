@@ -7,6 +7,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { formatDay, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { personName } from '../portfolio/labels';
 import type { Tenancy, Tenant, TenantRef } from '../portfolio/types';
@@ -146,7 +147,7 @@ export function TenantPayments({ tenantId }: { tenantId: string }) {
         {total > rows.length ? <Link className="nx-btn nx-btn--sm" to={`/app/payments?tenantId=${encodeURIComponent(tenantId)}`}>See all</Link> : null}
       </div>
       {list.isError ? <p className="ad__error" role="alert">{paymentsErrorMessage(list.error)}</p>
-        : list.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : list.isPending ? <TableSkeleton rows={3} />
           : rows.length === 0 ? <p className="ad__muted">No payments yet.</p>
             : (
               <>
@@ -220,7 +221,7 @@ export function TenantStatement({ tenant }: { tenant: TenantRef }) {
 
       {rangeError ? <p className="ad__error" role="alert">{rangeError}</p>
         : statement.isError ? <p className="ad__error" role="alert">{paymentsErrorMessage(statement.error)}</p>
-          : statement.isPending || !s ? <p className="ad__muted" role="status">Loading…</p>
+          : statement.isPending || !s ? <TableSkeleton />
             : (
               <>
                 <div className="ad__stats pf__stats bl__stats">

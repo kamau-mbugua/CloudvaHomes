@@ -9,6 +9,8 @@ import '../../core/money.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/stk_sheet.dart';
 
+export '../../core/auth/session_controller.dart' show sessionProvider;
+
 /// Tenant portal (`/tenant/accounts/:id/*`, phase 7). Only the signed-in tenant's records.
 
 class TenantOverview {

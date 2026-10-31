@@ -7,6 +7,7 @@ import { useSession } from '../../lib/auth/useAuth';
 import { currentPeriod, formatPeriod, shiftPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { INVOICE_STATUS } from '../billing/labels';
@@ -99,7 +100,7 @@ export function AdminInvoicesPage() {
 
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
 
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
+      {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered
             ? <EmptyState title="No invoices match" detail="Try a different month or status." onClear={() => filters.clear()} />

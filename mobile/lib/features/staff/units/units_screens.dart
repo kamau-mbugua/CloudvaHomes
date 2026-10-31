@@ -300,14 +300,18 @@ class _CurrentTenancy extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = u.tenancy!;
-    final tenancy = can(ref, 'tenancies:view')
-        ? ref.watch(tenancyProvider(t.id)).valueOrNull
+    final tenancyAsync = can(ref, 'tenancies:view')
+        ? ref.watch(tenancyProvider(t.id))
         : null;
+    final tenancy = tenancyAsync?.valueOrNull;
     final canTenants = can(ref, 'tenants:view');
-    final tenant = canTenants
-        ? ref.watch(tenantProvider(t.tenant.id)).valueOrNull
+    final tenantAsync = canTenants
+        ? ref.watch(tenantProvider(t.tenant.id))
         : null;
+    final tenant = tenantAsync?.valueOrNull;
     final balance = tenant?.balance;
+    final loadingDetails =
+        (tenancyAsync?.isLoading ?? false) || (tenantAsync?.isLoading ?? false);
     return SectionCard(
       title: 'Current tenancy',
       trailing: t.status == 'NOTICE'
@@ -326,6 +330,11 @@ class _CurrentTenancy extends ConsumerWidget {
         ),
         FactRow('Moved in', formatDay(t.startDate)),
         if (t.endDate != null) FactRow('Moving out', formatDay(t.endDate)),
+        if (loadingDetails && tenancy == null && balance == null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            child: KodiHubSkeletonList(rows: 1, padding: EdgeInsets.zero),
+          ),
         if (tenancy != null) ...[
           FactRow('Rent', formatKes(tenancy.rentAmount)),
           FactRow('Billed on day', '${tenancy.billingDay}'),
@@ -503,8 +512,8 @@ class _UnitFormSheetState extends ConsumerState<_UnitFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final properties =
-        ref.watch(propertiesProvider).valueOrNull ?? const <PropertyOption>[];
+    final propertiesAsync = ref.watch(propertiesProvider);
+    final properties = propertiesAsync.valueOrNull ?? const <PropertyOption>[];
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -528,7 +537,12 @@ class _UnitFormSheetState extends ConsumerState<_UnitFormSheet> {
                     _propertyId ??
                     (properties.length == 1 ? properties.first.id : null),
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Property'),
+                decoration: InputDecoration(
+                  labelText: 'Property',
+                  helperText: propertiesAsync.isLoading
+                      ? 'Loading properties…'
+                      : null,
+                ),
                 items: [
                   for (final p in properties)
                     DropdownMenuItem(value: p.id, child: Text(p.name)),
@@ -578,7 +592,12 @@ class _UnitFormSheetState extends ConsumerState<_UnitFormSheet> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _saving ? null : () => _save(properties),
-              child: Text(_saving ? 'Saving…' : 'Save unit'),
+              child: KodiHubButtonChild(
+                loading: _saving,
+                label: 'Save unit',
+                loadingLabel: 'Saving…',
+                tone: SpinnerTone.navy,
+              ),
             ),
           ],
         ),
@@ -765,7 +784,12 @@ class _MoveInSheetState extends ConsumerState<_MoveInSheet> {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'Moving in…' : 'Confirm move-in'),
+              child: KodiHubButtonChild(
+                loading: _saving,
+                label: 'Confirm move-in',
+                loadingLabel: 'Moving in…',
+                tone: SpinnerTone.navy,
+              ),
             ),
           ],
         ),

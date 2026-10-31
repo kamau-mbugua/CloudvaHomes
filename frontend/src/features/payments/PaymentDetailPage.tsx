@@ -9,6 +9,7 @@ import { formatKES } from '../../lib/money';
 import { formatPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { INVOICE_KIND } from '../billing/labels';
 import { splitFormError } from '../portfolio/formErrors';
@@ -50,7 +51,7 @@ export function PaymentDetailPage() {
     enabled: Boolean(payment.data?.reversesId),
   });
 
-  if (payment.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (payment.isPending) return <CardSkeleton count={3} />;
   if (payment.isError) {
     return (
       <div className="ph">

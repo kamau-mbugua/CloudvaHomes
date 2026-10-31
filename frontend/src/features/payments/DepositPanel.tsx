@@ -7,6 +7,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { formatDateTime } from '../../lib/dates';
 import { formatKES, minorToInput, parseAmount } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { splitFormError } from '../portfolio/formErrors';
 import { optional } from '../portfolio/forms';
@@ -61,7 +62,7 @@ export function DepositPanel({ tenancy, owed, who }: {
         ) : null}
       </div>
       {deposit.isError ? <p className="ad__error" role="alert">{paymentsErrorMessage(deposit.error)}</p>
-        : deposit.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : deposit.isPending ? <TableSkeleton rows={2} />
           : !d || d.transactions.length === 0 ? <p className="ad__muted">No deposit recorded.</p>
             : (
               <div className="ad__tablewrap">

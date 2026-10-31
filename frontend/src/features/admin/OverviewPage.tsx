@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom';
+import { CardSkeleton } from '../../components/Loading';
 import { formatKES } from '../../lib/money';
 import { formatPeriod } from '../../lib/periods';
 import { platformErrorMessage, usePlatformStats } from '../platform/api';
@@ -32,7 +33,7 @@ export function OverviewPage() {
     );
   };
 
-  if (stats.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (stats.isPending) return <CardSkeleton count={4} />;
   if (stats.isError) return <div className="pg"><p className="ad__error" role="alert">{platformErrorMessage(stats.error)}</p></div>;
   const s = stats.data;
 

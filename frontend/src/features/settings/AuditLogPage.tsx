@@ -7,6 +7,7 @@ import { displayName } from '../../lib/auth/permissions';
 import type { AuditEntry } from '../../lib/auth/types';
 import { formatDateTime, nairobiDayBoundary } from '../../lib/dates';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { keys, settingsErrorMessage } from './api';
 
@@ -95,7 +96,7 @@ export function AuditLogPage() {
       {list.isError ? <p className="ad__error" role="alert">{settingsErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (

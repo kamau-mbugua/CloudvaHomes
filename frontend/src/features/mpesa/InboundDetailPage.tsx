@@ -9,6 +9,7 @@ import { formatDateTime } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { AllocationEditor } from '../payments/AllocationEditor';
 import { useAllocationDraft } from '../payments/useAllocationDraft';
@@ -40,7 +41,7 @@ export function InboundDetailPage() {
   const [tab, setTab] = useState<'details' | 'suggestions' | 'raw'>('details');
   const inbound = useInboundDetail(inboundId);
 
-  if (inbound.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (inbound.isPending) return <CardSkeleton count={3} />;
   if (inbound.isError) {
     return (
       <div className="ph">

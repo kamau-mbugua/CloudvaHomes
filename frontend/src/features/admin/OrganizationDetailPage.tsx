@@ -10,6 +10,7 @@ import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { unwrap } from '../payments/rules';
 import { Breadcrumbs, Fact, Field } from '../portfolio/ui';
@@ -33,7 +34,7 @@ export function OrganizationDetailPage() {
     queryFn: () => api.get<unknown>(`/platform/organizations/${encodeURIComponent(organizationId)}`).then((body) => unwrap<PlatformOrganization>(body)),
   });
 
-  if (org.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (org.isPending) return <CardSkeleton count={3} />;
   if (org.isError) {
     return (
       <div className="ph">
@@ -313,7 +314,7 @@ function OrgInvoices({ orgId, superAdmin }: { orgId: string; superAdmin: boolean
     <section className="ad__section" aria-labelledby="oi-title">
       <div className="pf__sectionhead"><h2 id="oi-title">KodiHub invoices</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
+      {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap"><EmptyState title="No invoices yet" detail="Months in the trial aren’t billed. Run a month from Invoices." /></div>
       ) : (
         <HodiInvoicesTable rows={rows} actions={(inv) => <AdminInvoiceActions invoice={inv} onVoid={superAdmin ? setVoiding : undefined} />} />
@@ -337,7 +338,7 @@ function OrgPayments({ orgId }: { orgId: string }) {
     <section className="ad__section" aria-labelledby="op-title">
       <div className="pf__sectionhead"><h2 id="op-title">Payments</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
+      {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap"><EmptyState title="No payments yet" /></div>
       ) : <PlatformPaymentsTable rows={rows} />}
       <Pager meta={list.data?.meta} onPage={setPage} />

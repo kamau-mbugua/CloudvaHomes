@@ -6,6 +6,7 @@ import type { PageEnvelope } from '../../lib/api/types';
 import { useCan } from '../../lib/auth/useAuth';
 import { currentPeriod, formatPeriod, shiftPeriod } from '../../lib/periods';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { useListFilters } from '../portfolio/hooks';
 import { optionsOf } from '../portfolio/labels';
@@ -84,7 +85,7 @@ export function InvoicesPage() {
       {list.isError ? <p className="ad__error" role="alert">{billingErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (

@@ -5,6 +5,7 @@ import { formatDay, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { currentPeriod, formatPeriod, isPeriod } from '../../lib/periods';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton } from '../../components/Loading';
 import { ORG_NAV, entriesOf, filterNav } from '../../app/navigation';
 import { MonthPicker } from '../billing/ui';
 import { SignedAmount } from '../payments/ui';
@@ -63,7 +64,7 @@ function DashboardFigures() {
       </div>
 
       {dashboard.isError ? <p className="ad__error" role="alert">{reportsErrorMessage(dashboard.error)}</p> : null}
-      {dashboard.isPending ? <p className="ad__muted" role="status">Loading…</p> : null}
+      {dashboard.isPending ? <CardSkeleton count={4} /> : null}
       {dashboard.data ? <Figures data={dashboard.data} period={period} /> : null}
     </div>
   );

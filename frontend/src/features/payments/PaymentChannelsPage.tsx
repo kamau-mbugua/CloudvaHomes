@@ -6,6 +6,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { portfolioErrorMessage, usePropertyOptions } from '../portfolio/api';
 import { splitFormError } from '../portfolio/formErrors';
@@ -121,7 +122,7 @@ export function PaymentChannelsPage() {
           </div>
 
           {channels.isError ? <p className="ad__error" role="alert">{paymentsErrorMessage(channels.error)}</p>
-            : channels.isPending ? <p className="ad__muted" role="status">Loading…</p>
+            : channels.isPending ? <TableSkeleton />
               : rows.length === 0 ? (
                 <div className="ad__tablewrap">
                   {status ? (

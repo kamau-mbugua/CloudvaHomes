@@ -8,6 +8,7 @@ import { formatDateTime, formatDay, todayInNairobi } from '../../lib/dates';
 import { currentPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { SignedAmount } from '../payments/ui';
@@ -240,7 +241,7 @@ export function LedgerTab({ landlord, account }: { landlord: LandlordBasics; acc
 
       {rangeError ? <p className="ad__error" role="alert">{rangeError}</p>
         : ledger.isError ? <p className="ad__error" role="alert">{agencyErrorMessage(ledger.error)}</p>
-          : ledger.isPending ? <p className="ad__muted" role="status">Loading…</p>
+          : ledger.isPending ? <TableSkeleton />
             : rows.length === 0 ? <p className="ad__muted">Nothing in this part of the ledger{from || to ? ' for these dates' : ' yet'}.</p>
               : (
                 <div className="ad__tablewrap">
@@ -386,7 +387,7 @@ export function StatementTab({ landlord }: { landlord: LandlordBasics }) {
         onDownload={() => downloadLandlordStatement(landlord, range)} />
       {rangeError ? <p className="ad__error" role="alert">{rangeError}</p>
         : statement.isError && !statement.data ? <p className="ad__error" role="alert">{agencyErrorMessage(statement.error)}</p>
-          : statement.isPending || !statement.data ? <p className="ad__muted" role="status">Loading…</p>
+          : statement.isPending || !statement.data ? <TableSkeleton />
             : <StatementView statement={statement.data} />}
     </section>
   );

@@ -9,6 +9,7 @@ import { formatKES } from '../../lib/money';
 import { formatPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { InvoiceBadges } from '../billing/ui';
@@ -31,7 +32,7 @@ import { CopyRow, CustomBadge, HodiInvoicesTable, OrgStatusBadge, PlatformPaymen
 export function PlanBillingPage() {
   const summary = useBillingSummary();
 
-  if (summary.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (summary.isPending) return <CardSkeleton count={3} />;
   if (summary.isError) return <div className="pg"><p className="ad__error" role="alert">{platformErrorMessage(summary.error)}</p></div>;
   return <PlanBilling summary={summary.data} />;
 }
@@ -200,7 +201,7 @@ function InvoicesSection() {
     <section className="ad__section" aria-labelledby="hb-invoices">
       <div className="pf__sectionhead"><h2 id="hb-invoices">KodiHub invoices</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
+      {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap"><EmptyState title="No KodiHub invoices yet" detail="Your first one comes on the 1st after your trial ends." /></div>
       ) : (
         <HodiInvoicesTable
@@ -260,7 +261,7 @@ function InvoiceDetailSheet({ invoice, onClose }: { invoice: PlatformInvoice; on
           <Fact label="Due">{formatDayish(inv.dueDate)}</Fact>
         </dl>
         <h3 className="ad__h2">Paid by</h3>
-        {detail.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        {detail.isPending ? <TableSkeleton rows={2} />
           : detail.isError ? <p className="ad__error" role="alert">{platformErrorMessage(detail.error)}</p>
             : payments.length === 0 ? <p className="ad__muted">Nothing paid on it yet.</p>
               : <PlatformPaymentsTable rows={payments} />}
@@ -282,7 +283,7 @@ function PaymentsSection() {
     <section className="ad__section" aria-labelledby="hb-payments">
       <div className="pf__sectionhead"><h2 id="hb-payments">Payments to KodiHub</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
+      {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap"><EmptyState title="No payments yet" detail="Payments by M-Pesa or bank show here once KodiHub receives them." /></div>
       ) : <PlatformPaymentsTable rows={rows} />}
       <Pager meta={list.data?.meta} onPage={setPage} />

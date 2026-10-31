@@ -172,7 +172,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           const SizedBox(height: 12),
           FilledButton(
             onPressed: (_busy || _resending) ? null : _verifyTwoFactor,
-            child: Text(_busy ? 'Verifying…' : 'Verify & sign in'),
+            child: KodiHubButtonChild(
+              loading: _busy,
+              label: 'Verify & sign in',
+              loadingLabel: 'Verifying…',
+              tone: SpinnerTone.navy,
+            ),
           ),
         ],
       );
@@ -237,7 +242,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         if (_error != null) ...[ErrorBox(_error!), const SizedBox(height: 12)],
         FilledButton(
           onPressed: _busy ? null : _submit,
-          child: Text(_busy ? 'Signing in…' : 'Sign in'),
+          child: KodiHubButtonChild(
+            loading: _busy,
+            label: 'Sign in',
+            loadingLabel: 'Signing in…',
+            tone: SpinnerTone.navy,
+          ),
         ),
         const SizedBox(height: 24),
         Row(

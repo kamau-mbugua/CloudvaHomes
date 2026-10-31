@@ -9,6 +9,7 @@ import { currentPeriod, formatPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { OPTIONS_PAGE_SIZE, keys as portfolioKeys } from '../portfolio/api';
 import { splitFormError } from '../portfolio/formErrors';
@@ -138,7 +139,7 @@ function RecurringTab({ propertyId }: { propertyId: string }) {
       </div>
 
       {charges.isError ? <p className="ad__error" role="alert">{billingErrorMessage(charges.error)}</p>
-        : charges.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : charges.isPending ? <TableSkeleton />
           : rows.length === 0 ? (
             <div className="ad__tablewrap">
               <EmptyState title="No recurring charges" detail="Add garbage, service charge, water or power — anything billed monthly besides rent."
@@ -368,7 +369,7 @@ function MoveInTab({ propertyId }: { propertyId: string }) {
       </div>
 
       {charges.isError ? <p className="ad__error" role="alert">{billingErrorMessage(charges.error)}</p>
-        : charges.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : charges.isPending ? <TableSkeleton />
           : rows.length === 0 ? (
             <div className="ad__tablewrap">
               <EmptyState title="No move-in charges" detail="Add the deposit and any one-off fees new tenants pay, so moving someone in can bill them."
@@ -559,7 +560,7 @@ function VariableTab({ propertyId }: { propertyId: string }) {
   const period = filters.get('period') || currentPeriod();
 
   if (variable.isError) return <p className="ad__error" role="alert">{billingErrorMessage(variable.error)}</p>;
-  if (variable.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (variable.isPending) return <TableSkeleton />;
   if (choices.length === 0) {
     return (
       <div className="ad__tablewrap">
@@ -589,7 +590,7 @@ function VariableGrid({ chargeTypeId, period }: { chargeTypeId: string; period: 
   });
 
   if (grid.isError) return <p className="ad__error" role="alert">{billingErrorMessage(grid.error)}</p>;
-  if (grid.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (grid.isPending) return <TableSkeleton />;
   if (grid.data.length === 0) {
     return <div className="ad__tablewrap"><EmptyState title="No units" detail="This charge applies to no units yet. Edit the charge to choose them." /></div>;
   }

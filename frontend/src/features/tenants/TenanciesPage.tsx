@@ -4,6 +4,7 @@ import { api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
 import { useCan } from '../../lib/auth/useAuth';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { keys, portfolioErrorMessage, usePropertyOptions } from '../portfolio/api';
 import { TENANCY_STATUS, optionsOf } from '../portfolio/labels';
@@ -66,7 +67,7 @@ export function TenanciesPage() {
       {list.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (

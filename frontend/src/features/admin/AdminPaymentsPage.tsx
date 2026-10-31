@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { useListFilters } from '../portfolio/hooks';
 import { PAGE_SIZE, keys, platformErrorMessage } from '../platform/api';
@@ -36,7 +37,7 @@ export function AdminPaymentsPage() {
 
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
 
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
+      {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           <EmptyState
             title="No KodiHub payments yet"

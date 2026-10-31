@@ -1,9 +1,21 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
 import '../theme.dart';
+
+/// Returns true when loader animations should run continuously.
+/// Stops motion under OS reduced-motion settings (§08) and inside widget tests
+/// so `tester.pumpAndSettle()` never hangs on infinite animations.
+bool shouldAnimateLoaders(BuildContext context) {
+  if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return false;
+  final binding = WidgetsBinding.instance.runtimeType.toString();
+  if (binding.contains('Test')) return false;
+  return true;
+}
 
 /// C2.1 AppBar (`#002B4D` navy + `3dp` `#84BD00` bottom stripe) used across Staff, Tenant, and Owner shells (§06 Mobile).
 class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -14,6 +26,7 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.leading,
     this.actions,
     this.bottom,
+    this.loading = false,
   });
 
   final Widget title;
@@ -21,6 +34,7 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? leading;
   final List<Widget>? actions;
   final PreferredSizeWidget? bottom;
+  final bool loading;
 
   @override
   Size get preferredSize =>
@@ -60,15 +74,18 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ?bottom,
-            SizedBox(
-              height: 3,
-              width: double.infinity,
-              child: ColoredBox(
-                color: bottom == null
-                    ? HodiColors.lime
-                    : HodiColors.lime.withValues(alpha: 0.35),
+            if (loading)
+              const KodiHubTopBarProgress()
+            else
+              SizedBox(
+                height: 3,
+                width: double.infinity,
+                child: ColoredBox(
+                  color: bottom == null
+                      ? HodiColors.lime
+                      : HodiColors.lime.withValues(alpha: 0.35),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -354,19 +371,572 @@ class AsyncBody<T> extends StatelessWidget {
     required this.value,
     required this.data,
     this.onRetry,
+    this.loading,
   });
   final AsyncValue<T> value;
   final Widget Function(T data) data;
   final VoidCallback? onRetry;
+  final Widget? loading;
 
   @override
   Widget build(BuildContext context) => value.when(
     skipLoadingOnRefresh: true,
     skipLoadingOnReload: true,
     data: data,
-    loading: () => const Center(child: CircularProgressIndicator()),
+    loading: () => loading ?? const KodiHubPageLoader(),
     error: (e, _) => ErrorState(message: messageOf(e), onRetry: onRetry),
   );
+}
+
+// ───────────────────────────────────────────── §08 Loading and waiting elements
+
+enum SpinnerTone { light, navy, money }
+
+/// Pattern 2 — Inline ring spinner (§08 Loading and waiting).
+/// - [SpinnerTone.light]: `#ECE9E0` track + `#4D6B10` arc (or `#84BD00` in dark mode)
+/// - [SpinnerTone.navy]: `rgba(255,255,255,0.20)` track + `#84BD00` arc
+/// - [SpinnerTone.money]: `rgba(0,43,77,0.25)` track + `#002B4D` arc (inside `#84BD00` buttons)
+class KodiHubSpinner extends StatefulWidget {
+  const KodiHubSpinner({
+    super.key,
+    this.size = 28,
+    this.tone = SpinnerTone.light,
+  });
+
+  final double size;
+  final SpinnerTone tone;
+
+  @override
+  State<KodiHubSpinner> createState() => _KodiHubSpinnerState();
+}
+
+class _KodiHubSpinnerState extends State<KodiHubSpinner>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _ctrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    final animate = shouldAnimateLoaders(context);
+    if (animate && _ctrl == null) {
+      _ctrl = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 900),
+      )..repeat();
+    } else if (!animate && _ctrl != null) {
+      _ctrl?.dispose();
+      _ctrl = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final (track, arc) = switch (widget.tone) {
+      SpinnerTone.navy => (
+        Colors.white.withValues(alpha: 0.20),
+        HodiColors.lime,
+      ),
+      SpinnerTone.money => (
+        HodiColors.navy.withValues(alpha: 0.25),
+        HodiColors.navy,
+      ),
+      SpinnerTone.light =>
+        dark
+            ? (Colors.white.withValues(alpha: 0.16), HodiColors.lime)
+            : (HodiColors.muted, HodiColors.limeText),
+    };
+    final ctrl = _ctrl;
+    if (ctrl == null) {
+      return CustomPaint(
+        size: Size.square(widget.size),
+        painter: _SpinnerPainter(track: track, arc: arc, angle: 0),
+      );
+    }
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (_, _) => CustomPaint(
+        size: Size.square(widget.size),
+        painter: _SpinnerPainter(
+          track: track,
+          arc: arc,
+          angle: ctrl.value * 2 * math.pi,
+        ),
+      ),
+    );
+  }
+}
+
+class _SpinnerPainter extends CustomPainter {
+  const _SpinnerPainter({
+    required this.track,
+    required this.arc,
+    required this.angle,
+  });
+
+  final Color track;
+  final Color arc;
+  final double angle;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = (size.width * (5.0 / 44.0)).clamp(2.2, 5.5);
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - stroke) / 2;
+
+    final trackPaint = Paint()
+      ..color = track
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    final arcPaint = Paint()
+      ..color = arc
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2 + angle,
+      math.pi / 2,
+      false,
+      arcPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpinnerPainter oldDelegate) =>
+      oldDelegate.angle != angle ||
+      oldDelegate.track != track ||
+      oldDelegate.arc != arc;
+}
+
+/// Inline button label that locks with a 16dp [KodiHubSpinner] when [loading] is true (§08).
+class KodiHubButtonChild extends StatelessWidget {
+  const KodiHubButtonChild({
+    super.key,
+    required this.loading,
+    required this.label,
+    required this.loadingLabel,
+    this.tone = SpinnerTone.navy,
+  });
+
+  final bool loading;
+  final String label;
+  final String loadingLabel;
+  final SpinnerTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!loading) return Text(label);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        KodiHubSpinner(size: 16, tone: tone),
+        const SizedBox(width: 10),
+        Text(loadingLabel),
+      ],
+    );
+  }
+}
+
+/// Pattern 3 — Warm muted skeleton block with soft shimmer (`#ECE9E0` → `#F6F4EF` → `#ECE9E0`).
+class KodiHubSkeletonBox extends StatefulWidget {
+  const KodiHubSkeletonBox({
+    super.key,
+    this.width,
+    required this.height,
+    this.radius = 999,
+  });
+
+  final double? width;
+  final double height;
+  final double radius;
+
+  @override
+  State<KodiHubSkeletonBox> createState() => _KodiHubSkeletonBoxState();
+}
+
+class _KodiHubSkeletonBoxState extends State<KodiHubSkeletonBox>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _ctrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animate = shouldAnimateLoaders(context);
+    if (animate && _ctrl == null) {
+      _ctrl = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1400),
+      )..repeat();
+    } else if (!animate && _ctrl != null) {
+      _ctrl?.dispose();
+      _ctrl = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final base = dark ? const Color(0xFF13263B) : HodiColors.muted;
+    final hi = dark ? const Color(0xFF1D3652) : const Color(0xFFF6F4EF);
+    final ctrl = _ctrl;
+    if (ctrl == null) {
+      return Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: base,
+          borderRadius: BorderRadius.circular(widget.radius),
+        ),
+      );
+    }
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (_, _) {
+        final shift = (ctrl.value * 2) - 1;
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.radius),
+            gradient: LinearGradient(
+              begin: Alignment(shift - 1, 0),
+              end: Alignment(shift + 1, 0),
+              colors: [base, hi, base],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Pattern 3 — Single list row skeleton (`36×36` rounded-`10dp` badge + two pill lines + right pill).
+class KodiHubSkeletonRow extends StatelessWidget {
+  const KodiHubSkeletonRow({super.key, this.even = true});
+  final bool even;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Row(
+      children: [
+        const KodiHubSkeletonBox(width: 36, height: 36, radius: 10),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FractionallySizedBox(
+                widthFactor: even ? 0.70 : 0.60,
+                child: const KodiHubSkeletonBox(height: 10),
+              ),
+              const SizedBox(height: 6),
+              FractionallySizedBox(
+                widthFactor: even ? 0.45 : 0.35,
+                child: const KodiHubSkeletonBox(height: 8),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        const KodiHubSkeletonBox(width: 60, height: 18, radius: 999),
+      ],
+    ),
+  );
+}
+
+/// Pattern 3 — List skeleton card/section used while paged or section lists load.
+class KodiHubSkeletonList extends StatelessWidget {
+  const KodiHubSkeletonList({
+    super.key,
+    this.rows = 4,
+    this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  });
+
+  final int rows;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: padding,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < rows; i++) KodiHubSkeletonRow(even: i.isEven),
+      ],
+    ),
+  );
+}
+
+/// Pattern 3 — Summary/KPI card skeleton.
+class KodiHubSkeletonCard extends StatelessWidget {
+  const KodiHubSkeletonCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FractionallySizedBox(
+            widthFactor: 0.42,
+            child: KodiHubSkeletonBox(height: 10),
+          ),
+          SizedBox(height: 12),
+          FractionallySizedBox(
+            widthFactor: 0.68,
+            child: KodiHubSkeletonBox(height: 24, radius: 8),
+          ),
+          SizedBox(height: 10),
+          FractionallySizedBox(
+            widthFactor: 0.52,
+            child: KodiHubSkeletonBox(height: 10),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Default page-level loader used by [AsyncBody] (§08 Pattern 3).
+class KodiHubPageLoader extends StatelessWidget {
+  const KodiHubPageLoader({super.key});
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    physics: const NeverScrollableScrollPhysics(),
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const KodiHubSkeletonCard(),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: KodiHubSkeletonList(rows: 4, padding: EdgeInsets.zero),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Pattern 4 — Determinate progress bar for batch operations (§08).
+class KodiHubBatchProgress extends StatelessWidget {
+  const KodiHubBatchProgress({
+    super.key,
+    required this.title,
+    required this.completed,
+    required this.total,
+    this.subtitle,
+  });
+
+  final String title;
+  final int completed;
+  final int total;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final ratio = total > 0 ? (completed / total).clamp(0.0, 1.0) : 0.0;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '$completed of $total',
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 8,
+                backgroundColor: HodiColors.muted,
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  HodiColors.lime,
+                ),
+              ),
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                subtitle!,
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pattern 5 — 3dp lime indeterminate top-bar route progress (§08).
+class KodiHubTopBarProgress extends StatefulWidget {
+  const KodiHubTopBarProgress({super.key});
+
+  @override
+  State<KodiHubTopBarProgress> createState() => _KodiHubTopBarProgressState();
+}
+
+class _KodiHubTopBarProgressState extends State<KodiHubTopBarProgress>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _ctrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animate = shouldAnimateLoaders(context);
+    if (animate && _ctrl == null) {
+      _ctrl = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1300),
+      )..repeat();
+    } else if (!animate && _ctrl != null) {
+      _ctrl?.dispose();
+      _ctrl = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctrl = _ctrl;
+    return SizedBox(
+      height: 3,
+      width: double.infinity,
+      child: ColoredBox(
+        color: HodiColors.limeSoft,
+        child: ctrl == null
+            ? Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: 0.4,
+                  child: Container(color: HodiColors.lime),
+                ),
+              )
+            : AnimatedBuilder(
+                animation: ctrl,
+                builder: (_, _) => FractionalTranslation(
+                  translation: Offset(-1.0 + (ctrl.value * 2.4), 0),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: 0.4,
+                    child: Container(color: HodiColors.lime),
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Pattern 6 — Pulsing 10dp `#84BD00` dot with 5dp `#EEF6DB` halo for pending M-Pesa STK waits (§08).
+class KodiHubPulseDot extends StatefulWidget {
+  const KodiHubPulseDot({super.key});
+
+  @override
+  State<KodiHubPulseDot> createState() => _KodiHubPulseDotState();
+}
+
+class _KodiHubPulseDotState extends State<KodiHubPulseDot>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _ctrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animate = shouldAnimateLoaders(context);
+    if (animate && _ctrl == null) {
+      _ctrl = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1400),
+      )..repeat(reverse: true);
+    } else if (!animate && _ctrl != null) {
+      _ctrl?.dispose();
+      _ctrl = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dot = Container(
+      width: 10,
+      height: 10,
+      decoration: const BoxDecoration(
+        color: HodiColors.lime,
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: HodiColors.limeSoft, spreadRadius: 5)],
+      ),
+    );
+    final ctrl = _ctrl;
+    if (ctrl == null) return dot;
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (_, _) =>
+          Opacity(opacity: 0.35 + (0.65 * (1.0 - ctrl.value)), child: dot),
+    );
+  }
 }
 
 class ErrorState extends StatelessWidget {

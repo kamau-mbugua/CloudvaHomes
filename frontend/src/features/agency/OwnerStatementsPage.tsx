@@ -1,4 +1,5 @@
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { currentPeriod, isPeriod } from '../../lib/periods';
 import { useLandlordOptions } from '../portfolio/api';
 import { useListFilters } from '../portfolio/hooks';
@@ -39,7 +40,7 @@ export function OwnerStatementsPage() {
         </div>
       ) : rangeError ? <p className="ad__error" role="alert">{rangeError}</p>
         : statement.isError && !statement.data ? <p className="ad__error" role="alert">{agencyErrorMessage(statement.error)}</p>
-          : statement.isPending || !statement.data ? <p className="ad__muted" role="status">Loading…</p>
+          : statement.isPending || !statement.data ? <TableSkeleton />
             : <StatementView statement={statement.data} />}
     </div>
   );

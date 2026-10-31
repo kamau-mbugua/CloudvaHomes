@@ -7,6 +7,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { fetchIdNumber, keys, portfolioErrorMessage } from '../portfolio/api';
 import { LANDLORD_KIND, RECORD_STATUS } from '../portfolio/labels';
 import { PropertySheet } from '../portfolio/PropertySheet';
@@ -67,7 +68,7 @@ export function LandlordDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
-  if (landlord.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (landlord.isPending) return <CardSkeleton count={3} />;
   if (landlord.isError) {
     return (
       <div className="ph">
@@ -126,7 +127,7 @@ export function LandlordDetailPage() {
             <PortalCard landlord={l} account={account.data} />
           </div>
         ) : (
-          <p className="ad__muted" role="status">Loading payout and portal settings…</p>
+          <CardSkeleton count={2} label="Loading payout and portal settings…" />
         )
       ) : null}
 
@@ -134,7 +135,7 @@ export function LandlordDetailPage() {
         <section className="fm__section">
           <div className="pf__sectionhead"><h2>Properties</h2></div>
           {properties.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(properties.error)}</p>
-            : properties.isPending ? <p className="ad__muted" role="status">Loading…</p>
+            : properties.isPending ? <TableSkeleton />
               : rows.length === 0 ? <p className="ad__muted">No properties yet.</p>
                 : (
                   <div className="ad__tablewrap">

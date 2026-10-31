@@ -306,7 +306,12 @@ class _StkPaySheetState extends State<StkPaySheet> {
               FilledButton(
                 style: KodiHubButtonStyles.money(height: 54),
                 onPressed: _sending ? null : _send,
-                child: Text(_sending ? 'Sending…' : 'Send M-Pesa prompt'),
+                child: KodiHubButtonChild(
+                  loading: _sending,
+                  label: 'Send M-Pesa prompt',
+                  loadingLabel: 'Sending STK…',
+                  tone: SpinnerTone.money,
+                ),
               ),
             ] else
               _StatusView(
@@ -457,17 +462,9 @@ class _StatusView extends StatelessWidget {
         Row(
           children: [
             if (status.pending)
-              Container(
-                width: 12,
-                height: 12,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: const BoxDecoration(
-                  color: HodiColors.lime,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: HodiColors.limeSoft, spreadRadius: 5),
-                  ],
-                ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: KodiHubPulseDot(),
               )
             else
               Icon(icon, size: 28, color: toneColor(context, tone)),

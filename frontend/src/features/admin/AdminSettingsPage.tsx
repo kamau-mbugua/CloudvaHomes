@@ -5,6 +5,7 @@ import { ApiError, api } from '../../lib/api/client';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { CallbackUrl } from '../mpesa/DarajaPanel';
 import { DARAJA_ENV } from '../mpesa/labels';
@@ -61,7 +62,7 @@ export function AdminSettingsPage() {
       : 'billing';
   const settings = usePlatformSettings();
 
-  if (settings.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (settings.isPending) return <CardSkeleton count={3} />;
   if (settings.isError) return <div className="pg"><p className="ad__error" role="alert">{platformErrorMessage(settings.error)}</p></div>;
 
   const s = settings.data;
@@ -439,7 +440,7 @@ function SecurityLocksSection() {
       </p>
 
       {locks.isPending ? (
-        <p className="ad__muted">Loading…</p>
+        <TableSkeleton rows={2} />
       ) : rows.length === 0 ? (
         <EmptyState title="No active lockouts" detail="No accounts or IP addresses are currently throttled." />
       ) : (

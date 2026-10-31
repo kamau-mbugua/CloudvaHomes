@@ -4,6 +4,7 @@ import { api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
 import { formatKES } from '../../lib/money';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { useListFilters } from '../portfolio/hooks';
 import { optionsOf } from '../portfolio/labels';
@@ -67,7 +68,7 @@ export function OrganizationsPage() {
 
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
 
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !list.isError ? (
+      {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered
             ? <EmptyState title="No organisations match" detail="Try a different search, or clear the filters." onClear={() => filters.clear()} />

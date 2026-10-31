@@ -34,7 +34,11 @@ class TenantStatementScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final id = ref.watch(currentTenantIdProvider);
-    if (id == null) return const SizedBox.shrink();
+    if (id == null) {
+      return ref.watch(sessionProvider).isLoading
+          ? const KodiHubPageLoader()
+          : const SizedBox.shrink();
+    }
     final choice = ref.watch(statementRangeProvider);
     final range = rangeFor(choice, DateTime.now());
     final statement = ref.watch(tenantStatementProvider(range));

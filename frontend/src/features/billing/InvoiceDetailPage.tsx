@@ -11,6 +11,7 @@ import { formatPeriod } from '../../lib/periods';
 import { trimQuantity } from '../../lib/quantity';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { splitFormError } from '../portfolio/formErrors';
 import { useForm } from '../portfolio/hooks';
@@ -54,7 +55,7 @@ export function InvoiceDetailPage() {
     queryFn: () => api.get<DataEnvelope<InvoiceDetail>>(`/invoices/${invoiceId}`).then((r) => r.data),
   });
 
-  if (invoice.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (invoice.isPending) return <CardSkeleton count={3} />;
   if (invoice.isError) {
     return (
       <div className="ph">

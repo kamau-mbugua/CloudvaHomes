@@ -22,7 +22,11 @@ class TenantRequestsScreen extends ConsumerWidget {
     final tenantId = ref.watch(currentTenantIdProvider);
     final api = ref.watch(tenantApiProvider);
     final version = ref.watch(_tenantRequestsVersionProvider);
-    if (tenantId == null) return const SizedBox.shrink();
+    if (tenantId == null) {
+      return ref.watch(sessionProvider).isLoading
+          ? const KodiHubPageLoader()
+          : const SizedBox.shrink();
+    }
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -338,7 +342,12 @@ class _CreateTenantRequestSheetState
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _saving ? null : _submit,
-              child: Text(_saving ? 'Submitting…' : 'Submit request'),
+              child: KodiHubButtonChild(
+                loading: _saving,
+                label: 'Submit request',
+                loadingLabel: 'Submitting…',
+                tone: SpinnerTone.navy,
+              ),
             ),
           ],
         ),

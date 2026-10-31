@@ -173,7 +173,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         if (_error != null) ...[ErrorBox(_error!), const SizedBox(height: 12)],
         FilledButton(
           onPressed: _busy ? null : _submit,
-          child: Text(_busy ? 'Creating account…' : 'Create organisation'),
+          child: KodiHubButtonChild(
+            loading: _busy,
+            label: 'Create organisation',
+            loadingLabel: 'Creating account…',
+            tone: SpinnerTone.navy,
+          ),
         ),
         const SizedBox(height: 8),
         TextButton(

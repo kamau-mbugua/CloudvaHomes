@@ -7,6 +7,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { keys, portfolioErrorMessage, useCatalogue } from './api';
 import type { CatalogueKind } from './api';
@@ -102,7 +103,7 @@ function CatalogueList({ kind, label, singular, example, explain }: (typeof TABS
       {list.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           <EmptyState title={`No ${label.toLowerCase()} yet`} detail={`Add the ${label.toLowerCase()} you use (${example.replace('e.g. ', '')}, …).`}

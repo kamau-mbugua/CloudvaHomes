@@ -6,6 +6,7 @@ import { useSession } from '../../lib/auth/useAuth';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { Field } from '../portfolio/ui';
 import { keys, platformErrorMessage, usePlatformOperators, useUnassignedOrganizations } from '../platform/api';
@@ -66,7 +67,7 @@ export function AdminOperatorsPage() {
       {operators.isError ? <p className="ad__error" role="alert">{platformErrorMessage(operators.error)}</p> : null}
 
       {operators.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 ? (
         <div className="ad__tablewrap">
           <EmptyState title="No operators in this view" detail="Add a Superadmin or Salesperson to manage KodiHub." />

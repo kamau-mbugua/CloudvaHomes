@@ -8,6 +8,7 @@ import { formatKES, minorToInput } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { PropertySelect } from '../billing/ui';
 import { unwrap, unwrapList } from '../payments/rules';
@@ -97,7 +98,7 @@ export function RecurringTab() {
       {list.isError ? <p className="ad__error" role="alert">{expensesErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (

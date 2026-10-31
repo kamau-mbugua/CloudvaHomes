@@ -9,6 +9,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { keys, settingsErrorMessage, usePermissionCatalogue } from './api';
 import type { GroupState } from './permissionMatrix';
 import { groupState, samePermissions, toggleGroup, toggleOne } from './permissionMatrix';
@@ -44,7 +45,7 @@ export function RoleEditorPage() {
     return <p className="ad__error" role="alert">{settingsErrorMessage(error)}</p>;
   }
 
-  if ((!isNew && role.isPending) || catalogue.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if ((!isNew && role.isPending) || catalogue.isPending) return <TableSkeleton />;
 
   return (
     <RoleForm

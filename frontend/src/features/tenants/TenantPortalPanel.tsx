@@ -5,6 +5,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { Pager } from '../../components/Pager';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { keys } from '../portfolio/api';
 import { personName } from '../portfolio/labels';
@@ -166,7 +167,7 @@ function TenantMessages({ tenantId }: { tenantId: string }) {
     <section className="fm__section">
       <div className="pf__sectionhead"><h2>Messages</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{tenantMessagingError(list.error)}</p>
-        : list.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : list.isPending ? <TableSkeleton rows={2} />
           : rows.length === 0 ? <p className="ad__muted">No messages sent yet.</p>
             : (
               <ul className="tm__msgs">

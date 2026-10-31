@@ -8,6 +8,7 @@ import { formatDay, todayInNairobi } from '../../lib/dates';
 import { formatKES, parseAmount } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { PropertySelect } from '../billing/ui';
@@ -162,7 +163,7 @@ export function MaintenancePage() {
         </div>
       </div>
 
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p> : null}
+      {list.isPending ? <TableSkeleton /> : null}
       {list.isError ? <p className="ad__error" role="alert">{errorMessage(list.error)}</p> : null}
 
       {!list.isPending && !list.isError && rows.length === 0 ? (

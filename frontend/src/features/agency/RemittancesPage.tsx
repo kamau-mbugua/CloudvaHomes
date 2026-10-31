@@ -8,6 +8,7 @@ import { formatDateTime, todayInNairobi } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { currentPeriod, formatPeriod, isPeriod } from '../../lib/periods';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { MonthPicker } from '../billing/ui';
@@ -131,7 +132,7 @@ export function RemittancesPage() {
         <p className="hint bk__bulkhint">Paying landlords by bank? Tick approved remittances to download one bulk-payment file for your internet banking.</p>
       ) : null}
 
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p>
+      {list.isPending ? <TableSkeleton />
         : rows.length === 0 && !list.isError ? (
           <div className="ad__tablewrap">
             {filtered ? <EmptyState title="No remittances match" detail="Try another status, landlord or month." onClear={() => filters.clear()} />

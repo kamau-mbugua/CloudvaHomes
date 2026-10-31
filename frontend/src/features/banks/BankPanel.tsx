@@ -7,6 +7,7 @@ import { copyText } from '../../lib/clipboard';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { CallbackUrl } from '../mpesa/DarajaPanel';
 import { keys as paymentKeys } from '../payments/api';
@@ -158,7 +159,7 @@ function ImportHistory({ channelId }: { channelId: string }) {
     <details className="bk__details" onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary>Past imports</summary>
       {!open ? null
-        : history.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : history.isPending ? <TableSkeleton rows={2} />
           : history.isError ? <p className="ad__error" role="alert">{banksErrorMessage(history.error)}</p>
             : rows.length === 0 ? <p className="ad__muted">No statements imported yet.</p>
               : (

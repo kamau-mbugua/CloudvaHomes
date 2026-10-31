@@ -137,8 +137,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         if (_error != null) ...[ErrorBox(_error!), const SizedBox(height: 12)],
         FilledButton(
           onPressed: _busy ? null : _go,
-          child: Text(
-            _busy ? 'Please wait…' : (_sent ? 'Set new password' : 'Send code'),
+          child: KodiHubButtonChild(
+            loading: _busy,
+            label: _sent ? 'Set new password' : 'Send code',
+            loadingLabel: _sent ? 'Saving…' : 'Sending code…',
+            tone: SpinnerTone.navy,
           ),
         ),
         if (_sent) ...[

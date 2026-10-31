@@ -8,6 +8,7 @@ import { formatDateTime, formatDay, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { PropertySelect } from '../billing/ui';
@@ -136,7 +137,7 @@ function ExpensesTab() {
       {list.isError ? <p className="ad__error" role="alert">{expensesErrorMessage(list.error)}</p> : null}
 
       {rangeError ? null : list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (

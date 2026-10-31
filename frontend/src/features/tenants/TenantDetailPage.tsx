@@ -8,6 +8,7 @@ import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { fetchIdNumber, keys, portfolioErrorMessage } from '../portfolio/api';
 import { TENANT_STATUS, personName } from '../portfolio/labels';
 import type { Tenancy, Tenant } from '../portfolio/types';
@@ -73,7 +74,7 @@ export function TenantDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
-  if (tenant.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (tenant.isPending) return <CardSkeleton count={3} />;
   if (tenant.isError) {
     return (
       <div className="ph">
@@ -178,7 +179,7 @@ export function TenantDetailPage() {
             <section className="fm__section">
               <div className="pf__sectionhead"><h2>Tenancies</h2></div>
               {tenancies.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(tenancies.error)}</p>
-                : tenancies.isPending ? <p className="ad__muted" role="status">Loading…</p>
+                : tenancies.isPending ? <TableSkeleton rows={2} />
                   : rows.length === 0 ? <p className="ad__muted">No tenancies yet.{canMoveIn ? ' Use “Move in” to give them a unit.' : ''}</p>
                     : <TenancyTable rows={rows} showTenant={false} />}
             </section>

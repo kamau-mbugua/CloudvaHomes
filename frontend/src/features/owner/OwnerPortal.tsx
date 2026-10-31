@@ -6,6 +6,7 @@ import type { OwnerOf } from '../../lib/auth/types';
 import { useSession } from '../../lib/auth/useAuth';
 import { currentPeriod } from '../../lib/periods';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { checkMonthRange } from '../reports/rules';
 import {
   downloadOwnerStatement, ownerErrorMessage, useOwnerLandlord, useOwnerRemittances, useOwnerStatement,
@@ -65,7 +66,7 @@ export function OwnerOverviewPage() {
   const owner = useOwner();
   const detail = useOwnerLandlord(owner.landlordId);
 
-  if (detail.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (detail.isPending) return <CardSkeleton count={3} />;
   if (detail.isError) return <div className="ph"><EmptyState title="Not available" detail={ownerErrorMessage(detail.error)} /></div>;
   const d = detail.data;
   const org = d.organization;
@@ -112,7 +113,7 @@ export function OwnerStatementsPage() {
         onDownload={() => downloadOwnerStatement({ id: owner.landlordId, code: statement.data?.landlord?.code }, range)} />
       {rangeError ? <p className="ad__error" role="alert">{rangeError}</p>
         : statement.isError && !statement.data ? <p className="ad__error" role="alert">{ownerErrorMessage(statement.error)}</p>
-          : statement.isPending || !statement.data ? <p className="ad__muted" role="status">Loading…</p>
+          : statement.isPending || !statement.data ? <TableSkeleton />
             : <StatementView statement={statement.data} audience="owner" />}
     </div>
   );
@@ -127,7 +128,7 @@ export function OwnerPayoutsPage() {
     <div className="ow__stack">
       <h1 className="ow__h1">Payouts</h1>
       {list.isError ? <p className="ad__error" role="alert">{ownerErrorMessage(list.error)}</p>
-        : list.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : list.isPending ? <TableSkeleton />
           : rows.length === 0 ? <div className="ph"><EmptyState title="No payouts yet" detail="Each month the agency prepares a payout of what it collected for you, less commission and expenses. They’ll show here." /></div>
             : <PayoutCards rows={rows} />}
     </div>

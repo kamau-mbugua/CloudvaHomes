@@ -58,22 +58,29 @@ export function Spinner({ size = 18, tone = 'light', className }: SpinnerProps) 
 }
 
 /**
- * Pattern 3 — Warm paper table skeleton (§08 Loading).
+ * Pattern 3 — Warm paper table/list skeleton (§08 Loading).
+ * Matches C2.1 .skel-row: 36x36 rounded-10px badge + two pill lines (70%/60% and 45%/35%) + 60x18 right status pill.
  */
-export function TableSkeleton({ rows = 5, label = 'Loading records…' }: { rows?: number; label?: string }) {
+export function TableSkeleton({ rows = 4, label = 'Loading…' }: { rows?: number; label?: string }) {
   return (
     <div className="kh-skel-table" role="status" aria-busy="true" aria-label={label}>
+      <span className="sr-only">{label}</span>
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="kh-skel-row">
-          <div className="kh-skel" style={{ height: 13, width: i % 2 === 0 ? '82%' : '68%' }} />
-          <div style={{ display: 'grid', gap: 6 }}>
-            <div className="kh-skel" style={{ height: 13, width: i % 2 === 0 ? '58%' : '46%' }} />
-            <div className="kh-skel" style={{ height: 10, width: '34%' }} />
+          <div className="kh-skel" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+          <div style={{ flex: 1, display: 'grid', gap: 6 }}>
+            <div
+              className="kh-skel"
+              style={{ height: 11, borderRadius: 999, width: i % 2 === 0 ? '70%' : '60%' }}
+            />
+            <div
+              className="kh-skel"
+              style={{ height: 11, borderRadius: 999, width: i % 2 === 0 ? '45%' : '35%' }}
+            />
           </div>
-          <div className="kh-skel" style={{ height: 13, width: '72%', justifySelf: 'end' }} />
           <div
             className="kh-skel"
-            style={{ height: 22, width: 64, borderRadius: 999, justifySelf: 'end' }}
+            style={{ height: 18, width: 60, borderRadius: 999, flexShrink: 0 }}
           />
         </div>
       ))}
@@ -84,14 +91,15 @@ export function TableSkeleton({ rows = 5, label = 'Loading records…' }: { rows
 /**
  * Pattern 3 — Warm paper KPI / summary card skeleton (§08 Loading).
  */
-export function CardSkeleton({ count = 4 }: { count?: number }) {
+export function CardSkeleton({ count = 3, label = 'Loading…' }: { count?: number; label?: string }) {
   return (
-    <div className="kh-skel-cards" role="status" aria-busy="true" aria-label="Loading summary…">
+    <div className="kh-skel-cards" role="status" aria-busy="true" aria-label={label}>
+      <span className="sr-only">{label}</span>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="kh-skel-card">
-          <div className="kh-skel" style={{ height: 11, width: '48%' }} />
-          <div className="kh-skel" style={{ height: 26, width: '72%' }} />
-          <div className="kh-skel" style={{ height: 11, width: '56%' }} />
+          <div className="kh-skel" style={{ height: 11, width: '48%', borderRadius: 999 }} />
+          <div className="kh-skel" style={{ height: 26, width: '72%', borderRadius: 8 }} />
+          <div className="kh-skel" style={{ height: 11, width: '56%', borderRadius: 999 }} />
         </div>
       ))}
     </div>

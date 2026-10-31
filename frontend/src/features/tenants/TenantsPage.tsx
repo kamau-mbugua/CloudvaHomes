@@ -10,6 +10,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { keys, portfolioErrorMessage, usePropertyOptions } from '../portfolio/api';
 import { TENANT_STATUS, optionsOf, personName } from '../portfolio/labels';
@@ -140,7 +141,7 @@ export function TenantsPage() {
       {list.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (

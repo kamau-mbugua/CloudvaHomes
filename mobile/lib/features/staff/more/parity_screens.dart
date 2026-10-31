@@ -206,8 +206,8 @@ class _CreateMaintenanceSheetState
 
   @override
   Widget build(BuildContext context) {
-    final properties =
-        ref.watch(propertiesProvider).valueOrNull ?? const <PropertyOption>[];
+    final propertiesAsync = ref.watch(propertiesProvider);
+    final properties = propertiesAsync.valueOrNull ?? const <PropertyOption>[];
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -230,7 +230,12 @@ class _CreateMaintenanceSheetState
                   _propertyId ??
                   (properties.length == 1 ? properties.first.id : null),
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Property'),
+              decoration: InputDecoration(
+                labelText: 'Property',
+                helperText: propertiesAsync.isLoading
+                    ? 'Loading properties…'
+                    : null,
+              ),
               items: [
                 for (final p in properties)
                   DropdownMenuItem(value: p.id, child: Text(p.name)),
@@ -291,7 +296,12 @@ class _CreateMaintenanceSheetState
             const SizedBox(height: 16),
             FilledButton(
               onPressed: _saving ? null : () => _save(properties),
-              child: Text(_saving ? 'Saving…' : 'Save request'),
+              child: KodiHubButtonChild(
+                loading: _saving,
+                label: 'Save request',
+                loadingLabel: 'Saving…',
+                tone: SpinnerTone.navy,
+              ),
             ),
           ],
         ),
@@ -442,7 +452,12 @@ class _MaintenanceDetailSheetState
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: _saving ? null : _update,
-                child: Text(_saving ? 'Saving…' : 'Update status'),
+                child: KodiHubButtonChild(
+                  loading: _saving,
+                  label: 'Update status',
+                  loadingLabel: 'Saving…',
+                  tone: SpinnerTone.navy,
+                ),
               ),
               if (r['expense'] == null && can(ref, 'expenses:create')) ...[
                 const Divider(height: 28),

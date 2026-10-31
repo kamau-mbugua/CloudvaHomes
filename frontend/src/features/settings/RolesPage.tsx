@@ -6,6 +6,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { keys, settingsErrorMessage, useRoles } from './api';
 
 /** Settings → Roles: the named permission sets people are given. */
@@ -40,7 +41,7 @@ export function RolesPage() {
       {roles.isError ? <p className="ad__error" role="alert">{settingsErrorMessage(roles.error)}</p> : null}
 
       {roles.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : roles.data && roles.data.length === 0 ? (
         <div className="ad__tablewrap"><EmptyState title="No roles yet" /></div>
       ) : roles.data ? (

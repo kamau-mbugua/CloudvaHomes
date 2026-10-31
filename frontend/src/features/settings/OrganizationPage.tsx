@@ -10,6 +10,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton } from '../../components/Loading';
 import { checkDueDays } from '../billing/rules';
 import { isMpesaKind } from '../mpesa/rules';
 import { keys as paymentKeys, paymentsErrorMessage, useChannels } from '../payments/api';
@@ -53,7 +54,7 @@ export function OrganizationPage() {
     queryFn: () => api.get<DataEnvelope<Organization>>('/organization').then((r) => r.data),
   });
 
-  if (query.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (query.isPending) return <CardSkeleton count={3} />;
   if (query.isError) return <p className="ad__error" role="alert">{settingsErrorMessage(query.error)}</p>;
 
   // Keyed by id so switching organisation starts the form afresh.

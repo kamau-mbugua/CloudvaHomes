@@ -111,8 +111,11 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
         if (_error != null) ...[ErrorBox(_error!), const SizedBox(height: 12)],
         FilledButton(
           onPressed: _busy ? null : (_sent ? _verify : _send),
-          child: Text(
-            _busy ? 'Please wait…' : (_sent ? 'Sign in' : 'Send code'),
+          child: KodiHubButtonChild(
+            loading: _busy,
+            label: _sent ? 'Sign in' : 'Send code',
+            loadingLabel: _sent ? 'Signing in…' : 'Sending code…',
+            tone: SpinnerTone.navy,
           ),
         ),
         if (_sent) ...[

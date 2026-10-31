@@ -6,6 +6,7 @@ import type { PageEnvelope } from '../../lib/api/types';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { unwrap } from '../payments/rules';
 import { useListFilters } from '../portfolio/hooks';
@@ -98,7 +99,7 @@ export function AdminEmailPage() {
 function EmailSettingsTab() {
   const query = usePlatformEmailSettings();
 
-  if (query.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (query.isPending) return <CardSkeleton count={2} />;
   if (query.isError) return <p className="ad__error" role="alert">{platformErrorMessage(query.error)}</p>;
 
   const s = query.data;
@@ -112,7 +113,7 @@ function EmailSettingsTab() {
 function TestEmailTab() {
   const query = usePlatformEmailSettings();
 
-  if (query.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (query.isPending) return <CardSkeleton count={2} />;
   if (query.isError) return <p className="ad__error" role="alert">{platformErrorMessage(query.error)}</p>;
 
   const s = query.data;
@@ -746,7 +747,7 @@ function EmailLogsTab() {
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 ? (
         <div className="ad__tablewrap">
           <EmptyState title="No emails logged yet" detail="Every email KodiHub sends or attempts to send appears here." />

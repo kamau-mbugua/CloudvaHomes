@@ -524,12 +524,11 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
           onPressed: _saving || !canChannels
               ? null
               : () => _submit(channelRows, openRows),
-          child: Text(
-            _saving
-                ? 'Recording…'
-                : cents > 0
-                ? 'Record ${formatKes(cents)}'
-                : 'Record payment',
+          child: KodiHubButtonChild(
+            loading: _saving,
+            label: cents > 0 ? 'Record ${formatKes(cents)}' : 'Record payment',
+            loadingLabel: 'Recording…',
+            tone: SpinnerTone.money,
           ),
         ),
       ],
@@ -635,9 +634,9 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
                 return ErrorBox(staffErrorMessage(snap.error!));
               }
               if (!snap.hasData) {
-                return const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: LinearProgressIndicator(),
+                return const KodiHubSkeletonList(
+                  rows: 2,
+                  padding: EdgeInsets.symmetric(vertical: 8),
                 );
               }
               final rows = snap.data!.take(8).toList();

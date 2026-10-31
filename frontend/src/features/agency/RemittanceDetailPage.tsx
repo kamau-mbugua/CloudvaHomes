@@ -8,6 +8,7 @@ import { formatDateTime, formatDay, todayInNairobi } from '../../lib/dates';
 import { formatPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { CardSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { SignedAmount } from '../payments/ui';
 import { Badge, Breadcrumbs, Fact, Field } from '../portfolio/ui';
@@ -90,7 +91,7 @@ export function RemittanceDetailPage() {
     onError: (error) => toast.failed(agencyErrorMessage(error)),
   });
 
-  if (remittance.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (remittance.isPending) return <CardSkeleton count={3} />;
   if (remittance.isError) {
     return (
       <div className="ph">

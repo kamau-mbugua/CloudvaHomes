@@ -7,6 +7,7 @@ import { formatDay, todayInNairobi } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { useLandlordOptions } from '../portfolio/api';
 import { useListFilters } from '../portfolio/hooks';
 import { Badge } from '../portfolio/ui';
@@ -49,7 +50,7 @@ export function AgreementsPage() {
 
       {list.isError ? <p className="ad__error" role="alert">{agencyErrorMessage(list.error)}</p> : null}
 
-      {list.isPending ? <p className="ad__muted" role="status">Loading…</p>
+      {list.isPending ? <TableSkeleton />
         : (list.data ?? []).length === 0 && !list.isError ? (
           <div className="ad__tablewrap">
             {landlordId || show === 'all'

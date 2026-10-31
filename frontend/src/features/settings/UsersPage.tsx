@@ -11,6 +11,7 @@ import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { keys, settingsErrorMessage, useRoles } from './api';
@@ -148,7 +149,7 @@ export function UsersPage() {
       {list.isError ? <p className="ad__error" role="alert">{settingsErrorMessage(list.error)}</p> : null}
 
       {list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (

@@ -124,9 +124,12 @@ class PagedListState<T> extends State<PagedList<T>> {
             );
           }
           WidgetsBinding.instance.addPostFrameCallback((_) => _next());
+          if (_rows.isEmpty) {
+            return const KodiHubSkeletonList(rows: 5);
+          }
           return const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: KodiHubSpinner(size: 24)),
           );
         },
       ),

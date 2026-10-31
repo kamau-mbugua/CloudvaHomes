@@ -25,7 +25,11 @@ class TenantPaymentsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final id = ref.watch(currentTenantIdProvider);
-    if (id == null) return const SizedBox.shrink();
+    if (id == null) {
+      return ref.watch(sessionProvider).isLoading
+          ? const KodiHubPageLoader()
+          : const SizedBox.shrink();
+    }
     final api = ref.watch(tenantApiProvider);
     return PagedList<PaymentRow>(
       resetKey: id,

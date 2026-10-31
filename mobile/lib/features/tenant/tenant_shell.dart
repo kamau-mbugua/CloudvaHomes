@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/auth/session_controller.dart';
 import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
@@ -16,12 +15,13 @@ class TenantShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final accounts =
-        ref.watch(sessionProvider).valueOrNull?.tenantOf ?? const [];
+    final session = ref.watch(sessionProvider);
+    final accounts = session.valueOrNull?.tenantOf ?? const [];
     final currentId = ref.watch(currentTenantIdProvider);
     final current = accounts.where((a) => a.tenantId == currentId).firstOrNull;
     return Scaffold(
       appBar: KodiHubAppBar(
+        loading: session.isLoading,
         subtitle: current?.name,
         title: accounts.length > 1
             ? PopupMenuButton<String>(

@@ -7,6 +7,7 @@ import { formatKES } from '../../lib/money';
 import { currentPeriod, formatPeriod, isPeriod } from '../../lib/periods';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { categoryText } from '../expenses/labels';
 import { MonthPicker, PropertySelect } from '../billing/ui';
 import { SignedAmount } from '../payments/ui';
@@ -88,7 +89,7 @@ function ReportState({ query, empty, children }: {
   children: ReactNode;
 }) {
   if (query.isError && !query.data) return <p className="ad__error" role="alert">{reportsErrorMessage(query.error)}</p>;
-  if (query.isPending) return <p className="ad__muted" role="status">Loading…</p>;
+  if (query.isPending) return <TableSkeleton />;
   return (
     <>
       {query.isError ? <p className="ad__error" role="alert">{reportsErrorMessage(query.error)}</p> : null}

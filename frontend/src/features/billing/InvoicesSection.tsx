@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
 import { useCan } from '../../lib/auth/useAuth';
+import { TableSkeleton } from '../../components/Loading';
 import type { Tenancy } from '../portfolio/types';
 import { billingErrorMessage, keys } from './api';
 import { InvoiceSheet } from './InvoiceSheet';
@@ -38,7 +39,7 @@ export function TenantInvoices({ tenantId, currentTenancy }: { tenantId: string;
         {canCreate && currentTenancy ? <button type="button" className="nx-btn nx-btn--sm" onClick={() => setCreating(true)}>New invoice</button> : null}
       </div>
       {list.isError ? <p className="ad__error" role="alert">{billingErrorMessage(list.error)}</p>
-        : list.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : list.isPending ? <TableSkeleton rows={3} />
           : rows.length === 0 ? <p className="ad__muted">No invoices yet.</p>
             : (
               <>
@@ -68,7 +69,7 @@ export function UnitInvoices({ unitId }: { unitId: string }) {
     <section className="fm__section">
       <div className="pf__sectionhead"><h2>Invoices</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{billingErrorMessage(list.error)}</p>
-        : list.isPending ? <p className="ad__muted" role="status">Loading…</p>
+        : list.isPending ? <TableSkeleton rows={3} />
           : rows.length === 0 ? <p className="ad__muted">No invoices yet.</p>
             : (
               <>

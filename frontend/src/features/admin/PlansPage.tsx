@@ -6,6 +6,7 @@ import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { Field } from '../portfolio/ui';
 import { keys, platformErrorMessage, usePlans } from '../platform/api';
@@ -48,7 +49,7 @@ export function PlansPage() {
 
       {plans.isError ? <p className="ad__error" role="alert">{platformErrorMessage(plans.error)}</p> : null}
 
-      {plans.isPending ? <p className="ad__muted" role="status">Loading…</p> : rows.length === 0 && !plans.isError ? (
+      {plans.isPending ? <TableSkeleton /> : rows.length === 0 && !plans.isError ? (
         <div className="ad__tablewrap">
           <EmptyState title="No plans yet" detail="Add a plan and make it the default, so new organisations get a price."
             action={<button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => setEditing('new')}>New plan</button>} />

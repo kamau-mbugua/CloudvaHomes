@@ -6,6 +6,7 @@ import { useCan } from '../../lib/auth/useAuth';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
+import { CardSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
 import { CallbackUrl } from '../mpesa/DarajaPanel';
 import { DARAJA_ENV } from '../mpesa/labels';
@@ -44,7 +45,7 @@ export function PayoutsPage() {
         </p>
       </div>
 
-      {accounts.isPending ? <p className="ad__muted" role="status">Loading…</p>
+      {accounts.isPending ? <CardSkeleton count={2} />
         : accounts.isError ? <p className="ad__error" role="alert">{banksErrorMessage(accounts.error)}</p>
           : <B2cCard account={b2c} canUpdate={canUpdate} onEdit={() => setEditing(b2c ?? 'new')} />}
 

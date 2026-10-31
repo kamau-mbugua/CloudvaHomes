@@ -7,6 +7,7 @@ import { countText } from '../../app/navigation';
 import { formatDateTime, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { EmptyState } from '../../components/EmptyState';
+import { TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { useChannels } from '../payments/api';
 import { checkStatementRange } from '../payments/rules';
@@ -107,7 +108,7 @@ export function ReconciliationPage() {
       {list.isError ? <p className="ad__error" role="alert">{mpesaErrorMessage(list.error)}</p> : null}
 
       {rangeError ? null : list.isPending ? (
-        <p className="ad__muted" role="status">Loading…</p>
+        <TableSkeleton />
       ) : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           {filtered ? (
