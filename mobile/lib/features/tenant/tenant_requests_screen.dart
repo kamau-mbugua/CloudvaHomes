@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_error.dart';
 import '../../core/dates.dart';
+import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
 import '../staff/more/photo.dart';
@@ -33,6 +34,61 @@ class TenantRequestsScreen extends ConsumerWidget {
       body: PagedList<TenantMaintenanceRequest>(
         resetKey: (tenantId, version),
         padding: const EdgeInsets.only(bottom: 88),
+        header: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _CreateTenantRequestSheet.show(context, tenantId),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: HodiColors.limeSoft,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: HodiColors.limeText.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: HodiColors.navy,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Report a problem',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: HodiColors.navy,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Add a photo and we’ll tell the caretaker',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: HodiColors.limeHover,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: HodiColors.limeHover),
+                ],
+              ),
+            ),
+          ),
+        ),
         load: (page) async {
           final p = await api.requests(tenantId, page: page);
           return (rows: p.rows, hasMore: p.hasMore);
@@ -45,7 +101,7 @@ class TenantRequestsScreen extends ConsumerWidget {
         itemBuilder: (context, r) => Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -55,8 +111,8 @@ class TenantRequestsScreen extends ConsumerWidget {
                       child: Text(
                         r.title,
                         style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15.5,
                         ),
                       ),
                     ),
@@ -69,13 +125,22 @@ class TenantRequestsScreen extends ConsumerWidget {
                       },
                       tone: switch (r.status) {
                         'RESOLVED' || 'CLOSED' => Tone.good,
-                        'IN_PROGRESS' => Tone.warn,
-                        _ => Tone.neutral,
+                        'IN_PROGRESS' => Tone.info,
+                        _ => Tone.warn,
                       },
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
+                Text(
+                  r.description,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.45,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Text(
                   [
                     r.number,
@@ -85,18 +150,27 @@ class TenantRequestsScreen extends ConsumerWidget {
                     if (r.createdAt.isNotEmpty) formatDay(r.createdAt),
                   ].join(' · '),
                   style: TextStyle(
-                    fontSize: 12,
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: 11.5,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(r.description),
                 if (r.resolutionNote != null &&
                     r.resolutionNote!.isNotEmpty) ...[
-                  const Divider(height: 16),
-                  Text(
-                    'Update: ${r.resolutionNote}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: HodiColors.paper2,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Update: ${r.resolutionNote}',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ],

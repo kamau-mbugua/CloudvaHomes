@@ -59,7 +59,25 @@ class NotificationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       tooltip: 'Notifications',
-      icon: const Icon(Icons.notifications_outlined),
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.notifications_outlined, size: 22),
+          Positioned(
+            right: 1,
+            top: 1,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: const Color(0xFF84BD00),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF002B4D), width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
       onPressed: () => NotificationsSheet.show(context),
     );
   }

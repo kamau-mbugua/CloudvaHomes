@@ -141,9 +141,15 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
                       body: 'Add a unit or adjust your search filters.',
                     ),
                     itemBuilder: (context, u) => ListTile(
-                      title: Text('${u.number} · ${u.property.name}'),
+                      leading: UnitBadge(u.number),
+                      title: Text(
+                        '${u.number} · ${u.property.name}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                       subtitle: Text(
-                        u.tenancy?.tenant.name ?? formatKes(u.rentAmount),
+                        u.tenancy == null
+                            ? '${formatKes(u.rentAmount)} / mo'
+                            : '${u.tenancy!.tenant.name} · ${formatKes(u.rentAmount)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -220,10 +226,11 @@ class UnitDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final unit = ref.watch(unitProvider(unitId));
     return Scaffold(
-      appBar: AppBar(
+      appBar: KodiHubAppBar(
         title: Text(
           unit.valueOrNull == null ? 'Unit' : 'Unit ${unit.value!.number}',
         ),
+        subtitle: unit.valueOrNull?.property.name,
         actions: [
           if (unit.valueOrNull != null && can(ref, 'units:update'))
             IconButton(

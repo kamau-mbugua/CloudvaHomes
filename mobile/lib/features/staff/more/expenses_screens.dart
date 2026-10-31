@@ -69,7 +69,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         title: const Text('Expenses'),
         actions: [
           TextButton.icon(
-            icon: const Icon(Icons.autorenew_outlined),
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            icon: const Icon(Icons.autorenew_outlined, color: Colors.white),
             label: const Text('Recurring'),
             onPressed: () => _RecurringExpensesSheet.show(context),
           ),

@@ -7,6 +7,7 @@ import '../../../core/dates.dart';
 import '../../../core/files.dart';
 import '../../../core/money.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme.dart';
 import '../../../core/widgets/common.dart';
 import '../staff_api.dart';
 import '../staff_models.dart';
@@ -239,40 +240,50 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
     final text = Theme.of(context).textTheme;
     return _Scroll(
       children: [
-        Text('Payment recorded — ${p.number}', style: text.titleLarge),
-        const SizedBox(height: 8),
+        const Kicker('Receipt'),
+        const SizedBox(height: 4),
+        Text(
+          'Payment recorded — ${p.number}',
+          style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 6),
         Text(
           '${formatKes(p.amount)} from ${p.tenant.name}, received ${formatDay(p.receivedAt)}.',
         ),
         const SizedBox(height: 12),
-        FactRow('Held as credit', formatKes(p.unallocated)),
-        FactRow(
-          'Receipt notification',
-          p.receiptSent == true
-              ? 'Sent'
-              : _notify
-              ? 'Not sent'
-              : 'Not requested',
-        ),
-        if (p.receiptSent != true && _notify)
-          const Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Text(
-              'The receipt notification could not be sent. The payment is saved; give the tenant the PDF receipt instead.',
-            ),
-          ),
-        const SizedBox(height: 8),
-        Text('Allocated to', style: text.titleSmall),
-        if (p.allocations.isEmpty)
-          const Text(
-            'No invoices — the whole amount is the tenant’s credit and will be used on their next invoice.',
-          )
-        else
-          for (final a in p.allocations)
+        LedgerReceiptCard(
+          children: [
+            FactRow('Held as credit', formatKes(p.unallocated)),
             FactRow(
-              '${a.number} · ${formatPeriod(a.period)}',
-              formatKes(a.amount),
+              'Receipt notification',
+              p.receiptSent == true
+                  ? 'Sent'
+                  : _notify
+                  ? 'Not sent'
+                  : 'Not requested',
             ),
+            if (p.receiptSent != true && _notify)
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  'The receipt notification could not be sent. The payment is saved; give the tenant the PDF receipt instead.',
+                ),
+              ),
+            const Divider(height: 16),
+            Text('Allocated to', style: text.titleSmall),
+            const SizedBox(height: 4),
+            if (p.allocations.isEmpty)
+              const Text(
+                'No invoices — the whole amount is the tenant’s credit and will be used on their next invoice.',
+              )
+            else
+              for (final a in p.allocations)
+                FactRow(
+                  '${a.number} · ${formatPeriod(a.period)}',
+                  formatKes(a.amount),
+                ),
+          ],
+        ),
         const SizedBox(height: 16),
         OutlinedButton.icon(
           icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -310,13 +321,39 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
     final openRows = open.valueOrNull ?? const <OpenInvoice>[];
     final owed = openRows.fold<int>(0, (s, i) => s + i.balance);
     final cents = parseKes(_amount.text) ?? 0;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final previewAllocations = openRows.isNotEmpty && cents > 0
+        ? PaymentRules.allocate(cents, openRows, _invoiceId)
+        : const <({String invoiceId, int amount})>[];
 
     return _Scroll(
       children: [
-        Text('Record a payment', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Record a payment',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: dark ? Colors.white : HodiColors.navy,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                Icons.close,
+                size: 18,
+                color: dark ? Colors.white : HodiColors.navy,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
         _tenantField(tenant),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         TextField(
           key: const Key('pay-amount'),
           controller: _amount,
@@ -330,7 +367,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
             errorText: _errors['amount'],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         if (!canChannels)
           const Text(
             'Your role cannot list payment channels, so it can’t record payments here.',
@@ -366,7 +403,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
               _touch();
             }),
           ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         InkWell(
           onTap: () async {
             final picked = await showDatePicker(
@@ -393,7 +430,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
             child: Text(formatDay(toDay(_receivedOn))),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         TextField(
           key: const Key('pay-reference'),
           controller: _reference,
@@ -410,14 +447,19 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
           ),
         ),
         if (openRows.isNotEmpty) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             key: const Key('pay-invoice'),
             initialValue: _invoiceId,
             isExpanded: true,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Pay towards',
-              helperText: 'Anything left over is kept as the tenant’s credit.',
+              helperText: previewAllocations.isNotEmpty
+                  ? 'Will clear ${previewAllocations.map((a) {
+                      final inv = openRows.where((i) => i.id == a.invoiceId).firstOrNull;
+                      return '${inv?.number ?? a.invoiceId} (${formatKes(a.amount)})';
+                    }).join(', ')}.'
+                  : 'Anything left over is kept as the tenant’s credit.',
             ),
             items: [
               const DropdownMenuItem(
@@ -439,7 +481,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
             }),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         TextField(
           controller: _paidBy,
           maxLength: 120,
@@ -451,7 +493,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
             counterText: '',
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         TextField(
           controller: _note,
           maxLength: 300,
@@ -464,6 +506,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
+          dense: true,
           title: const Text('Send receipt to the tenant (SMS & email)'),
           value: _notify,
           onChanged: (v) => setState(() {
@@ -473,10 +516,11 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
         ),
         if (_general != null) ...[
           ErrorBox(_general!),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
         ],
         FilledButton(
           key: const Key('pay-submit'),
+          style: KodiHubButtonStyles.money(height: 48),
           onPressed: _saving || !canChannels
               ? null
               : () => _submit(channelRows, openRows),
@@ -494,31 +538,62 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
 
   Widget _tenantField(TenantRef? tenant) {
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     if (tenant != null) {
-      return InputDecorator(
-        decoration: InputDecoration(
-          labelText: 'Tenant',
-          errorText: _errors['tenantId'],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${tenant.name} · ${tenant.code}',
-                overflow: TextOverflow.ellipsis,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: dark ? scheme.surfaceContainerLowest : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _errors['tenantId'] != null
+                    ? scheme.error
+                    : scheme.outlineVariant,
               ),
             ),
-            if (widget.tenant == null)
-              TextButton(
-                onPressed: () => setState(() {
-                  _tenant = null;
-                  _invoiceId = '';
-                  _touch();
-                }),
-                child: const Text('Change'),
+            child: Row(
+              children: [
+                InitialsBadge(
+                  name: tenant.name,
+                  size: 32,
+                  radius: 8,
+                  fontSize: 11.5,
+                  backgroundColor: HodiColors.limeSoft,
+                  foregroundColor: HodiColors.navy,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${tenant.name} · ${tenant.code}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (widget.tenant == null)
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _tenant = null;
+                      _invoiceId = '';
+                      _touch();
+                    }),
+                    child: const Text('Change'),
+                  ),
+              ],
+            ),
+          ),
+          if (_errors['tenantId'] != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 12),
+              child: Text(
+                _errors['tenantId']!,
+                style: TextStyle(color: scheme.error, fontSize: 12),
               ),
-          ],
-        ),
+            ),
+        ],
       );
     }
     if (!can(ref, 'tenants:view')) {

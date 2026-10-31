@@ -11,12 +11,14 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.title,
     this.subtitle,
+    this.leading,
     this.actions,
     this.bottom,
   });
 
   final Widget title;
   final String? subtitle;
+  final Widget? leading;
   final List<Widget>? actions;
   final PreferredSizeWidget? bottom;
 
@@ -30,6 +32,8 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       backgroundColor: HodiColors.navy,
       foregroundColor: Colors.white,
+      shape: const Border(),
+      leading: leading,
       title: subtitle == null
           ? title
           : Column(
@@ -37,11 +41,12 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 title,
+                const SizedBox(height: 1),
                 Text(
                   subtitle!,
                   style: const TextStyle(
                     fontFamily: 'Lufga',
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w400,
                     color: Color(0xFF9EAEC4),
                   ),
@@ -55,13 +60,185 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ?bottom,
-            const SizedBox(
+            SizedBox(
               height: 3,
               width: double.infinity,
-              child: ColoredBox(color: HodiColors.lime),
+              child: ColoredBox(
+                color: bottom == null
+                    ? HodiColors.lime
+                    : HodiColors.lime.withValues(alpha: 0.35),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// JetBrains Mono uppercase kicker label (`.k` in KodiHub Mobile Redesign).
+class Kicker extends StatelessWidget {
+  const Kicker(
+    this.text, {
+    super.key,
+    this.color = HodiColors.limeText,
+    this.padding = EdgeInsets.zero,
+  });
+  final String text;
+  final Color color;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: padding,
+    child: Text(
+      text.toUpperCase(),
+      style: TextStyle(
+        fontFamily: 'JetBrainsMono',
+        fontSize: 10.5,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.4,
+        color: color,
+      ),
+    ),
+  );
+}
+
+/// Monospace unit / reference code badge (`.code` in KodiHub Mobile Redesign).
+class UnitBadge extends StatelessWidget {
+  const UnitBadge(
+    this.code, {
+    super.key,
+    this.width = 44,
+    this.height = 40,
+    this.fontSize = 13,
+  });
+  final String code;
+  final double width;
+  final double height;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: width,
+      height: height,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF162A42) : HodiColors.paper2,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          code,
+          style: TextStyle(
+            fontFamily: 'JetBrainsMono',
+            fontSize: fontSize,
+            fontWeight: FontWeight.w600,
+            color: dark ? Colors.white : HodiColors.navy,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Rounded square or circular initials badge (`#84BD00` lime with `#002B4D` bold text).
+class InitialsBadge extends StatelessWidget {
+  const InitialsBadge({
+    super.key,
+    required this.name,
+    this.size = 40,
+    this.radius = 12,
+    this.fontSize = 13,
+    this.lime = true,
+    this.backgroundColor,
+    this.foregroundColor,
+  });
+
+  final String name;
+  final double size;
+  final double radius;
+  final double fontSize;
+  final bool lime;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+
+  String get _text {
+    final n = name.trim();
+    if (n.isEmpty) return '?';
+    final parts = n.split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: backgroundColor ?? (lime ? HodiColors.lime : HodiColors.navy),
+      borderRadius: BorderRadius.circular(radius),
+    ),
+    child: Text(
+      _text,
+      style: TextStyle(
+        fontFamily: 'Lufga',
+        fontSize: fontSize,
+        fontWeight: FontWeight.w700,
+        color: foregroundColor ?? (lime ? HodiColors.navy : Colors.white),
+      ),
+    ),
+  );
+}
+
+/// Receipt card with the signature 4dp `#002B4D` + 2dp `#84BD00` top ledger stripe (Screen 08).
+class LedgerReceiptCard extends StatelessWidget {
+  const LedgerReceiptCard({
+    super.key,
+    required this.children,
+    this.padding = const EdgeInsets.all(18),
+  });
+  final List<Widget> children;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(
+            height: 4,
+            width: double.infinity,
+            child: ColoredBox(color: HodiColors.navy),
+          ),
+          const SizedBox(
+            height: 2,
+            width: double.infinity,
+            child: ColoredBox(color: HodiColors.lime),
+          ),
+          Padding(
+            padding: padding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -72,11 +249,13 @@ class CurvedHeroCard extends StatelessWidget {
   const CurvedHeroCard({
     super.key,
     this.label,
+    this.kicker,
     this.trailing,
     required this.children,
     this.padding = const EdgeInsets.all(20),
   });
   final String? label;
+  final String? kicker;
   final Widget? trailing;
   final List<Widget> children;
   final EdgeInsetsGeometry padding;
@@ -86,16 +265,12 @@ class CurvedHeroCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [HodiColors.navy, HodiColors.navyMid],
-        ),
+        color: HodiColors.navy,
         boxShadow: const [
           BoxShadow(
-            color: Color(0x24002B4D),
-            blurRadius: 18,
-            offset: Offset(0, 8),
+            color: Color(0x33002B4D),
+            blurRadius: 28,
+            offset: Offset(0, 12),
           ),
         ],
       ),
@@ -111,21 +286,7 @@ class CurvedHeroCard extends StatelessWidget {
                 height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 24,
-            bottom: -48,
-            child: IgnorePointer(
-              child: Container(
-                width: 110,
-                height: 110,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.04),
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
@@ -139,17 +300,30 @@ class CurvedHeroCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (label != null || trailing != null)
+                    if (kicker != null || label != null || trailing != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Row(
                           children: [
-                            if (label != null)
+                            if (kicker != null)
+                              Expanded(
+                                child: Text(
+                                  kicker!.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontFamily: 'JetBrainsMono',
+                                    color: HodiColors.lime,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                              )
+                            else if (label != null)
                               Expanded(
                                 child: Text(
                                   label!,
                                   style: const TextStyle(
-                                    color: Color(0xCCFFFFFF),
+                                    color: Color(0xFFD7E0EC),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -410,7 +584,7 @@ class CopyRow extends StatelessWidget {
   );
 }
 
-/// A small coloured label (status).
+/// A small coloured label (status pill, `.pill` in KodiHub Mobile Redesign).
 class StatusChip extends StatelessWidget {
   const StatusChip(this.label, {super.key, this.tone = Tone.neutral});
   final String label;
@@ -418,18 +592,18 @@ class StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = toneColor(context, tone);
+    final (bg, fg) = _pillPalette(context, tone);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: color,
-          fontSize: 12,
+          color: fg,
+          fontSize: 11.5,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -437,16 +611,32 @@ class StatusChip extends StatelessWidget {
   }
 }
 
-enum Tone { good, warn, bad, neutral }
+enum Tone { good, warn, bad, info, neutral }
+
+(Color, Color) _pillPalette(BuildContext context, Tone tone) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  if (dark) {
+    final fg = toneColor(context, tone);
+    return (fg.withValues(alpha: 0.16), fg);
+  }
+  return switch (tone) {
+    Tone.good => (HodiColors.successSoft, HodiColors.success),
+    Tone.warn => (HodiColors.warningSoft, HodiColors.warning),
+    Tone.bad => (HodiColors.dangerSoft, HodiColors.danger),
+    Tone.info => (HodiColors.infoSoft, HodiColors.info),
+    Tone.neutral => (HodiColors.muted, HodiColors.inkMuted),
+  };
+}
 
 /// The colour of a [Tone] in the current theme.
 Color toneColor(BuildContext context, Tone tone) {
   final scheme = Theme.of(context).colorScheme;
   final dark = Theme.of(context).brightness == Brightness.dark;
   return switch (tone) {
-    Tone.good => dark ? const Color(0xFF34D399) : const Color(0xFF1F7A4F),
-    Tone.warn => dark ? const Color(0xFFFBBF24) : const Color(0xFF9A5B00),
+    Tone.good => dark ? const Color(0xFF34D399) : HodiColors.success,
+    Tone.warn => dark ? const Color(0xFFFBBF24) : HodiColors.warning,
     Tone.bad => scheme.error,
+    Tone.info => dark ? const Color(0xFF60A5FA) : HodiColors.info,
     Tone.neutral => scheme.onSurfaceVariant,
   };
 }

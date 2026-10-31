@@ -21,7 +21,10 @@ class PlanBillingScreen extends ConsumerWidget {
     final billing = ref.watch(hodiBillingProvider);
     final invoices = ref.watch(hodiInvoicesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Plan & billing')),
+      appBar: KodiHubAppBar(
+        title: const Text('Plan & billing'),
+        subtitle: session?.activeOrganization?.name,
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(hodiBillingProvider);
@@ -92,14 +95,7 @@ class PlanBillingScreen extends ConsumerWidget {
                       (session?.can('settings:update') ?? false)) ...[
                     const SizedBox(height: 14),
                     FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: HodiColors.navy,
-                        minimumSize: const Size.fromHeight(46),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
+                      style: KodiHubButtonStyles.money(height: 48),
                       onPressed: () =>
                           showPayHodi(context, ref, b, session?.user.phone),
                       child: const Text('Pay now'),

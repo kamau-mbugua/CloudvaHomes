@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_error.dart';
@@ -78,7 +77,8 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
     final channelWord = target.contains('@') ? 'email' : 'SMS';
     return AuthScaffold(
       back: true,
-      title: _sent ? 'Enter the code' : 'Sign in with a code',
+      kicker: _sent ? 'Step 2 of 2 · Verify' : 'Step 1 of 2 · One-time code',
+      title: _sent ? 'Enter the 6-digit code' : 'Sign in with a code',
       subtitle: _sent
           ? 'If $target has a Hodi account, a 6-digit code is on its way by $channelWord.'
           : 'We’ll send a 6-digit code to your phone or email.',
@@ -100,18 +100,10 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
           },
         ),
         if (_sent) ...[
-          const SizedBox(height: 12),
-          TextField(
+          const SizedBox(height: 16),
+          SixDigitCodeField(
             controller: _code,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            style: const TextStyle(fontSize: 22, letterSpacing: 6),
-            decoration: const InputDecoration(labelText: 'Code'),
+            labelText: 'Code',
             onSubmitted: (_) => _verify(),
           ),
         ],
@@ -126,13 +118,12 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
         if (_sent) ...[
           const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               TextButton(
                 onPressed: _busy ? null : _send,
                 child: const Text('Send code again'),
               ),
-              const Text('·'),
               TextButton(
                 onPressed: _busy
                     ? null

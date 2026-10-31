@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -98,6 +97,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     final channelWord = target.contains('@') ? 'email' : 'SMS';
     return AuthScaffold(
       back: true,
+      kicker: _sent ? 'Step 2 of 2 · New password' : 'Password reset',
       title: 'Reset your password',
       subtitle: _sent
           ? 'If $target has an account, a 6-digit reset code is on its way by $channelWord.'
@@ -110,20 +110,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           decoration: const InputDecoration(labelText: 'Email or phone'),
         ),
         if (_sent) ...[
-          const SizedBox(height: 12),
-          TextField(
-            controller: _code,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            style: const TextStyle(fontSize: 22, letterSpacing: 6),
-            decoration: const InputDecoration(labelText: 'Code'),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+          SixDigitCodeField(controller: _code, labelText: 'Code'),
+          const SizedBox(height: 16),
           TextField(
             controller: _password,
             obscureText: _hide,

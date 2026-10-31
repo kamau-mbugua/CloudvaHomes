@@ -89,16 +89,45 @@ final routerProvider = Provider<GoRouter>((ref) {
 class _Splash extends StatelessWidget {
   const _Splash();
   @override
-  Widget build(BuildContext context) => const Scaffold(
-    body: Center(
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: HodiColors.navy,
+    body: SafeArea(
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          KodiHubLockup(iconSize: 44, fontSize: 26, animated: true),
-          SizedBox(height: 16),
-          Text(
-            'Checking your session…',
-            style: TextStyle(color: HodiColors.inkSubtle, fontSize: 13.5),
+          const Spacer(),
+          const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                KodiHubMark(size: 104, tone: BrandTone.navy, animated: true),
+                SizedBox(height: 18),
+                KodiHubWordmark(fontSize: 34, tone: BrandTone.navy),
+              ],
+            ),
+          ),
+          const Spacer(),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 36),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Rent, reconciled.',
+                  style: TextStyle(color: Color(0xFFD7E0EC), fontSize: 14),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'A CLOUDVALABS PRODUCT',
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    color: Color(0xFF9EAEC4),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 1.9,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

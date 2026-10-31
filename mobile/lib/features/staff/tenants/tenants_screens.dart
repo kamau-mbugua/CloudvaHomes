@@ -7,6 +7,7 @@ import '../../../core/dates.dart';
 import '../../../core/files.dart';
 import '../../../core/money.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
 import '../../../core/widgets/stk_sheet.dart';
@@ -78,7 +79,12 @@ class _TenantTile extends StatelessWidget {
     final units = t.units.map((u) => '${u.unitNumber}, ${u.propertyName}');
     final balance = t.balance;
     return ListTile(
-      title: Text(t.name),
+      leading: InitialsBadge(
+        name: t.name,
+        backgroundColor: HodiColors.limeSoft,
+        foregroundColor: HodiColors.navy,
+      ),
+      title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w700)),
       subtitle: Text(
         [t.ref.code, if (units.isNotEmpty) units.join(' · ')].join(' · '),
         maxLines: 1,
@@ -106,16 +112,24 @@ class TenantDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tenant = ref.watch(tenantProvider(tenantId));
     final canPayments = can(ref, 'payments:view');
+    final tVal = tenant.valueOrNull;
+    final sub = tVal == null
+        ? null
+        : [
+            tVal.ref.code,
+            for (final u in tVal.units)
+              'Unit ${u.unitNumber} · ${u.propertyName}',
+          ].join(' · ');
     return Scaffold(
-      appBar: AppBar(
-        title: Text(tenant.valueOrNull?.name ?? 'Tenant'),
+      appBar: KodiHubAppBar(
+        title: Text(tVal?.name ?? 'Tenant'),
+        subtitle: sub,
         actions: [
-          if (tenant.valueOrNull != null && can(ref, 'tenants:update'))
+          if (tVal != null && can(ref, 'tenants:update'))
             IconButton(
               tooltip: 'Edit tenant',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () =>
-                  _TenantFormSheet.show(context, existing: tenant.valueOrNull),
+              onPressed: () => _TenantFormSheet.show(context, existing: tVal),
             ),
         ],
       ),
@@ -406,7 +420,9 @@ class _TenantActionsState extends ConsumerState<TenantActions> {
         if (canRecord)
           FilledButton.icon(
             key: const Key('action-record-payment'),
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            style: KodiHubButtonStyles.money(
+              height: 44,
+            ).copyWith(minimumSize: const WidgetStatePropertyAll(Size(0, 44))),
             icon: const Icon(Icons.payments_outlined),
             label: const Text('Record payment'),
             onPressed: () => RecordPaymentSheet.show(context, tenant: t.ref),

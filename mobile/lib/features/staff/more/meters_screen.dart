@@ -26,15 +26,22 @@ class _MetersScreenState extends ConsumerState<MetersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final period = formatPeriod(nairobiPeriod());
     if (!can(ref, 'meters:view')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Meter readings')),
+        appBar: KodiHubAppBar(
+          title: const Text('Meter readings'),
+          subtitle: period,
+        ),
         body: const NoPermission('meters'),
       );
     }
     final properties = ref.watch(propertiesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Meter readings')),
+      appBar: KodiHubAppBar(
+        title: const Text('Meter readings'),
+        subtitle: period,
+      ),
       body: AsyncBody(
         value: properties,
         onRetry: () => ref.invalidate(propertiesProvider),
@@ -104,21 +111,49 @@ class _MeterList extends ConsumerWidget {
             );
           }
           final period = nairobiPeriod();
+          final readCount = active
+              .where((m) => m.lastReading?.period == period)
+              .length;
           return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
             children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Kicker('${formatPeriod(period)} readings'),
+                    StatusChip(
+                      '$readCount of ${active.length} read',
+                      tone: readCount == active.length ? Tone.good : Tone.warn,
+                    ),
+                  ],
+                ),
+              ),
               for (final m in active)
-                ListTile(
-                  title: Text('${m.unitNumber} · ${m.chargeName}'),
-                  subtitle: Text(
-                    'Meter ${m.serialNo} · '
-                    '${m.lastReading == null ? 'no readings yet' : 'last ${m.lastReading!.current}${m.unitLabel != null ? ' ${m.unitLabel}' : ''} (${formatPeriod(m.lastReading!.period)})'}',
-                  ),
-                  trailing: m.lastReading?.period == period
-                      ? const StatusChip('Read', tone: Tone.good)
-                      : const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context, rootNavigator: true).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ReadingScreen(meter: m, canSave: canRead),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Card(
+                    child: ListTile(
+                      leading: UnitBadge(m.unitNumber),
+                      title: Text(
+                        '${m.unitNumber} · ${m.chargeName}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        'Meter ${m.serialNo} · '
+                        '${m.lastReading == null ? 'no readings yet' : 'last ${m.lastReading!.current}${m.unitLabel != null ? ' ${m.unitLabel}' : ''} (${formatPeriod(m.lastReading!.period)})'}',
+                      ),
+                      trailing: m.lastReading?.period == period
+                          ? const StatusChip('Read', tone: Tone.good)
+                          : const StatusChip('Pending', tone: Tone.warn),
+                      onTap: () =>
+                          Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  ReadingScreen(meter: m, canSave: canRead),
+                            ),
+                          ),
                     ),
                   ),
                 ),
@@ -247,12 +282,18 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final unit = m.unitLabel == null ? '' : ' ${m.unitLabel}';
     final existing = row?.reading;
     return Scaffold(
-      appBar: AppBar(title: Text('${m.unitNumber} · ${m.chargeName}')),
+      appBar: KodiHubAppBar(
+        title: Text('${m.unitNumber} · ${m.chargeName}'),
+        subtitle: 'Meter ${m.serialNo}',
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           SectionCard(
             title: 'Reading for ${formatPeriod(_period)}',
+            trailing: existing != null
+                ? const StatusChip('Read', tone: Tone.good)
+                : const StatusChip('Pending', tone: Tone.warn),
             children: [
               FactRow('Meter', m.serialNo),
               if (row != null)

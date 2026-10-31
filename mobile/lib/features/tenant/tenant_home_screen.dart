@@ -26,36 +26,95 @@ class TenantHomeScreen extends ConsumerWidget {
         data: (o) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              'Hello, ${o.firstName}',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 12),
             _OwedCard(o: o),
             if (o.openInvoices.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               SectionCard(
                 title: 'Open invoices',
-                children: [
-                  for (final i in o.openInvoices)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        '${formatPeriod(i.period)} · ${formatKes(i.balance)}',
-                      ),
-                      subtitle: Text(
-                        '${i.number} · due ${formatDay(i.dueDate)}',
-                      ),
-                      trailing: i.overdue
-                          ? const StatusChip('Overdue', tone: Tone.bad)
-                          : const Icon(Icons.chevron_right),
-                      onTap: () => context.push('/tenant/invoices/${i.id}'),
+                trailing: GestureDetector(
+                  onTap: () => context.go('/tenant/invoices'),
+                  child: const Text(
+                    'See all',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: HodiColors.limeText,
                     ),
+                  ),
+                ),
+                children: [
+                  for (final (idx, i) in o.openInvoices.indexed) ...[
+                    if (idx > 0) const Divider(height: 16),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => context.push('/tenant/invoices/${i.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    formatPeriod(i.period),
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${i.number} · due ${formatDay(i.dueDate)}',
+                                    style: TextStyle(
+                                      fontFamily: 'JetBrainsMono',
+                                      fontSize: 11.5,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  formatKes(i.balance),
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                if (i.overdue)
+                                  const StatusChip('Overdue', tone: Tone.bad)
+                                else
+                                  StatusChip(
+                                    'Due ${formatDay(i.dueDate)}',
+                                    tone: Tone.warn,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 18,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
             if (o.howToPay.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               SectionCard(
                 title: 'How to pay',
                 children: [
@@ -67,17 +126,64 @@ class TenantHomeScreen extends ConsumerWidget {
               ),
             ],
             for (final h in o.homes) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               SectionCard(
                 title: o.homes.length > 1
                     ? 'Your home · ${h.unit}'
                     : 'Your home',
                 children: [
-                  Text(
-                    '${h.unit}, ${h.property}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF122438)
+                          : HodiColors.paper2,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.home_outlined,
+                            color: HodiColors.navy,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${h.unit}, ${h.property}',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${formatKes(h.rent)} a month',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 10),
                   FactRow('Rent a month', formatKes(h.rent)),
                   FactRow(
                     'Billed on',
@@ -239,7 +345,8 @@ void showTenantPaySheet(
   StkPaySheet.show(
     context,
     StkPaySheet(
-      title: 'Pay rent by M-Pesa',
+      kicker: 'To ${o.orgName}',
+      title: 'Pay with M-Pesa',
       intro:
           'An M-Pesa prompt goes to the phone below. Enter your M-Pesa PIN to pay ${o.orgName}.',
       defaultAmount: wholeShillingsUp(targetCents),

@@ -53,65 +53,87 @@ class _QuickActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final actions = <(IconData, String, VoidCallback)>[
+    final scheme = Theme.of(context).colorScheme;
+    final actions = <(IconData, String, VoidCallback, bool)>[
       if (can(ref, 'payments:create'))
         (
-          Icons.payments_outlined,
+          Icons.add,
           'Record payment',
           () => RecordPaymentSheet.show(context),
+          true,
         ),
       if (can(ref, 'meters:create'))
         (
           Icons.speed_outlined,
           'Read a meter',
           () => context.go('/staff/more/meters'),
+          false,
         ),
       if (can(ref, 'expenses:create'))
         (
           Icons.receipt_outlined,
           'Add expense',
           () => context.go('/staff/more/expenses/new'),
+          false,
         ),
     ];
     if (actions.isEmpty) return const SizedBox.shrink();
     return Row(
       children: [
         for (final (i, a) in actions.indexed) ...[
-          if (i > 0) const SizedBox(width: 10),
+          if (i > 0) const SizedBox(width: 8),
           Expanded(
-            child: Card(
+            child: Material(
+              color: a.$4
+                  ? HodiColors.lime
+                  : (dark ? scheme.surfaceContainerLowest : Colors.white),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: a.$4
+                    ? BorderSide.none
+                    : BorderSide(color: scheme.outlineVariant),
+              ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 onTap: a.$3,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 14,
+                    vertical: 12,
                     horizontal: 8,
                   ),
                   child: Column(
                     children: [
                       Container(
-                        width: 38,
-                        height: 38,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
-                          color: dark
-                              ? HodiColors.limeSoftDark
-                              : HodiColors.limeSoft,
-                          shape: BoxShape.circle,
+                          color: a.$4
+                              ? HodiColors.navy.withValues(alpha: 0.14)
+                              : (dark
+                                    ? HodiColors.limeSoftDark
+                                    : HodiColors.limeSoft),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           a.$1,
-                          size: 20,
-                          color: dark ? HodiColors.lime : HodiColors.limeHover,
+                          size: 18,
+                          color: a.$4
+                              ? HodiColors.navy
+                              : (dark ? HodiColors.lime : HodiColors.limeHover),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         a.$2,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: a.$4
+                              ? HodiColors.navy
+                              : (dark ? Colors.white : HodiColors.navy),
                         ),
                       ),
                     ],
@@ -134,160 +156,231 @@ class _DashboardBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dash = ref.watch(dashboardProvider);
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return AsyncBody(
       value: dash,
       onRetry: () => ref.invalidate(dashboardProvider),
-      data: (d) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CurvedHeroCard(
-            label: 'Collected',
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                formatPeriod(d.period),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+      data: (d) {
+        final progress = (d.collectionRate ?? 0).clamp(0.0, 1.0);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CurvedHeroCard(
+              kicker: 'COLLECTED · ${formatPeriod(d.period)}',
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    formatKes(d.collected),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.8,
+                      height: 1.05,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  formatKes(d.collected),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    backgroundColor: Colors.white.withValues(alpha: 0.16),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      HodiColors.lime,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_percent(d.collectionRate)} of this month’s invoices',
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                    color: Color(0xFFB8C6D9),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${_percent(d.collectionRate)} of this month’s invoices',
-                style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Divider(color: Color(0x2EFFFFFF), height: 1),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Invoiced',
-                    style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        formatKes(d.invoiced),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(color: Color(0x24FFFFFF), height: 1),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Invoiced',
+                      style: TextStyle(color: Color(0xFFB8C6D9), fontSize: 13),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          formatKes(d.invoiced),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _Figure(
+                    'Arrears',
+                    formatKes(d.arrears),
+                    note: 'Overdue, as of today',
+                    alert: d.arrears > 0,
                   ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Figure(
+                    'Occupancy',
+                    _percent(d.occupancyRate),
+                    note:
+                        '${d.occupied + d.notice} of ${d.units} let · ${d.vacant} vacant',
+                  ),
+                ),
+              ],
+            ),
+            if (d.unmatchedMpesa != null && d.unmatchedMpesa! > 0) ...[
+              const SizedBox(height: 12),
+              Material(
+                color: dark
+                    ? HodiColors.info.withValues(alpha: 0.22)
+                    : const Color(0xFFEBF1FA),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: HodiColors.info.withValues(alpha: 0.22),
+                  ),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => context.go('/staff/money?tab=mpesa'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: dark ? HodiColors.surfaceDark : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.phone_iphone,
+                            size: 20,
+                            color: dark
+                                ? const Color(0xFF93C5FD)
+                                : HodiColors.info,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${d.unmatchedMpesa} M-Pesa ${d.unmatchedMpesa == 1 ? 'payment needs' : 'payments need'} matching',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                  color: dark ? Colors.white : HodiColors.navy,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Review and assign to a tenant',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Assign →',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: dark
+                                ? const Color(0xFF93C5FD)
+                                : HodiColors.info,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (d.topOverdue.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SectionCard(
+                title: 'Most overdue',
+                children: [
+                  for (final (idx, r) in d.topOverdue.indexed) ...[
+                    if (idx > 0) const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: UnitBadge(r.tenant.code, width: 52),
+                      title: Text(
+                        r.tenant.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        r.oldestDueDate == null
+                            ? r.tenant.code
+                            : 'Since ${formatDay(r.oldestDueDate)}',
+                      ),
+                      trailing: Text(
+                        formatKes(r.overdue),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: toneColor(context, Tone.bad),
+                        ),
+                      ),
+                      onTap: can(ref, 'tenants:view')
+                          ? () => context.push('/staff/tenants/${r.tenant.id}')
+                          : null,
+                    ),
+                  ],
                 ],
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _Figure(
-                  'Arrears',
-                  formatKes(d.arrears),
-                  note: 'Overdue, as of today',
-                  alert: d.arrears > 0,
-                  tint: d.arrears > 0
-                      ? HodiColors.roseSoft
-                      : HodiColors.skySoft,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _Figure(
-                  'Occupancy',
-                  _percent(d.occupancyRate),
-                  note:
-                      '${d.occupied + d.notice} of ${d.units} let · ${d.vacant} vacant',
-                  tint: HodiColors.mintSoft,
-                ),
-              ),
-            ],
-          ),
-          if (d.unmatchedMpesa != null && d.unmatchedMpesa! > 0) ...[
-            const SizedBox(height: 12),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.help_outline),
-                title: Text(
-                  '${d.unmatchedMpesa} M-Pesa ${d.unmatchedMpesa == 1 ? 'payment needs' : 'payments need'} matching',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.go('/staff/money?tab=mpesa'),
-              ),
-            ),
           ],
-          if (d.topOverdue.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SectionCard(
-              title: 'Most overdue',
-              children: [
-                for (final r in d.topOverdue)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(r.tenant.name),
-                    subtitle: Text(
-                      r.oldestDueDate == null
-                          ? r.tenant.code
-                          : 'Since ${formatDay(r.oldestDueDate)}',
-                    ),
-                    trailing: Text(
-                      formatKes(r.overdue),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    onTap: can(ref, 'tenants:view')
-                        ? () => context.push('/staff/tenants/${r.tenant.id}')
-                        : null,
-                  ),
-              ],
-            ),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 class _Figure extends StatelessWidget {
-  const _Figure(
-    this.label,
-    this.value, {
-    this.note,
-    this.alert = false,
-    this.tint,
-  });
+  const _Figure(this.label, this.value, {this.note, this.alert = false});
   final String label;
   final String value;
   final String? note;
   final bool alert;
-  final Color? tint;
 
   @override
   Widget build(BuildContext context) {
@@ -295,7 +388,7 @@ class _Figure extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: dark ? scheme.surfaceContainerLowest : (tint ?? Colors.white),
+        color: dark ? scheme.surfaceContainerLowest : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: scheme.outlineVariant),
       ),
@@ -303,14 +396,7 @@ class _Figure extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: scheme.onSurfaceVariant,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Kicker(label),
           const SizedBox(height: 6),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -319,9 +405,9 @@ class _Figure extends StatelessWidget {
               value,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: alert
-                    ? scheme.error
+                    ? toneColor(context, Tone.warn)
                     : (dark ? Colors.white : HodiColors.navy),
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),

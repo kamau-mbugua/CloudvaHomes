@@ -5,6 +5,7 @@ import '../../core/dates.dart';
 import '../../core/files.dart';
 import '../../core/money.dart';
 import '../../core/providers.dart';
+import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
 import 'tenant_api.dart';
@@ -28,6 +29,7 @@ class TenantPaymentsScreen extends ConsumerWidget {
     final api = ref.watch(tenantApiProvider);
     return PagedList<PaymentRow>(
       resetKey: id,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       load: (page) async {
         final p = await api.payments(id, page: page);
         return (rows: p.rows, hasMore: p.hasMore);
@@ -49,33 +51,81 @@ class TenantPaymentsScreen extends ConsumerWidget {
           });
         }
 
-        return ListTile(
-          title: Row(
-            children: [
-              Text(
-                formatKes(p.amount),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: openReceipt,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: p.reversal
+                            ? HodiColors.warningSoft
+                            : HodiColors.successSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        p.reversal ? Icons.undo_rounded : Icons.check_rounded,
+                        size: 20,
+                        color: p.reversal
+                            ? HodiColors.warning
+                            : HodiColors.success,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                formatKes(p.amount),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (p.reversal) ...[
+                                const SizedBox(width: 8),
+                                const StatusChip('Reversal', tone: Tone.warn),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            [
+                              p.number,
+                              formatDay(p.receivedAt),
+                              _methods[p.method] ?? p.method,
+                              ?p.reference,
+                            ].join(' · '),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Receipt ${p.number}',
+                      icon: const Icon(Icons.receipt_outlined, size: 20),
+                      onPressed: openReceipt,
+                    ),
+                  ],
+                ),
               ),
-              if (p.reversal) ...[
-                const SizedBox(width: 8),
-                const StatusChip('Reversal', tone: Tone.warn),
-              ],
-            ],
+            ),
           ),
-          subtitle: Text(
-            [
-              p.number,
-              formatDay(p.receivedAt),
-              _methods[p.method] ?? p.method,
-              ?p.reference,
-            ].join(' · '),
-          ),
-          trailing: IconButton(
-            tooltip: 'Receipt ${p.number}',
-            icon: const Icon(Icons.receipt_outlined),
-            onPressed: openReceipt,
-          ),
-          onTap: openReceipt,
         );
       },
     );

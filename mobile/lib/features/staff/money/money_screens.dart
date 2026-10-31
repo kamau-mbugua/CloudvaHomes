@@ -7,6 +7,7 @@ import '../../../core/dates.dart';
 import '../../../core/files.dart';
 import '../../../core/money.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
 import '../staff_api.dart';
@@ -81,7 +82,25 @@ class _PaymentsListState extends ConsumerState<_PaymentsList> {
               title: 'No payments found',
             ),
             itemBuilder: (context, p) => ListTile(
-              title: Text('${formatKes(p.amount)} · ${p.tenant.name}'),
+              leading: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: p.isReversal
+                      ? const Color(0xFFFDECEC)
+                      : const Color(0xFFE6F4EC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  p.isReversal ? Icons.undo : Icons.check,
+                  size: 18,
+                  color: p.isReversal ? HodiColors.danger : HodiColors.success,
+                ),
+              ),
+              title: Text(
+                '${formatKes(p.amount)} · ${p.tenant.name}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               subtitle: Text(
                 '${p.number} · ${formatDay(p.receivedAt)} · ${channelKindLabel[p.method] ?? p.method}',
                 maxLines: 1,
@@ -110,8 +129,9 @@ class PaymentDetailScreen extends ConsumerWidget {
     final payment = ref.watch(paymentProvider(paymentId));
     final p = payment.valueOrNull;
     return Scaffold(
-      appBar: AppBar(
+      appBar: KodiHubAppBar(
         title: Text(p?.number ?? 'Payment'),
+        subtitle: p?.tenant.name,
         actions: [
           if (p != null)
             IconButton(
@@ -136,14 +156,26 @@ class PaymentDetailScreen extends ConsumerWidget {
         data: (p) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            SectionCard(
-              title: formatKes(p.amount),
-              trailing: p.isReversal
-                  ? const StatusChip('Reversal', tone: Tone.bad)
-                  : p.reversedByNumber != null
-                  ? const StatusChip('Reversed')
-                  : null,
+            LedgerReceiptCard(
               children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        formatKes(p.amount),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    if (p.isReversal)
+                      const StatusChip('Reversal', tone: Tone.bad)
+                    else if (p.reversedByNumber != null)
+                      const StatusChip('Reversed')
+                    else
+                      const StatusChip('Confirmed', tone: Tone.good),
+                  ],
+                ),
+                const SizedBox(height: 10),
                 FactRow('Received', formatDay(p.receivedAt)),
                 FactRow(
                   'Method',
@@ -299,7 +331,11 @@ class _InvoicesListState extends ConsumerState<_InvoicesList> {
               title: 'No invoices found',
             ),
             itemBuilder: (context, i) => ListTile(
-              title: Text('${i.tenant.name} · ${formatKes(i.total)}'),
+              leading: UnitBadge(i.unitNumber),
+              title: Text(
+                '${i.tenant.name} · ${formatKes(i.total)}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               subtitle: Text(
                 '${i.number} · ${formatPeriod(i.period)} · ${i.unitNumber}',
                 maxLines: 1,
@@ -324,8 +360,11 @@ class InvoiceDetailScreen extends ConsumerWidget {
     final detail = ref.watch(invoiceProvider(invoiceId));
     final d = detail.valueOrNull;
     return Scaffold(
-      appBar: AppBar(
+      appBar: KodiHubAppBar(
         title: Text(d?.invoice.number ?? 'Invoice'),
+        subtitle: d == null
+            ? null
+            : '${d.invoice.unitNumber} · ${d.invoice.propertyName}',
         actions: [
           if (d != null)
             IconButton(
@@ -469,12 +508,29 @@ class _UnmatchedList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final api = ref.watch(staffApiProvider);
     final version = ref.watch(listsVersionProvider);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
     return PagedList<Inbound>(
       resetKey: version,
-      header: const Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-        child: Text(
-          'M-Pesa payments Hodi couldn’t match to a tenant. Assign each one, or ignore it if it isn’t rent.',
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: dark
+                ? HodiColors.info.withValues(alpha: 0.20)
+                : const Color(0xFFEBF1FA),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: HodiColors.info.withValues(alpha: 0.22)),
+          ),
+          child: Text(
+            'M-Pesa payments Hodi couldn’t match to a tenant. Assign each one, or ignore it if it isn’t rent.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.4,
+              color: dark ? Colors.white : HodiColors.navy,
+            ),
+          ),
         ),
       ),
       load: (page) async {
@@ -486,17 +542,133 @@ class _UnmatchedList extends ConsumerWidget {
         title: 'All matched',
         body: 'Every M-Pesa payment has been matched to a tenant.',
       ),
-      itemBuilder: (context, t) => ListTile(
-        title: Text(
-          '${formatKes(t.amount)} · ${t.payerName ?? t.payerPhone ?? 'Unknown payer'}',
+      itemBuilder: (context, t) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        child: Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => context.push('/staff/money/mpesa/${t.id}'),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Kicker(
+                              '${t.providerRef} · ${formatTimestamp(t.occurredAt)}',
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${formatKes(t.amount)} · ${t.payerName ?? t.payerPhone ?? 'Unknown payer'}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: dark ? Colors.white : HodiColors.navy,
+                              ),
+                            ),
+                            if (t.payerPhone != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                t.payerPhone!,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const StatusChip('Review', tone: Tone.info),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: dark
+                          ? scheme.surfaceContainerLowest
+                          : HodiColors.canvas,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Account typed: ',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            t.accountRef ?? '—',
+                            style: TextStyle(
+                              fontFamily: 'JetBrainsMono',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: dark ? Colors.white : HodiColors.navy,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          t.channelName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (t.suggestions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: dark
+                            ? HodiColors.limeSoftDark
+                            : HodiColors.limeSoft,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Kicker(
+                            'Likely match',
+                            color: dark ? HodiColors.lime : HodiColors.limeText,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${t.suggestions.first.tenant.name} · ${t.suggestions.first.reason}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: dark ? Colors.white : HodiColors.navy,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ),
-        subtitle: Text(
-          '${t.providerRef} · ${formatTimestamp(t.occurredAt)}${t.accountRef != null ? ' · Acc ${t.accountRef}' : ''}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/staff/money/mpesa/${t.id}'),
       ),
     );
   }
@@ -608,8 +780,9 @@ class _InboundDetailScreenState extends ConsumerState<InboundDetailScreen> {
     final item = ref.watch(inboundProvider(widget.inboundId));
     final canUpdate = can(ref, 'reconciliation:update');
     return Scaffold(
-      appBar: AppBar(
+      appBar: KodiHubAppBar(
         title: Text(item.valueOrNull?.providerRef ?? 'M-Pesa payment'),
+        subtitle: item.valueOrNull?.channelName,
       ),
       body: AsyncBody(
         value: item,

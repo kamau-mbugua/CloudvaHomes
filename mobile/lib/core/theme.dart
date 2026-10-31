@@ -15,6 +15,9 @@ abstract final class HodiColors {
   static const paper = Color(0xFFFAFAF7);
   static const paper2 = Color(0xFFF1EFE9);
   static const muted = Color(0xFFECE9E0);
+  static const canvas = paper;
+  static const stone = paper2;
+  static const surfaceDark = nightCard;
 
   static const ink = Color(0xFF0A2540);
   static const inkSecondary = Color(0xFF1F3A5C);
@@ -31,6 +34,8 @@ abstract final class HodiColors {
   static const danger = Color(0xFFB91C1C);
   static const dangerBorder = Color(0xFFDC2626);
   static const dangerSoft = Color(0xFFFDECEC);
+  static const info = Color(0xFF28618F);
+  static const infoSoft = Color(0x1F337ABF);
 
   // Semantic aliases used across staff & portal widgets
   static const blueAccent = limeText;
@@ -47,13 +52,13 @@ typedef KodiHubColors = HodiColors;
 /// Explicit button helpers for C2.1 semantic CTA rules (§04 Components & §06 Mobile).
 abstract final class KodiHubButtonStyles {
   /// #84BD00 lime pill with #002B4D navy bold text — reserved for money-moving CTAs.
-  static ButtonStyle money({double height = 48}) => FilledButton.styleFrom(
+  static ButtonStyle money({double height = 52}) => FilledButton.styleFrom(
     backgroundColor: HodiColors.lime,
     foregroundColor: HodiColors.navy,
     minimumSize: Size.fromHeight(height),
     textStyle: const TextStyle(
       fontFamily: 'Lufga',
-      fontSize: 15,
+      fontSize: 15.5,
       fontWeight: FontWeight.w600,
     ),
     shape: const StadiumBorder(),
@@ -112,6 +117,7 @@ ThemeData hodiTheme(Brightness brightness) {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
+      shape: Border(bottom: BorderSide(color: HodiColors.lime, width: 3)),
       iconTheme: IconThemeData(color: Colors.white),
       actionsIconTheme: IconThemeData(color: Colors.white),
       titleTextStyle: TextStyle(
@@ -122,14 +128,31 @@ ThemeData hodiTheme(Brightness brightness) {
         letterSpacing: -0.3,
       ),
     ),
+    tabBarTheme: const TabBarThemeData(
+      labelColor: Colors.white,
+      unselectedLabelColor: Color(0xFF9EAEC4),
+      indicatorColor: HodiColors.lime,
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: Colors.transparent,
+      labelStyle: TextStyle(
+        fontFamily: 'Lufga',
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelStyle: TextStyle(
+        fontFamily: 'Lufga',
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+    ),
     cardTheme: CardThemeData(
       color: scheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: scheme.outline),
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
     ),
     dividerTheme: DividerThemeData(
@@ -139,23 +162,33 @@ ThemeData hodiTheme(Brightness brightness) {
     ),
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: scheme.surfaceContainerLowest,
-      selectedColor: scheme.secondaryContainer,
+      selectedColor: dark ? HodiColors.lime : HodiColors.navy,
+      secondarySelectedColor: dark ? HodiColors.lime : HodiColors.navy,
+      checkmarkColor: dark ? HodiColors.navy : Colors.white,
       side: BorderSide(color: scheme.outline),
       shape: const StadiumBorder(),
       labelStyle: TextStyle(
         fontFamily: 'Lufga',
         color: scheme.onSurface,
-        fontSize: 13,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
+      ),
+      secondaryLabelStyle: TextStyle(
+        fontFamily: 'Lufga',
+        color: dark ? HodiColors.navy : Colors.white,
+        fontSize: 12.5,
         fontWeight: FontWeight.w600,
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: scheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
+      dragHandleColor: dark ? const Color(0x33FFFFFF) : HodiColors.muted,
+      dragHandleSize: const Size(40, 4),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -163,7 +196,7 @@ ThemeData hodiTheme(Brightness brightness) {
     dialogTheme: DialogThemeData(
       backgroundColor: scheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
@@ -178,7 +211,7 @@ ThemeData hodiTheme(Brightness brightness) {
       style: FilledButton.styleFrom(
         backgroundColor: dark ? HodiColors.lime : HodiColors.navy,
         foregroundColor: dark ? const Color(0xFF001A2E) : Colors.white,
-        minimumSize: const Size.fromHeight(48),
+        minimumSize: const Size.fromHeight(52),
         textStyle: const TextStyle(
           fontFamily: 'Lufga',
           fontSize: 15,
@@ -190,7 +223,7 @@ ThemeData hodiTheme(Brightness brightness) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: dark ? Colors.white : HodiColors.navy,
-        minimumSize: const Size(0, 44),
+        minimumSize: const Size(0, 48),
         side: BorderSide(
           color: dark ? const Color(0x29FFFFFF) : const Color(0x2E0A2540),
         ),
@@ -204,18 +237,18 @@ ThemeData hodiTheme(Brightness brightness) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: scheme.outline),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: scheme.outline),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
           color: dark ? HodiColors.lime : HodiColors.limeText,
-          width: 1.8,
+          width: 1.5,
         ),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),

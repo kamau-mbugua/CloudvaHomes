@@ -52,6 +52,7 @@ class StkPaySheet extends StatefulWidget {
     required this.defaultPhone,
     required this.submit,
     required this.poll,
+    this.kicker,
     this.amountHint,
     this.onFinished,
     this.pollEvery = const Duration(seconds: 3),
@@ -61,6 +62,7 @@ class StkPaySheet extends StatefulWidget {
   final String intro;
   final int defaultAmount;
   final String? defaultPhone;
+  final String? kicker;
   final String? amountHint;
   final Future<StkStatus> Function(
     int amount,
@@ -198,30 +200,75 @@ class _StkPaySheetState extends State<StkPaySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final status = _status;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
         0,
         20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
+        24 + MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(widget.title, style: text.titleLarge),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Kicker(
+                        widget.kicker ?? 'M-Pesa Express',
+                        color: dark
+                            ? const Color(0xFF9EAEC4)
+                            : HodiColors.inkSubtle,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.4,
+                          color: dark ? Colors.white : HodiColors.navy,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             if (status == null) ...[
-              Text(widget.intro),
+              Text(
+                widget.intro,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.45,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: _amount,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: dark ? Colors.white : HodiColors.navy,
+                ),
                 decoration: InputDecoration(
                   labelText: 'Amount (KES)',
+                  prefixText: 'KES ',
                   helperText: widget.amountHint ?? 'Whole shillings only.',
                 ),
               ),
@@ -231,7 +278,24 @@ class _StkPaySheetState extends State<StkPaySheet> {
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: 'M-Pesa phone number',
+                  prefixIcon: Icon(Icons.phone_iphone_outlined, size: 20),
                   helperText: 'The prompt goes to this phone.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF122438) : HodiColors.paper2,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  'We’ll send an M-Pesa prompt to this phone. Enter your PIN to finish — your receipt arrives right away.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.45,
+                    color: dark ? const Color(0xFFD7E0EC) : HodiColors.inkMuted,
+                  ),
                 ),
               ),
               if (_error != null) ...[
@@ -240,7 +304,7 @@ class _StkPaySheetState extends State<StkPaySheet> {
               ],
               const SizedBox(height: 16),
               FilledButton(
-                style: KodiHubButtonStyles.money(),
+                style: KodiHubButtonStyles.money(height: 54),
                 onPressed: _sending ? null : _send,
                 child: Text(_sending ? 'Sending…' : 'Send M-Pesa prompt'),
               ),
@@ -279,6 +343,7 @@ class _StatusView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final timedOut60 = status.pending && elapsedSeconds >= 60;
     final (icon, tone, title, body) = switch (status.state) {
       'PENDING' => (
@@ -316,6 +381,75 @@ class _StatusView extends StatelessWidget {
         status.resultDesc ?? 'M-Pesa couldn’t complete the payment.',
       ),
     };
+
+    if (status.state == 'SUCCESS') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              width: 76,
+              height: 76,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: HodiColors.limeSoft,
+                shape: BoxShape.circle,
+              ),
+              child: Container(
+                width: 54,
+                height: 54,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: HodiColors.lime,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 30,
+                  color: HodiColors.navy,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Center(child: Kicker('Payment received')),
+          const SizedBox(height: 4),
+          Center(
+            child: Text(
+              formatKes(status.amount),
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.8,
+                color: dark ? Colors.white : HodiColors.navy,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Center(child: StatusChip(title, tone: tone)),
+          const SizedBox(height: 14),
+          LedgerReceiptCard(
+            children: [
+              Text(
+                body,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (status.phone.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                FactRow('Paid from', status.phone),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: onClose, child: const Text('Done')),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -348,6 +482,7 @@ class _StatusView extends StatelessWidget {
               Text(
                 _formatElapsed(elapsedSeconds),
                 style: TextStyle(
+                  fontFamily: 'JetBrainsMono',
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,

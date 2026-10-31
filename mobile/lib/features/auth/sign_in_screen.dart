@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_error.dart';
 import '../../core/auth/session_controller.dart';
+import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import 'auth_scaffold.dart';
 
@@ -113,21 +113,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     if (challenge != null) {
       final channelWord = challenge.channel == 'SMS' ? 'SMS' : 'email';
       return AuthScaffold(
+        kicker: 'Step 2 of 2 · Verify',
         title: 'Two-step verification',
         subtitle:
             'Enter the 6-digit code sent by $channelWord to ${challenge.destinationMasked}.',
+        onBack: () => setState(() {
+          _challenge = null;
+          _error = null;
+          _notice = null;
+          _twoFactorCode.clear();
+        }),
         children: [
-          TextField(
+          SixDigitCodeField(
             controller: _twoFactorCode,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            style: const TextStyle(fontSize: 22, letterSpacing: 6),
-            decoration: const InputDecoration(labelText: 'Verification code'),
+            labelText: 'Verification code',
             onSubmitted: (_) => _verifyTwoFactor(),
           ),
           const SizedBox(height: 16),
@@ -135,13 +134,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFEAF5CC),
-                borderRadius: BorderRadius.circular(10),
+                color: const Color(0xFFEEF6DB),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF84BD00)),
               ),
               child: Text(
                 _notice!,
-                style: const TextStyle(color: Color(0xFF3E5E00)),
+                style: const TextStyle(color: Color(0xFF3D5509)),
               ),
             ),
             const SizedBox(height: 12),
@@ -150,19 +149,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ErrorBox(_error!),
             const SizedBox(height: 12),
           ],
-          FilledButton(
-            onPressed: (_busy || _resending) ? null : _verifyTwoFactor,
-            child: Text(_busy ? 'Verifying…' : 'Verify & sign in'),
-          ),
-          const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               TextButton(
                 onPressed: (_busy || _resending) ? null : _resendTwoFactor,
                 child: Text(_resending ? 'Sending…' : 'Resend code'),
               ),
-              const Text('·'),
               TextButton(
                 onPressed: (_busy || _resending)
                     ? null
@@ -176,14 +169,21 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: (_busy || _resending) ? null : _verifyTwoFactor,
+            child: Text(_busy ? 'Verifying…' : 'Verify & sign in'),
+          ),
         ],
       );
     }
 
     final appConfig = ref.watch(appConfigProvider).valueOrNull;
     return AuthScaffold(
-      title: 'Sign in',
-      subtitle: 'Rent, invoices and payments in one place.',
+      kicker: 'Sign in',
+      title: 'Welcome back',
+      subtitle:
+          'Use the email or phone your organisation or landlord has for you.',
       children: [
         if (appConfig?.maintenanceMode == true) ...[
           const ErrorBox(
@@ -261,17 +261,92 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           label: const Text('Sign in with a one-time code'),
           onPressed: () => context.push('/sign-in/code'),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Tenants: receive a 6-digit code by SMS or email using the contact your landlord or agent has on file.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontSize: 13,
-          ),
+        const SizedBox(height: 18),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => context.push('/sign-in/code'),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'I’m a tenant',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Your landlord adds your phone or email. Sign in with a 6-digit code.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (appConfig?.allowPublicSignup != false) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => context.push('/register'),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: HodiColors.limeSoft,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: HodiColors.limeText.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'I manage property',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: HodiColors.limeHover,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Landlord or letting agency? Start a free trial in a minute.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: HodiColors.limeHover,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         if (appConfig?.allowPublicSignup != false) ...[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: () => context.push('/register'),
             child: const Text('Landlord or agency? Create an organisation'),

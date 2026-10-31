@@ -80,6 +80,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
+      kicker: 'Get started',
       title: 'Create organisation',
       subtitle: 'Start managing properties, units, invoices and M-Pesa.',
       back: true,
