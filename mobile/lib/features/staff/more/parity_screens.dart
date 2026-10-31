@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_error.dart';
 import '../../../core/dates.dart';
 import '../../../core/money.dart';
+import '../../../core/theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
 import '../staff_api.dart';
@@ -29,7 +31,7 @@ class _StaffMaintenanceScreenState
     final api = ref.watch(staffApiProvider);
     final version = ref.watch(listsVersionProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Maintenance & repairs')),
+      appBar: const KodiHubAppBar(title: Text('Maintenance & repairs')),
       floatingActionButton: can(ref, 'maintenance:create')
           ? FloatingActionButton.extended(
               heroTag: 'fab-maintenance',
@@ -98,36 +100,54 @@ class _StaffMaintenanceScreenState
                       final prop =
                           (r['property'] as Map?)?['name'] as String? ?? '';
                       final unit = (r['unit'] as Map?)?['number'] as String?;
-                      return ListTile(
-                        title: Text(
-                          '${r['title'] ?? ''} · ${r['number'] ?? ''}',
+                      final priority = r['priority'] as String? ?? 'MEDIUM';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
                         ),
-                        subtitle: Text(
-                          [
-                            if (unit != null) 'Unit $unit',
-                            if (prop.isNotEmpty) prop,
-                            expenseCategoryLabel[r['category']] ??
-                                r['category'] ??
-                                '',
-                            r['priority'] ?? '',
-                          ].where((s) => '$s'.isNotEmpty).join(' · '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Card(
+                          child: ListTile(
+                            leading: UnitBadge(
+                              unit ?? 'PROP',
+                              width: 48,
+                              fontSize: 12,
+                            ),
+                            title: Text(
+                              '${r['title'] ?? ''} · ${r['number'] ?? ''}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              [
+                                if (unit != null) 'Unit $unit',
+                                if (prop.isNotEmpty) prop,
+                                expenseCategoryLabel[r['category']] ??
+                                    r['category'] ??
+                                    '',
+                                priority,
+                              ].where((s) => '$s'.isNotEmpty).join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: StatusChip(
+                              switch (status) {
+                                'IN_PROGRESS' => 'In progress',
+                                'RESOLVED' => 'Resolved',
+                                'CLOSED' => 'Closed',
+                                _ => 'Open',
+                              },
+                              tone: switch (status) {
+                                'RESOLVED' || 'CLOSED' => Tone.good,
+                                'IN_PROGRESS' => Tone.warn,
+                                _ => Tone.neutral,
+                              },
+                            ),
+                            onTap: () =>
+                                _MaintenanceDetailSheet.show(context, r),
+                          ),
                         ),
-                        trailing: StatusChip(
-                          switch (status) {
-                            'IN_PROGRESS' => 'In progress',
-                            'RESOLVED' => 'Resolved',
-                            'CLOSED' => 'Closed',
-                            _ => 'Open',
-                          },
-                          tone: switch (status) {
-                            'RESOLVED' || 'CLOSED' => Tone.good,
-                            'IN_PROGRESS' => Tone.warn,
-                            _ => Tone.neutral,
-                          },
-                        ),
-                        onTap: () => _MaintenanceDetailSheet.show(context, r),
                       );
                     },
                   ),
@@ -330,6 +350,7 @@ class _MaintenanceDetailSheet extends ConsumerStatefulWidget {
 
 class _MaintenanceDetailSheetState
     extends ConsumerState<_MaintenanceDetailSheet> {
+  int _tab = 0;
   late String _status = widget.item['status'] as String? ?? 'OPEN';
   late final _note = TextEditingController(
     text: widget.item['resolutionNote'] as String? ?? '',
@@ -405,6 +426,7 @@ class _MaintenanceDetailSheetState
   Widget build(BuildContext context) {
     final r = widget.item;
     final canUpdate = can(ref, 'maintenance:update');
+    final canExpense = r['expense'] == null && can(ref, 'expenses:create');
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -417,13 +439,23 @@ class _MaintenanceDetailSheetState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Kicker('${r['number'] ?? ''} · ${r['priority'] ?? 'MEDIUM'}'),
+            const SizedBox(height: 4),
             Text(
-              '${r['number'] ?? ''} · ${r['title'] ?? ''}',
+              '${r['title'] ?? ''}',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text('${r['description'] ?? ''}'),
-            if (canUpdate) ...[
+            if (canUpdate && canExpense) ...[
+              const SizedBox(height: 14),
+              KodiHubSegmentedTabs(
+                tabs: const ['Status & Note', 'Record Expense'],
+                index: _tab,
+                onChanged: (i) => setState(() => _tab = i),
+              ),
+            ],
+            if (canUpdate && _tab == 0) ...[
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _status,
@@ -459,44 +491,39 @@ class _MaintenanceDetailSheetState
                   tone: SpinnerTone.navy,
                 ),
               ),
-              if (r['expense'] == null && can(ref, 'expenses:create')) ...[
-                const Divider(height: 28),
-                Text(
-                  'Convert to repair expense',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _expenseAmount,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Amount (KES)',
-                        ),
+            ],
+            if (canUpdate && canExpense && _tab == 1) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _expenseAmount,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Amount (KES)',
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _expensePayee,
-                        decoration: const InputDecoration(
-                          labelText: 'Payee / fundi',
-                        ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _expensePayee,
+                      decoration: const InputDecoration(
+                        labelText: 'Payee / fundi',
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.receipt_long_outlined),
-                  label: const Text('Record expense'),
-                  onPressed: _saving ? null : _convertToExpense,
-                ),
-              ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('Record expense'),
+                onPressed: _saving ? null : _convertToExpense,
+              ),
             ],
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -518,7 +545,7 @@ class StaffPropertiesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final properties = ref.watch(propertiesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Properties')),
+      appBar: const KodiHubAppBar(title: Text('Properties')),
       floatingActionButton: can(ref, 'properties:create')
           ? FloatingActionButton.extended(
               heroTag: 'fab-properties',
@@ -537,13 +564,30 @@ class StaffPropertiesScreen extends ConsumerWidget {
                 body: 'Add your first building or estate.',
               )
             : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
                 itemCount: rows.length,
                 itemBuilder: (context, i) {
                   final p = rows[i];
-                  return ListTile(
-                    leading: const Icon(Icons.apartment_outlined),
-                    title: Text(p.name),
-                    subtitle: Text('Code: ${p.code}'),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      child: ListTile(
+                        leading: UnitBadge(p.code, width: 52),
+                        title: Text(
+                          p.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text('Property code · ${p.code}'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () =>
+                            Navigator.of(context, rootNavigator: true).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    _PropertyDetailScreen(property: p),
+                              ),
+                            ),
+                      ),
+                    ),
                   );
                 },
               ),
@@ -552,15 +596,199 @@ class StaffPropertiesScreen extends ConsumerWidget {
   }
 }
 
+final _propertyUnitsProvider = FutureProvider.autoDispose
+    .family<List<UnitRow>, String>((ref, propertyId) async {
+      final p = await ref
+          .watch(staffApiProvider)
+          .units(page: 1, propertyId: propertyId);
+      return p.rows;
+    });
+
+class _PropertyDetailScreen extends ConsumerStatefulWidget {
+  const _PropertyDetailScreen({required this.property});
+  final PropertyOption property;
+
+  @override
+  ConsumerState<_PropertyDetailScreen> createState() =>
+      _PropertyDetailScreenState();
+}
+
+class _PropertyDetailScreenState extends ConsumerState<_PropertyDetailScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.property;
+    final unitsAsync = ref.watch(_propertyUnitsProvider(p.id));
+    final metersAsync = ref.watch(metersProvider(p.id));
+    return Scaffold(
+      appBar: KodiHubAppBar(
+        title: Text(p.name),
+        subtitle: 'Code · ${p.code}',
+        actions: [
+          if (can(ref, 'properties:update'))
+            IconButton(
+              tooltip: 'Edit property',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () =>
+                  _CreatePropertySheet.show(context, ref, existing: p),
+            ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          CurvedHeroCard(
+            kicker: 'PROPERTY · ${p.code}',
+            children: [
+              Text(
+                p.name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (unitsAsync.valueOrNull != null)
+                Builder(
+                  builder: (_) {
+                    final rows = unitsAsync.value!;
+                    final letCount = rows
+                        .where((u) => u.occupancy != 'VACANT')
+                        .length;
+                    return Text(
+                      '$letCount of ${rows.length} units let · ${rows.length - letCount} vacant',
+                      style: const TextStyle(
+                        color: Color(0xFFB8C6D9),
+                        fontSize: 13,
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          KodiHubSegmentedTabs(
+            tabs: const ['Units', 'Meters', 'Details'],
+            index: _tab,
+            onChanged: (i) => setState(() => _tab = i),
+          ),
+          const SizedBox(height: 12),
+          if (_tab == 0)
+            SectionCard(
+              title: 'Units in ${p.name}',
+              children: [
+                AsyncBody(
+                  value: unitsAsync,
+                  onRetry: () => ref.invalidate(_propertyUnitsProvider(p.id)),
+                  data: (rows) => rows.isEmpty
+                      ? const Text('No units in this property yet.')
+                      : Column(
+                          children: [
+                            for (final (idx, u) in rows.indexed) ...[
+                              if (idx > 0) const Divider(height: 1),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: UnitBadge(u.number),
+                                title: Text(
+                                  'Unit ${u.number}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  u.tenancy == null
+                                      ? '${formatKes(u.rentAmount)} / mo'
+                                      : '${u.tenancy!.tenant.name} · ${formatKes(u.rentAmount)}',
+                                ),
+                                trailing: StatusChip(
+                                  occupancyLabel[u.occupancy] ?? u.occupancy,
+                                  tone: occupancyTone(u.occupancy),
+                                ),
+                                onTap: () =>
+                                    context.push('/staff/units/${u.id}'),
+                              ),
+                            ],
+                          ],
+                        ),
+                ),
+              ],
+            )
+          else if (_tab == 1)
+            SectionCard(
+              title: 'Utility meters',
+              trailing: can(ref, 'meters:create')
+                  ? TextButton(
+                      onPressed: () => context.push('/staff/more/meters'),
+                      child: const Text('Read meters →'),
+                    )
+                  : null,
+              children: [
+                AsyncBody(
+                  value: metersAsync,
+                  onRetry: () => ref.invalidate(metersProvider(p.id)),
+                  data: (rows) => rows.isEmpty
+                      ? const Text('No utility meters in this property.')
+                      : Column(
+                          children: [
+                            for (final (idx, m) in rows.indexed) ...[
+                              if (idx > 0) const Divider(height: 1),
+                              ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: UnitBadge(m.unitNumber),
+                                title: Text(
+                                  '${m.unitNumber} · ${m.chargeName}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  'Meter ${m.serialNo} · ${m.lastReading == null ? 'no readings' : 'last ${m.lastReading!.current} ${m.unitLabel ?? ''}'}',
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                ),
+              ],
+            )
+          else
+            SectionCard(
+              title: 'Property summary',
+              children: [
+                FactRow('Name', p.name),
+                FactRow('Code', p.code),
+                if (can(ref, 'properties:update')) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit property details'),
+                    onPressed: () =>
+                        _CreatePropertySheet.show(context, ref, existing: p),
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CreatePropertySheet {
-  static Future<void> show(BuildContext context, WidgetRef ref) async {
-    final nameCtrl = TextEditingController();
-    final codeCtrl = TextEditingController();
+  static Future<void> show(
+    BuildContext context,
+    WidgetRef ref, {
+    PropertyOption? existing,
+  }) async {
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final codeCtrl = TextEditingController(text: existing?.code ?? '');
     final locationCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add property'),
+        title: Text(existing == null ? 'Add property' : 'Edit property'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -599,14 +827,24 @@ class _CreatePropertySheet {
     if (ok != true || !context.mounted) return;
     if (nameCtrl.text.trim().isEmpty || codeCtrl.text.trim().isEmpty) return;
     try {
-      await ref.read(staffApiProvider).createProperty({
+      final body = {
         'name': nameCtrl.text.trim(),
         'code': codeCtrl.text.trim().toUpperCase(),
         if (locationCtrl.text.trim().isNotEmpty)
           'location': locationCtrl.text.trim(),
-      });
+      };
+      if (existing == null) {
+        await ref.read(staffApiProvider).createProperty(body);
+      } else {
+        await ref.read(staffApiProvider).updateProperty(existing.id, body);
+      }
       ref.invalidate(propertiesProvider);
-      if (context.mounted) showMessage(context, 'Property created.');
+      if (context.mounted) {
+        showMessage(
+          context,
+          existing == null ? 'Property created.' : 'Property updated.',
+        );
+      }
     } on ApiError catch (e) {
       if (context.mounted) showMessage(context, staffErrorMessage(e));
     }
@@ -633,8 +871,9 @@ class StaffReportsScreen extends ConsumerWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        appBar: AppBar(
+        appBar: KodiHubAppBar(
           title: const Text('Reports'),
+          subtitle: formatPeriod(nairobiPeriod()),
           bottom: const TabBar(
             tabs: [
               Tab(text: 'P&L'),
@@ -663,6 +902,12 @@ class _PlTab extends ConsumerWidget {
       onRetry: () => ref.invalidate(_reportPlProvider),
       data: (d) {
         final totals = d['totals'] as Map<String, dynamic>? ?? const {};
+        final invMap = totals['invoiced'] is Map<String, dynamic>
+            ? totals['invoiced'] as Map<String, dynamic>
+            : null;
+        final invoicedTotal = invMap != null
+            ? centsFrom(invMap['total'])
+            : centsFrom(totals['invoiced']);
         final rows = [
           for (final r in (d['rows'] as List? ?? const []))
             if (r is Map<String, dynamic>) r,
@@ -670,10 +915,44 @@ class _PlTab extends ConsumerWidget {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            CurvedHeroCard(
+              kicker: 'NET OPERATING INCOME · ${formatPeriod(nairobiPeriod())}',
+              children: [
+                Text(
+                  formatKes(centsFrom(totals['net'])),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Collected ${formatKes(centsFrom(totals['collected']))} − Expenses ${formatKes(centsFrom(totals['expenses']))}',
+                  style: const TextStyle(
+                    color: Color(0xFFB8C6D9),
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             SectionCard(
               title: 'Summary (${formatPeriod(nairobiPeriod())})',
               children: [
-                FactRow('Invoiced', formatKes(centsFrom(totals['invoiced']))),
+                FactRow('Invoiced', formatKes(invoicedTotal), bold: true),
+                if (invMap != null) ...[
+                  FactRow('  · Rent', formatKes(centsFrom(invMap['rent']))),
+                  FactRow(
+                    '  · Charges & utilities',
+                    formatKes(centsFrom(invMap['charges'])),
+                  ),
+                  if (centsFrom(invMap['moveIn']) > 0)
+                    FactRow(
+                      '  · Move-in & deposits',
+                      formatKes(centsFrom(invMap['moveIn'])),
+                    ),
+                ],
                 FactRow('Collected', formatKes(centsFrom(totals['collected']))),
                 FactRow('Expenses', formatKes(centsFrom(totals['expenses']))),
                 const Divider(),
@@ -690,7 +969,16 @@ class _PlTab extends ConsumerWidget {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: SectionCard(
                   title: '${(r['property'] as Map?)?['name'] ?? ''}',
+                  trailing: StatusChip(
+                    formatKes(centsFrom(r['net'])),
+                    tone: centsFrom(r['net']) >= 0 ? Tone.good : Tone.bad,
+                  ),
                   children: [
+                    if (r['invoiced'] is Map)
+                      FactRow(
+                        'Invoiced',
+                        formatKes(centsFrom((r['invoiced'] as Map)['total'])),
+                      ),
                     FactRow('Collected', formatKes(centsFrom(r['collected']))),
                     FactRow('Expenses', formatKes(centsFrom(r['expenses']))),
                     FactRow('Net', formatKes(centsFrom(r['net'])), bold: true),
@@ -713,6 +1001,8 @@ class _ArrearsTab extends ConsumerWidget {
       value: asyncArrears,
       onRetry: () => ref.invalidate(_reportArrearsProvider),
       data: (d) {
+        final totals = d['totals'] as Map<String, dynamic>? ?? const {};
+        final buckets = totals['buckets'] as Map<String, dynamic>? ?? const {};
         final rows = [
           for (final r in (d['rows'] as List? ?? const []))
             if (r is Map<String, dynamic>) r,
@@ -724,24 +1014,81 @@ class _ArrearsTab extends ConsumerWidget {
             body: 'All tenants are up to date.',
           );
         }
-        return ListView.builder(
+        return ListView(
           padding: const EdgeInsets.all(16),
-          itemCount: rows.length,
-          itemBuilder: (context, i) {
-            final r = rows[i];
-            final t = r['tenant'] as Map<String, dynamic>? ?? const {};
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                '${t['firstName'] ?? ''} ${t['lastName'] ?? ''}'.trim(),
+          children: [
+            if (buckets.isNotEmpty) ...[
+              SectionCard(
+                title: 'Aging breakdown',
+                trailing: StatusChip(
+                  formatKes(centsFrom(totals['overdue'] ?? totals['balance'])),
+                  tone: Tone.bad,
+                ),
+                children: [
+                  FactRow(
+                    'Current (not yet due)',
+                    formatKes(centsFrom(buckets['current'])),
+                  ),
+                  FactRow(
+                    '1–30 days overdue',
+                    formatKes(centsFrom(buckets['d1_30'])),
+                  ),
+                  FactRow(
+                    '31–60 days overdue',
+                    formatKes(centsFrom(buckets['d31_60'])),
+                  ),
+                  FactRow(
+                    '61–90 days overdue',
+                    formatKes(centsFrom(buckets['d61_90'])),
+                  ),
+                  FactRow(
+                    '90+ days overdue',
+                    formatKes(centsFrom(buckets['d90_plus'])),
+                    bold: true,
+                  ),
+                ],
               ),
-              subtitle: Text('${t['code'] ?? ''} · ${t['phone'] ?? ''}'),
-              trailing: StatusChip(
-                formatKes(centsFrom(r['overdue'] ?? r['balance'])),
-                tone: Tone.bad,
-              ),
-            );
-          },
+              const SizedBox(height: 12),
+            ],
+            SectionCard(
+              title: 'Tenants in arrears (${rows.length})',
+              children: [
+                for (final (idx, r) in rows.indexed) ...[
+                  if (idx > 0) const Divider(height: 1),
+                  Builder(
+                    builder: (_) {
+                      final t =
+                          r['tenant'] as Map<String, dynamic>? ?? const {};
+                      final tid = t['id'] as String?;
+                      final days = r['oldestOverdueDays'];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: UnitBadge('${t['code'] ?? ''}', width: 52),
+                        title: Text(
+                          '${t['firstName'] ?? ''} ${t['lastName'] ?? ''}'
+                              .trim(),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          [
+                            '${t['phone'] ?? ''}',
+                            if (days != null) '${days}d overdue',
+                          ].where((s) => s.isNotEmpty).join(' · '),
+                        ),
+                        trailing: StatusChip(
+                          formatKes(centsFrom(r['overdue'] ?? r['balance'])),
+                          tone: Tone.bad,
+                        ),
+                        onTap: tid != null && can(ref, 'tenants:view')
+                            ? () => context.push('/staff/tenants/$tid')
+                            : null,
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ],
         );
       },
     );
@@ -757,29 +1104,76 @@ class _OccupancyTab extends ConsumerWidget {
       value: asyncOcc,
       onRetry: () => ref.invalidate(_reportOccupancyProvider),
       data: (d) {
+        final totals = d['totals'] as Map<String, dynamic>? ?? const {};
         final rows = [
           for (final r in (d['rows'] as List? ?? const []))
             if (r is Map<String, dynamic>) r,
         ];
-        return ListView.builder(
+        final totalRate = (totals['rate'] as num?)?.toDouble();
+        return ListView(
           padding: const EdgeInsets.all(16),
-          itemCount: rows.length,
-          itemBuilder: (context, i) {
-            final r = rows[i];
-            final prop = r['property'] as Map<String, dynamic>? ?? const {};
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: SectionCard(
-                title: '${prop['name'] ?? ''}',
+          children: [
+            if (totals.isNotEmpty) ...[
+              CurvedHeroCard(
+                kicker: 'PORTFOLIO OCCUPANCY',
                 children: [
-                  FactRow('Total units', '${r['units'] ?? 0}'),
-                  FactRow('Occupied', '${r['occupied'] ?? 0}'),
-                  FactRow('On notice', '${r['notice'] ?? 0}'),
-                  FactRow('Vacant', '${r['vacant'] ?? 0}'),
+                  Text(
+                    totalRate == null ? '—' : '${(totalRate * 100).round()}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: (totalRate ?? 0).clamp(0.0, 1.0),
+                      minHeight: 8,
+                      backgroundColor: Colors.white.withValues(alpha: 0.16),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        HodiColors.lime,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${totals['occupied'] ?? 0} occupied · ${totals['notice'] ?? 0} on notice · ${totals['vacant'] ?? 0} vacant',
+                    style: const TextStyle(
+                      color: Color(0xFFB8C6D9),
+                      fontSize: 12.5,
+                    ),
+                  ),
                 ],
               ),
-            );
-          },
+              const SizedBox(height: 12),
+            ],
+            for (final r in rows)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Builder(
+                  builder: (_) {
+                    final prop =
+                        r['property'] as Map<String, dynamic>? ?? const {};
+                    final rate = (r['rate'] as num?)?.toDouble();
+                    return SectionCard(
+                      title: '${prop['name'] ?? ''}',
+                      trailing: StatusChip(
+                        rate == null ? '—' : '${(rate * 100).round()}% let',
+                        tone: (rate ?? 0) >= 0.8 ? Tone.good : Tone.warn,
+                      ),
+                      children: [
+                        FactRow('Total units', '${r['units'] ?? 0}'),
+                        FactRow('Occupied', '${r['occupied'] ?? 0}'),
+                        FactRow('On notice', '${r['notice'] ?? 0}'),
+                        FactRow('Vacant', '${r['vacant'] ?? 0}'),
+                      ],
+                    );
+                  },
+                ),
+              ),
+          ],
         );
       },
     );
@@ -799,7 +1193,7 @@ class StaffChannelsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final list = ref.watch(_allChannelsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment channels')),
+      appBar: const KodiHubAppBar(title: Text('Payment channels')),
       floatingActionButton: can(ref, 'channels:manage')
           ? FloatingActionButton.extended(
               heroTag: 'fab-channels',
@@ -817,20 +1211,50 @@ class StaffChannelsScreen extends ConsumerWidget {
                 title: 'No payment channels',
               )
             : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
                 itemCount: rows.length,
                 itemBuilder: (context, i) {
                   final c = rows[i];
-                  return ListTile(
-                    title: Text(c.name),
-                    subtitle: Text(
-                      [
-                        channelKindLabel[c.kind] ?? c.kind,
-                        if (c.shortcode != null) c.shortcode!,
-                      ].join(' · '),
-                    ),
-                    trailing: StatusChip(
-                      c.status == 'ACTIVE' ? 'Active' : 'Inactive',
-                      tone: c.status == 'ACTIVE' ? Tone.good : Tone.neutral,
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Card(
+                      child: ListTile(
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: c.isMpesa
+                                ? HodiColors.limeSoft
+                                : HodiColors.paper2,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            c.isMpesa
+                                ? Icons.phone_iphone
+                                : Icons.account_balance_outlined,
+                            color: HodiColors.navy,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          c.name,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          [
+                            channelKindLabel[c.kind] ?? c.kind,
+                            if (c.shortcode != null) c.shortcode!,
+                            if (c.isMpesa)
+                              c.darajaConfigured
+                                  ? 'Daraja connected'
+                                  : 'Manual M-Pesa',
+                          ].join(' · '),
+                        ),
+                        trailing: StatusChip(
+                          c.status == 'ACTIVE' ? 'Active' : 'Inactive',
+                          tone: c.status == 'ACTIVE' ? Tone.good : Tone.neutral,
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -910,37 +1334,214 @@ class StaffChannelsScreen extends ConsumerWidget {
 final _chargeTypesProvider = FutureProvider.autoDispose<List<Json>>(
   (ref) => ref.watch(staffApiProvider).chargeTypes(),
 );
+final _moveInChargesProvider = FutureProvider.autoDispose<List<Json>>(
+  (ref) => ref.watch(staffApiProvider).moveInCharges(),
+);
 
-class StaffChargesScreen extends ConsumerWidget {
+class StaffChargesScreen extends ConsumerStatefulWidget {
   const StaffChargesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final list = ref.watch(_chargeTypesProvider);
+  ConsumerState<StaffChargesScreen> createState() => _StaffChargesScreenState();
+}
+
+class _StaffChargesScreenState extends ConsumerState<StaffChargesScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final recurring = ref.watch(_chargeTypesProvider);
+    final moveIn = ref.watch(_moveInChargesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Recurring & metered charges')),
-      body: AsyncBody(
-        value: list,
-        onRetry: () => ref.invalidate(_chargeTypesProvider),
-        data: (rows) => rows.isEmpty
-            ? const EmptyState(
-                icon: Icons.bolt_outlined,
-                title: 'No charge types configured',
-              )
-            : ListView.builder(
-                itemCount: rows.length,
-                itemBuilder: (context, i) {
-                  final c = rows[i];
-                  return ListTile(
-                    title: Text('${c['name'] ?? ''} (${c['code'] ?? ''})'),
-                    subtitle: Text(
-                      '${c['kind'] ?? ''} · Default ${formatKes(centsFrom(c['defaultAmount']))}',
-                    ),
-                  );
-                },
-              ),
+      appBar: const KodiHubAppBar(title: Text('Recurring & metered charges')),
+      floatingActionButton: can(ref, 'charges:manage')
+          ? FloatingActionButton.extended(
+              heroTag: 'fab-charges',
+              icon: const Icon(Icons.add),
+              label: const Text('Add charge'),
+              onPressed: () => _addChargeType(context),
+            )
+          : null,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: KodiHubSegmentedTabs(
+              tabs: const ['Recurring & Metered', 'Move-in charges'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
+          ),
+          Expanded(
+            child: _tab == 0
+                ? AsyncBody(
+                    value: recurring,
+                    onRetry: () => ref.invalidate(_chargeTypesProvider),
+                    data: (rows) => rows.isEmpty
+                        ? const EmptyState(
+                            icon: Icons.bolt_outlined,
+                            title: 'No charge types configured',
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                            itemCount: rows.length,
+                            itemBuilder: (context, i) {
+                              final c = rows[i];
+                              final kind = '${c['kind'] ?? 'FIXED'}';
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Card(
+                                  child: ListTile(
+                                    leading: UnitBadge(
+                                      '${c['code'] ?? ''}',
+                                      width: 52,
+                                    ),
+                                    title: Text(
+                                      '${c['name'] ?? ''}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '$kind · Default ${formatKes(centsFrom(c['defaultAmount']))}${c['unitLabel'] != null ? ' / ${c['unitLabel']}' : ''}',
+                                    ),
+                                    trailing: StatusChip(
+                                      kind == 'METERED' ? 'Metered' : 'Fixed',
+                                      tone: kind == 'METERED'
+                                          ? Tone.info
+                                          : Tone.neutral,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  )
+                : AsyncBody(
+                    value: moveIn,
+                    onRetry: () => ref.invalidate(_moveInChargesProvider),
+                    data: (rows) => rows.isEmpty
+                        ? const EmptyState(
+                            icon: Icons.door_front_door_outlined,
+                            title: 'No move-in charges configured',
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                            itemCount: rows.length,
+                            itemBuilder: (context, i) {
+                              final c = rows[i];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Card(
+                                  child: ListTile(
+                                    title: Text(
+                                      '${c['name'] ?? ''}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      'Move-in fee · ${formatKes(centsFrom(c['amount']))}',
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _addChargeType(BuildContext context) async {
+    final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    String kind = 'FIXED';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Add charge type'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: kind,
+                decoration: const InputDecoration(labelText: 'Kind'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'FIXED',
+                    child: Text('Fixed monthly'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'METERED',
+                    child: Text('Metered (per unit used)'),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v != null) setDialogState(() => kind = v);
+                },
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Name (e.g. Water)',
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: codeCtrl,
+                decoration: const InputDecoration(labelText: 'Code (e.g. WTR)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Default rate / amount (KES)',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final cents = parseKes(amountCtrl.text);
+    if (nameCtrl.text.trim().isEmpty ||
+        codeCtrl.text.trim().isEmpty ||
+        cents == null) {
+      return;
+    }
+    try {
+      await ref.read(staffApiProvider).createChargeType({
+        'name': nameCtrl.text.trim(),
+        'code': codeCtrl.text.trim().toUpperCase(),
+        'kind': kind,
+        'defaultAmount': cents,
+        if (kind == 'METERED') 'unitLabel': 'm³',
+      });
+      ref.invalidate(_chargeTypesProvider);
+      if (context.mounted) showMessage(context, 'Charge type added.');
+    } on ApiError catch (e) {
+      if (context.mounted) showMessage(context, staffErrorMessage(e));
+    }
   }
 }
 
@@ -961,15 +1562,23 @@ class StaffAgencyScreen extends ConsumerWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Landlords & payouts'),
-          bottom: const TabBar(
+        appBar: const KodiHubAppBar(
+          title: Text('Landlords & payouts'),
+          bottom: TabBar(
             tabs: [
               Tab(text: 'Landlords'),
               Tab(text: 'Remittances'),
             ],
           ),
         ),
+        floatingActionButton: can(ref, 'agency:manage')
+            ? FloatingActionButton.extended(
+                heroTag: 'fab-agency',
+                icon: const Icon(Icons.person_add_outlined),
+                label: const Text('Add landlord'),
+                onPressed: () => _addLandlord(context, ref),
+              )
+            : null,
         body: TabBarView(
           children: [
             AsyncBody(
@@ -978,13 +1587,34 @@ class StaffAgencyScreen extends ConsumerWidget {
               data: (rows) => rows.isEmpty
                   ? const EmptyState(title: 'No landlords yet')
                   : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
                       itemCount: rows.length,
                       itemBuilder: (context, i) {
                         final l = rows[i];
-                        return ListTile(
-                          title: Text('${l['name'] ?? ''}'),
-                          subtitle: Text(
-                            '${l['code'] ?? ''} · ${l['phone'] ?? l['email'] ?? ''}',
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Card(
+                            child: ListTile(
+                              leading: InitialsBadge(
+                                name: '${l['name'] ?? '?'}',
+                              ),
+                              title: Text(
+                                '${l['name'] ?? ''}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${l['code'] ?? ''} · ${l['phone'] ?? l['email'] ?? ''}',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => _LandlordDetailSheet.show(
+                                context,
+                                landlord: l,
+                                allRemittances:
+                                    remittances.valueOrNull ?? const [],
+                              ),
+                            ),
                           ),
                         );
                       },
@@ -996,21 +1626,181 @@ class StaffAgencyScreen extends ConsumerWidget {
               data: (rows) => rows.isEmpty
                   ? const EmptyState(title: 'No remittances yet')
                   : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
                       itemCount: rows.length,
                       itemBuilder: (context, i) {
                         final r = rows[i];
-                        return ListTile(
-                          title: Text(
-                            '${r['number'] ?? ''} · ${(r['landlord'] as Map?)?['name'] ?? ''}',
+                        final status = '${r['status'] ?? 'DRAFT'}';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Card(
+                            child: ListTile(
+                              title: Text(
+                                '${r['number'] ?? ''} · ${(r['landlord'] as Map?)?['name'] ?? ''}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${formatPeriod('${r['period'] ?? ''}')} · Net ${formatKes(centsFrom(r['net']))}',
+                              ),
+                              trailing: StatusChip(
+                                status,
+                                tone: status == 'PAID'
+                                    ? Tone.good
+                                    : (status == 'APPROVED'
+                                          ? Tone.info
+                                          : Tone.neutral),
+                              ),
+                            ),
                           ),
-                          subtitle: Text(
-                            '${formatPeriod('${r['period'] ?? ''}')} · Net ${formatKes(centsFrom(r['net']))}',
-                          ),
-                          trailing: StatusChip('${r['status'] ?? 'DRAFT'}'),
                         );
                       },
                     ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _addLandlord(BuildContext context, WidgetRef ref) async {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add landlord'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Full name'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'Phone (optional)'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted || nameCtrl.text.trim().isEmpty) return;
+    try {
+      await ref.read(staffApiProvider).createLandlord({
+        'name': nameCtrl.text.trim(),
+        if (phoneCtrl.text.trim().isNotEmpty) 'phone': phoneCtrl.text.trim(),
+        if (emailCtrl.text.trim().isNotEmpty) 'email': emailCtrl.text.trim(),
+      });
+      ref.invalidate(_landlordsProvider);
+      if (context.mounted) showMessage(context, 'Landlord added.');
+    } on ApiError catch (e) {
+      if (context.mounted) showMessage(context, staffErrorMessage(e));
+    }
+  }
+}
+
+class _LandlordDetailSheet extends StatefulWidget {
+  const _LandlordDetailSheet({
+    required this.landlord,
+    required this.allRemittances,
+  });
+  final Json landlord;
+  final List<Json> allRemittances;
+
+  static Future<void> show(
+    BuildContext context, {
+    required Json landlord,
+    required List<Json> allRemittances,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (_) => _LandlordDetailSheet(
+      landlord: landlord,
+      allRemittances: allRemittances,
+    ),
+  );
+
+  @override
+  State<_LandlordDetailSheet> createState() => _LandlordDetailSheetState();
+}
+
+class _LandlordDetailSheetState extends State<_LandlordDetailSheet> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = widget.landlord;
+    final lid = l['id'];
+    final rems = widget.allRemittances
+        .where((r) => (r['landlord'] as Map?)?['id'] == lid)
+        .toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Kicker('${l['code'] ?? 'LANDLORD'}'),
+            const SizedBox(height: 4),
+            Text(
+              '${l['name'] ?? ''}',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            KodiHubSegmentedTabs(
+              tabs: ['Overview', 'Remittances (${rems.length})'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
+            const SizedBox(height: 12),
+            if (_tab == 0)
+              SectionCard(
+                children: [
+                  FactRow('Code', '${l['code'] ?? '—'}'),
+                  if (l['phone'] != null) FactRow('Phone', '${l['phone']}'),
+                  if (l['email'] != null) FactRow('Email', '${l['email']}'),
+                  if (l['payoutMethod'] != null)
+                    FactRow('Payout method', '${l['payoutMethod']}'),
+                ],
+              )
+            else
+              SectionCard(
+                children: [
+                  if (rems.isEmpty)
+                    const Text(
+                      'No remittance statements for this landlord yet.',
+                    ),
+                  for (final r in rems)
+                    FactRow(
+                      '${r['number'] ?? ''} · ${formatPeriod('${r['period'] ?? ''}')}',
+                      formatKes(centsFrom(r['net'])),
+                    ),
+                ],
+              ),
           ],
         ),
       ),
@@ -1021,39 +1811,188 @@ class StaffAgencyScreen extends ConsumerWidget {
 final _usersProvider = FutureProvider.autoDispose<List<Json>>(
   (ref) => ref.watch(staffApiProvider).users(),
 );
+final _rolesProvider = FutureProvider.autoDispose<List<Json>>(
+  (ref) => ref.watch(staffApiProvider).roles(),
+);
 
-class StaffUsersScreen extends ConsumerWidget {
+class StaffUsersScreen extends ConsumerStatefulWidget {
   const StaffUsersScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StaffUsersScreen> createState() => _StaffUsersScreenState();
+}
+
+class _StaffUsersScreenState extends ConsumerState<StaffUsersScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final users = ref.watch(_usersProvider);
+    final roles = ref.watch(_rolesProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Team & roles')),
-      body: AsyncBody(
-        value: users,
-        onRetry: () => ref.invalidate(_usersProvider),
-        data: (rows) => rows.isEmpty
-            ? const EmptyState(title: 'No team members')
-            : ListView.builder(
-                itemCount: rows.length,
-                itemBuilder: (context, i) {
-                  final u = rows[i];
-                  final user = u['user'] as Map<String, dynamic>? ?? u;
-                  final role = u['role'] as Map<String, dynamic>?;
-                  return ListTile(
-                    leading: const Icon(Icons.person_outline),
-                    title: Text(
-                      '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'
-                          .trim(),
-                    ),
-                    subtitle: Text(
-                      '${user['email'] ?? user['phone'] ?? ''} · ${role?['name'] ?? u['roleName'] ?? ''}',
-                    ),
-                  );
-                },
-              ),
+      appBar: const KodiHubAppBar(title: Text('Team & roles')),
+      floatingActionButton: can(ref, 'users:manage')
+          ? FloatingActionButton.extended(
+              heroTag: 'fab-users',
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Invite member'),
+              onPressed: () =>
+                  _inviteUser(context, roles.valueOrNull ?? const []),
+            )
+          : null,
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: KodiHubSegmentedTabs(
+              tabs: const ['Team members', 'Roles & permissions'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
+          ),
+          Expanded(
+            child: _tab == 0
+                ? AsyncBody(
+                    value: users,
+                    onRetry: () => ref.invalidate(_usersProvider),
+                    data: (rows) => rows.isEmpty
+                        ? const EmptyState(title: 'No team members')
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                            itemCount: rows.length,
+                            itemBuilder: (context, i) {
+                              final u = rows[i];
+                              final user =
+                                  u['user'] as Map<String, dynamic>? ?? u;
+                              final role = u['role'] as Map<String, dynamic>?;
+                              final fullName =
+                                  '${user['firstName'] ?? ''} ${user['lastName'] ?? ''}'
+                                      .trim();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Card(
+                                  child: ListTile(
+                                    leading: InitialsBadge(
+                                      name: fullName.isEmpty ? '?' : fullName,
+                                    ),
+                                    title: Text(
+                                      fullName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '${user['email'] ?? user['phone'] ?? ''}',
+                                    ),
+                                    trailing: StatusChip(
+                                      '${role?['name'] ?? u['roleName'] ?? 'Member'}',
+                                      tone: Tone.info,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  )
+                : AsyncBody(
+                    value: roles,
+                    onRetry: () => ref.invalidate(_rolesProvider),
+                    data: (rows) => rows.isEmpty
+                        ? const EmptyState(title: 'No roles configured')
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
+                            itemCount: rows.length,
+                            itemBuilder: (context, i) {
+                              final r = rows[i];
+                              final perms =
+                                  (r['permissions'] as List?)?.length ?? 0;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Card(
+                                  child: ListTile(
+                                    title: Text(
+                                      '${r['name'] ?? ''}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      '${r['description'] ?? '$perms permissions granted'}',
+                                    ),
+                                    trailing: StatusChip('$perms perms'),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _inviteUser(BuildContext context, List<Json> roles) async {
+    final emailCtrl = TextEditingController();
+    String? roleId = roles.isNotEmpty ? '${roles.first['id']}' : null;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Invite team member'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email address'),
+              ),
+              if (roles.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: roleId,
+                  decoration: const InputDecoration(labelText: 'Role'),
+                  items: [
+                    for (final r in roles)
+                      DropdownMenuItem(
+                        value: '${r['id']}',
+                        child: Text('${r['name']}'),
+                      ),
+                  ],
+                  onChanged: (v) => setDialogState(() => roleId = v),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Send invite'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true ||
+        !context.mounted ||
+        emailCtrl.text.trim().isEmpty ||
+        roleId == null) {
+      return;
+    }
+    try {
+      await ref.read(staffApiProvider).inviteUser({
+        'email': emailCtrl.text.trim(),
+        'roleId': roleId,
+      });
+      ref.invalidate(_usersProvider);
+      if (context.mounted) showMessage(context, 'Invitation sent.');
+    } on ApiError catch (e) {
+      if (context.mounted) showMessage(context, staffErrorMessage(e));
+    }
   }
 }

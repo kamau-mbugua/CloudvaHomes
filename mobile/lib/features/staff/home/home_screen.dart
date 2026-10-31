@@ -167,6 +167,27 @@ class _DashboardBody extends ConsumerWidget {
           children: [
             CurvedHeroCard(
               kicker: 'COLLECTED · ${formatPeriod(d.period)}',
+              trailing: GestureDetector(
+                onTap: () => context.push('/staff/more/reports'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'Reports →',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
               children: [
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -241,6 +262,7 @@ class _DashboardBody extends ConsumerWidget {
                     formatKes(d.arrears),
                     note: 'Overdue, as of today',
                     alert: d.arrears > 0,
+                    onTap: () => context.push('/staff/more/reports'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -250,10 +272,39 @@ class _DashboardBody extends ConsumerWidget {
                     _percent(d.occupancyRate),
                     note:
                         '${d.occupied + d.notice} of ${d.units} let · ${d.vacant} vacant',
+                    onTap: () => context.go('/staff/units'),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _Figure(
+                    'Expenses',
+                    formatKes(d.expenses),
+                    note: 'Net: ${formatKes(d.net)}',
+                    onTap: can(ref, 'expenses:view')
+                        ? () => context.push('/staff/more/expenses')
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _Figure(
+                    'P&L & Aging',
+                    formatPeriod(d.period),
+                    note: 'Full financial statements →',
+                    onTap: () => context.push('/staff/more/reports'),
+                  ),
+                ),
+              ],
+            ),
+            if (d.trend.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _TrendChartCard(trend: d.trend),
+            ],
             if (d.unmatchedMpesa != null && d.unmatchedMpesa! > 0) ...[
               const SizedBox(height: 12),
               Material(
@@ -338,6 +389,10 @@ class _DashboardBody extends ConsumerWidget {
               const SizedBox(height: 12),
               SectionCard(
                 title: 'Most overdue',
+                trailing: TextButton(
+                  onPressed: () => context.push('/staff/more/reports'),
+                  child: const Text('See all →'),
+                ),
                 children: [
                   for (final (idx, r) in d.topOverdue.indexed) ...[
                     if (idx > 0) const Divider(height: 1),
@@ -376,50 +431,214 @@ class _DashboardBody extends ConsumerWidget {
 }
 
 class _Figure extends StatelessWidget {
-  const _Figure(this.label, this.value, {this.note, this.alert = false});
+  const _Figure(
+    this.label,
+    this.value, {
+    this.note,
+    this.alert = false,
+    this.onTap,
+  });
   final String label;
   final String value;
   final String? note;
   final bool alert;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: dark ? scheme.surfaceContainerLowest : Colors.white,
+    return Material(
+      color: dark ? scheme.surfaceContainerLowest : Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Kicker(label),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: alert
-                    ? toneColor(context, Tone.warn)
-                    : (dark ? Colors.white : HodiColors.navy),
-                fontWeight: FontWeight.w800,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Kicker(label),
+              const SizedBox(height: 6),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  value,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: alert
+                        ? toneColor(context, Tone.warn)
+                        : (dark ? Colors.white : HodiColors.navy),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
-            ),
+              if (note != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  note!,
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
           ),
-          if (note != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              note!,
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
+}
+
+class _TrendChartCard extends StatelessWidget {
+  const _TrendChartCard({required this.trend});
+  final List<({String period, int invoiced, int collected, int expenses})>
+  trend;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final recent = trend.length > 6 ? trend.sublist(trend.length - 6) : trend;
+    var maxVal = 1;
+    for (final t in recent) {
+      if (t.invoiced > maxVal) maxVal = t.invoiced;
+      if (t.collected > maxVal) maxVal = t.collected;
+      if (t.expenses > maxVal) maxVal = t.expenses;
+    }
+
+    return SectionCard(
+      title: '6-month cashflow trend',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _LegendDot(
+            color: dark ? const Color(0xFF60A5FA) : HodiColors.navy,
+            label: 'Invoiced',
+          ),
+          const SizedBox(width: 8),
+          const _LegendDot(color: HodiColors.lime, label: 'Collected'),
+          const SizedBox(width: 8),
+          _LegendDot(color: toneColor(context, Tone.warn), label: 'Expenses'),
+        ],
+      ),
+      children: [
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 128,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final t in recent)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _Bar(
+                                fraction: (t.invoiced / maxVal).clamp(
+                                  0.04,
+                                  1.0,
+                                ),
+                                color: dark
+                                    ? const Color(0xFF60A5FA)
+                                    : HodiColors.navy,
+                              ),
+                              const SizedBox(width: 3),
+                              _Bar(
+                                fraction: (t.collected / maxVal).clamp(
+                                  0.04,
+                                  1.0,
+                                ),
+                                color: HodiColors.lime,
+                              ),
+                              if (t.expenses > 0) ...[
+                                const SizedBox(width: 3),
+                                _Bar(
+                                  fraction: (t.expenses / maxVal).clamp(
+                                    0.04,
+                                    1.0,
+                                  ),
+                                  color: toneColor(context, Tone.warn),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          t.period.length >= 7
+                              ? t.period.substring(5, 7)
+                              : t.period,
+                          style: TextStyle(
+                            fontFamily: 'JetBrainsMono',
+                            fontSize: 10.5,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Bar extends StatelessWidget {
+  const _Bar({required this.fraction, required this.color});
+  final double fraction;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => FractionallySizedBox(
+    heightFactor: fraction,
+    child: Container(
+      width: 8,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+      ),
+    ),
+  );
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.5,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ],
+  );
 }

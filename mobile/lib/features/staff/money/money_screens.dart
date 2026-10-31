@@ -120,12 +120,21 @@ class _PaymentsListState extends ConsumerState<_PaymentsList> {
   }
 }
 
-class PaymentDetailScreen extends ConsumerWidget {
+class PaymentDetailScreen extends ConsumerStatefulWidget {
   const PaymentDetailScreen({super.key, required this.paymentId});
   final String paymentId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PaymentDetailScreen> createState() =>
+      _PaymentDetailScreenState();
+}
+
+class _PaymentDetailScreenState extends ConsumerState<PaymentDetailScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final paymentId = widget.paymentId;
     final payment = ref.watch(paymentProvider(paymentId));
     final p = payment.valueOrNull;
     return Scaffold(
@@ -185,55 +194,72 @@ class PaymentDetailScreen extends ConsumerWidget {
                   ].join(' · '),
                 ),
                 if (p.reference != null) FactRow('Reference', p.reference!),
-                if (p.paidBy != null) FactRow('Paid by', p.paidBy!),
-                if (p.note != null) FactRow('Note', p.note!),
                 if (p.unallocated > 0)
                   FactRow('Kept as credit', formatKes(p.unallocated)),
-                if (p.recordedBy != null) FactRow('Recorded by', p.recordedBy!),
-                if (p.reversedByNumber != null)
-                  FactRow('Reversed by', p.reversedByNumber!),
-                if (p.reversalReason != null)
-                  FactRow('Reason', p.reversalReason!),
               ],
             ),
             const SizedBox(height: 12),
-            SectionCard(
-              title: 'Tenant',
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(p.tenant.name),
-                  subtitle: Text(p.tenant.code),
-                  trailing: can(ref, 'tenants:view')
-                      ? const Icon(Icons.chevron_right)
-                      : null,
-                  onTap: can(ref, 'tenants:view')
-                      ? () => context.push('/staff/tenants/${p.tenant.id}')
-                      : null,
-                ),
-              ],
+            KodiHubSegmentedTabs(
+              tabs: const ['Allocated to', 'Details & Tenant'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
             ),
             const SizedBox(height: 12),
-            SectionCard(
-              title: 'Allocated to',
-              children: [
-                if (p.allocations.isEmpty)
-                  const Text(
-                    'No invoices — the amount is the tenant’s credit.',
-                  ),
-                for (final a in p.allocations)
+            if (_tab == 0)
+              SectionCard(
+                title: 'Allocated to',
+                children: [
+                  if (p.allocations.isEmpty)
+                    const Text(
+                      'No invoices — the amount is the tenant’s credit.',
+                    ),
+                  for (final a in p.allocations)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${a.number} · ${formatPeriod(a.period)}'),
+                      trailing: Text(
+                        formatKes(a.amount),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      onTap: can(ref, 'invoices:view')
+                          ? () => context.push(
+                              '/staff/money/invoices/${a.invoiceId}',
+                            )
+                          : null,
+                    ),
+                ],
+              )
+            else
+              SectionCard(
+                title: 'Receipt & Tenant',
+                children: [
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text('${a.number} · ${formatPeriod(a.period)}'),
-                    trailing: Text(formatKes(a.amount)),
-                    onTap: can(ref, 'invoices:view')
-                        ? () => context.push(
-                            '/staff/money/invoices/${a.invoiceId}',
-                          )
+                    leading: InitialsBadge(name: p.tenant.name),
+                    title: Text(
+                      p.tenant.name,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text('${p.tenant.code} · ${p.tenant.phone}'),
+                    trailing: can(ref, 'tenants:view')
+                        ? const Icon(Icons.chevron_right)
+                        : null,
+                    onTap: can(ref, 'tenants:view')
+                        ? () => context.push('/staff/tenants/${p.tenant.id}')
                         : null,
                   ),
-              ],
-            ),
+                  const Divider(),
+                  FactRow('Receipt no.', p.number),
+                  if (p.paidBy != null) FactRow('Paid by', p.paidBy!),
+                  if (p.note != null) FactRow('Note', p.note!),
+                  if (p.recordedBy != null)
+                    FactRow('Recorded by', p.recordedBy!),
+                  if (p.reversedByNumber != null)
+                    FactRow('Reversed by', p.reversedByNumber!),
+                  if (p.reversalReason != null)
+                    FactRow('Reason', p.reversalReason!),
+                ],
+              ),
           ],
         ),
       ),
@@ -351,12 +377,21 @@ class _InvoicesListState extends ConsumerState<_InvoicesList> {
   }
 }
 
-class InvoiceDetailScreen extends ConsumerWidget {
+class InvoiceDetailScreen extends ConsumerStatefulWidget {
   const InvoiceDetailScreen({super.key, required this.invoiceId});
   final String invoiceId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InvoiceDetailScreen> createState() =>
+      _InvoiceDetailScreenState();
+}
+
+class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final invoiceId = widget.invoiceId;
     final detail = ref.watch(invoiceProvider(invoiceId));
     final d = detail.valueOrNull;
     return Scaffold(
@@ -391,99 +426,115 @@ class InvoiceDetailScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              SectionCard(
-                title: formatPeriod(i.period),
-                trailing: invoiceStatusChip(i),
+              LedgerReceiptCard(
                 children: [
-                  FactRow('Unit', '${i.unitNumber}, ${i.propertyName}'),
-                  FactRow('Issued', formatDay(i.issueDate)),
-                  FactRow('Due', formatDay(i.dueDate)),
-                  if (i.voidReason != null)
-                    FactRow('Void because', i.voidReason!),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(i.tenant.name),
-                    subtitle: Text(i.tenant.code),
-                    trailing: can(ref, 'tenants:view')
-                        ? const Icon(Icons.chevron_right)
-                        : null,
-                    onTap: can(ref, 'tenants:view')
-                        ? () => context.push('/staff/tenants/${i.tenant.id}')
-                        : null,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Kicker(
+                              '${i.number} · ${formatPeriod(i.period)}',
+                              color: HodiColors.limeText,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              formatKes(i.balance > 0 ? i.balance : i.total),
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              i.balance > 0
+                                  ? 'Balance due · Due ${formatDay(i.dueDate)}'
+                                  : 'Total ${formatKes(i.total)} · Issued ${formatDay(i.issueDate)}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      invoiceStatusChip(i),
+                    ],
                   ),
+                  if (i.status != 'VOID' && can(ref, 'invoices:update')) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (i.balance > 0)
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            label: const Text('Issue credit note'),
+                            onPressed: () => _InvoiceActions.creditNote(
+                              context,
+                              ref,
+                              invoiceId: i.id,
+                              tenantId: i.tenant.id,
+                              maxBalance: i.balance,
+                            ),
+                          ),
+                        if (i.amountPaid == 0)
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.cancel_outlined),
+                            label: const Text('Void invoice'),
+                            onPressed: () => _InvoiceActions.voidInvoice(
+                              context,
+                              ref,
+                              invoiceId: i.id,
+                              tenantId: i.tenant.id,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 12),
-              SectionCard(
-                title: 'Lines',
-                children: [
-                  for (final l in d.lines)
-                    FactRow(
-                      l.quantity == '1' || l.quantity == '1.000'
-                          ? l.description
-                          : '${l.description} (${l.quantity} × ${formatKes(l.unitAmount)})',
-                      formatKes(l.amount),
-                    ),
-                  const Divider(),
-                  FactRow('Total', formatKes(i.total), bold: true),
-                  if (i.creditedAmount > 0)
-                    FactRow('Credited', '-${formatKes(i.creditedAmount)}'),
-                  FactRow('Paid', formatKes(i.amountPaid)),
-                  FactRow('Balance', formatKes(i.balance), bold: true),
-                ],
+              KodiHubSegmentedTabs(
+                tabs: const ['Lines', 'Payments & Credits', 'Details'],
+                index: _tab,
+                onChanged: (idx) => setState(() => _tab = idx),
               ),
-              if (i.status != 'VOID' && can(ref, 'invoices:update')) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (i.balance > 0)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.remove_circle_outline),
-                        label: const Text('Issue credit note'),
-                        onPressed: () => _InvoiceActions.creditNote(
-                          context,
-                          ref,
-                          invoiceId: i.id,
-                          tenantId: i.tenant.id,
-                          maxBalance: i.balance,
-                        ),
-                      ),
-                    if (i.amountPaid == 0)
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.cancel_outlined),
-                        label: const Text('Void invoice'),
-                        onPressed: () => _InvoiceActions.voidInvoice(
-                          context,
-                          ref,
-                          invoiceId: i.id,
-                          tenantId: i.tenant.id,
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-              if (d.creditNotes.isNotEmpty) ...[
-                const SizedBox(height: 12),
+              const SizedBox(height: 12),
+              if (_tab == 0)
                 SectionCard(
-                  title: 'Credit notes',
+                  title: 'Lines',
                   children: [
-                    for (final c in d.creditNotes)
-                      FactRow('${c.number} · ${c.reason}', formatKes(c.amount)),
+                    for (final l in d.lines)
+                      FactRow(
+                        l.quantity == '1' || l.quantity == '1.000'
+                            ? l.description
+                            : '${l.description} (${l.quantity} × ${formatKes(l.unitAmount)})',
+                        formatKes(l.amount),
+                      ),
+                    const Divider(),
+                    FactRow('Total', formatKes(i.total), bold: true),
+                    if (i.creditedAmount > 0)
+                      FactRow('Credited', '-${formatKes(i.creditedAmount)}'),
+                    FactRow('Paid', formatKes(i.amountPaid)),
+                    FactRow('Balance', formatKes(i.balance), bold: true),
                   ],
-                ),
-              ],
-              if (d.payments.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                )
+              else if (_tab == 1) ...[
                 SectionCard(
                   title: 'Payments',
                   children: [
+                    if (d.payments.isEmpty)
+                      const Text('No payments allocated to this invoice yet.'),
                     for (final p in d.payments)
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text('${p.number} · ${formatDay(p.receivedAt)}'),
-                        trailing: Text(formatKes(p.amount)),
+                        trailing: Text(
+                          formatKes(p.amount),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                         onTap: can(ref, 'payments:view')
                             ? () =>
                                   context.push('/staff/money/payments/${p.id}')
@@ -491,7 +542,48 @@ class InvoiceDetailScreen extends ConsumerWidget {
                       ),
                   ],
                 ),
-              ],
+                if (d.creditNotes.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SectionCard(
+                    title: 'Credit notes',
+                    children: [
+                      for (final c in d.creditNotes)
+                        FactRow(
+                          '${c.number} · ${c.reason}',
+                          formatKes(c.amount),
+                        ),
+                    ],
+                  ),
+                ],
+              ] else
+                SectionCard(
+                  title: 'Invoice & Tenant',
+                  children: [
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: InitialsBadge(name: i.tenant.name),
+                      title: Text(
+                        i.tenant.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(i.tenant.code),
+                      trailing: can(ref, 'tenants:view')
+                          ? const Icon(Icons.chevron_right)
+                          : null,
+                      onTap: can(ref, 'tenants:view')
+                          ? () => context.push('/staff/tenants/${i.tenant.id}')
+                          : null,
+                    ),
+                    const Divider(),
+                    FactRow('Invoice no.', i.number),
+                    FactRow('Period', formatPeriod(i.period)),
+                    FactRow('Unit', '${i.unitNumber}, ${i.propertyName}'),
+                    FactRow('Issued', formatDay(i.issueDate)),
+                    FactRow('Due', formatDay(i.dueDate)),
+                    if (i.voidReason != null)
+                      FactRow('Void because', i.voidReason!),
+                  ],
+                ),
             ],
           );
         },

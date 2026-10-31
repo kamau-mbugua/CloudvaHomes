@@ -104,12 +104,21 @@ class _TenantTile extends StatelessWidget {
 
 /// One tenant: contacts, balance, deposit, open invoices, statement, recent payments and
 /// the money actions (each shown only with its permission).
-class TenantDetailScreen extends ConsumerWidget {
+/// Uses a 4-tab segmented switcher (`Statement | Invoices | Payments | Lease`) per C2.1 Screen 13.
+class TenantDetailScreen extends ConsumerStatefulWidget {
   const TenantDetailScreen({super.key, required this.tenantId});
   final String tenantId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TenantDetailScreen> createState() => _TenantDetailScreenState();
+}
+
+class _TenantDetailScreenState extends ConsumerState<TenantDetailScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final tenantId = widget.tenantId;
     final tenant = ref.watch(tenantProvider(tenantId));
     final canPayments = can(ref, 'payments:view');
     final tVal = tenant.valueOrNull;
@@ -125,6 +134,24 @@ class TenantDetailScreen extends ConsumerWidget {
         title: Text(tVal?.name ?? 'Tenant'),
         subtitle: sub,
         actions: [
+          if (tVal != null && tVal.ref.phone.isNotEmpty) ...[
+            IconButton(
+              tooltip: 'Call ${tVal.ref.phone}',
+              icon: const Icon(Icons.call_outlined),
+              onPressed: () => launchOrSay(
+                context,
+                Uri(scheme: 'tel', path: tVal.ref.phone),
+              ),
+            ),
+            IconButton(
+              tooltip: 'SMS ${tVal.ref.phone}',
+              icon: const Icon(Icons.sms_outlined),
+              onPressed: () => launchOrSay(
+                context,
+                Uri(scheme: 'sms', path: tVal.ref.phone),
+              ),
+            ),
+          ],
           if (tVal != null && can(ref, 'tenants:update'))
             IconButton(
               tooltip: 'Edit tenant',
@@ -151,19 +178,25 @@ class TenantDetailScreen extends ConsumerWidget {
           data: (t) => ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _Contacts(t),
-              const SizedBox(height: 12),
               _Balance(t, canPayments: canPayments),
               const SizedBox(height: 12),
               TenantActions(tenant: t),
+              const SizedBox(height: 14),
               if (canPayments) ...[
+                KodiHubSegmentedTabs(
+                  tabs: const ['Statement', 'Invoices', 'Payments', 'Lease'],
+                  index: _tab,
+                  onChanged: (i) => setState(() => _tab = i),
+                ),
                 const SizedBox(height: 12),
-                _OpenInvoices(t.id),
-                const SizedBox(height: 12),
-                _RecentPayments(t.id),
-                const SizedBox(height: 12),
-                _StatementCard(t),
-              ],
+                switch (_tab) {
+                  0 => _StatementCard(t),
+                  1 => _OpenInvoices(t.id),
+                  2 => _RecentPayments(t.id),
+                  _ => _Contacts(t),
+                },
+              ] else
+                _Contacts(t),
             ],
           ),
         ),
@@ -605,11 +638,12 @@ class _StatementCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final st = ref.watch(statementProvider(t.id));
+    final scheme = Theme.of(context).colorScheme;
     return SectionCard(
       title: 'Statement',
-      trailing: IconButton(
-        tooltip: 'Statement PDF',
-        icon: const Icon(Icons.picture_as_pdf_outlined),
+      trailing: OutlinedButton.icon(
+        icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+        label: const Text('PDF'),
         onPressed: () =>
             openApiPdf(
               ref.read(apiClientProvider),
@@ -633,32 +667,73 @@ class _StatementCard extends ConsumerWidget {
                 formatKes(s.openingBalance),
               ),
               const Divider(),
-              if (s.entries.isEmpty) const Text('No entries in this period.'),
-              for (final e in s.entries.reversed.take(12))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 68,
+                      child: Kicker('Date', color: scheme.onSurfaceVariant),
+                    ),
+                    Expanded(
+                      child: Kicker('Entry', color: scheme.onSurfaceVariant),
+                    ),
+                    Kicker('Balance', color: scheme.onSurfaceVariant),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              if (s.entries.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('No entries in this period.'),
+                ),
+              for (final e in s.entries.reversed.take(20)) ...[
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      SizedBox(
+                        width: 68,
+                        child: Text(
+                          formatDay(e.date),
+                          style: TextStyle(
+                            fontFamily: 'JetBrainsMono',
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${statementTypeLabel[e.type] ?? e.type}${e.reference != null ? ' · ${e.reference}' : ''}',
-                            ),
-                            Text(
-                              formatDay(e.date),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
+                              statementTypeLabel[e.type] ?? e.type,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
                               ),
                             ),
+                            if (e.reference != null || e.description != null)
+                              Text(
+                                [
+                                  if (e.reference != null) e.reference!,
+                                  if (e.description != null &&
+                                      e.description!.isNotEmpty)
+                                    e.description!,
+                                ].join(' · '),
+                                style: TextStyle(
+                                  fontFamily: 'JetBrainsMono',
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -666,14 +741,20 @@ class _StatementCard extends ConsumerWidget {
                             e.debit != null
                                 ? formatKes(e.debit!)
                                 : '-${formatKes(e.credit ?? 0)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: e.debit != null
+                                  ? null
+                                  : toneColor(context, Tone.good),
+                            ),
                           ),
                           Text(
-                            formatKes(e.balance),
+                            'Bal ${formatKes(e.balance)}',
                             style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              fontFamily: 'JetBrainsMono',
+                              fontSize: 10.5,
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -681,7 +762,9 @@ class _StatementCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-              const Divider(),
+                const Divider(height: 1),
+              ],
+              const SizedBox(height: 8),
               FactRow(
                 'Closing balance (${formatDay(s.to)})',
                 formatKes(s.closingBalance),

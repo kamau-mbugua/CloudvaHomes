@@ -7,6 +7,7 @@ import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/owner/owner_screens.dart';
+import '../features/platform/platform_screens.dart';
 import '../features/staff/staff_routes.dart';
 import '../features/tenant/tenant_routes.dart';
 import 'api/api_error.dart';
@@ -38,12 +39,14 @@ String? redirectFor({
     AppMode.staff => '/staff',
     AppMode.tenant => '/tenant',
     AppMode.owner => '/owner',
+    AppMode.platform => '/platform',
     null => '/no-access',
   };
   if (isPublic || location == '/' || location == '/offline') return home;
   if (location.startsWith('/staff') && mode != AppMode.staff) return home;
   if (location.startsWith('/tenant') && mode != AppMode.tenant) return home;
   if (location.startsWith('/owner') && mode != AppMode.owner) return home;
+  if (location.startsWith('/platform') && mode != AppMode.platform) return home;
   if (location == '/no-access' && mode != null) return home;
   return null;
 }
@@ -82,6 +85,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       tenantRoutes(),
       ownerRoutes(),
       staffRoutes(),
+      platformRoutes(),
     ],
   );
 });

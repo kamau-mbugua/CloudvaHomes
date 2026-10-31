@@ -11,6 +11,53 @@ import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
 import 'tenant_api.dart';
 import 'tenant_home_screen.dart';
+import 'tenant_payments_screen.dart';
+import 'tenant_statement_screen.dart';
+
+/// Unified tenant financial ledger screen with 3 segmented tabs (`Invoices | Payments | Statement`)
+/// so the tenant bottom navigation bar stays lean (3 tabs: Home, Ledger, Repairs).
+class TenantLedgerScreen extends StatefulWidget {
+  const TenantLedgerScreen({super.key, this.initialTab = 0});
+  final int initialTab;
+
+  @override
+  State<TenantLedgerScreen> createState() => _TenantLedgerScreenState();
+}
+
+class _TenantLedgerScreenState extends State<TenantLedgerScreen> {
+  late int _tab = widget.initialTab;
+
+  @override
+  void didUpdateWidget(covariant TenantLedgerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      _tab = widget.initialTab;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: KodiHubSegmentedTabs(
+            tabs: const ['Invoices', 'Payments', 'Statement'],
+            index: _tab,
+            onChanged: (i) => setState(() => _tab = i),
+          ),
+        ),
+        Expanded(
+          child: switch (_tab) {
+            0 => const TenantInvoicesScreen(),
+            1 => const TenantPaymentsScreen(),
+            _ => const TenantStatementScreen(),
+          },
+        ),
+      ],
+    );
+  }
+}
 
 class TenantInvoicesScreen extends ConsumerWidget {
   const TenantInvoicesScreen({super.key});
@@ -108,12 +155,21 @@ Widget invoiceChip(InvoiceRow i) {
   };
 }
 
-class TenantInvoiceScreen extends ConsumerWidget {
+class TenantInvoiceScreen extends ConsumerStatefulWidget {
   const TenantInvoiceScreen({super.key, required this.invoiceId});
   final String invoiceId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TenantInvoiceScreen> createState() =>
+      _TenantInvoiceScreenState();
+}
+
+class _TenantInvoiceScreenState extends ConsumerState<TenantInvoiceScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final invoiceId = widget.invoiceId;
     final invoice = ref.watch(tenantInvoiceProvider(invoiceId));
     final overview = ref.watch(tenantOverviewProvider).valueOrNull;
     final tenantId = ref.watch(currentTenantIdProvider);
@@ -150,41 +206,36 @@ class TenantInvoiceScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              SectionCard(
-                title: d.row.balance > 0
-                    ? 'Left to pay'
-                    : formatPeriod(d.row.period),
-                trailing: invoiceChip(d.row),
+              LedgerReceiptCard(
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Kicker(
+                        d.row.balance > 0
+                            ? 'Left to pay'
+                            : formatPeriod(d.row.period),
+                        color: HodiColors.limeText,
+                      ),
+                      invoiceChip(d.row),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   Text(
                     formatKes(d.row.balance > 0 ? d.row.balance : d.row.total),
                     style: TextStyle(
                       fontSize: 32,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: -0.8,
                       color: dark ? Colors.white : HodiColors.navy,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   const Divider(),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   FactRow('Issued', formatDay(d.issueDate)),
                   FactRow('Due', formatDay(d.row.dueDate)),
                   if (d.row.unit != null) FactRow('Unit', d.row.unit!),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SectionCard(
-                title: 'Charges',
-                children: [
-                  for (final l in d.lines)
-                    FactRow(l.description, formatKes(l.amount)),
-                  const Divider(),
-                  FactRow('Total', formatKes(d.row.total), bold: true),
-                  if (d.credited > 0)
-                    FactRow('Credited', '-${formatKes(d.credited)}'),
-                  FactRow('Paid', formatKes(d.amountPaid)),
-                  FactRow('Balance', formatKes(d.row.balance), bold: true),
                   if (d.row.balance > 0 &&
                       overview != null &&
                       overview.canPayInApp) ...[
@@ -208,11 +259,36 @@ class TenantInvoiceScreen extends ConsumerWidget {
                   ],
                 ],
               ),
-              if (d.payments.isNotEmpty) ...[
-                const SizedBox(height: 12),
+              const SizedBox(height: 12),
+              KodiHubSegmentedTabs(
+                tabs: [
+                  'Charges (${d.lines.length})',
+                  'Payments (${d.payments.length})',
+                ],
+                index: _tab,
+                onChanged: (i) => setState(() => _tab = i),
+              ),
+              const SizedBox(height: 12),
+              if (_tab == 0)
+                SectionCard(
+                  title: 'Charges',
+                  children: [
+                    for (final l in d.lines)
+                      FactRow(l.description, formatKes(l.amount)),
+                    const Divider(),
+                    FactRow('Total', formatKes(d.row.total), bold: true),
+                    if (d.credited > 0)
+                      FactRow('Credited', '-${formatKes(d.credited)}'),
+                    FactRow('Paid', formatKes(d.amountPaid)),
+                    FactRow('Balance', formatKes(d.row.balance), bold: true),
+                  ],
+                )
+              else
                 SectionCard(
                   title: 'Payments',
                   children: [
+                    if (d.payments.isEmpty)
+                      const Text('No payments recorded for this invoice yet.'),
                     for (final p in d.payments)
                       FactRow(
                         '${p.number} · ${formatDay(p.receivedAt)}',
@@ -235,7 +311,6 @@ class TenantInvoiceScreen extends ConsumerWidget {
                       ),
                   ],
                 ),
-              ],
             ],
           );
         },

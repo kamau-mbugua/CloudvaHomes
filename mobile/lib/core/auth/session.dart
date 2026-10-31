@@ -22,6 +22,7 @@ class Session {
   bool get isStaff => activeOrganization != null;
   bool get isTenant => tenantOf.isNotEmpty;
   bool get isOwner => ownerOf.isNotEmpty;
+  bool get isPlatformAdmin => user.isPlatformAdmin;
 
   factory Session.fromJson(Map<String, dynamic> j) {
     final active = j['activeOrganization'];
@@ -61,12 +62,16 @@ class SessionUser {
     required this.lastName,
     this.email,
     this.phone,
+    this.isPlatformAdmin = false,
+    this.platformRole,
   });
   final String id;
   final String firstName;
   final String lastName;
   final String? email;
   final String? phone;
+  final bool isPlatformAdmin;
+  final String? platformRole;
 
   String get fullName => '$firstName $lastName';
   String get initials =>
@@ -79,6 +84,8 @@ class SessionUser {
     lastName: j['lastName'] as String? ?? '',
     email: j['email'] as String?,
     phone: j['phone'] as String?,
+    isPlatformAdmin: j['isPlatformAdmin'] == true,
+    platformRole: j['platformRole'] as String?,
   );
 }
 

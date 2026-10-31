@@ -77,6 +77,7 @@ class AccountSheet extends ConsumerWidget {
             StatusChip(switch (mode) {
               AppMode.tenant => 'Tenant',
               AppMode.owner => 'Owner',
+              AppMode.platform => 'Platform',
               _ => 'Staff',
             }, tone: Tone.good),
           ],
@@ -86,6 +87,38 @@ class AccountSheet extends ConsumerWidget {
           'You can switch between these any time from the top corner.',
           style: TextStyle(fontSize: 13.5, color: muted),
         ),
+        if (session.isPlatformAdmin) ...[
+          const SizedBox(height: 16),
+          _Heading('Platform · KodiHub Admin', muted),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _AccountDestCard(
+              badge: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: HodiColors.navy,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.admin_panel_settings_outlined,
+                  color: HodiColors.lime,
+                ),
+              ),
+              title: 'KodiHub Platform',
+              subtitle: session.user.platformRole ?? 'Platform Operator',
+              pill: StatusChip(
+                session.user.platformRole ?? 'ADMIN',
+                tone: Tone.info,
+              ),
+              selected: mode == AppMode.platform,
+              onTap: () {
+                ref.read(appModeProvider.notifier).state = AppMode.platform;
+                Navigator.of(context).pop();
+              },
+            ),
+          ),
+        ],
         if (session.organizations.isNotEmpty) ...[
           const SizedBox(height: 16),
           _Heading('Work · Organisations', muted),

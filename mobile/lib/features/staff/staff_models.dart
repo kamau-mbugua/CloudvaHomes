@@ -76,44 +76,63 @@ class TenantRef {
 class Dashboard {
   Dashboard({
     required this.period,
+    this.asOf,
     required this.invoiced,
     required this.collected,
     required this.collectionRate,
+    this.expenses = 0,
+    this.net = 0,
     required this.arrears,
     required this.units,
     required this.occupied,
     required this.notice,
     required this.vacant,
+    this.unavailable = 0,
     required this.occupancyRate,
     required this.unmatchedMpesa,
     required this.topOverdue,
+    this.trend = const [],
   });
   final String period;
+  final String? asOf;
   final int invoiced;
   final int collected;
   final double? collectionRate;
+  final int expenses;
+  final int net;
   final int arrears;
   final int units;
   final int occupied;
   final int notice;
   final int vacant;
+  final int unavailable;
   final double? occupancyRate;
   final int? unmatchedMpesa;
   final List<({TenantRef tenant, int overdue, String? oldestDueDate})>
   topOverdue;
+  final List<({String period, int invoiced, int collected, int expenses})>
+  trend;
 
   factory Dashboard.fromJson(Json j) {
     final occ = j['occupancy'] as Map<String, dynamic>? ?? const {};
+    final invoiced = centsFrom(j['invoiced']);
+    final collected = centsFrom(j['collected']);
+    final expenses = centsFrom(j['expenses']);
+    final net = j['net'] == null ? (collected - expenses) : centsFrom(j['net']);
     return Dashboard(
       period: _s(j['period']) ?? '',
-      invoiced: centsFrom(j['invoiced']),
-      collected: centsFrom(j['collected']),
+      asOf: _s(j['asOf']),
+      invoiced: invoiced,
+      collected: collected,
       collectionRate: (j['collectionRate'] as num?)?.toDouble(),
+      expenses: expenses,
+      net: net,
       arrears: centsFrom(j['arrears']),
       units: _i(occ['units']),
       occupied: _i(occ['occupied']),
       notice: _i(occ['notice']),
       vacant: _i(occ['vacant']),
+      unavailable: _i(occ['unavailable']),
       occupancyRate: (occ['rate'] as num?)?.toDouble(),
       unmatchedMpesa: j['unmatchedMpesa'] == null
           ? null
@@ -124,6 +143,15 @@ class Dashboard {
             tenant: TenantRef.fromJson(r['tenant'] as Json),
             overdue: centsFrom(r['overdue']),
             oldestDueDate: _s(r['oldestDueDate']),
+          ),
+      ],
+      trend: [
+        for (final t in _list(j['trend']))
+          (
+            period: _s(t['period']) ?? '',
+            invoiced: centsFrom(t['invoiced']),
+            collected: centsFrom(t['collected']),
+            expenses: centsFrom(t['expenses']),
           ),
       ],
     );

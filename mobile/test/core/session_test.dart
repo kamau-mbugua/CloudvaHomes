@@ -72,6 +72,26 @@ void main() {
       );
     });
 
+    test('platform admin routes to /platform instead of /no-access', () {
+      final raw = sessionJson(staff: false);
+      (raw['user'] as Map<String, dynamic>)['isPlatformAdmin'] = true;
+      (raw['user'] as Map<String, dynamic>)['platformRole'] = 'SUPERADMIN';
+      final platformSession = Session.fromJson(raw);
+      expect(effectiveMode(platformSession, null), AppMode.platform);
+      expect(
+        go(AsyncData<Session?>(platformSession), AppMode.platform, '/sign-in'),
+        '/platform',
+      );
+      expect(
+        go(
+          AsyncData<Session?>(platformSession),
+          AppMode.platform,
+          '/platform/orgs',
+        ),
+        isNull,
+      );
+    });
+
     test('signed in → home of the mode; the other mode is off-limits', () {
       final s = AsyncData<Session?>(session(tenant: true));
       expect(go(s, AppMode.staff, '/sign-in'), '/staff');

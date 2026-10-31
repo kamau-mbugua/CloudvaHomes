@@ -84,12 +84,20 @@ class _MetersScreenState extends ConsumerState<MetersScreen> {
   }
 }
 
-class _MeterList extends ConsumerWidget {
+class _MeterList extends ConsumerStatefulWidget {
   const _MeterList({required this.propertyId});
   final String propertyId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MeterList> createState() => _MeterListState();
+}
+
+class _MeterListState extends ConsumerState<_MeterList> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final propertyId = widget.propertyId;
     final meters = ref.watch(metersProvider(propertyId));
     final canRead = can(ref, 'meters:create');
     return RefreshIndicator(
@@ -111,26 +119,99 @@ class _MeterList extends ConsumerWidget {
             );
           }
           final period = nairobiPeriod();
-          final readCount = active
+          final readMeters = active
               .where((m) => m.lastReading?.period == period)
-              .length;
+              .toList();
+          final pendingMeters = active
+              .where((m) => m.lastReading?.period != period)
+              .toList();
+          final readCount = readMeters.length;
+          final filtered = switch (_tab) {
+            1 => pendingMeters,
+            2 => readMeters,
+            _ => active,
+          };
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              KodiHubBatchProgress(
+                title: '${formatPeriod(period)} readings',
+                completed: readCount,
+                total: active.length,
+                subtitle: '$readCount of ${active.length} read',
+              ),
+              if (pendingMeters.isNotEmpty && canRead) ...[
+                const SizedBox(height: 10),
+                CurvedHeroCard(
+                  kicker:
+                      'UP NEXT · ${pendingMeters.length} REMAINING THIS MONTH',
+                  trailing: StatusChip(
+                    pendingMeters.first.chargeName,
+                    tone: Tone.info,
+                  ),
                   children: [
-                    Kicker('${formatPeriod(period)} readings'),
-                    StatusChip(
-                      '$readCount of ${active.length} read',
-                      tone: readCount == active.length ? Tone.good : Tone.warn,
+                    Row(
+                      children: [
+                        UnitBadge(
+                          pendingMeters.first.unitNumber,
+                          width: 48,
+                          height: 44,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Unit ${pendingMeters.first.unitNumber} · ${pendingMeters.first.chargeName}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Meter ${pendingMeters.first.serialNo} · Last: ${pendingMeters.first.lastReading?.current ?? '0'} ${pendingMeters.first.unitLabel ?? ''}',
+                                style: const TextStyle(
+                                  color: Color(0xFFB8C6D9),
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.speed_outlined, size: 18),
+                      label: const Text('Enter reading & photo →'),
+                      onPressed: () =>
+                          Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ReadingScreen(
+                                meter: pendingMeters.first,
+                                canSave: canRead,
+                              ),
+                            ),
+                          ),
                     ),
                   ],
                 ),
+              ],
+              const SizedBox(height: 12),
+              KodiHubSegmentedTabs(
+                tabs: [
+                  'All (${active.length})',
+                  'Pending (${pendingMeters.length})',
+                  'Read ($readCount)',
+                ],
+                index: _tab,
+                onChanged: (i) => setState(() => _tab = i),
               ),
-              for (final m in active)
+              const SizedBox(height: 10),
+              for (final m in filtered)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Card(

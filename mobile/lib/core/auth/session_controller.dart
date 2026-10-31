@@ -6,8 +6,8 @@ import '../providers.dart';
 import 'session.dart';
 import 'token_store.dart';
 
-/// Which side of the app is showing. Someone who is staff, a tenant, or a landlord owner can switch.
-enum AppMode { staff, tenant, owner }
+/// Which side of the app is showing. Someone who is staff, a tenant, a landlord owner, or a platform admin can switch.
+enum AppMode { staff, tenant, owner, platform }
 
 /// Returned when password sign-in requires a second-factor verification code.
 class TwoFactorChallenge {
@@ -228,15 +228,17 @@ final sessionProvider = AsyncNotifierProvider<SessionController, Session?>(
 /// The mode the person chose; null = the default for their session.
 final appModeProvider = StateProvider<AppMode?>((ref) => null);
 
-/// The mode to show: staff when they belong to an organisation, else tenant, else owner.
+/// The mode to show: staff when they belong to an organisation, else tenant, else owner, else platform admin.
 AppMode? effectiveMode(Session? s, AppMode? chosen) {
   if (s == null) return null;
+  if (chosen == AppMode.platform && s.isPlatformAdmin) return AppMode.platform;
   if (chosen == AppMode.staff && s.isStaff) return AppMode.staff;
   if (chosen == AppMode.tenant && s.isTenant) return AppMode.tenant;
   if (chosen == AppMode.owner && s.isOwner) return AppMode.owner;
   if (s.isStaff) return AppMode.staff;
   if (s.isTenant) return AppMode.tenant;
   if (s.isOwner) return AppMode.owner;
+  if (s.isPlatformAdmin) return AppMode.platform;
   return null;
 }
 

@@ -218,12 +218,21 @@ class _PropertyChip extends StatelessWidget {
 }
 
 /// One unit: current tenancy, tenant, rent and balance; tap through to the tenant.
-class UnitDetailScreen extends ConsumerWidget {
+/// Uses segmented tabs (`Tenancy | Invoices | Meters`) to organize unit details cleanly.
+class UnitDetailScreen extends ConsumerStatefulWidget {
   const UnitDetailScreen({super.key, required this.unitId});
   final String unitId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UnitDetailScreen> createState() => _UnitDetailScreenState();
+}
+
+class _UnitDetailScreenState extends ConsumerState<UnitDetailScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final unitId = widget.unitId;
     final unit = ref.watch(unitProvider(unitId));
     return Scaffold(
       appBar: KodiHubAppBar(
@@ -250,45 +259,188 @@ class UnitDetailScreen extends ConsumerWidget {
         child: AsyncBody(
           value: unit,
           onRetry: () => ref.invalidate(unitProvider(unitId)),
-          data: (u) => ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              SectionCard(
-                title: '${u.number} · ${u.property.name}',
-                trailing: StatusChip(
-                  occupancyLabel[u.occupancy] ?? u.occupancy,
-                  tone: occupancyTone(u.occupancy),
-                ),
-                children: [
-                  if (u.unitType != null) FactRow('Type', u.unitType!),
-                  if (u.floor != null)
-                    FactRow('Floor', u.floor == 0 ? 'Ground' : '${u.floor}'),
-                  FactRow('Rent (default)', formatKes(u.rentAmount)),
-                  if (u.status != 'ACTIVE') const FactRow('Status', 'Inactive'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (u.tenancy == null)
+          data: (u) {
+            final hasTenancy = u.tenancy != null;
+            final tabs = hasTenancy
+                ? const ['Tenancy', 'Invoices', 'Meters']
+                : const ['Tenancy', 'Meters'];
+            final activeTab = _tab.clamp(0, tabs.length - 1);
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
                 SectionCard(
-                  title: 'Current tenancy',
+                  title: '${u.number} · ${u.property.name}',
+                  trailing: StatusChip(
+                    occupancyLabel[u.occupancy] ?? u.occupancy,
+                    tone: occupancyTone(u.occupancy),
+                  ),
                   children: [
-                    const Text('Vacant.'),
-                    if (can(ref, 'tenancies:create')) ...[
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        icon: const Icon(Icons.person_add_alt_1_outlined),
-                        label: const Text('Move in a tenant'),
-                        onPressed: () => _MoveInSheet.show(context, u),
+                    if (u.unitType != null) FactRow('Type', u.unitType!),
+                    if (u.floor != null)
+                      FactRow('Floor', u.floor == 0 ? 'Ground' : '${u.floor}'),
+                    FactRow('Rent (default)', formatKes(u.rentAmount)),
+                    if (u.status != 'ACTIVE')
+                      const FactRow('Status', 'Inactive'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                KodiHubSegmentedTabs(
+                  tabs: tabs,
+                  index: activeTab,
+                  onChanged: (i) => setState(() => _tab = i),
+                ),
+                const SizedBox(height: 12),
+                if (activeTab == 0)
+                  if (u.tenancy == null)
+                    SectionCard(
+                      title: 'Current tenancy',
+                      children: [
+                        const Text('Vacant.'),
+                        if (can(ref, 'tenancies:create')) ...[
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            icon: const Icon(Icons.person_add_alt_1_outlined),
+                            label: const Text('Move in a tenant'),
+                            onPressed: () => _MoveInSheet.show(context, u),
+                          ),
+                        ],
+                      ],
+                    )
+                  else
+                    _CurrentTenancy(u)
+                else if (hasTenancy && activeTab == 1)
+                  _UnitInvoicesTab(tenantId: u.tenancy!.tenant.id)
+                else
+                  _UnitMetersTab(
+                    propertyId: u.property.id,
+                    unitNumber: u.number,
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _UnitInvoicesTab extends ConsumerWidget {
+  const _UnitInvoicesTab({required this.tenantId});
+  final String tenantId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!can(ref, 'invoices:view')) {
+      return const SectionCard(
+        title: 'Invoices',
+        children: [Text('Invoices aren’t available for your role.')],
+      );
+    }
+    final open = ref.watch(openInvoicesProvider(tenantId));
+    return SectionCard(
+      title: 'Open invoices',
+      children: [
+        AsyncBody(
+          value: open,
+          onRetry: () => ref.invalidate(openInvoicesProvider(tenantId)),
+          data: (rows) => rows.isEmpty
+              ? const Text('Nothing owing on this unit.')
+              : Column(
+                  children: [
+                    for (final (idx, i) in rows.indexed) ...[
+                      if (idx > 0) const Divider(height: 1),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          '${i.number} · ${formatPeriod(i.period)}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text('Due ${formatDay(i.dueDate)}'),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              formatKes(i.balance),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (i.overdue)
+                              const StatusChip('Overdue', tone: Tone.bad),
+                          ],
+                        ),
+                        onTap: () =>
+                            context.push('/staff/money/invoices/${i.id}'),
                       ),
                     ],
                   ],
-                )
-              else
-                _CurrentTenancy(u),
-            ],
-          ),
+                ),
         ),
-      ),
+      ],
+    );
+  }
+}
+
+class _UnitMetersTab extends ConsumerWidget {
+  const _UnitMetersTab({required this.propertyId, required this.unitNumber});
+  final String propertyId;
+  final String unitNumber;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!can(ref, 'meters:view')) {
+      return const SectionCard(
+        title: 'Meters',
+        children: [Text('Meters aren’t available for your role.')],
+      );
+    }
+    final meters = ref.watch(metersProvider(propertyId));
+    return SectionCard(
+      title: 'Unit meters',
+      trailing: can(ref, 'meters:create')
+          ? TextButton.icon(
+              icon: const Icon(Icons.speed_outlined, size: 16),
+              label: const Text('Read meters'),
+              onPressed: () => context.push('/staff/more/meters'),
+            )
+          : null,
+      children: [
+        AsyncBody(
+          value: meters,
+          onRetry: () => ref.invalidate(metersProvider(propertyId)),
+          data: (all) {
+            final rows = all.where((m) => m.unitNumber == unitNumber).toList();
+            if (rows.isEmpty) {
+              return const Text('No utility meters assigned to this unit.');
+            }
+            return Column(
+              children: [
+                for (final (idx, m) in rows.indexed) ...[
+                  if (idx > 0) const Divider(height: 1),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: UnitBadge(m.unitNumber),
+                    title: Text(
+                      '${m.chargeName} · ${m.serialNo}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(
+                      m.lastReading == null
+                          ? 'No readings recorded yet'
+                          : 'Last reading: ${m.lastReading!.current} ${m.unitLabel ?? ''} (${formatPeriod(m.lastReading!.period)})',
+                    ),
+                    trailing: StatusChip(
+                      m.status == 'ACTIVE' ? 'Active' : m.status,
+                      tone: m.status == 'ACTIVE' ? Tone.good : Tone.neutral,
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
