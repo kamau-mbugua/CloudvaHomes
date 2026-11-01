@@ -180,6 +180,51 @@ void main() {
         'client': 'mobile',
       });
       expect(store.token, 'r-2fa');
+      expect(store.savedCredentials.single.identifier, 'owner@example.invalid');
+    },
+  );
+
+  testWidgets(
+    'saved credentials open a bottom sheet on login and sign in when tapped',
+    (tester) async {
+      final adapter = FakeAdapter(
+        (c) => c.path == '/auth/login'
+            ? (200, {'data': sessionJson(refreshToken: 'r-saved')})
+            : (401, errorBody('SESSION_REVOKED', 'x')),
+      );
+      _adapter = adapter;
+      final store = MemoryTokenStore()
+        ..savedCredentials.add(
+          const SavedCredential(
+            identifier: 'kelvin@cloudvalabs.com',
+            password: 'SavedPassword123',
+            displayName: 'Kelvin Mbugua',
+            roleHint: 'Ivory breeze',
+          ),
+        );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(fakeClient(adapter)),
+            tokenStoreProvider.overrideWithValue(store),
+          ],
+          child: const MaterialApp(home: SignInScreen()),
+        ),
+      );
+      await settle(tester);
+
+      // The bottom sheet automatically appears with the saved account.
+      expect(find.text('Choose a saved account'), findsOneWidget);
+      expect(find.text('Kelvin Mbugua'), findsOneWidget);
+
+      await _tapReal(tester, find.text('Kelvin Mbugua'));
+      final login = adapter.calls.firstWhere((c) => c.path == '/auth/login');
+      expect(login.body, {
+        'identifier': 'kelvin@cloudvalabs.com',
+        'password': 'SavedPassword123',
+        'client': 'mobile',
+      });
+      expect(store.token, 'r-saved');
     },
   );
 }

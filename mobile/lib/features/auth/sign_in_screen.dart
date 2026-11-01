@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_error.dart';
+import '../../core/auth/session.dart';
 import '../../core/auth/session_controller.dart';
+import '../../core/auth/token_store.dart';
+import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import 'auth_scaffold.dart';
@@ -19,11 +22,105 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   final _password = TextEditingController();
   final _twoFactorCode = TextEditingController();
   TwoFactorChallenge? _challenge;
+  List<SavedCredential> _savedCredentials = const [];
+  bool _didAutoPromptSaved = false;
+  bool _rememberMe = true;
   bool _busy = false;
   bool _resending = false;
   bool _hide = true;
   String? _error;
   String? _notice;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials(autoOpenSheet: true);
+  }
+
+  Future<void> _loadSavedCredentials({bool autoOpenSheet = false}) async {
+    final store = ref.read(tokenStoreProvider);
+    final creds = await store.readSavedCredentials();
+    if (!mounted) return;
+    setState(() => _savedCredentials = creds);
+    if (autoOpenSheet &&
+        !_didAutoPromptSaved &&
+        creds.isNotEmpty &&
+        _challenge == null) {
+      _didAutoPromptSaved = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _challenge == null && _savedCredentials.isNotEmpty) {
+          _showSavedCredentialsSheet();
+        }
+      });
+    }
+  }
+
+  static String? _roleHintFor(Session? s) {
+    if (s == null) return null;
+    if (s.activeOrganization != null) return s.activeOrganization!.name;
+    if (s.isPlatformAdmin) return s.user.platformRole ?? 'Platform Admin';
+    if (s.tenantOf.isNotEmpty) return s.tenantOf.first.orgName;
+    if (s.ownerOf.isNotEmpty) return s.ownerOf.first.orgName;
+    return null;
+  }
+
+  Future<void> _persistCredentialIfRemembered(
+    String identifier,
+    String password,
+  ) async {
+    final store = ref.read(tokenStoreProvider);
+    final trimmedId = identifier.trim();
+    if (_rememberMe) {
+      final session = ref.read(sessionProvider).valueOrNull;
+      final fullName = session?.user.fullName.trim();
+      await store.saveCredential(
+        SavedCredential(
+          identifier: trimmedId,
+          password: password,
+          displayName: (fullName != null && fullName.isNotEmpty)
+              ? fullName
+              : null,
+          roleHint: _roleHintFor(session),
+          savedAt: DateTime.now().toUtc().toIso8601String(),
+        ),
+      );
+    } else {
+      await store.removeSavedCredential(trimmedId);
+    }
+  }
+
+  Future<void> _showSavedCredentialsSheet() async {
+    if (_savedCredentials.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _SavedCredentialsSheet(
+        initialCredentials: _savedCredentials,
+        onSelect: (selected) {
+          if (!mounted) return;
+          setState(() {
+            _id.text = selected.identifier;
+            _password.text = selected.password;
+            _rememberMe = true;
+            _error = null;
+          });
+          _submit();
+        },
+        onRemove: (identifier) async {
+          await ref.read(tokenStoreProvider).removeSavedCredential(identifier);
+          final updated = await ref
+              .read(tokenStoreProvider)
+              .readSavedCredentials();
+          if (mounted) {
+            setState(() => _savedCredentials = updated);
+          }
+          return updated;
+        },
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -34,7 +131,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 
   Future<void> _submit() async {
-    if (_id.text.trim().isEmpty || _password.text.isEmpty) {
+    final identifier = _id.text.trim();
+    final password = _password.text;
+    if (identifier.isEmpty || password.isEmpty) {
       setState(() => _error = 'Enter your email or phone and your password.');
       return;
     }
@@ -46,12 +145,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     try {
       final challenge = await ref
           .read(sessionProvider.notifier)
-          .signInWithPassword(_id.text, _password.text);
-      if (challenge != null && mounted) {
-        setState(() {
-          _challenge = challenge;
-          _twoFactorCode.clear();
-        });
+          .signInWithPassword(identifier, password);
+      if (challenge != null) {
+        if (mounted) {
+          setState(() {
+            _challenge = challenge;
+            _twoFactorCode.clear();
+          });
+        }
+      } else {
+        await _persistCredentialIfRemembered(identifier, password);
       }
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -89,6 +192,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       setState(() => _error = 'Enter the 6-digit verification code.');
       return;
     }
+    final identifier = _id.text.trim();
+    final password = _password.text;
     setState(() {
       _busy = true;
       _error = null;
@@ -98,6 +203,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       await ref
           .read(sessionProvider.notifier)
           .verifyTwoFactor(_challenge!.challengeToken, _twoFactorCode.text);
+      await _persistCredentialIfRemembered(identifier, password);
     } on ApiError catch (e) {
       if (mounted) {
         setState(() => _error = e.fieldErrors['code'] ?? e.message);
@@ -202,6 +308,76 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           ),
           const SizedBox(height: 12),
         ],
+        if (_savedCredentials.isNotEmpty) ...[
+          Material(
+            color: HodiColors.limeSoft,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: _showSavedCredentialsSheet,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: HodiColors.limeText.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: HodiColors.navy,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: const Icon(
+                        Icons.key_rounded,
+                        size: 16,
+                        color: HodiColors.lime,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _savedCredentials.length == 1
+                                ? '1 saved login on this device'
+                                : '${_savedCredentials.length} saved logins on this device',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: HodiColors.navy,
+                            ),
+                          ),
+                          Text(
+                            'Tap to choose a saved account',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: HodiColors.navy.withValues(alpha: 0.72),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_up_rounded,
+                      size: 20,
+                      color: HodiColors.navy,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
         TextField(
           controller: _id,
           keyboardType: TextInputType.emailAddress,
@@ -232,12 +408,50 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             ),
           ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () => context.push('/forgot'),
-            child: const Text('Forgot password?'),
-          ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => setState(() => _rememberMe = !_rememberMe),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: Checkbox(
+                          value: _rememberMe,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: (v) =>
+                              setState(() => _rememberMe = v ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Flexible(
+                        child: Text(
+                          'Remember me',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => context.push('/forgot'),
+              child: const Text('Forgot password?'),
+            ),
+          ],
         ),
         if (_error != null) ...[ErrorBox(_error!), const SizedBox(height: 12)],
         FilledButton(
@@ -363,6 +577,186 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _SavedCredentialsSheet extends StatefulWidget {
+  const _SavedCredentialsSheet({
+    required this.initialCredentials,
+    required this.onSelect,
+    required this.onRemove,
+  });
+
+  final List<SavedCredential> initialCredentials;
+  final void Function(SavedCredential credential) onSelect;
+  final Future<List<SavedCredential>> Function(String identifier) onRemove;
+
+  @override
+  State<_SavedCredentialsSheet> createState() => _SavedCredentialsSheetState();
+}
+
+class _SavedCredentialsSheetState extends State<_SavedCredentialsSheet> {
+  late List<SavedCredential> _credentials = widget.initialCredentials;
+
+  Future<void> _handleRemove(SavedCredential cred) async {
+    final updated = await widget.onRemove(cred.identifier);
+    if (!mounted) return;
+    if (updated.isEmpty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _credentials = updated);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Kicker('SAVED CREDENTIALS'),
+            const SizedBox(height: 4),
+            Text(
+              'Choose a saved account',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+                color: dark ? Colors.white : HodiColors.navy,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Tap an account to sign in immediately, or remove it from this device.',
+              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.45,
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _credentials.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final cred = _credentials[index];
+                  final hasName =
+                      cred.displayName != null &&
+                      cred.displayName!.trim().isNotEmpty;
+                  final title = hasName
+                      ? cred.displayName!.trim()
+                      : cred.identifier;
+                  final subtitleParts = <String>[
+                    if (hasName) cred.identifier,
+                    if (cred.roleHint != null && cred.roleHint!.isNotEmpty)
+                      cred.roleHint!,
+                    '••••••••',
+                  ];
+                  return Material(
+                    color: scheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        widget.onSelect(cred);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 11,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: scheme.outlineVariant),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: HodiColors.navy,
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                              child: Text(
+                                cred.initials,
+                                style: const TextStyle(
+                                  fontFamily: 'JetBrainsMono',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: HodiColors.lime,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subtitleParts.join(' · '),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Remove saved account',
+                              visualDensity: VisualDensity.compact,
+                              icon: Icon(
+                                Icons.delete_outline_rounded,
+                                size: 19,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                              onPressed: () => _handleRemove(cred),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 14,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.person_outline_rounded, size: 18),
+              label: const Text('Use another account'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
