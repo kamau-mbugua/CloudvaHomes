@@ -364,6 +364,13 @@ export class PlatformController {
     return ok(await this.admin.updateOperator(id, dto));
   }
 
+  @Post('operators/:id/reset-password')
+  @PlatformAdminOnly()
+  @HttpCode(200)
+  async resetOperatorPassword(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.admin.resetOperatorPassword(id));
+  }
+
   @Post('operators/:id/assign-organizations')
   @PlatformAdminOnly()
   @HttpCode(200)

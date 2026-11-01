@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
 import { PASSWORD_RULES_HINT, newPasswordErrors } from '../../lib/auth/passwordPolicy';
-import { updateSessionDetails } from '../../lib/auth/session';
+import { reloadSessionDetails, updateSessionDetails } from '../../lib/auth/session';
 import type { SessionPayload } from '../../lib/auth/types';
 import { useSession } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
@@ -16,8 +16,10 @@ import { settingsErrorMessage } from '../settings/api';
  * they are shown but changed by an organisation owner (or support), not here.
  */
 export function AccountPage() {
+  const session = useSession();
   const [params, setParams] = useSearchParams();
-  const tab = params.get('tab') === 'password' ? 'password' : 'profile';
+  const mustChange = Boolean(session.user.mustChangePassword);
+  const tab = mustChange || params.get('tab') === 'password' ? 'password' : 'profile';
 
   const setTab = (next: 'profile' | 'password') => {
     setParams(
@@ -140,19 +142,22 @@ function ProfileSection() {
 type PwField = 'currentPassword' | 'password' | 'confirm';
 
 function PasswordSection() {
+  const session = useSession();
   const toast = useToast();
   const [current, setCurrent] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<Partial<Record<PwField, string>>>({});
+  const mustChange = Boolean(session.user.mustChangePassword);
 
   const change = useMutation({
     mutationFn: () => api.post('/me/password', { currentPassword: current, newPassword: password }),
-    onSuccess: () => {
+    onSuccess: async () => {
       setCurrent('');
       setPassword('');
       setConfirm('');
       setErrors({});
+      await reloadSessionDetails();
       toast.saved('Password changed. Your other devices have been signed out.');
     },
     onError: (error) => {
@@ -190,6 +195,11 @@ function PasswordSection() {
     <form className="fm__section" onSubmit={submit} noValidate>
       <h2>Password</h2>
       <p>Changing it signs you out everywhere else.</p>
+      {mustChange ? (
+        <p className="ad__error" role="status">
+          You signed in with a temporary system-generated password. Please set a new personal password to continue.
+        </p>
+      ) : null}
 
       <div className="fm__grid">
         <div className="fm__wide pg-half">{pw('currentPassword', 'me-current', 'Current password', current, setCurrent, 'current-password')}</div>

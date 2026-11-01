@@ -30,6 +30,7 @@ export interface SessionPayload {
     phone: string | null;
     isPlatformAdmin: boolean;
     platformRole: 'SUPERADMIN' | 'SALESPERSON' | null;
+    mustChangePassword?: boolean;
     defaultOrgId: string | null;
     defaultPropertyId: string | null;
     defaultTenantId: string | null;
@@ -504,6 +505,7 @@ export class SessionsService {
         phone: user.phone,
         isPlatformAdmin,
         platformRole,
+        ...(user.mustChangePassword ? { mustChangePassword: true } : {}),
         defaultOrgId: user.defaultOrgId ?? null,
         defaultPropertyId: user.defaultPropertyId ?? null,
         defaultTenantId: user.defaultTenantId ?? null,

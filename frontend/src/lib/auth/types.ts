@@ -12,6 +12,7 @@ export interface SessionUser {
   phone: string | null;
   isPlatformAdmin: boolean;
   platformRole?: PlatformRole | null;
+  mustChangePassword?: boolean;
 }
 
 export interface AdminTwoFactorChallenge {

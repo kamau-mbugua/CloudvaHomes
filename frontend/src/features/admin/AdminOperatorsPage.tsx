@@ -41,6 +41,16 @@ export function AdminOperatorsPage() {
     onError: (error) => toast.failed(platformErrorMessage(error)),
   });
 
+  const resetOperatorPassword = useMutation({
+    mutationFn: (op: PlatformOperator) =>
+      api.post<unknown>(`/platform/operators/${encodeURIComponent(op.id)}/reset-password`, {}),
+    onSuccess: async (_res, op) => {
+      toast.saved(`New temporary password and sign-in link sent to ${op.email ?? op.phone ?? op.firstName}.`);
+      await queryClient.invalidateQueries({ queryKey: keys.operators });
+    },
+    onError: (error) => toast.failed(platformErrorMessage(error)),
+  });
+
   const all = operators.data ?? [];
   const roleOf = (op: PlatformOperator) => op.role ?? op.platformRole ?? 'SALESPERSON';
   const rows = roleFilter === 'ALL' ? all : all.filter((op) => roleOf(op) === roleFilter);
@@ -104,6 +114,14 @@ export function AdminOperatorsPage() {
                       <span className={`ad__badge ${op.status === 'ACTIVE' ? 'ad__badge--ok' : 'ad__badge--off'}`}>
                         {op.status === 'ACTIVE' ? 'Active' : op.status}
                       </span>
+                      {op.mustChangePassword ? (
+                        <>
+                          {' '}
+                          <span className="ad__badge ad__badge--warn" title="Using temporary password — required to change on next sign-in">
+                            Temp password
+                          </span>
+                        </>
+                      ) : null}
                     </td>
                     <td className="num">{op.organizationsCount ?? op.organizationCount ?? 0}</td>
                     <td>{op.lastLoginAt ? formatDateTime(op.lastLoginAt) : formatDayish(op.createdAt)}</td>
@@ -114,6 +132,15 @@ export function AdminOperatorsPage() {
                         </button>
                         {!isSelf ? (
                           <>
+                            <button
+                              type="button"
+                              className="nx-btn nx-btn--sm"
+                              disabled={resetOperatorPassword.isPending}
+                              onClick={() => resetOperatorPassword.mutate(op)}
+                              title="Generate a new temporary password and email/SMS it to this operator"
+                            >
+                              Send new password
+                            </button>
                             <button
                               type="button"
                               className="nx-btn nx-btn--sm"
@@ -161,7 +188,6 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [platformRole, setPlatformRole] = useState<'SUPERADMIN' | 'SALESPERSON'>('SALESPERSON');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState<string | null>(null);
@@ -169,7 +195,9 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
   const create = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.post<unknown>('/platform/operators', body),
     onSuccess: async () => {
-      toast.saved(`${firstName} ${lastName} added as ${platformRole === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson'}.`);
+      toast.saved(
+        `${firstName} ${lastName} added as ${platformRole === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson'} and login details sent to ${email.trim()}.`,
+      );
       await queryClient.invalidateQueries({ queryKey: keys.operators });
       onClose();
     },
@@ -189,7 +217,6 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
     if (!firstName.trim()) next.firstName = 'Enter a first name.';
     if (!lastName.trim()) next.lastName = 'Enter a last name.';
     if (!email.trim() || !email.includes('@')) next.email = 'Enter a valid email address.';
-    if (password.length < 12) next.password = 'Password must be at least 12 characters.';
     if (Object.keys(next).length > 0) {
       setErrors(next);
       return;
@@ -200,7 +227,6 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
       lastName: lastName.trim(),
       email: email.trim(),
       ...(phone.trim() ? { phone: phone.trim() } : {}),
-      password,
       role: platformRole,
     });
   };
@@ -214,7 +240,7 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
         <>
           <button type="button" className="nx-btn" onClick={onClose} disabled={create.isPending}>Cancel</button>
           <button type="submit" form="op-create" className="nx-btn nx-btn--primary" disabled={create.isPending}>
-            {create.isPending ? 'Adding…' : 'Add operator'}
+            {create.isPending ? 'Adding & sending invite…' : 'Add & send login details'}
           </button>
         </>
       )}
@@ -237,14 +263,17 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
           <Field id="op-phone" label="Phone" optional error={errors.phone}>
             <input id="op-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </Field>
-          <Field id="op-role" label="Role" error={errors.platformRole}>
+          <Field
+            id="op-role"
+            label="Role"
+            wide
+            error={errors.platformRole}
+            hint="We will send a sign-in link and system-generated temporary password to their email (and SMS if a phone number is provided). They will be required to change it on first sign-in."
+          >
             <select id="op-role" value={platformRole} onChange={(e) => setPlatformRole(e.target.value as 'SUPERADMIN' | 'SALESPERSON')}>
               <option value="SALESPERSON">Salesperson</option>
               <option value="SUPERADMIN">Superadmin</option>
             </select>
-          </Field>
-          <Field id="op-pass" label="Initial password" error={errors.password} hint="At least 12 characters.">
-            <input id="op-pass" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
         </div>
         {general ? <p className="nx-sheet__error" role="alert">{general}</p> : null}

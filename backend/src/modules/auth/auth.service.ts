@@ -460,7 +460,7 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword) },
+      data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
     });
     await this.sessions.revokeAllForUser(user.id);
     await this.audit.record({
@@ -619,7 +619,7 @@ export class AuthService {
     if (problem) throw AppError.fieldInvalid('newPassword', problem);
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword) },
+      data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
     });
     await this.sessions.revokeAllForUser(user.id, ctx.sessionId);
     await this.audit.record({

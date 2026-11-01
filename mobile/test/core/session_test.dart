@@ -102,6 +102,24 @@ void main() {
         '/no-access',
       );
     });
+
+    test('mustChangePassword forces redirect to /change-password', () {
+      final raw = sessionJson(staff: true);
+      (raw['user'] as Map<String, dynamic>)['mustChangePassword'] = true;
+      final mustChangeSession = Session.fromJson(raw);
+      expect(
+        go(AsyncData<Session?>(mustChangeSession), AppMode.staff, '/staff'),
+        '/change-password',
+      );
+      expect(
+        go(
+          AsyncData<Session?>(mustChangeSession),
+          AppMode.staff,
+          '/change-password',
+        ),
+        isNull,
+      );
+    });
   });
 
   group('SessionController', () {

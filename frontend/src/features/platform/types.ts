@@ -300,6 +300,8 @@ export interface PlatformOperator {
   status: 'ACTIVE' | 'DISABLED' | 'LOCKED' | 'INVITED';
   role: 'SUPERADMIN' | 'SALESPERSON';
   platformRole?: 'SUPERADMIN' | 'SALESPERSON';
+  mustChangePassword?: boolean;
+  invitationDelivered?: boolean;
   organizationsCount: number;
   activeOrganizationsCount?: number;
   organizationCount?: number;

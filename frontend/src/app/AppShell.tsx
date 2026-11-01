@@ -68,6 +68,12 @@ export function AppShell() {
     document.title = `${title} · KodiHub`;
   }, [title]);
 
+  useEffect(() => {
+    if (session.user.mustChangePassword && (!onAccount || location.search !== '?tab=password')) {
+      navigate(`${ACCOUNT_ENTRY.to}?tab=password`, { replace: true });
+    }
+  }, [session.user.mustChangePassword, onAccount, location.search, navigate]);
+
   // A change refused as `ORG_SUSPENDED` means the session's status is out of date (the
   // daily job suspended the organisation since it was read): re-read it so the banner
   // appears. The message itself is set by the API client.

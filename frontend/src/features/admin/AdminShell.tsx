@@ -54,6 +54,12 @@ export function AdminShell() {
   }, [title]);
 
   useEffect(() => {
+    if (session.user.mustChangePassword && (!onAccount || location.search !== '?tab=password')) {
+      navigate(`${ADMIN_ACCOUNT_ENTRY.to}?tab=password`, { replace: true });
+    }
+  }, [session.user.mustChangePassword, onAccount, location.search, navigate]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setDrawerOpen(false);
     };

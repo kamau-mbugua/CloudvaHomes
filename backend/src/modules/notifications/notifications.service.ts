@@ -591,6 +591,50 @@ export class NotificationsService {
     );
   }
 
+  /**
+   * Sends login credentials and a sign-in link to a newly added or password-reset platform
+   * operator (Superadmin or Salesperson). Never throws if delivery fails — returns whether
+   * at least one channel succeeded.
+   */
+  async sendOperatorWelcome(
+    to: Recipient,
+    p: {
+      firstName: string;
+      role: 'SUPERADMIN' | 'SALESPERSON';
+      temporaryPassword: string | null;
+    },
+  ): Promise<boolean> {
+    const loginUrl = `${this.env.APP_URL.replace(/\/$/, '')}/login`;
+    const roleLabel = p.role === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson';
+    const signInId = [to.email, to.phone].filter(Boolean).join(' or ');
+    const subject = `Your KodiHub ${roleLabel} account`;
+    const emailBody = p.temporaryPassword
+      ? `Hi ${p.firstName},\n\n` +
+        `You have been added to KodiHub as a ${roleLabel}.\n\n` +
+        `--- Sign-in Details ---\n` +
+        `Sign in at: ${loginUrl}\n` +
+        `Email / Phone: ${signInId}\n` +
+        `Temporary password: ${p.temporaryPassword}\n\n` +
+        `For your security, you will be prompted to change this temporary password as soon as you sign in.`
+      : `Hi ${p.firstName},\n\n` +
+        `Your KodiHub account (${signInId}) has been granted ${roleLabel} access.\n\n` +
+        `Sign in with your existing password at: ${loginUrl}`;
+    const smsText = p.temporaryPassword
+      ? `KodiHub ${roleLabel}: sign in at ${loginUrl} with ${to.email ?? to.phone} and temp password ${p.temporaryPassword} (change on first login).`
+      : `Your KodiHub account now has ${roleLabel} access. Sign in at ${loginUrl}`;
+
+    const tasks: Promise<void>[] = [];
+    if (to.email) {
+      tasks.push(this.dispatchEmail({ to: to.email, subject, text: emailBody }, 'invitation'));
+    }
+    if (to.phone) {
+      tasks.push(this.dispatchSms(to.phone, smsText.slice(0, 160)));
+    }
+    if (!tasks.length) return false;
+    const results = await Promise.allSettled(tasks);
+    return results.some((r) => r.status === 'fulfilled');
+  }
+
   private async renderSystemEmailTemplate(
     key: EmailTemplateKey,
     vars: Record<string, string | number | null | undefined>,

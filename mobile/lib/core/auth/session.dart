@@ -130,6 +130,7 @@ class SessionUser {
     this.phone,
     this.isPlatformAdmin = false,
     this.platformRole,
+    this.mustChangePassword = false,
   });
   final String id;
   final String firstName;
@@ -138,6 +139,7 @@ class SessionUser {
   final String? phone;
   final bool isPlatformAdmin;
   final String? platformRole;
+  final bool mustChangePassword;
 
   String get fullName => '$firstName $lastName';
   String get initials =>
@@ -152,6 +154,7 @@ class SessionUser {
     phone: j['phone'] as String?,
     isPlatformAdmin: j['isPlatformAdmin'] == true,
     platformRole: j['platformRole'] as String?,
+    mustChangePassword: j['mustChangePassword'] == true,
   );
 }
 

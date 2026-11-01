@@ -24,9 +24,10 @@ model User {
   passwordHash    String?
   firstName       String
   lastName        String
-  isPlatformAdmin Boolean       @default(false)
-  platformRole    PlatformRole?
-  status            UserStatus    @default(ACTIVE)
+  isPlatformAdmin    Boolean       @default(false)
+  platformRole       PlatformRole?
+  mustChangePassword Boolean       @default(false)
+  status             UserStatus    @default(ACTIVE)
   defaultOrgId      String?       @db.Uuid
   defaultPropertyId String?       @db.Uuid
   defaultTenantId   String?       @db.Uuid

@@ -256,10 +256,13 @@ class SessionController extends AsyncNotifier<Session?> {
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
-  }) => _api.post(
-    '/me/password',
-    body: {'currentPassword': currentPassword, 'newPassword': newPassword},
-  );
+  }) async {
+    await _api.post(
+      '/me/password',
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+    await reload();
+  }
 
   /// Re-reads the session (permissions, organisation status).
   Future<void> reload() async {

@@ -35,6 +35,9 @@ String? redirectFor({
   final s = session.valueOrNull;
   final isPublic = _public.contains(location);
   if (s == null) return isPublic ? null : '/sign-in';
+  if (s.user.mustChangePassword) {
+    return location == '/change-password' ? null : '/change-password';
+  }
   final home = switch (mode) {
     AppMode.staff => '/staff',
     AppMode.tenant => '/tenant',
@@ -42,7 +45,12 @@ String? redirectFor({
     AppMode.platform => '/platform',
     null => '/no-access',
   };
-  if (isPublic || location == '/' || location == '/offline') return home;
+  if (isPublic ||
+      location == '/' ||
+      location == '/offline' ||
+      location == '/change-password') {
+    return home;
+  }
   if (location.startsWith('/staff') && mode != AppMode.staff) return home;
   if (location.startsWith('/tenant') && mode != AppMode.tenant) return home;
   if (location.startsWith('/owner') && mode != AppMode.owner) return home;
@@ -75,6 +83,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (_, _) => const _Splash()),
       GoRoute(path: '/offline', builder: (_, _) => const _Offline()),
       GoRoute(path: '/no-access', builder: (_, _) => const _NoAccess()),
+      GoRoute(
+        path: '/change-password',
+        builder: (_, _) => const _MustChangePasswordScreen(),
+      ),
       GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
       GoRoute(
         path: '/sign-in/code',
@@ -176,4 +188,116 @@ class _NoAccess extends ConsumerWidget {
       ),
     ),
   );
+}
+
+class _MustChangePasswordScreen extends ConsumerStatefulWidget {
+  const _MustChangePasswordScreen();
+
+  @override
+  ConsumerState<_MustChangePasswordScreen> createState() =>
+      _MustChangePasswordScreenState();
+}
+
+class _MustChangePasswordScreenState
+    extends ConsumerState<_MustChangePasswordScreen> {
+  final _currentPw = TextEditingController();
+  final _newPw = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _currentPw.dispose();
+    _newPw.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_currentPw.text.isEmpty || _newPw.text.length < 10) {
+      setState(
+        () => _error =
+            'Enter your temporary password and a new password of at least 10 characters.',
+      );
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(sessionProvider.notifier)
+          .changePassword(
+            currentPassword: _currentPw.text,
+            newPassword: _newPw.text,
+          );
+      if (mounted) showMessage(context, 'Password updated.');
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Set your password'),
+        actions: [
+          TextButton(
+            onPressed: () => ref.read(sessionProvider.notifier).signOut(),
+            child: const Text(
+              'Sign out',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const Kicker('ACTION REQUIRED'),
+            const SizedBox(height: 6),
+            Text(
+              'Change your temporary password',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'You signed in with a system-generated temporary password. Choose a new password to continue using KodiHub.',
+              style: TextStyle(color: muted, fontSize: 13.5, height: 1.4),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _currentPw,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Temporary password',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _newPw,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'New password (10+ characters)',
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_error != null) ...[
+              ErrorBox(_error!),
+              const SizedBox(height: 12),
+            ],
+            FilledButton(
+              onPressed: _saving ? null : _submit,
+              child: Text(_saving ? 'Saving…' : 'Update password & continue'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

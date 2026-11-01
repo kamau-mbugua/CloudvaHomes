@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { currentContext, withoutOrgScope } from '../../common/context/request-context.js';
 import { FieldCipher } from '../../common/crypto/field-cipher.js';
@@ -337,6 +338,15 @@ export class PlatformAdminService {
 
   // ── Platform Operators (Superadmins & Salespeople) ──
 
+  private generateTemporaryPassword(): string {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const digits = '23456789';
+    const pick = (chars: string, len: number) =>
+      Array.from({ length: len }, () => chars[randomInt(0, chars.length)]!).join('');
+    return `Kodi-${pick(upper, 2)}${pick(lower, 3)}-${pick(digits, 3)}!`;
+  }
+
   private async toOperator(u: User) {
     const role = u.platformRole ?? (u.isPlatformAdmin ? 'SUPERADMIN' : 'SALESPERSON');
     const [organizationsCount, activeOrganizationsCount] = await Promise.all([
@@ -353,6 +363,7 @@ export class PlatformAdminService {
       phone: u.phone,
       status: u.status,
       role,
+      mustChangePassword: u.mustChangePassword,
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
       organizationsCount,
@@ -394,7 +405,6 @@ export class PlatformAdminService {
         if (problem) throw AppError.fieldInvalid('password', problem);
       }
 
-      const passwordHash = dto.password ? await hashPassword(dto.password) : undefined;
       const existingByEmail = email ? await this.db.user.findUnique({ where: { email } }) : null;
       const existingByPhone = phone ? await this.db.user.findUnique({ where: { phone } }) : null;
       if (existingByEmail && existingByPhone && existingByEmail.id !== existingByPhone.id) {
@@ -405,6 +415,12 @@ export class PlatformAdminService {
       }
       const existing = existingByEmail ?? existingByPhone;
 
+      const generatedPassword =
+        !dto.password && !existing?.passwordHash ? this.generateTemporaryPassword() : null;
+      const plainPasswordToSet = dto.password ?? generatedPassword;
+      const passwordHash = plainPasswordToSet ? await hashPassword(plainPasswordToSet) : undefined;
+      const mustChangePassword = Boolean(generatedPassword);
+
       const user = await this.db.$transaction(async (tx) => {
         const row = existing
           ? await tx.user.update({
@@ -414,7 +430,7 @@ export class PlatformAdminService {
                 lastName: dto.lastName.trim(),
                 ...(email && !existing.email ? { email } : {}),
                 ...(phone && !existing.phone ? { phone } : {}),
-                ...(passwordHash ? { passwordHash } : {}),
+                ...(passwordHash ? { passwordHash, mustChangePassword } : {}),
                 platformRole: dto.role,
                 isPlatformAdmin: dto.role === 'SUPERADMIN',
                 status: 'ACTIVE',
@@ -427,6 +443,7 @@ export class PlatformAdminService {
                 email,
                 phone,
                 passwordHash: passwordHash ?? null,
+                mustChangePassword,
                 platformRole: dto.role,
                 isPlatformAdmin: dto.role === 'SUPERADMIN',
                 status: 'ACTIVE',
@@ -448,7 +465,60 @@ export class PlatformAdminService {
         );
         return row;
       });
-      return this.toOperator(user);
+
+      const invitationDelivered = await this.notifications.sendOperatorWelcome(
+        { email: user.email, phone: user.phone },
+        {
+          firstName: user.firstName,
+          role: dto.role,
+          temporaryPassword: plainPasswordToSet ?? null,
+        },
+      );
+
+      return {
+        ...(await this.toOperator(user)),
+        invitationDelivered,
+      };
+    });
+  }
+
+  resetOperatorPassword(id: string) {
+    return withoutOrgScope(async () => {
+      const target = await this.db.user.findUnique({ where: { id } });
+      if (!target || (!target.isPlatformAdmin && !target.platformRole)) {
+        throw AppError.notFound('Operator');
+      }
+      const temporaryPassword = this.generateTemporaryPassword();
+      const passwordHash = await hashPassword(temporaryPassword);
+      const role = target.platformRole ?? (target.isPlatformAdmin ? 'SUPERADMIN' : 'SALESPERSON');
+      const updated = await this.db.$transaction(async (tx) => {
+        const row = await tx.user.update({
+          where: { id },
+          data: { passwordHash, mustChangePassword: true },
+        });
+        await this.audit.record(
+          {
+            action: 'platform.operator_password_reset',
+            entity: 'user',
+            entityId: id,
+            orgId: null,
+          },
+          tx,
+        );
+        return row;
+      });
+      const invitationDelivered = await this.notifications.sendOperatorWelcome(
+        { email: updated.email, phone: updated.phone },
+        {
+          firstName: updated.firstName,
+          role,
+          temporaryPassword,
+        },
+      );
+      return {
+        ...(await this.toOperator(updated)),
+        invitationDelivered,
+      };
     });
   }
 
