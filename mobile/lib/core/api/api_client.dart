@@ -5,7 +5,6 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../config.dart';
 import 'api_error.dart';
 import 'logging_interceptor.dart';
 
@@ -27,8 +26,7 @@ class ApiClient {
                receiveTimeout: const Duration(seconds: 45),
              ),
            ) {
-    if (enableLogging ??
-        (dio == null && (!kReleaseMode || !AppConfig.isProd))) {
+    if (enableLogging ?? (dio == null && kDebugMode)) {
       final hasLogger = _dio.interceptors.any((i) => i is LoggingInterceptor);
       if (!hasLogger) {
         _dio.interceptors.add(

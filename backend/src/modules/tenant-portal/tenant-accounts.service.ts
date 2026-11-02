@@ -163,45 +163,24 @@ export class TenantAccountsService {
     const phone = normalizePhone(t.phone);
     if (!phone) throw AppError.conflict('This tenant has no phone number', 'NO_CONTACT');
     const email = t.email ? normalizeEmail(t.email) : null;
-    // Users are global: look them up unscoped by phone OR email. A tenant may already be staff or a landlord.
-    let user = await this.prisma.user.findFirst({
-      where: {
-        OR: [
-          { phone },
-          ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
-        ],
-      },
-    });
+    // Users are global: look up by phone first; never mutate an existing user's email or phone
+    // from unverified tenant contact fields.
+    const [userByPhone, userByEmail] = await Promise.all([
+      this.prisma.user.findUnique({ where: { phone } }),
+      email
+        ? this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
+        : null,
+    ]);
+    let user = userByPhone ?? (!userByEmail?.phone ? userByEmail : null);
     if (!user) {
-      const emailFree = email ? !(await this.prisma.user.count({ where: { email } })) : false;
       user = await this.prisma.user.create({
         data: {
           phone,
-          email: emailFree ? email : null,
+          email: email && !userByEmail ? email : null,
           firstName: t.firstName,
           lastName: t.lastName,
         },
       });
-    } else {
-      const fill: { email?: string; phone?: string } = {};
-      if (!user.email && email) {
-        const emailFree = !(await this.prisma.user.count({
-          where: { email: { equals: email, mode: 'insensitive' }, id: { not: user.id } },
-        }));
-        if (emailFree) fill.email = email;
-      }
-      if (!user.phone && phone) {
-        const phoneFree = !(await this.prisma.user.count({
-          where: { phone, id: { not: user.id } },
-        }));
-        if (phoneFree) fill.phone = phone;
-      }
-      if (Object.keys(fill).length > 0) {
-        user = await this.prisma.user.update({
-          where: { id: user.id },
-          data: fill,
-        });
-      }
     }
     await this.db.$transaction(async (tx) => {
       await tx.tenant.update({

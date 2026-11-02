@@ -6,6 +6,7 @@ import { AppError } from '../../common/errors/app-error.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { ALL_PERMISSIONS } from '../roles/permissions.js';
 import {
+  ALLOW_WHEN_MUST_CHANGE_PASSWORD,
   ALLOW_WHEN_SUSPENDED,
   ANY_PERMISSION,
   IS_PUBLIC,
@@ -51,7 +52,13 @@ export class AuthGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: claims.userId },
-      select: { id: true, status: true, isPlatformAdmin: true, platformRole: true },
+      select: {
+        id: true,
+        status: true,
+        isPlatformAdmin: true,
+        platformRole: true,
+        mustChangePassword: true,
+      },
     });
     if (
       !user ||
@@ -65,6 +72,16 @@ export class AuthGuard implements CanActivate {
     ctx.sessionId = claims.sessionId;
     ctx.platformRole = effectiveRole;
     ctx.isPlatformAdmin = effectiveRole === 'SUPERADMIN';
+
+    if (
+      user.mustChangePassword &&
+      !this.reflector.getAllAndOverride<boolean>(ALLOW_WHEN_MUST_CHANGE_PASSWORD, targets)
+    ) {
+      throw AppError.forbidden(
+        'PASSWORD_CHANGE_REQUIRED',
+        'You must change your temporary password before continuing.',
+      );
+    }
 
     if (claims.orgId) {
       const membership = await this.prisma.membership.findFirst({

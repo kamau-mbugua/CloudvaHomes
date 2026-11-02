@@ -39,7 +39,12 @@ import {
   UpdateMeDto,
 } from './auth.dto.js';
 import { AuthService } from './auth.service.js';
-import { authContext, Public, AllowWhenSuspended } from './decorators.js';
+import {
+  AllowWhenMustChangePassword,
+  AllowWhenSuspended,
+  authContext,
+  Public,
+} from './decorators.js';
 import { type IssuedSession, REFRESH_TTL_DAYS, SessionsService } from './sessions.service.js';
 
 export const REFRESH_COOKIE = 'hodi_rt';
@@ -263,6 +268,7 @@ export class MeController {
   ) {}
 
   /** The session object (without tokens) for the current access token. */
+  @AllowWhenMustChangePassword()
   @Get()
   async me() {
     const ctx = authContext();
@@ -302,6 +308,7 @@ export class MeController {
     });
   }
 
+  @AllowWhenMustChangePassword()
   @Post('password')
   @HttpCode(204)
   async changePassword(@Body() dto: ChangePasswordDto) {

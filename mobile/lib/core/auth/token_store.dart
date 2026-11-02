@@ -3,17 +3,19 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// A login saved on the device when "Remember me" is enabled.
+/// Never stores plaintext passwords: stores only the identifier, optional refresh token,
+/// and display metadata.
 class SavedCredential {
   const SavedCredential({
     required this.identifier,
-    required this.password,
+    this.refreshToken,
     this.displayName,
     this.roleHint,
     this.savedAt,
   });
 
   final String identifier;
-  final String password;
+  final String? refreshToken;
   final String? displayName;
   final String? roleHint;
   final String? savedAt;
@@ -35,7 +37,7 @@ class SavedCredential {
 
   Map<String, dynamic> toJson() => {
     'identifier': identifier,
-    'password': password,
+    if (refreshToken != null) 'refreshToken': refreshToken,
     if (displayName != null) 'displayName': displayName,
     if (roleHint != null) 'roleHint': roleHint,
     if (savedAt != null) 'savedAt': savedAt,
@@ -43,7 +45,7 @@ class SavedCredential {
 
   factory SavedCredential.fromJson(Map<String, dynamic> j) => SavedCredential(
     identifier: (j['identifier'] as String?) ?? '',
-    password: (j['password'] as String?) ?? '',
+    refreshToken: j['refreshToken'] as String?,
     displayName: j['displayName'] as String?,
     roleHint: j['roleHint'] as String?,
     savedAt: j['savedAt'] as String?,
@@ -90,13 +92,30 @@ class SecureTokenStore extends TokenStore {
       if (raw == null || raw.isEmpty) return const [];
       final decoded = jsonDecode(raw);
       if (decoded is! List) return const [];
-      return [
-        for (final item in decoded)
-          if (item is Map<String, dynamic>)
-            SavedCredential.fromJson(item)
-          else if (item is Map)
-            SavedCredential.fromJson(Map<String, dynamic>.from(item)),
-      ].where((c) => c.identifier.isNotEmpty && c.password.isNotEmpty).toList();
+      var hadLegacyPassword = false;
+      final list = <SavedCredential>[];
+      for (final item in decoded) {
+        final Map<String, dynamic>? map = switch (item) {
+          Map<String, dynamic> m => m,
+          Map m => Map<String, dynamic>.from(m),
+          _ => null,
+        };
+        if (map == null) continue;
+        if (map.containsKey('password')) {
+          hadLegacyPassword = true;
+        }
+        final cred = SavedCredential.fromJson(map);
+        if (cred.identifier.isNotEmpty) {
+          list.add(cred);
+        }
+      }
+      if (hadLegacyPassword) {
+        await _storage.write(
+          key: _savedCredentialsKey,
+          value: jsonEncode([for (final c in list) c.toJson()]),
+        );
+      }
+      return list;
     } on Object {
       return const [];
     }
@@ -105,7 +124,7 @@ class SecureTokenStore extends TokenStore {
   @override
   Future<void> saveCredential(SavedCredential credential) async {
     final norm = credential.identifier.trim().toLowerCase();
-    if (norm.isEmpty || credential.password.isEmpty) return;
+    if (norm.isEmpty) return;
     final current = await readSavedCredentials();
     final updated = <SavedCredential>[
       credential,
@@ -156,7 +175,7 @@ class MemoryTokenStore extends TokenStore {
   @override
   Future<void> saveCredential(SavedCredential credential) async {
     final norm = credential.identifier.trim().toLowerCase();
-    if (norm.isEmpty || credential.password.isEmpty) return;
+    if (norm.isEmpty) return;
     savedCredentials.removeWhere(
       (c) => c.identifier.trim().toLowerCase() == norm,
     );

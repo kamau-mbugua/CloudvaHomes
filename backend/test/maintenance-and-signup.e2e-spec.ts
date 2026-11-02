@@ -115,6 +115,38 @@ describe('App Config, Public Signup, Maintenance & Notifications (e2e)', () => {
     expect(reg.accessToken).toBeDefined();
     expect(reg.activeOrganization.name).toBe('Self Sign Properties');
     expect(reg.permissions).toContain('properties:create');
+
+    // Public signup must refuse claiming an existing passwordless account (H2)
+    await t.prisma.user.create({
+      data: {
+        email: 'invited-staff@selfsign.invalid',
+        phone: '+254722999888',
+        firstName: 'Pending',
+        lastName: 'Staff',
+        passwordHash: null,
+      },
+    });
+    const claimEmailAttempt = await t.http().post('/api/v1/auth/register').send({
+      organizationName: 'Hijack Org',
+      organizationKind: 'LANDLORD',
+      firstName: 'Attacker',
+      lastName: 'One',
+      email: 'invited-staff@selfsign.invalid',
+      phone: '0733445566',
+      password: PASSWORD,
+    });
+    expect(claimEmailAttempt.status).toBe(422);
+
+    const claimPhoneAttempt = await t.http().post('/api/v1/auth/register').send({
+      organizationName: 'Hijack Org 2',
+      organizationKind: 'LANDLORD',
+      firstName: 'Attacker',
+      lastName: 'Two',
+      email: 'fresh-attacker@selfsign.invalid',
+      phone: '0722999888',
+      password: PASSWORD,
+    });
+    expect(claimPhoneAttempt.status).toBe(422);
   });
 
   it('handles full tenant -> staff maintenance request lifecycle, expense conversion, and notifications', async () => {

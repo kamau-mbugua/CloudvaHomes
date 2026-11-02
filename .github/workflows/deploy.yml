@@ -25,24 +25,25 @@ name: Deploy
 #
 # Images are built here, never on the servers: a broken build fails before anything on a
 # server changes, and the VMs keep their memory for the app.
+#
+# Nothing deploys unless CI passed: a push to main/dev runs CI (ci.yml), and its last job
+# calls this workflow only when the backend, web and landing checks succeeded (or had nothing
+# to check). Called from CI, `github.*` is still the push (same branch, same commit), so the
+# steps below read it as before. workflow_dispatch is the manual escape hatch and skips CI.
 
 on:
-  push:
-    branches:
-      - main
-      - dev
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - 'infra/**'
-      - 'landing/**'
-      - '.github/workflows/deploy.yml'
+  workflow_call:
+    inputs:
+      landing_only:
+        description: Only the landing site changed in this push (skip image builds and the app deploy)
+        type: boolean
+        default: false
   workflow_dispatch:
-
-# Per BRANCH, not one global lock: a development deploy must never hold a production hotfix.
-concurrency:
-  group: deploy-${{ github.ref_name }}
-  cancel-in-progress: false
+    inputs:
+      landing_only:
+        description: Only publish the landing site (skip image builds and the app deploy)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,6 +54,12 @@ jobs:
     name: Deploy ${{ github.ref_name }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    # Per BRANCH, not one global lock: a development deploy must never hold a production
+    # hotfix. Never cancelled: stopping a deploy midway could interrupt a migration.
+    concurrency:
+      group: deploy-${{ github.ref_name }}
+      cancel-in-progress: false
 
     # Named so protection rules apply: add a required reviewer on `production` in the repo
     # settings without touching this file.
@@ -68,15 +75,14 @@ jobs:
     steps:
       - name: Check out the code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          fetch-depth: 2
 
       # Fails loudly on an unconfigured target, before anything is built or sent.
       - name: Check the target is configured
         env:
           HAS_KEY: ${{ (github.ref_name == 'main' && secrets.GCP_SSH_PRIVATE_KEY || secrets.DEV_SSH_PRIVATE_KEY) != '' }}
           HAS_KNOWN_HOSTS: ${{ (github.ref_name == 'main' && secrets.GCP_VM_KNOWN_HOSTS || secrets.DEV_VM_KNOWN_HOSTS) != '' }}
-          BEFORE_SHA: ${{ github.event.before }}
+          # Decided by CI from EVERY commit in the push (not just the last one); false by default.
+          LANDING_ONLY: ${{ inputs.landing_only && 'true' || 'false' }}
         run: |
           if [ -z "$VM_HOST" ] || [ -z "$VM_USER" ] || [ "$HAS_KEY" != true ] || [ "$HAS_KNOWN_HOSTS" != true ]; then
             echo "::error::No host/user/key/known_hosts configured for '$GITHUB_REF_NAME'."
@@ -84,14 +90,6 @@ jobs:
             exit 1
           fi
           echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-          LANDING_ONLY=false
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git rev-parse --verify "$BEFORE_SHA^{commit}" >/dev/null 2>&1; then
-            non_landing="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" | grep -v '^landing/' || true)"
-            landing_changed="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" | grep '^landing/' || true)"
-            if [ -n "$landing_changed" ] && [ -z "$non_landing" ]; then
-              LANDING_ONLY=true
-            fi
-          fi
           echo "LANDING_ONLY=$LANDING_ONLY" >> "$GITHUB_ENV"
           echo "Deploying '$GITHUB_REF_NAME' ($DEPLOY_ENV) to $VM_HOST (landing_only=$LANDING_ONLY)"
 

@@ -9,6 +9,7 @@ export const REQUIRES_ORG = 'hodi:requiresOrg';
 export const PLATFORM_ADMIN_ONLY = 'hodi:platformAdmin';
 export const PLATFORM_OPERATOR_ONLY = 'hodi:platformOperator';
 export const ALLOW_WHEN_SUSPENDED = 'hodi:allowWhenSuspended';
+export const ALLOW_WHEN_MUST_CHANGE_PASSWORD = 'hodi:allowWhenMustChangePassword';
 
 /** No sign-in needed. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
@@ -34,6 +35,13 @@ export const PlatformOperatorOnly = () => SetMetadata(PLATFORM_OPERATOR_ONLY, tr
  * paying Hodi, signing in, and taking money in — rent collection is never blocked.
  */
 export const AllowWhenSuspended = () => SetMetadata(ALLOW_WHEN_SUSPENDED, true);
+
+/**
+ * Allowed while `user.mustChangePassword` is true (reading the session via `GET /me` and
+ * changing the temporary password via `POST /me/password`). All other authenticated routes
+ * are rejected with `403 PASSWORD_CHANGE_REQUIRED`.
+ */
+export const AllowWhenMustChangePassword = () => SetMetadata(ALLOW_WHEN_MUST_CHANGE_PASSWORD, true);
 
 /** Context of a signed-in caller (throws if called on a public route). */
 export function authContext(): RequestContext & { userId: string; sessionId: string } {

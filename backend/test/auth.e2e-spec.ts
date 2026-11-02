@@ -303,6 +303,83 @@ describe('Auth (e2e)', () => {
         .expect(200);
       expect(otpLogin.body.data.tenantOf).toHaveLength(1);
     });
+
+    it('prevents account takeover via unverified tenant contact fields (C1 email & phone variants)', async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Attacker Org',
+        ownerEmail: 'attacker-org@example.invalid',
+        ownerPhone: '+254700000055',
+      });
+      outbox.length = 0;
+
+      // Variant 1: Attacker creates a tenant using the platform admin's phone (+254700000099)
+      // and an attacker-controlled email address.
+      const attackerEmail = 'attacker-takeover@evil.invalid';
+      await t
+        .http()
+        .post('/api/v1/tenants')
+        .set(auth(owner))
+        .send({
+          firstName: 'Fake',
+          lastName: 'Tenant',
+          phone: '0700000099',
+          email: attackerEmail,
+        })
+        .expect(201);
+      outbox.length = 0;
+
+      // Requesting login OTP or password reset for attackerEmail must NOT resolve to the victim
+      // or send any OTP code.
+      await t.http().post('/api/v1/auth/otp/request').send({ phone: attackerEmail }).expect(202);
+      await t
+        .http()
+        .post('/api/v1/auth/password/forgot')
+        .send({ identifier: attackerEmail })
+        .expect(202);
+      expect(outbox.filter((m) => m.to === attackerEmail)).toHaveLength(0);
+
+      // Victim's email and phone remain unchanged
+      const adminUser = await t.prisma.user.findUniqueOrThrow({
+        where: { email: 'admin@example.invalid' },
+      });
+      expect(adminUser.email).toBe('admin@example.invalid');
+      expect(adminUser.phone).toBe('+254700000099');
+
+      // Variant 2: Victim is an email-only user (phone is null). Attacker creates a tenant
+      // with victim's email and an attacker-controlled phone, then grants portal access.
+      const emailOnlyVictim = await t.prisma.user.create({
+        data: {
+          email: 'victim-no-phone@example.invalid',
+          phone: null,
+          firstName: 'Vera',
+          lastName: 'Victim',
+        },
+      });
+      const attackerPhone = '+254799888777';
+      const createdTenant = await t
+        .http()
+        .post('/api/v1/tenants')
+        .set(auth(owner))
+        .send({
+          firstName: 'Vera',
+          lastName: 'Clone',
+          phone: attackerPhone,
+          email: 'victim-no-phone@example.invalid',
+        })
+        .expect(201);
+      await t
+        .http()
+        .post(`/api/v1/tenants/${createdTenant.body.data.id}/portal-access`)
+        .set(auth(owner))
+        .expect(200);
+      outbox.length = 0;
+
+      // Victim's phone must still be null (never backfilled from unverified tenant data)
+      const refreshedVictim = await t.prisma.user.findUniqueOrThrow({
+        where: { id: emailOnlyVictim.id },
+      });
+      expect(refreshedVictim.phone).toBeNull();
+    });
   });
 
   describe('password reset', () => {

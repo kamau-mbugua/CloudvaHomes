@@ -124,6 +124,16 @@ class SessionController extends AsyncNotifier<Session?> {
     state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
   }
 
+  /// Restores a remembered account from its stored refresh token without storing a password.
+  Future<bool> signInWithSavedToken(String refreshToken) async {
+    try {
+      state = AsyncData(await _refreshWith(refreshToken));
+      return true;
+    } on ApiError {
+      return false;
+    }
+  }
+
   /// Sends a sign-in code by SMS or email. The server answers the same whether or not the
   /// phone/email has an account, so this never says who uses Hodi.
   Future<void> requestCode(String phoneOrEmail) =>

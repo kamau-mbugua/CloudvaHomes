@@ -64,19 +64,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     return null;
   }
 
-  Future<void> _persistCredentialIfRemembered(
-    String identifier,
-    String password,
-  ) async {
+  Future<void> _persistCredentialIfRemembered(String identifier) async {
     final store = ref.read(tokenStoreProvider);
     final trimmedId = identifier.trim();
     if (_rememberMe) {
       final session = ref.read(sessionProvider).valueOrNull;
       final fullName = session?.user.fullName.trim();
+      final refreshToken = await store.read();
       await store.saveCredential(
         SavedCredential(
           identifier: trimmedId,
-          password: password,
+          refreshToken: refreshToken,
           displayName: (fullName != null && fullName.isNotEmpty)
               ? fullName
               : null,
@@ -86,6 +84,37 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       );
     } else {
       await store.removeSavedCredential(trimmedId);
+    }
+  }
+
+  Future<void> _selectSavedAccount(SavedCredential selected) async {
+    if (!mounted) return;
+    setState(() {
+      _id.text = selected.identifier;
+      _rememberMe = true;
+      _error = null;
+      _notice = null;
+    });
+    final token = selected.refreshToken;
+    if (token != null && token.isNotEmpty) {
+      setState(() => _busy = true);
+      try {
+        final ok = await ref
+            .read(sessionProvider.notifier)
+            .signInWithSavedToken(token);
+        if (ok) {
+          await _persistCredentialIfRemembered(selected.identifier);
+          return;
+        }
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _notice =
+            'Enter your password to continue as ${selected.displayName ?? selected.identifier}.';
+      });
     }
   }
 
@@ -99,14 +128,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       builder: (_) => _SavedCredentialsSheet(
         initialCredentials: _savedCredentials,
         onSelect: (selected) {
-          if (!mounted) return;
-          setState(() {
-            _id.text = selected.identifier;
-            _password.text = selected.password;
-            _rememberMe = true;
-            _error = null;
-          });
-          _submit();
+          _selectSavedAccount(selected);
         },
         onRemove: (identifier) async {
           await ref.read(tokenStoreProvider).removeSavedCredential(identifier);
@@ -154,7 +176,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           });
         }
       } else {
-        await _persistCredentialIfRemembered(identifier, password);
+        await _persistCredentialIfRemembered(identifier);
       }
     } on ApiError catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -193,7 +215,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       return;
     }
     final identifier = _id.text.trim();
-    final password = _password.text;
     setState(() {
       _busy = true;
       _error = null;
@@ -203,7 +224,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       await ref
           .read(sessionProvider.notifier)
           .verifyTwoFactor(_challenge!.challengeToken, _twoFactorCode.text);
-      await _persistCredentialIfRemembered(identifier, password);
+      await _persistCredentialIfRemembered(identifier);
     } on ApiError catch (e) {
       if (mounted) {
         setState(() => _error = e.fieldErrors['code'] ?? e.message);

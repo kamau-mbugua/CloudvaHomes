@@ -706,6 +706,9 @@ export class NotificationsService {
 
     try {
       if (this.env.NODE_ENV !== 'test' && settings?.smtpHost) {
+        if (isForbiddenSmtpHost(settings.smtpHost)) {
+          throw new Error('SMTP host points to a forbidden private or loopback address');
+        }
         const pass =
           settings.smtpPassEnc && this.cipher
             ? this.cipher.decrypt(settings.smtpPassEnc, SMTP_PASS_CONTEXT)
@@ -1021,6 +1024,53 @@ export class NotificationsService {
     });
     return { removed: res.count };
   }
+}
+
+export function isForbiddenSmtpHost(rawHost: string): boolean {
+  const host = rawHost
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '');
+  if (!host || /[\s/:@?#]/.test(host)) return true;
+  if (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host === 'metadata' ||
+    host === 'metadata.google.internal' ||
+    host === '::1' ||
+    host === '::' ||
+    host === '0:0:0:0:0:0:0:1' ||
+    host.startsWith('fe80:') ||
+    host.startsWith('fc') ||
+    host.startsWith('fd')
+  ) {
+    return true;
+  }
+  const v4Mapped = host.startsWith('::ffff:') ? host.slice(7) : host;
+  if (/^\d+$/.test(v4Mapped) || /^0x[0-9a-f]+$/i.test(v4Mapped)) {
+    return true;
+  }
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(v4Mapped);
+  if (ipv4) {
+    const parts = ipv4.slice(1).map(Number);
+    if (parts.some((n) => n < 0 || n > 255)) return true;
+    const [a, b] = parts as [number, number, number, number];
+    if (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function paymentReceiptText(p: {

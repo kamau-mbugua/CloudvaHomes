@@ -27,7 +27,11 @@ import {
   resolveAllEmailTemplates,
   resolveEmailTemplate,
 } from '../notifications/email-templates.js';
-import { NotificationsService, SMTP_PASS_CONTEXT } from '../notifications/notifications.service.js';
+import {
+  isForbiddenSmtpHost,
+  NotificationsService,
+  SMTP_PASS_CONTEXT,
+} from '../notifications/notifications.service.js';
 import { PlatformBillingService } from './platform-billing.service.js';
 import type {
   AssignOrganizationsDto,
@@ -414,10 +418,25 @@ export class PlatformAdminService {
         );
       }
       const existing = existingByEmail ?? existingByPhone;
+      if (existing) {
+        const [membershipCount, tenantCount, landlordCount] = await Promise.all([
+          this.db.membership.count({ where: { userId: existing.id } }),
+          this.db.tenant.count({ where: { userId: existing.id } }),
+          this.db.landlord.count({ where: { userId: existing.id } }),
+        ]);
+        if (membershipCount > 0 || tenantCount > 0 || landlordCount > 0) {
+          throw AppError.conflict(
+            'This email or phone belongs to a customer account. Use a dedicated operator email or phone.',
+            'CUSTOMER_ACCOUNT_CONFLICT',
+          );
+        }
+      }
 
       const generatedPassword =
         !dto.password && !existing?.passwordHash ? this.generateTemporaryPassword() : null;
-      const plainPasswordToSet = dto.password ?? generatedPassword;
+      const plainPasswordToSet = existing?.passwordHash
+        ? null
+        : (dto.password ?? generatedPassword);
       const passwordHash = plainPasswordToSet ? await hashPassword(plainPasswordToSet) : undefined;
       const mustChangePassword = Boolean(generatedPassword);
 
@@ -426,8 +445,6 @@ export class PlatformAdminService {
           ? await tx.user.update({
               where: { id: existing.id },
               data: {
-                firstName: dto.firstName.trim(),
-                lastName: dto.lastName.trim(),
                 ...(email && !existing.email ? { email } : {}),
                 ...(phone && !existing.phone ? { phone } : {}),
                 ...(passwordHash ? { passwordHash, mustChangePassword } : {}),
@@ -449,6 +466,10 @@ export class PlatformAdminService {
                 status: 'ACTIVE',
               },
             });
+        await tx.refreshToken.updateMany({
+          where: { userId: row.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
         await this.audit.record(
           {
             action: existing ? 'platform.operator_promote' : 'platform.operator_create',
@@ -495,6 +516,10 @@ export class PlatformAdminService {
         const row = await tx.user.update({
           where: { id },
           data: { passwordHash, mustChangePassword: true },
+        });
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
         });
         await this.audit.record(
           {
@@ -567,6 +592,10 @@ export class PlatformAdminService {
               : {}),
             ...(dto.status !== undefined ? { status: dto.status } : {}),
           },
+        });
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
         });
         await this.audit.record(
           {
@@ -671,6 +700,13 @@ export class PlatformAdminService {
 
   updateEmailSettings(dto: UpdateEmailSettingsDto) {
     return withoutOrgScope(async () => {
+      const trimmedHost = dto.host?.trim();
+      if (trimmedHost && isForbiddenSmtpHost(trimmedHost)) {
+        throw AppError.fieldInvalid(
+          'host',
+          'SMTP host cannot point to a private, loopback, or internal address',
+        );
+      }
       const before = await this.getEmailSettings();
       const data: Prisma.PlatformSettingsUpdateInput = {
         ...(dto.host !== undefined ? { smtpHost: dto.host?.trim() || null } : {}),

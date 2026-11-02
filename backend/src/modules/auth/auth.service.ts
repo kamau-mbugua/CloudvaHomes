@@ -135,7 +135,7 @@ export class AuthService {
       throw new AppError(
         403,
         'SIGNUP_DISABLED',
-        'Public organisation registration is currently disabled. Contact Hodi to get started.',
+        'Public organisation registration is currently disabled. Contact KodiHub to get started.',
       );
     }
 
@@ -158,24 +158,17 @@ export class AuthService {
     const { userId, orgId } = await withoutOrgScope(async () =>
       runner.$transaction(async (tx) => {
         const existingEmailUser = await tx.user.findUnique({ where: { email } });
-        const existingPhoneUser = await tx.user.findUnique({ where: { phone } });
-
-        if (
-          existingEmailUser &&
-          existingPhoneUser &&
-          existingEmailUser.id !== existingPhoneUser.id
-        ) {
+        if (existingEmailUser) {
           throw AppError.fieldInvalid(
             'email',
-            'This email and phone number belong to two different accounts. Sign in instead.',
+            'An account with this email already exists. Sign in instead.',
           );
         }
-
-        const existingUser = existingEmailUser ?? existingPhoneUser;
-        if (existingUser?.passwordHash) {
+        const existingPhoneUser = await tx.user.findUnique({ where: { phone } });
+        if (existingPhoneUser) {
           throw AppError.fieldInvalid(
-            existingEmailUser ? 'email' : 'phone',
-            'An account with these details already exists. Sign in instead.',
+            'phone',
+            'An account with this phone number already exists. Sign in instead.',
           );
         }
 
@@ -205,26 +198,15 @@ export class AuthService {
 
         const roles = await RolesService.seedSystemRoles(tx, org.id);
 
-        const user = existingUser
-          ? await tx.user.update({
-              where: { id: existingUser.id },
-              data: {
-                firstName: dto.firstName.trim(),
-                lastName: dto.lastName.trim(),
-                email: existingUser.email ?? email,
-                phone: existingUser.phone ?? phone,
-                passwordHash,
-              },
-            })
-          : await tx.user.create({
-              data: {
-                firstName: dto.firstName.trim(),
-                lastName: dto.lastName.trim(),
-                email,
-                phone,
-                passwordHash,
-              },
-            });
+        const user = await tx.user.create({
+          data: {
+            firstName: dto.firstName.trim(),
+            lastName: dto.lastName.trim(),
+            email,
+            phone,
+            passwordHash,
+          },
+        });
 
         await tx.membership.create({
           data: {
@@ -235,14 +217,6 @@ export class AuthService {
             status: 'ACTIVE',
             joinedAt: new Date(),
           },
-        });
-
-        await tx.tenant.updateMany({
-          where: {
-            userId: null,
-            OR: [{ phone }, { email: { equals: email, mode: 'insensitive' } }],
-          },
-          data: { userId: user.id, portalInvitedAt: new Date() },
         });
 
         await this.audit.record(
@@ -282,7 +256,7 @@ export class AuthService {
       await verifyPassword(null, password);
       throw invalid;
     }
-    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: true });
+    const user = await this.findUserByIdentifier(id);
     const ok = await verifyPassword(user?.passwordHash, password);
     if (!user || !ok || user.status !== 'ACTIVE') throw invalid;
 
@@ -374,8 +348,9 @@ export class AuthService {
       { key: `otp:phone:${id.value}`, limit: 3, windowSeconds: 15 * MIN },
       { key: `otp:ip:${this.ip()}`, limit: 10, windowSeconds: HOUR },
     );
-    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: true });
+    const user = await this.findUserByIdentifier(id);
     if (!user || user.status !== 'ACTIVE') return;
+    if (user.isPlatformAdmin || user.platformRole !== null) return;
     const code = await this.otp.issue(id.value, 'LOGIN', user.id);
     await this.deliverCode(
       id.kind === 'phone' ? { phone: id.value } : { email: id.value },
@@ -406,6 +381,12 @@ export class AuthService {
         'That code is wrong or has expired. Request a new one.',
       );
     }
+    if (user.isPlatformAdmin || user.platformRole !== null) {
+      throw AppError.forbidden(
+        'OPERATOR_PASSWORD_REQUIRED',
+        'Platform operators must sign in with a password.',
+      );
+    }
     const session = await this.sessions.start(user.id, null);
     await this.audit.record({
       action: 'auth.login',
@@ -426,7 +407,7 @@ export class AuthService {
       { key: `reset:id:${id.value}`, limit: 3, windowSeconds: HOUR },
       { key: `reset:ip:${this.ip()}`, limit: 10, windowSeconds: HOUR },
     );
-    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: false });
+    const user = await this.findUserByIdentifier(id);
     if (!user || user.status !== 'ACTIVE') return;
     const code = await this.otp.issue(id.value, 'PASSWORD_RESET', user.id);
     await this.deliverCode(
@@ -450,7 +431,7 @@ export class AuthService {
       limit: 30,
       windowSeconds: 15 * MIN,
     });
-    const user = await this.resolveUserForAuth(id, { requireEmailIfUnlinkedTenant: false });
+    const user = await this.findUserByIdentifier(id);
     if (!user) throw invalid;
     const problem = passwordProblem(newPassword, [user.email, user.phone]);
     if (problem) throw AppError.fieldInvalid('newPassword', problem);
@@ -473,135 +454,14 @@ export class AuthService {
   }
 
   /**
-   * Resolves a global `User` by email or phone. If a tenant record already exists with that
-   * email/phone (for example, onboarded before portal access was explicitly granted) or if the
-   * user row is missing the tenant's email, provisions/updates the `User` and links the tenant.
+   * Resolves a global `User` strictly from the `users` table by normalized email or phone.
+   * Never reads or links `tenant` records during authentication so unverified tenant contact
+   * fields supplied by an organisation cannot be used to take over or mutate another user's account.
    */
-  private async resolveUserForAuth(
-    id: Identifier,
-    opts: { requireEmailIfUnlinkedTenant: boolean },
-  ) {
-    let user = await this.prisma.user.findUnique({
+  private findUserByIdentifier(id: Identifier) {
+    return this.prisma.user.findUnique({
       where: id.kind === 'email' ? { email: id.value } : { phone: id.value },
     });
-
-    if (id.kind === 'email') {
-      if (!user) {
-        const tenant = await this.prisma.tenant.findFirst({
-          where: {
-            email: { equals: id.value, mode: 'insensitive' },
-            organization: { status: { not: 'CLOSED' } },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-        if (!tenant) return null;
-        user = await this.prisma.user.findFirst({
-          where: {
-            OR: [
-              ...(tenant.userId ? [{ id: tenant.userId }] : []),
-              { phone: tenant.phone },
-              { email: id.value },
-            ],
-          },
-        });
-        if (!user) {
-          user = await this.prisma.user.create({
-            data: {
-              phone: tenant.phone,
-              email: id.value,
-              firstName: tenant.firstName,
-              lastName: tenant.lastName,
-            },
-          });
-        } else if (!user.email) {
-          const emailTaken = await this.prisma.user.count({
-            where: { email: id.value, id: { not: user.id } },
-          });
-          if (!emailTaken) {
-            user = await this.prisma.user.update({
-              where: { id: user.id },
-              data: { email: id.value },
-            });
-          }
-        }
-      }
-      await this.prisma.tenant.updateMany({
-        where: {
-          userId: null,
-          OR: [
-            ...(user.phone ? [{ phone: user.phone }] : []),
-            { email: { equals: id.value, mode: 'insensitive' } },
-          ],
-        },
-        data: { userId: user.id, portalInvitedAt: new Date() },
-      });
-      return user;
-    }
-
-    // id.kind === 'phone'
-    if (!user) {
-      const tenant = await this.prisma.tenant.findFirst({
-        where: {
-          phone: id.value,
-          ...(opts.requireEmailIfUnlinkedTenant ? { email: { not: null } } : {}),
-          organization: { status: { not: 'CLOSED' } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (!tenant) return null;
-      const tenantEmail = tenant.email ? tenant.email.trim().toLowerCase() : null;
-      if (tenantEmail) {
-        user = await this.prisma.user.findUnique({ where: { email: tenantEmail } });
-      }
-      if (!user) {
-        const emailFree = tenantEmail
-          ? !(await this.prisma.user.count({ where: { email: tenantEmail } }))
-          : false;
-        user = await this.prisma.user.create({
-          data: {
-            phone: tenant.phone,
-            email: emailFree ? tenantEmail : null,
-            firstName: tenant.firstName,
-            lastName: tenant.lastName,
-          },
-        });
-      } else if (!user.phone) {
-        user = await this.prisma.user.update({
-          where: { id: user.id },
-          data: { phone: tenant.phone },
-        });
-      }
-      await this.prisma.tenant.updateMany({
-        where: { userId: null, phone: tenant.phone },
-        data: { userId: user.id, portalInvitedAt: new Date() },
-      });
-      return user;
-    }
-
-    if (!user.email) {
-      const tenantWithEmail = await this.prisma.tenant.findFirst({
-        where: {
-          phone: id.value,
-          email: { not: null },
-          organization: { status: { not: 'CLOSED' } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      if (tenantWithEmail?.email) {
-        const email = tenantWithEmail.email.trim().toLowerCase();
-        const emailTaken = await this.prisma.user.count({
-          where: { email, id: { not: user.id } },
-        });
-        if (!emailTaken) {
-          user = await this.prisma.user.update({
-            where: { id: user.id },
-            data: { email },
-          });
-        }
-      }
-    }
-
-    return user;
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {

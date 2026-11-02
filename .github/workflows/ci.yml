@@ -15,11 +15,16 @@ on:
       - 'frontend/**'
       - 'mobile/**'
       - 'landing/**'
+      - 'infra/**'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/deploy.yml'
 
+# Pull requests: a newer push cancels the older run. Pushes to main/dev are never cancelled,
+# because their run ends with the deploy job, and stopping a deploy midway could interrupt a
+# migration. A newer push queues behind it instead.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -32,10 +37,12 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       mobile: ${{ steps.filter.outputs.mobile }}
       landing: ${{ steps.filter.outputs.landing }}
+      deploy_app: ${{ steps.filter.outputs.deploy_app }}
+      deploy_landing: ${{ steps.filter.outputs.deploy_landing }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         with:
           base: ${{ github.ref_name }}
           filters: |
@@ -51,6 +58,16 @@ jobs:
             landing:
               - 'landing/**'
               - '.github/workflows/ci.yml'
+            # What the deploy job looks at. On a push these cover every commit in the push
+            # (compared with the branch before it), so a last commit that only touches
+            # landing/ can't hide backend or web changes made earlier in the same push.
+            deploy_app:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'infra/**'
+              - '.github/workflows/deploy.yml'
+            deploy_landing:
+              - 'landing/**'
 
   backend:
     needs: changes
@@ -79,8 +96,8 @@ jobs:
       FIELD_ENCRYPTION_KEYS: ci1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
       FIELD_INDEX_KEY: AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22
           cache: npm
@@ -96,7 +113,7 @@ jobs:
       - run: npm run build
       - name: OpenAPI document builds
         run: npm run openapi:export -- openapi.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6
         with:
           name: openapi
           path: backend/openapi.json
@@ -113,8 +130,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22
           cache: npm
@@ -133,8 +150,8 @@ jobs:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: subosito/flutter-action@e938fdf56512cc96ef2f93601a5a40bde3801046 # v2.19.0
         with:
           channel: stable
           cache: true
@@ -148,9 +165,27 @@ jobs:
     if: needs.changes.outputs.landing == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 22
       - name: Verify landing page HTML, DOM bindings & inline scripts
         run: node landing/check.mjs
+
+  # Pushes to main/dev only: deploys after the checks for what ships (API, web, landing)
+  # passed. A skipped check (nothing changed there) is fine; a failed or cancelled one stops
+  # the deploy. Mobile isn't deployed from here, so a mobile failure doesn't hold a server fix.
+  deploy:
+    name: Deploy
+    needs: [changes, backend, frontend, landing]
+    if: >-
+      ${{ github.event_name == 'push' && !cancelled()
+          && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+          && (needs.changes.outputs.deploy_app == 'true' || needs.changes.outputs.deploy_landing == 'true') }}
+    permissions:
+      contents: read
+      packages: write # deploy.yml pushes images to ghcr.io
+    uses: ./.github/workflows/deploy.yml
+    with:
+      landing_only: ${{ needs.changes.outputs.deploy_app != 'true' }}
+    secrets: inherit

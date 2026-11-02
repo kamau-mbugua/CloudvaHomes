@@ -104,6 +104,44 @@ class LoggingInterceptor extends Interceptor {
     return '${value.substring(0, 15)}...${value.substring(value.length - 4)}';
   }
 
+  static const _sensitiveKeys = <String>{
+    'password',
+    'currentpassword',
+    'newpassword',
+    'temporarypassword',
+    'token',
+    'accesstoken',
+    'refreshtoken',
+    'challengetoken',
+    'stepuptoken',
+  };
+
+  static bool _shouldRedact(String key, Object? val) {
+    final k = key.toLowerCase();
+    if (_sensitiveKeys.contains(k)) return true;
+    if (k == 'code' &&
+        val is String &&
+        RegExp(r'^\d{6}$').hasMatch(val.trim())) {
+      return true;
+    }
+    return false;
+  }
+
+  static Object? _redact(Object? value) {
+    if (value is Map) {
+      return {
+        for (final entry in value.entries)
+          entry.key: _shouldRedact(entry.key.toString(), entry.value)
+              ? '***REDACTED***'
+              : _redact(entry.value),
+      };
+    }
+    if (value is List) {
+      return value.map(_redact).toList();
+    }
+    return value;
+  }
+
   String _formatData(Object? data) {
     if (data == null) return 'null';
     if (data is Uint8List) return '<bytes: ${data.length} bytes>';
@@ -116,7 +154,7 @@ class LoggingInterceptor extends Interceptor {
       }
     }
     if (data is FormData) {
-      final fields = {for (final f in data.fields) f.key: f.value};
+      final fields = _redact({for (final f in data.fields) f.key: f.value});
       final files = [
         for (final f in data.files)
           '${f.key}: ${f.value.filename ?? 'file'} (${f.value.length} bytes)',
@@ -125,7 +163,7 @@ class LoggingInterceptor extends Interceptor {
     }
     if (data is Map || data is List) {
       try {
-        return jsonEncode(data);
+        return jsonEncode(_redact(data));
       } catch (_) {
         return data.toString();
       }

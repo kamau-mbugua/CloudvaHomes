@@ -142,6 +142,59 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
 
     // Admin cannot demote/disable themselves
     await patch(admin, `/platform/operators/${admin.body.user.id}`, { status: 'DISABLED' }, 409);
+
+    // M1: Cannot promote an existing customer account into a platform operator
+    await post(
+      admin,
+      '/platform/operators',
+      {
+        firstName: 'Olive',
+        lastName: 'Owner',
+        email: 'olive1@example.invalid',
+        role: 'SALESPERSON',
+      },
+      409,
+    );
+
+    // M1 & M3: Operator created without password gets temporary password with mustChangePassword=true,
+    // and AuthGuard blocks API calls with 403 PASSWORD_CHANGE_REQUIRED until POST /me/password
+    outbox.length = 0;
+    const tempOp = (
+      await post(
+        admin,
+        '/platform/operators',
+        {
+          firstName: 'David',
+          lastName: 'Kimani',
+          email: 'david.op@hodi.test',
+          role: 'SALESPERSON',
+        },
+        201,
+      )
+    ).data;
+    expect(tempOp.mustChangePassword).toBe(true);
+    const opWelcome = outbox.find((m) => m.channel === 'email' && m.to === 'david.op@hodi.test');
+    const tempPw = /Temporary password: (\S+)/.exec(opWelcome!.text)![1]!;
+    const tempSession = await login(t, 'david.op@hodi.test', tempPw);
+    expect((tempSession.body.user as any).mustChangePassword).toBe(true);
+
+    // Blocked on regular endpoints with 403 PASSWORD_CHANGE_REQUIRED
+    const blocked = await t
+      .http()
+      .get('/api/v1/platform/organizations')
+      .set(auth(tempSession))
+      .expect(403);
+    expect(blocked.body.error.code).toBe('PASSWORD_CHANGE_REQUIRED');
+
+    // Allowed on GET /me and POST /me/password
+    await get(tempSession, '/me', 200);
+    await post(
+      tempSession,
+      '/me/password',
+      { currentPassword: tempPw, newPassword: 'David-New-Pass-2026!' },
+      204,
+    );
+    await get(tempSession, '/platform/organizations', 200);
   });
 
   it('requires a 6-digit 2FA code for platform operators when requireAdminTwoFactor is enabled', async () => {
@@ -174,6 +227,11 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
       .expect(200);
     expect(step2.body.data.accessToken).toBeDefined();
     expect(step2.body.data.user.isPlatformAdmin).toBe(true);
+
+    // H1: Platform operators cannot bypass password + 2FA via passwordless /auth/otp/request
+    outbox.length = 0;
+    await t.http().post('/api/v1/auth/otp/request').send({ phone: 'admin@hodi.test' }).expect(202);
+    expect(outbox.filter((m) => m.to === 'admin@hodi.test')).toHaveLength(0);
   });
 
   it('configures Email SMTP settings, sends owner welcome + platform invoice + test + broadcast emails, and records PlatformEmailLog entries', async () => {
@@ -231,6 +289,14 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     expect(invoiceEmail!.attachments?.length).toBe(1);
     expect(invoiceEmail!.attachments![0]!.filename).toMatch(/\.pdf$/);
     expect(invoiceEmail!.attachments![0]!.content.subarray(0, 5).toString()).toBe('%PDF-');
+
+    // L3: Rejects private/loopback/metadata SMTP hosts (SSRF protection)
+    for (const badHost of ['localhost', '127.0.0.1', '169.254.169.254', '10.0.0.5', '[::1]']) {
+      await put(admin, '/platform/email/settings', { host: badHost }, 422);
+    }
+
+    // L2: Rejects non-https store URLs
+    await put(admin, '/platform/settings', { appStoreUrl: 'javascript:alert(1)' }, 422);
 
     // Save SMTP settings
     const smtp = (

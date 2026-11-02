@@ -55,17 +55,20 @@ LANDING_HOST=$LANDING_HOST
 APP_STACK=hodi-$ENV
 EDGE
 
-  # Keep APP_URL, PUBLIC_API_URL, and CORS_ORIGINS in api.env aligned with the active hosts.
+  # Initialize APP_URL, PUBLIC_API_URL, and CORS_ORIGINS in api.env only if missing or still
+  # pointing at a legacy sslip.io placeholder, so manual server edits are never overwritten.
   local api_env="$ROOT/envs/$ENV/api.env"
   if [ -f "$api_env" ]; then
-    grep -vE '^(APP_URL|PUBLIC_API_URL|CORS_ORIGINS)=' "$api_env" > "$api_env.tmp" || true
-    cat >> "$api_env.tmp" <<EOF
+    if ! grep -q '^APP_URL=' "$api_env" || grep -qE '^(APP_URL|PUBLIC_API_URL|CORS_ORIGINS)=.*\.sslip\.io' "$api_env"; then
+      grep -vE '^(APP_URL|PUBLIC_API_URL|CORS_ORIGINS)=' "$api_env" > "$api_env.tmp" || true
+      cat >> "$api_env.tmp" <<EOF
 APP_URL=https://$APP_HOST
 PUBLIC_API_URL=https://$API_HOST
 CORS_ORIGINS=https://$APP_HOST,https://$LANDING_HOST
 EOF
-    chmod 600 "$api_env.tmp"
-    mv "$api_env.tmp" "$api_env"
+      chmod 600 "$api_env.tmp"
+      mv "$api_env.tmp" "$api_env"
+    fi
   fi
 
   rm -rf "$ROOT/infra/edge/sites"; mkdir -p "$ROOT/infra/edge/sites"

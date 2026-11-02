@@ -332,6 +332,9 @@ export class TenantsService {
    * When a tenant has an email address OR matches an existing global `User` (such as a team/staff
    * member or landlord by phone or email), automatically provision or link their `User` record
    * so they can access both their team workspace and their tenant portal under one login.
+   *
+   * Security invariant: NEVER mutate an existing `User`'s `email` or `phone` from landlord-supplied
+   * tenant fields, and never link when `phone` and `email` conflict with an existing `User`.
    */
   private async ensurePortalUserInTx(
     tx: Tx,
@@ -346,15 +349,22 @@ export class TenantsService {
   ): Promise<void> {
     const email = t.email ? t.email.trim().toLowerCase() : null;
     const phone = t.phone;
-    let user = await tx.user.findFirst({
-      where: {
-        OR: [
-          { phone },
-          ...(email ? [{ email: { equals: email, mode: 'insensitive' as const } }] : []),
-        ],
-      },
-    });
-    if (!user) {
+    const [userByPhone, userByEmail] = await Promise.all([
+      tx.user.findUnique({ where: { phone } }),
+      email
+        ? tx.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
+        : null,
+    ]);
+
+    if (userByPhone && userByEmail && userByPhone.id !== userByEmail.id) {
+      return;
+    }
+
+    let user = userByPhone ?? userByEmail;
+    if (user) {
+      if (user.phone && user.phone !== phone) return;
+      if (email && user.email && user.email.toLowerCase() !== email) return;
+    } else {
       if (!email) return;
       user = await tx.user.create({
         data: {
@@ -364,27 +374,8 @@ export class TenantsService {
           lastName: t.lastName,
         },
       });
-    } else {
-      const fill: { email?: string; phone?: string } = {};
-      if (!user.email && email) {
-        const emailTaken = await tx.user.count({
-          where: { email: { equals: email, mode: 'insensitive' }, id: { not: user.id } },
-        });
-        if (!emailTaken) fill.email = email;
-      }
-      if (!user.phone && phone) {
-        const phoneTaken = await tx.user.count({
-          where: { phone, id: { not: user.id } },
-        });
-        if (!phoneTaken) fill.phone = phone;
-      }
-      if (Object.keys(fill).length > 0) {
-        user = await tx.user.update({
-          where: { id: user.id },
-          data: fill,
-        });
-      }
     }
+
     if (t.userId !== user.id) {
       await tx.tenant.update({
         where: { id: t.id },

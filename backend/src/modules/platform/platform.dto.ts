@@ -243,9 +243,10 @@ export class PlatformSettingsDto {
   appUpdateMessage?: string | null;
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
-  @ValidateIf((_, v) => v !== null)
+  @ValidateIf((_, v) => v !== null && v !== '')
   @IsString()
   @MaxLength(300)
+  @Matches(/^https:\/\/\S+$/i, { message: 'appStoreUrl must be an https:// URL' })
   appStoreUrl?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() maintenanceMode?: boolean;
   @ApiPropertyOptional({ nullable: true })
@@ -583,16 +584,18 @@ export class UpdateLandingPageDto {
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
-  @ValidateIf((_, v) => v !== null)
+  @ValidateIf((_, v) => v !== null && v !== '')
   @IsString()
   @MaxLength(300)
+  @Matches(/^https:\/\/\S+$/i, { message: 'googlePlayUrl must be an https:// URL' })
   googlePlayUrl?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
-  @ValidateIf((_, v) => v !== null)
+  @ValidateIf((_, v) => v !== null && v !== '')
   @IsString()
   @MaxLength(300)
+  @Matches(/^https:\/\/\S+$/i, { message: 'appStoreUrl must be an https:// URL' })
   appStoreUrl?: string | null;
 
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) agenciesTitle?: string;

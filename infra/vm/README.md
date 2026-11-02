@@ -15,7 +15,12 @@ environment's superadmin via `/admin/settings?tab=landing` (`GET /api/v1/public/
 
 ## How a deploy works
 
-`.github/workflows/deploy.yml`, on push:
+A push to `main` or `dev` runs CI (`.github/workflows/ci.yml`). Its last job calls
+`.github/workflows/deploy.yml`, but only if the backend, web and landing checks passed (a check
+with nothing to check is skipped and doesn't block). Pushes that only touch mobile or docs don't
+deploy. If only `landing/` changed across all the pushed commits, only the landing site is
+published. CI runs on pushes are never cancelled by a newer push; it waits its turn. To deploy
+without CI (an emergency), run **Deploy** by hand from the Actions tab.
 
 | Branch | Server | Secrets used |
 |---|---|---|
@@ -127,6 +132,5 @@ To move to real domains:
 ## Not set up yet
 
 - **SMS and e-mail are in log mode.** Codes and invitations appear in the API logs.
-- **Protect the branches.** A push to `dev` or `main` deploys straight away, as in
-  UltimatePOS. Add a required reviewer to the `production` environment, and/or require pull
-  requests on `main`.
+- **Protect the branches.** A push to `dev` or `main` deploys as soon as CI passes. Add a
+  required reviewer to the `production` environment, and/or require pull requests on `main`.

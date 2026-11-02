@@ -185,23 +185,22 @@ void main() {
   );
 
   testWidgets(
-    'saved credentials open a bottom sheet on login and sign in when tapped',
+    'saved credentials open a bottom sheet on login and restore session via refreshToken without storing plaintext passwords',
     (tester) async {
       final adapter = FakeAdapter(
-        (c) => c.path == '/auth/login'
-            ? (200, {'data': sessionJson(refreshToken: 'r-saved')})
+        (c) => c.path == '/auth/refresh'
+            ? (200, {'data': sessionJson(refreshToken: 'r-rotated')})
             : (401, errorBody('SESSION_REVOKED', 'x')),
       );
       _adapter = adapter;
-      final store = MemoryTokenStore()
-        ..savedCredentials.add(
-          const SavedCredential(
-            identifier: 'kelvin@cloudvalabs.com',
-            password: 'SavedPassword123',
-            displayName: 'Kelvin Mbugua',
-            roleHint: 'Ivory breeze',
-          ),
-        );
+      const saved = SavedCredential(
+        identifier: 'kelvin@cloudvalabs.com',
+        refreshToken: 'r-saved',
+        displayName: 'Kelvin Mbugua',
+        roleHint: 'Ivory breeze',
+      );
+      expect(saved.toJson().containsKey('password'), isFalse);
+      final store = MemoryTokenStore()..savedCredentials.add(saved);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -218,13 +217,11 @@ void main() {
       expect(find.text('Kelvin Mbugua'), findsOneWidget);
 
       await _tapReal(tester, find.text('Kelvin Mbugua'));
-      final login = adapter.calls.firstWhere((c) => c.path == '/auth/login');
-      expect(login.body, {
-        'identifier': 'kelvin@cloudvalabs.com',
-        'password': 'SavedPassword123',
-        'client': 'mobile',
-      });
-      expect(store.token, 'r-saved');
+      final refresh = adapter.calls.firstWhere(
+        (c) => c.path == '/auth/refresh',
+      );
+      expect(refresh.body, {'refreshToken': 'r-saved', 'client': 'mobile'});
+      expect(store.token, 'r-rotated');
     },
   );
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { queryClient } from './lib/api/queryClient';
@@ -14,60 +14,70 @@ import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { AcceptInvitationPage } from './features/auth/AcceptInvitationPage';
 import { StepUpProvider } from './features/auth/StepUpProvider';
-import { AccountPage } from './features/account/AccountPage';
-import { OrganizationPage } from './features/settings/OrganizationPage';
-import { UsersPage } from './features/settings/UsersPage';
-import { RolesPage } from './features/settings/RolesPage';
-import { RoleEditorPage } from './features/settings/RoleEditorPage';
-import { AuditLogPage } from './features/settings/AuditLogPage';
-import { PropertiesPage } from './features/portfolio/PropertiesPage';
-import { PropertyDetailPage } from './features/portfolio/PropertyDetailPage';
-import { UnitsPage } from './features/portfolio/UnitsPage';
-import { UnitDetailPage } from './features/portfolio/UnitDetailPage';
-import { UnitSetupPage } from './features/portfolio/UnitSetupPage';
-import { TenantsPage } from './features/tenants/TenantsPage';
-import { TenantDetailPage } from './features/tenants/TenantDetailPage';
-import { TenanciesPage } from './features/tenants/TenanciesPage';
-import { LandlordsPage } from './features/landlords/LandlordsPage';
-import { LandlordDetailPage } from './features/landlords/LandlordDetailPage';
-import { InvoicesPage } from './features/billing/InvoicesPage';
-import { InvoiceDetailPage } from './features/billing/InvoiceDetailPage';
-import { InvoiceRunPage } from './features/billing/InvoiceRunPage';
-import { MeterReadingsPage } from './features/billing/MeterReadingsPage';
-import { ChargesPage } from './features/billing/ChargesPage';
-import { PaymentsPage } from './features/payments/PaymentsPage';
-import { PaymentDetailPage } from './features/payments/PaymentDetailPage';
-import { PaymentChannelsPage } from './features/payments/PaymentChannelsPage';
-import { ReconciliationPage } from './features/mpesa/ReconciliationPage';
-import { InboundDetailPage } from './features/mpesa/InboundDetailPage';
-import { ExpensesPage } from './features/expenses/ExpensesPage';
-import { MaintenancePage } from './features/maintenance/MaintenancePage';
 import { DashboardPage } from './features/reports/DashboardPage';
-import { ReportsPage } from './features/reports/ReportsPage';
-import { AgreementsPage } from './features/agency/AgreementsPage';
-import { OwnerStatementsPage } from './features/agency/OwnerStatementsPage';
-import { RemittancesPage } from './features/agency/RemittancesPage';
-import { RemittanceDetailPage } from './features/agency/RemittanceDetailPage';
-import { PlanBillingPage } from './features/platform/PlanBillingPage';
-import { PayoutsPage } from './features/banks/PayoutsPage';
-import { AdminShell } from './features/admin/AdminShell';
-import { OverviewPage as AdminOverviewPage } from './features/admin/OverviewPage';
-import { OrganizationsPage as AdminOrganizationsPage } from './features/admin/OrganizationsPage';
-import { CreateOrganizationPage } from './features/admin/CreateOrganizationPage';
-import { OrganizationDetailPage as AdminOrganizationDetailPage } from './features/admin/OrganizationDetailPage';
-import { PlansPage as AdminPlansPage } from './features/admin/PlansPage';
-import { AdminInvoicesPage } from './features/admin/AdminInvoicesPage';
-import { AdminPaymentsPage } from './features/admin/AdminPaymentsPage';
-import { AdminOperatorsPage } from './features/admin/AdminOperatorsPage';
-import { AdminEmailPage } from './features/admin/AdminEmailPage';
-import { AdminReportsPage } from './features/admin/AdminReportsPage';
-import { AdminSettingsPage } from './features/admin/AdminSettingsPage';
-import {
-  OwnerOverviewPage, OwnerPayoutsPage, OwnerShell, OwnerStatementsPage as OwnerPortalStatementsPage,
-} from './features/owner/OwnerPortal';
-import {
-  TenantHomePage, TenantInvoicePage, TenantInvoicesPage, TenantPaymentsPage, TenantRequestsPage, TenantShell, TenantStatementPage,
-} from './features/tenant/TenantPortal';
+
+const AccountPage = lazy(() => import('./features/account/AccountPage').then((m) => ({ default: m.AccountPage })));
+const OrganizationPage = lazy(() => import('./features/settings/OrganizationPage').then((m) => ({ default: m.OrganizationPage })));
+const UsersPage = lazy(() => import('./features/settings/UsersPage').then((m) => ({ default: m.UsersPage })));
+const RolesPage = lazy(() => import('./features/settings/RolesPage').then((m) => ({ default: m.RolesPage })));
+const RoleEditorPage = lazy(() => import('./features/settings/RoleEditorPage').then((m) => ({ default: m.RoleEditorPage })));
+const AuditLogPage = lazy(() => import('./features/settings/AuditLogPage').then((m) => ({ default: m.AuditLogPage })));
+const PropertiesPage = lazy(() => import('./features/portfolio/PropertiesPage').then((m) => ({ default: m.PropertiesPage })));
+const PropertyDetailPage = lazy(() => import('./features/portfolio/PropertyDetailPage').then((m) => ({ default: m.PropertyDetailPage })));
+const UnitsPage = lazy(() => import('./features/portfolio/UnitsPage').then((m) => ({ default: m.UnitsPage })));
+const UnitDetailPage = lazy(() => import('./features/portfolio/UnitDetailPage').then((m) => ({ default: m.UnitDetailPage })));
+const UnitSetupPage = lazy(() => import('./features/portfolio/UnitSetupPage').then((m) => ({ default: m.UnitSetupPage })));
+const TenantsPage = lazy(() => import('./features/tenants/TenantsPage').then((m) => ({ default: m.TenantsPage })));
+const TenantDetailPage = lazy(() => import('./features/tenants/TenantDetailPage').then((m) => ({ default: m.TenantDetailPage })));
+const TenanciesPage = lazy(() => import('./features/tenants/TenanciesPage').then((m) => ({ default: m.TenanciesPage })));
+const LandlordsPage = lazy(() => import('./features/landlords/LandlordsPage').then((m) => ({ default: m.LandlordsPage })));
+const LandlordDetailPage = lazy(() => import('./features/landlords/LandlordDetailPage').then((m) => ({ default: m.LandlordDetailPage })));
+const InvoicesPage = lazy(() => import('./features/billing/InvoicesPage').then((m) => ({ default: m.InvoicesPage })));
+const InvoiceDetailPage = lazy(() => import('./features/billing/InvoiceDetailPage').then((m) => ({ default: m.InvoiceDetailPage })));
+const InvoiceRunPage = lazy(() => import('./features/billing/InvoiceRunPage').then((m) => ({ default: m.InvoiceRunPage })));
+const MeterReadingsPage = lazy(() => import('./features/billing/MeterReadingsPage').then((m) => ({ default: m.MeterReadingsPage })));
+const ChargesPage = lazy(() => import('./features/billing/ChargesPage').then((m) => ({ default: m.ChargesPage })));
+const PaymentsPage = lazy(() => import('./features/payments/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
+const PaymentDetailPage = lazy(() => import('./features/payments/PaymentDetailPage').then((m) => ({ default: m.PaymentDetailPage })));
+const PaymentChannelsPage = lazy(() => import('./features/payments/PaymentChannelsPage').then((m) => ({ default: m.PaymentChannelsPage })));
+const ReconciliationPage = lazy(() => import('./features/mpesa/ReconciliationPage').then((m) => ({ default: m.ReconciliationPage })));
+const InboundDetailPage = lazy(() => import('./features/mpesa/InboundDetailPage').then((m) => ({ default: m.InboundDetailPage })));
+const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })));
+const MaintenancePage = lazy(() => import('./features/maintenance/MaintenancePage').then((m) => ({ default: m.MaintenancePage })));
+
+const ReportsPage = lazy(() => import('./features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
+const AgreementsPage = lazy(() => import('./features/agency/AgreementsPage').then((m) => ({ default: m.AgreementsPage })));
+const OwnerStatementsPage = lazy(() => import('./features/agency/OwnerStatementsPage').then((m) => ({ default: m.OwnerStatementsPage })));
+const RemittancesPage = lazy(() => import('./features/agency/RemittancesPage').then((m) => ({ default: m.RemittancesPage })));
+const RemittanceDetailPage = lazy(() => import('./features/agency/RemittanceDetailPage').then((m) => ({ default: m.RemittanceDetailPage })));
+const PlanBillingPage = lazy(() => import('./features/platform/PlanBillingPage').then((m) => ({ default: m.PlanBillingPage })));
+const PayoutsPage = lazy(() => import('./features/banks/PayoutsPage').then((m) => ({ default: m.PayoutsPage })));
+
+const AdminShell = lazy(() => import('./features/admin/AdminShell').then((m) => ({ default: m.AdminShell })));
+const AdminOverviewPage = lazy(() => import('./features/admin/OverviewPage').then((m) => ({ default: m.OverviewPage })));
+const AdminOrganizationsPage = lazy(() => import('./features/admin/OrganizationsPage').then((m) => ({ default: m.OrganizationsPage })));
+const CreateOrganizationPage = lazy(() => import('./features/admin/CreateOrganizationPage').then((m) => ({ default: m.CreateOrganizationPage })));
+const AdminOrganizationDetailPage = lazy(() => import('./features/admin/OrganizationDetailPage').then((m) => ({ default: m.OrganizationDetailPage })));
+const AdminPlansPage = lazy(() => import('./features/admin/PlansPage').then((m) => ({ default: m.PlansPage })));
+const AdminInvoicesPage = lazy(() => import('./features/admin/AdminInvoicesPage').then((m) => ({ default: m.AdminInvoicesPage })));
+const AdminPaymentsPage = lazy(() => import('./features/admin/AdminPaymentsPage').then((m) => ({ default: m.AdminPaymentsPage })));
+const AdminOperatorsPage = lazy(() => import('./features/admin/AdminOperatorsPage').then((m) => ({ default: m.AdminOperatorsPage })));
+const AdminEmailPage = lazy(() => import('./features/admin/AdminEmailPage').then((m) => ({ default: m.AdminEmailPage })));
+const AdminReportsPage = lazy(() => import('./features/admin/AdminReportsPage').then((m) => ({ default: m.AdminReportsPage })));
+const AdminSettingsPage = lazy(() => import('./features/admin/AdminSettingsPage').then((m) => ({ default: m.AdminSettingsPage })));
+
+const OwnerShell = lazy(() => import('./features/owner/OwnerPortal').then((m) => ({ default: m.OwnerShell })));
+const OwnerOverviewPage = lazy(() => import('./features/owner/OwnerPortal').then((m) => ({ default: m.OwnerOverviewPage })));
+const OwnerPortalStatementsPage = lazy(() => import('./features/owner/OwnerPortal').then((m) => ({ default: m.OwnerStatementsPage })));
+const OwnerPayoutsPage = lazy(() => import('./features/owner/OwnerPortal').then((m) => ({ default: m.OwnerPayoutsPage })));
+
+const TenantShell = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantShell })));
+const TenantHomePage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantHomePage })));
+const TenantInvoicesPage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantInvoicesPage })));
+const TenantInvoicePage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantInvoicePage })));
+const TenantStatementPage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantStatementPage })));
+const TenantPaymentsPage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantPaymentsPage })));
+const TenantRequestsPage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantRequestsPage })));
 
 /**
  * Routes come from the navigation model, so a menu entry and its page cannot drift apart:
@@ -126,6 +136,7 @@ export default function App() {
       <ToastProvider>
         <BrowserRouter>
           <StepUpProvider>
+            <Suspense fallback={<div className="p-8 text-sm text-slate-500">Loading…</div>}>
             <Routes>
               <Route path="/" element={<Navigate to="/app" replace />} />
               <Route path="/login" element={<LoginPage />} />
@@ -233,6 +244,7 @@ export default function App() {
 
               <Route path="*" element={<Navigate to="/app" replace />} />
             </Routes>
+            </Suspense>
           </StepUpProvider>
         </BrowserRouter>
       </ToastProvider>
