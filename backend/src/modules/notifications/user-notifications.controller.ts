@@ -58,16 +58,21 @@ export class UserNotificationsController {
     return this.notifications.listForUser(authContext().userId, q);
   }
 
-  @Post(':id/read')
-  @HttpCode(200)
-  async markRead(@Param('id', ParseUUIDPipe) id: string) {
-    return ok(await this.notifications.markRead(authContext().userId, id));
-  }
-
   @Post('read-all')
   @HttpCode(200)
   async markAllRead() {
     return ok(await this.notifications.markAllRead(authContext().userId));
+  }
+
+  @Post('test')
+  @HttpCode(200)
+  async sendTest() {
+    return ok(await this.notifications.sendTestNotification(authContext().userId));
+  }
+
+  @Get('devices')
+  async listDevices() {
+    return ok(await this.notifications.listDevices(authContext().userId));
   }
 
   @Post('devices')
@@ -80,5 +85,17 @@ export class UserNotificationsController {
   @HttpCode(200)
   async unregisterDevice(@Body() dto: UnregisterDeviceTokenDto) {
     return ok(await this.notifications.unregisterDevice(authContext().userId, dto.token));
+  }
+
+  @Post(':id/read')
+  @HttpCode(200)
+  async markRead(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.notifications.markRead(authContext().userId, id));
+  }
+
+  @Delete(':id')
+  @HttpCode(200)
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.notifications.deleteNotification(authContext().userId, id));
   }
 }

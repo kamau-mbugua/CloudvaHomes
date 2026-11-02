@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../../app/Sidebar';
 import { AccountMenu } from '../../app/AccountMenu';
+import { NotificationBell } from '../../app/NotificationBell';
 import { TopRouteProgress } from '../../components/Loading';
 import { MenuIcon, MoonIcon, SunIcon } from '../../app/icons';
 import { ADMIN_ACCOUNT_ENTRY, ADMIN_NAV, bestEntry, filterAdminNav, matchScore } from '../../app/navigation';
@@ -123,6 +124,7 @@ export function AdminShell() {
 
           <div className="ms__right">
             <span className="ad__badge ad__badge--info adm__tag">{roleLabel}</span>
+            <NotificationBell />
             <button type="button" className="sh__icon" onClick={() => setTheme(nextTheme)}
               aria-label={`Switch to ${nextTheme} theme`} title={`Switch to ${nextTheme} theme`}>
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}

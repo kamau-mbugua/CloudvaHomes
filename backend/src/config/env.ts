@@ -116,6 +116,12 @@ const envSchema = z
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
     EMAIL_FROM: z.string().default('KodiHub <noreply@example.invalid>'),
+    // ── Push notifications (Firebase Cloud Messaging HTTP v1) ──
+    FCM_PROVIDER: z.enum(['log', 'fcm']).default('log'),
+    FCM_PROJECT_ID: z.string().min(1).optional(),
+    // Optional JSON (or base64-encoded JSON) of a Firebase service account; if omitted when
+    // FCM_PROVIDER=fcm, Application Default Credentials (GCP metadata server) are used.
+    FCM_SERVICE_ACCOUNT_JSON: z.string().min(1).optional(),
   })
   .superRefine((env, ctx) => {
     const need = (cond: boolean, keys: (keyof typeof env)[], why: string) => {

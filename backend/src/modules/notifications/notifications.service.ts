@@ -14,9 +14,11 @@ import {
 import {
   AfricasTalkingSmsSender,
   createEmailSender,
+  createPushSender,
   createSmsSender,
   type EmailMessage,
   type EmailSender,
+  type PushSender,
   type SmsSender,
 } from './senders.js';
 
@@ -177,6 +179,7 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly sms: SmsSender;
   private readonly email: EmailSender;
+  private readonly push: PushSender;
 
   constructor(
     @Inject(ENV) private readonly env: Env,
@@ -185,6 +188,7 @@ export class NotificationsService {
   ) {
     this.sms = createSmsSender(env);
     this.email = createEmailSender(env);
+    this.push = createPushSender(env);
   }
 
   async sendCode(
@@ -792,7 +796,7 @@ export class NotificationsService {
   }): Promise<void> {
     if (!this.prisma) return;
     try {
-      await this.prisma.userNotification.create({
+      const created = await this.prisma.userNotification.create({
         data: {
           userId: entry.userId,
           orgId: entry.orgId ?? null,
@@ -801,6 +805,17 @@ export class NotificationsService {
           title: entry.title,
           body: entry.body,
           actionUrl: entry.actionUrl ?? null,
+        },
+      });
+      await this.dispatchPushToUsers([entry.userId], {
+        title: entry.title,
+        body: entry.body,
+        data: {
+          notificationId: created.id,
+          kind: entry.kind,
+          ...(entry.actionUrl ? { actionUrl: entry.actionUrl } : {}),
+          ...(entry.orgId ? { orgId: entry.orgId } : {}),
+          ...(entry.tenantId ? { tenantId: entry.tenantId } : {}),
         },
       });
     } catch (err) {
@@ -829,9 +844,10 @@ export class NotificationsService {
         select: { userId: true },
       });
       if (!memberships.length) return;
+      const userIds = [...new Set(memberships.map((m) => m.userId))];
       await this.prisma.userNotification.createMany({
-        data: memberships.map((m) => ({
-          userId: m.userId,
+        data: userIds.map((userId) => ({
+          userId,
           orgId,
           kind: entry.kind,
           title: entry.title,
@@ -839,8 +855,54 @@ export class NotificationsService {
           actionUrl: entry.actionUrl ?? null,
         })),
       });
+      await this.dispatchPushToUsers(userIds, {
+        title: entry.title,
+        body: entry.body,
+        data: {
+          kind: entry.kind,
+          orgId,
+          ...(entry.actionUrl ? { actionUrl: entry.actionUrl } : {}),
+        },
+      });
     } catch (err) {
       this.logger.warn({ err }, 'Could not create staff UserNotifications');
+    }
+  }
+
+  private async dispatchPushToUsers(
+    userIds: string[],
+    payload: { title: string; body: string; data?: Record<string, string> },
+  ): Promise<{ targeted: number; sent: number }> {
+    if (!this.prisma || !userIds.length) return { targeted: 0, sent: 0 };
+    try {
+      const devices = await this.prisma.deviceToken.findMany({
+        where: { userId: { in: userIds } },
+        select: { token: true },
+      });
+      if (!devices.length) return { targeted: 0, sent: 0 };
+      const staleTokens: string[] = [];
+      let sent = 0;
+      await Promise.allSettled(
+        devices.map(async (d) => {
+          const res = await this.push.send({
+            token: d.token,
+            title: payload.title,
+            body: payload.body,
+            data: payload.data,
+          });
+          if (res.sent) sent += 1;
+          if (res.unregistered) staleTokens.push(d.token);
+        }),
+      );
+      if (staleTokens.length > 0) {
+        await this.prisma.deviceToken.deleteMany({
+          where: { token: { in: staleTokens } },
+        });
+      }
+      return { targeted: devices.length, sent };
+    } catch (err) {
+      this.logger.warn({ err }, 'Push notification dispatch failed');
+      return { targeted: 0, sent: 0 };
     }
   }
 
@@ -894,6 +956,50 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
     return { updated: res.count };
+  }
+
+  async deleteNotification(userId: string, id: string) {
+    if (!this.prisma) return { removed: 0 };
+    const res = await this.prisma.userNotification.deleteMany({
+      where: { id, userId },
+    });
+    return { removed: res.count };
+  }
+
+  async listDevices(userId: string) {
+    if (!this.prisma) return [];
+    return this.prisma.deviceToken.findMany({
+      where: { userId },
+      select: { id: true, platform: true, createdAt: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  async sendTestNotification(userId: string) {
+    if (!this.prisma) return { sent: false, devicesTargeted: 0 };
+    const title = 'KodiHub notification check';
+    const body = 'Your in-app and push notifications are active and working.';
+    const created = await this.prisma.userNotification.create({
+      data: {
+        userId,
+        orgId: currentContext()?.orgId ?? null,
+        kind: 'TEST_NOTIFICATION',
+        title,
+        body,
+        actionUrl: null,
+      },
+    });
+    const pushRes = await this.dispatchPushToUsers([userId], {
+      title,
+      body,
+      data: { notificationId: created.id, kind: 'TEST_NOTIFICATION' },
+    });
+    return {
+      sent: true,
+      notificationId: created.id,
+      devicesTargeted: pushRes.targeted,
+      devicesSent: pushRes.sent,
+    };
   }
 
   async registerDevice(userId: string, dto: { token: string; platform: string }) {

@@ -140,6 +140,12 @@ export class PlatformBillingService {
     if (!created) return false;
 
     if (this.notifications) {
+      await this.notifications.notifyOrgStaff(orgId, {
+        kind: 'PLATFORM_INVOICE_ISSUED',
+        title: `KodiHub bill ${created.inv.number}`,
+        body: `KES ${money(created.inv.total)} for ${created.inv.period} (due ${formatDateOnly(created.inv.dueDate)}).`,
+        actionUrl: '/settings/billing',
+      });
       try {
         const ownerMembership = await this.prisma.membership.findFirst({
           where: {

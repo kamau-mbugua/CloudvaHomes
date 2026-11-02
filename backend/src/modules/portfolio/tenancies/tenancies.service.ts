@@ -265,7 +265,14 @@ export class TenanciesService {
       const [tenantRecord, org, activeTenancies, channels] = await Promise.all([
         this.db.tenant.findUnique({
           where: { id: tenancy.tenant.id },
-          select: { email: true, phone: true, firstName: true, lastName: true, code: true },
+          select: {
+            userId: true,
+            email: true,
+            phone: true,
+            firstName: true,
+            lastName: true,
+            code: true,
+          },
         }),
         this.db.organization.findUnique({
           where: { id: orgId },
@@ -294,8 +301,22 @@ export class TenanciesService {
         }),
       ]);
 
-      if (!tenantRecord?.email) return;
+      if (!tenantRecord) return;
       const orgName = org?.name ?? 'KodiHub';
+
+      if (tenantRecord.userId) {
+        await this.notifications.notifyUser({
+          userId: tenantRecord.userId,
+          orgId,
+          tenantId: tenancy.tenant.id,
+          kind: 'UNIT_ASSIGNED',
+          title: `Assigned to ${tenancy.unit.property.name} · Unit ${tenancy.unit.number}`,
+          body: `Your tenancy with ${orgName} starts ${tenancy.startDate} (Rent KES ${formatKesMinor(tenancy.rentAmount)}).`,
+          actionUrl: '/tenant',
+        });
+      }
+
+      if (!tenantRecord.email) return;
 
       // 1. Send Welcome Email ONLY if this tenant/user did not previously exist on KodiHub
       if (wasBrandNewPerson) {

@@ -150,6 +150,7 @@ export class InvoiceIssuer {
                 tenant: {
                   select: {
                     id: true,
+                    userId: true,
                     firstName: true,
                     lastName: true,
                     email: true,
@@ -191,10 +192,27 @@ export class InvoiceIssuer {
       ]);
 
       const tenant = fullInvoice?.tenancy.tenant;
-      if (!fullInvoice || !tenant?.email) return;
+      if (!fullInvoice || !tenant) return;
 
       const unit = fullInvoice.tenancy.unit;
       const orgName = org?.name ?? 'KodiHub';
+      const issueDateStr = formatDateOnly(fullInvoice.issueDate);
+      const dueDateStr = formatDateOnly(fullInvoice.dueDate);
+
+      if (tenant.userId) {
+        await this.notifications.notifyUser({
+          userId: tenant.userId,
+          orgId: r.orgId,
+          tenantId: tenant.id,
+          kind: 'INVOICE_ISSUED',
+          title: `New invoice ${fullInvoice.number}`,
+          body: `KES ${formatKesMinor(fullInvoice.total)} due ${dueDateStr} for ${unit.property.name} · Unit ${unit.number}.`,
+          actionUrl: '/tenant/invoices',
+        });
+      }
+
+      if (!tenant.email) return;
+
       const kindLabel =
         r.kind === 'MOVE_IN' ? 'Move-in' : r.kind === 'ADHOC' ? 'Ad-hoc / Adjustment' : 'Monthly';
 
@@ -222,8 +240,6 @@ export class InvoiceIssuer {
           ? `Pay via ${payLines.join(' or ')}.`
           : `Use your tenant account code ${tenant.code} when paying.`;
 
-      const issueDateStr = formatDateOnly(fullInvoice.issueDate);
-      const dueDateStr = formatDateOnly(fullInvoice.dueDate);
       const pdfBuffer = await renderInvoicePdf({
         invoice: {
           id: fullInvoice.id,

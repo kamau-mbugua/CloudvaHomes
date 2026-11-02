@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
 import '../api/api_error.dart';
+import '../notifications/push_service.dart';
 import '../providers.dart';
 import 'session.dart';
 import 'token_store.dart';
@@ -87,6 +88,7 @@ class SessionController extends AsyncNotifier<Session?> {
     if (refresh is String) await _store.write(refresh);
     final session = Session.fromJson(data);
     _api.accessToken = session.accessToken;
+    await ref.read(pushNotificationsServiceProvider).registerCurrentDevice();
     return session;
   }
 
@@ -276,6 +278,7 @@ class SessionController extends AsyncNotifier<Session?> {
   }
 
   Future<void> signOut() async {
+    await ref.read(pushNotificationsServiceProvider).unregisterCurrentDevice();
     final token = await _store.read();
     try {
       if (token != null) {

@@ -92,7 +92,8 @@ class ApiClient {
   Future<Map<String, dynamic>> put(String path, {Object? body}) async =>
       _json(await _send('PUT', path, body: body ?? const {}));
 
-  Future<void> delete(String path) async => _send('DELETE', path);
+  Future<void> delete(String path, {Object? body}) async =>
+      _send('DELETE', path, body: body);
 
   /// A file (PDF) as bytes.
   Future<Uint8List> bytes(String path, {Map<String, Object?>? query}) async {

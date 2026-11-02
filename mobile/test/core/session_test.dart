@@ -3,10 +3,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hodi/core/auth/session.dart';
 import 'package:hodi/core/auth/session_controller.dart';
 import 'package:hodi/core/auth/token_store.dart';
+import 'package:hodi/core/notifications/push_service.dart';
 import 'package:hodi/core/providers.dart';
 import 'package:hodi/core/router.dart';
+import 'package:hodi/core/widgets/notifications_sheet.dart';
 
 import '../helpers/fake_http.dart';
+
+class _FakePushTokenSource implements PushTokenSource {
+  _FakePushTokenSource(this.tokenInfo);
+  final ({String token, String platform})? tokenInfo;
+
+  @override
+  Future<({String token, String platform})?> currentToken() async => tokenInfo;
+}
 
 void main() {
   Session session({bool staff = true, bool tenant = false}) =>
@@ -198,5 +208,85 @@ void main() {
         expect(c.read(sessionProvider).value, isNull);
       },
     );
+
+    test(
+      'registers FCM push device token on sign-in and unregisters on sign-out',
+      () async {
+        adapter = FakeAdapter(
+          (call) => switch (call.path) {
+            '/auth/otp/verify' => (200, {'data': sessionJson(staff: true)}),
+            '/notifications/devices' => (
+              200,
+              {
+                'data': {'registered': true},
+              },
+            ),
+            '/auth/logout' => (204, null),
+            _ => (404, null),
+          },
+        );
+        c = ProviderContainer(
+          overrides: [
+            apiClientProvider.overrideWithValue(fakeClient(adapter)),
+            tokenStoreProvider.overrideWithValue(store),
+            pushTokenSourceProvider.overrideWithValue(
+              _FakePushTokenSource((
+                token: 'fcm-token-abc12345',
+                platform: 'android',
+              )),
+            ),
+          ],
+        );
+        await c.read(sessionProvider.future);
+        await c
+            .read(sessionProvider.notifier)
+            .signInWithCode('0700000001', '123456');
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          adapter.calls.any(
+            (call) =>
+                call.method == 'POST' &&
+                call.path == '/notifications/devices' &&
+                (call.body as Map)['token'] == 'fcm-token-abc12345',
+          ),
+          isTrue,
+        );
+
+        await c.read(sessionProvider.notifier).signOut();
+        expect(
+          adapter.calls.any(
+            (call) =>
+                call.method == 'DELETE' &&
+                call.path == '/notifications/devices' &&
+                (call.body as Map)['token'] == 'fcm-token-abc12345',
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test('maps notification actionUrls to mobile routes and modes', () {
+      final n = AppNotification.fromJson({
+        'id': 'n1',
+        'kind': 'PAYMENT_RECEIVED',
+        'title': 'Payment received',
+        'body': 'KES 25,000.00',
+        'actionUrl': '/tenant/payments',
+        'createdAt': '2026-11-01T10:00:00.000Z',
+      });
+      expect(n.actionUrl, '/tenant/payments');
+      expect(mobileRouteForActionUrl(n.actionUrl), (
+        route: '/tenant/payments',
+        mode: AppMode.tenant,
+      ));
+      expect(mobileRouteForActionUrl('/app/maintenance'), (
+        route: '/staff/more/maintenance',
+        mode: AppMode.staff,
+      ));
+      expect(mobileRouteForActionUrl('/app/payments'), (
+        route: '/staff/money',
+        mode: AppMode.staff,
+      ));
+    });
   });
 }

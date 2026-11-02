@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { currentContext } from '../../common/context/request-context.js';
 import { formatDateOnly, parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError, type ErrorDetail } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
@@ -450,8 +451,28 @@ export class PaymentsService {
 
       const tenantRow = await this.db.tenant.findUnique({
         where: { id: payment.tenant.id },
-        select: { email: true },
+        select: { email: true, userId: true, orgId: true },
       });
+      if (tenantRow?.userId) {
+        await this.notifications.notifyUser({
+          userId: tenantRow.userId,
+          orgId: tenantRow.orgId,
+          tenantId: payment.tenant.id,
+          kind: 'PAYMENT_RECEIVED',
+          title: `Payment received · KES ${money(payment.amount)}`,
+          body: `Receipt ${payment.number} (${org.name}). ${standing}`,
+          actionUrl: '/tenant/payments',
+        });
+      }
+      if (tenantRow?.orgId) {
+        await this.notifications.notifyOrgStaff(tenantRow.orgId, {
+          kind: 'PAYMENT_RECEIVED',
+          title: `Payment received · KES ${money(payment.amount)}`,
+          body: `${payment.tenant.firstName} ${payment.tenant.lastName} (${payment.tenant.code}) · Receipt ${payment.number}`,
+          actionUrl: '/app/payments',
+          excludeUserId: currentContext()?.userId ?? null,
+        });
+      }
       if (tenantRow?.email) {
         try {
           const pdfBuffer = await renderReceiptPdf(receiptData);
