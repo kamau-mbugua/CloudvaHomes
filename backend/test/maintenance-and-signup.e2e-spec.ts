@@ -222,12 +222,17 @@ describe('App Config, Public Signup, Maintenance & Notifications (e2e)', () => {
     expect(resolved.status).toBe('RESOLVED');
     expect(resolved.canResolve).toBe(false);
 
-    // Tenant receives an in-app notification about the resolution and marks it read
+    // Tenant receives in-app notifications (unit move-in + maintenance resolution) and marks them read
     const tenantNotifs = await get(tenantSession, '/notifications');
-    expect(tenantNotifs.meta.unreadCount).toBe(1);
+    expect(tenantNotifs.meta.unreadCount).toBe(2);
     expect(tenantNotifs.data[0].kind).toBe('MAINTENANCE_UPDATE');
+    expect(tenantNotifs.data[1].kind).toBe('UNIT_ASSIGNED');
 
     await post(tenantSession, `/notifications/${tenantNotifs.data[0].id}/read`, {});
+    const afterOneRead = await get(tenantSession, '/notifications');
+    expect(afterOneRead.meta.unreadCount).toBe(1);
+
+    await post(tenantSession, '/notifications/read-all', {});
     const afterRead = await get(tenantSession, '/notifications');
     expect(afterRead.meta.unreadCount).toBe(0);
 
