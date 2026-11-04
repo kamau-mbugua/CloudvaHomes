@@ -23,10 +23,10 @@ import type { BillingSummary, PlatformInvoice, PlatformInvoiceDetail, PlatformPa
 import { CopyRow, CustomBadge, HodiInvoicesTable, OrgStatusBadge, PlatformPaymentsTable } from './ui';
 
 /**
- * Settings → Plan & billing (`/app/settings/plan`): what the organisation pays Hodi and
+ * Settings → Plan & billing (`/app/settings/plan`): what the organisation pays KodiHub and
  * how. Its status, plan and price (its own price shown as "Custom"), the trial end, what
- * is owed and held as credit, how to pay (Hodi's paybill + its billing account number,
- * copyable), "Pay now" (an M-Pesa prompt, `settings:update`), and its Hodi invoices (with
+ * is owed and held as credit, how to pay (KodiHub's paybill + its billing account number,
+ * copyable), "Pay now" (an M-Pesa prompt, `settings:update`), and its KodiHub invoices (with
  * PDF) and payments. Everyone with `settings:view` sees it. Works while suspended.
  */
 export function PlanBillingPage() {

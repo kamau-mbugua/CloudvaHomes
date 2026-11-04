@@ -583,4 +583,79 @@ describe('Payments (e2e)', () => {
       mine.id,
     ]);
   });
+
+  it('sorts tenants by balance, invoices by total and payments by amount', async () => {
+    const a = await tenantWithInvoices(owner, 'SRA', '0711000311'); // owes 25,000
+    // A second tenant in the same block with the same two invoices (5,000 one-off + 20,000 rent).
+    const u2 = (
+      await post(owner, '/units', { propertyId: a.p.id, number: 'P2', rentAmount: KES(20000) }, 201)
+    ).data;
+    const ty2 = (
+      await post(
+        owner,
+        '/tenancies',
+        {
+          unitId: u2.id,
+          tenant: { firstName: 'Bea', lastName: 'Payer', phone: '0711000312' },
+          startDate: STARTED,
+          billingDay: 1,
+        },
+        201,
+      )
+    ).data;
+    await post(
+      owner,
+      '/invoices',
+      {
+        tenancyId: ty2.id,
+        lines: [{ description: 'Repairs', amount: KES(5000) }],
+        dueDate: STARTED,
+      },
+      201,
+    );
+    await post(owner, '/invoices/run', { date: RUN_DATE });
+    const b = { tenantId: ty2.tenant.id as string };
+    await pay(owner, { tenantId: b.tenantId, channelId: a.cash.id, amount: KES(20000) }); // now 5,000
+    await pay(owner, { tenantId: a.tenantId, channelId: a.cash.id, amount: KES(3000) }); // a now 22,000
+    const zed = (
+      await post(
+        owner,
+        '/tenants',
+        { firstName: 'Zed', lastName: 'Prospect', phone: '0711000313' },
+        201,
+      )
+    ).data; // owes nothing
+    const ids = (body: { data: { id: string }[] }) => body.data.map((r) => r.id);
+
+    expect(ids(await get(owner, '/tenants?sort=-balance'))).toEqual([
+      a.tenantId,
+      b.tenantId,
+      zed.id,
+    ]);
+    expect(ids(await get(owner, '/tenants?sort=balance'))).toEqual([
+      zed.id,
+      b.tenantId,
+      a.tenantId,
+    ]);
+    // Sorted before paging, so page 2 of 1 is the second-highest balance.
+    const page2 = await get(owner, '/tenants?sort=-balance&page=2&pageSize=1');
+    expect(ids(page2)).toEqual([b.tenantId]);
+    expect(page2.meta.total).toBe(3);
+    await get(owner, '/tenants?sort=bogus', 422);
+
+    const totals = (body: { data: { total: number }[] }) => body.data.map((r) => r.total);
+    expect(totals(await get(owner, '/invoices?sort=total'))).toEqual([
+      KES(5000),
+      KES(5000),
+      KES(20000),
+      KES(20000),
+    ]);
+    expect(totals(await get(owner, '/invoices?sort=-total'))[0]).toBe(KES(20000));
+    await get(owner, '/invoices?sort=-tenant', 422);
+
+    const amounts = (body: { data: { amount: number }[] }) => body.data.map((r) => r.amount);
+    expect(amounts(await get(owner, '/payments?sort=amount'))).toEqual([KES(3000), KES(20000)]);
+    expect(amounts(await get(owner, '/payments?sort=-amount'))).toEqual([KES(20000), KES(3000)]);
+    await get(owner, '/payments?sort=amount,receivedAt', 422);
+  });
 });

@@ -369,7 +369,7 @@ export function checkSettings(draft: SettingsDraft): Checked<SettingsBody, keyof
 }
 
 /**
- * Hodi's Daraja keys as `PUT /platform/settings` takes them (flat, write-only), from the
+ * KodiHub's Daraja keys as `PUT /platform/settings` takes them (flat, write-only), from the
  * checked form (`checkDaraja`). Sending any of them asks for a verification code.
  */
 export function darajaSettingsBody(body: { environment: 'SANDBOX' | 'PRODUCTION'; consumerKey: string; consumerSecret: string; passkey?: string }) {

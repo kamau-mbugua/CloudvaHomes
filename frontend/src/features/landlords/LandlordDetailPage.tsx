@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
@@ -68,6 +69,7 @@ export function LandlordDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
+  useDocumentTitle(landlord.data?.name);
   if (landlord.isPending) return <CardSkeleton count={3} />;
   if (landlord.isError) {
     return (
@@ -88,7 +90,7 @@ export function LandlordDetailPage() {
       <div className="pf__head">
         <div>
           <h1>{l.name} {l.status === 'INACTIVE' ? <Badge table={RECORD_STATUS} value={l.status} /> : null}</h1>
-          <p><span className="num">{l.code}</span> · {LANDLORD_KIND[l.kind] ?? l.kind} · <span className="num">{l.phone}</span></p>
+          <p><span className="code">{l.code}</span> · {LANDLORD_KIND[l.kind] ?? l.kind} · <span className="num">{l.phone}</span></p>
         </div>
         <div className="sl__headactions">
           {canAddProperty ? <button type="button" className="nx-btn nx-btn--primary" onClick={() => setAddingProperty(true)}>Add property</button> : null}
@@ -155,7 +157,7 @@ export function LandlordDetailPage() {
                           <tr key={p.id}>
                             <td>
                               <Link className="ad__link" to={`/app/properties/${p.id}`}><strong>{p.name}</strong></Link>
-                              <span className="ad__sub num">{p.code}</span>
+                              <span className="ad__sub code">{p.code}</span>
                             </td>
                             <td>{p.location ?? '—'}</td>
                             <td className="num">{p.unitCount}</td>

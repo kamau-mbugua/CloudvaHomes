@@ -22,7 +22,7 @@ import { PlatformPayService } from './platform-pay.service.js';
 
 const ACCEPTED = { ResultCode: 0, ResultDesc: 'Accepted' };
 
-/** Safaricom's callbacks for Hodi's own paybill. Same checks as the organisations' hooks. */
+/** Safaricom's callbacks for KodiHub's own paybill. Same checks as the organisations' hooks. */
 @ApiExcludeController()
 @Public()
 @Controller('hooks/platform/:token')
@@ -36,7 +36,10 @@ export class PlatformHooksController {
 
   private async settings(token: string, req: Request): Promise<PlatformSettings> {
     if (!ipAllowed(req.ip, this.env.MPESA_CALLBACK_IPS ?? SAFARICOM_CALLBACK_IPS)) {
-      this.log.warn({ ip: req.ip }, 'Hodi M-Pesa callback from an address not on the allow-list');
+      this.log.warn(
+        { ip: req.ip },
+        'KodiHub M-Pesa callback from an address not on the allow-list',
+      );
       throw AppError.forbidden();
     }
     const s = await this.pay.settingsByToken(token);
@@ -65,11 +68,11 @@ export class PlatformHooksController {
     const s = await this.settings(token, req);
     const c = parseC2bConfirmation(body);
     if (!c) {
-      this.log.warn('Hodi C2B confirmation that could not be parsed');
+      this.log.warn('KodiHub C2B confirmation that could not be parsed');
       return ACCEPTED;
     }
     if (c.shortcode && s.paybill && c.shortcode !== s.paybill) {
-      this.log.warn('Hodi C2B confirmation for another shortcode');
+      this.log.warn('KodiHub C2B confirmation for another shortcode');
       return ACCEPTED;
     }
     await this.pay.handleC2b(c, body);

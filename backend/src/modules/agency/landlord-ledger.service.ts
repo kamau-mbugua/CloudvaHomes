@@ -95,6 +95,8 @@ export class LandlordLedgerService {
         lines: { select: { kind: true, refundable: true, amount: true, position: true } },
       },
     });
+    // A late fee the agency keeps is the agency's own income, never the landlord's.
+    if (invoice.lateFeeKeptBy === 'AGENCY') return;
     const landlordId = await this.landlordOf(tx, invoice.propertyId);
     if (!landlordId) return;
     const payment = await tx.payment.findUniqueOrThrow({
@@ -160,6 +162,7 @@ export class LandlordLedgerService {
       where: { id: invoiceId },
       include: { lines: true },
     });
+    if (invoice.lateFeeKeptBy === 'AGENCY') return;
     const landlordId = await this.landlordOf(tx, invoice.propertyId);
     if (!landlordId) return;
     const date = formatDateOnly(invoice.issueDate);

@@ -66,7 +66,7 @@ export function UnitsTable({ rows, showProperty = true }: { rows: Unit[]; showPr
                   {showProperty ? (
                     <td>
                       <Link className="ad__link" to={`/app/properties/${unit.property.id}`}>{unit.property.name}</Link>
-                      <span className="ad__sub num">{unit.property.code}</span>
+                      <span className="ad__sub code">{unit.property.code}</span>
                     </td>
                   ) : null}
                   <td>

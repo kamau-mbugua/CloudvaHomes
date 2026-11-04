@@ -28,7 +28,7 @@ import { activeMoveInCharges } from '../billing/rules';
  * Opened from a vacant unit (unit fixed), from a tenant (tenant fixed) or from the
  * tenancies list (both picked here). Rent starts as the unit's rent; the billing day
  * follows the start date (capped at 28) until someone changes it by hand. The opening
- * deposit is for tenants who already paid one before Hodi.
+ * deposit is for tenants who already paid one before KodiHub.
  *
  * When the unit's property has active move-in charges, "Issue move-in invoice" (on by
  * default) bills them in the same step, each charge shown with what it comes to for the
@@ -37,7 +37,7 @@ import { activeMoveInCharges } from '../billing/rules';
  */
 
 const FIELDS = [
-  'propertyId', 'unitId', 'tenantId', 'rentAmount', 'billingDay', 'startDate', 'depositHeld',
+  'propertyId', 'unitId', 'tenantId', 'rentAmount', 'billingDay', 'startDate', 'leaseEndDate', 'depositHeld',
   'firstName', 'lastName', 'phone', 'email', 'idNumber',
 ] as const;
 type MoveInField = (typeof FIELDS)[number];
@@ -70,6 +70,7 @@ export function MoveInSheet({
     rentAmount: unit ? minorToInput(unit.rentAmount) : '',
     billingDay: String(defaultBillingDay(today) ?? 1),
     startDate: today,
+    leaseEndDate: '',
     depositHeld: '',
     firstName: '',
     lastName: '',
@@ -163,6 +164,9 @@ export function MoveInSheet({
     if (!rent.ok) found.rentAmount = rent.error;
     if (!/^\d+$/.test(values.billingDay) || billingDay < 1 || billingDay > 28) found.billingDay = 'A day from 1 to 28.';
     if (!isDay(values.startDate)) found.startDate = 'Choose the move-in date.';
+    if (values.leaseEndDate && (!isDay(values.leaseEndDate) || values.leaseEndDate <= values.startDate)) {
+      found.leaseEndDate = 'The lease must end after the move-in date.';
+    }
     if (deposit && !deposit.ok) found.depositHeld = deposit.error;
     form.setErrors(found);
     form.setGeneral(null);
@@ -174,6 +178,7 @@ export function MoveInSheet({
       billingDay,
       startDate: values.startDate,
     };
+    if (values.leaseEndDate) body.leaseEndDate = values.leaseEndDate;
     if (deposit?.ok) body.depositHeld = deposit.minor;
     if (!canInvoice) body.issueMoveInInvoice = false;
     else if (offerInvoice) body.issueMoveInInvoice = issueInvoice;
@@ -279,7 +284,7 @@ export function MoveInSheet({
                     className={`pf__result ${picked?.id === t.id ? 'is-on' : ''}`}
                     onClick={() => setPicked(t)}>
                     <strong>{personName(t)}</strong>
-                    <span className="num">{t.code} · {t.phone}</span>
+                    <span className="code">{t.code} · {t.phone}</span>
                   </button>
                 ))}
                 {tenants.isSuccess && tenantRows.length === 0 ? (
@@ -308,6 +313,10 @@ export function MoveInSheet({
           <Field id="mi-startDate" label="Move-in date" error={errors.startDate}>
             <input id="mi-startDate" type="date" value={values.startDate} onChange={(e) => chooseStart(e.target.value)}
               aria-invalid={Boolean(errors.startDate)} />
+          </Field>
+          <Field id="mi-leaseEnd" label="Lease ends" optional error={errors.leaseEndDate} hint="Leave empty for a month-to-month tenancy.">
+            <input id="mi-leaseEnd" type="date" min={values.startDate || undefined} value={values.leaseEndDate}
+              onChange={(e) => set('leaseEndDate', e.target.value)} aria-invalid={Boolean(errors.leaseEndDate)} />
           </Field>
           <Field id="mi-billingDay" label="Billing day" error={errors.billingDay} hint="Rent falls due on this day each month (1–28).">
             <input id="mi-billingDay" value={values.billingDay} inputMode="numeric" autoComplete="off"

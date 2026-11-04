@@ -198,7 +198,7 @@ export function RecordPaymentSheet({
             <span className="num">{formatKES(result.amount)}</span> from {personName(result.tenant)}, received {formatDay(result.receivedAt)}.
           </p>
           <dl className="pf__facts">
-            <div><dt>Receipt</dt><dd><Link to={`/app/payments/${result.id}`} onClick={onClose}><strong className="num">{result.number}</strong></Link></dd></div>
+            <div><dt>Receipt</dt><dd><Link to={`/app/payments/${result.id}`} onClick={onClose}><strong className="code">{result.number}</strong></Link></dd></div>
             <div><dt>Credit left</dt><dd className="num">{formatKES(result.unallocated)}</dd></div>
             <div>
               <dt>Receipt sent (SMS &amp; email)</dt>
@@ -219,7 +219,7 @@ export function RecordPaymentSheet({
             <ul className="py__alloclist">
               {result.allocations.map((a) => (
                 <li key={a.invoice.id}>
-                  <span><Link to={`/app/invoices/${a.invoice.id}`} onClick={onClose} className="num">{a.invoice.number}</Link>
+                  <span><Link to={`/app/invoices/${a.invoice.id}`} onClick={onClose} className="code">{a.invoice.number}</Link>
                     <span className="ad__muted"> · {formatPeriod(a.invoice.period)}</span></span>
                   <span className="num">{formatKES(a.amount)}</span>
                 </li>
@@ -254,7 +254,7 @@ export function RecordPaymentSheet({
           <span className="fld__label">Tenant</span>
           {picked ? (
             <div className="py__picked">
-              <span><strong>{personName(picked)}</strong> <span className="ad__muted num">{picked.code} · {picked.phone}</span></span>
+              <span><strong>{personName(picked)}</strong> <span className="ad__muted code">{picked.code} · {picked.phone}</span></span>
               {!tenant ? (
                 <button type="button" className="nx-btn nx-btn--sm" onClick={() => { setPicked(null); allocation.reset(allocation.auto); touch(); }}>Change</button>
               ) : null}
@@ -270,7 +270,7 @@ export function RecordPaymentSheet({
                   <button key={t.id} type="button" role="option" aria-selected={false} className="pf__result"
                     onClick={() => { setPicked(t); allocation.reset(allocation.auto); touch(); }}>
                     <strong>{personName(t)}</strong>
-                    <span className="num">{t.code} · {t.phone}</span>
+                    <span className="code">{t.code} · {t.phone}</span>
                   </button>
                 ))}
                 {tenants.isSuccess && tenantRows.length === 0 ? <span className="hint">No tenants match.</span> : null}

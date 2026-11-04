@@ -18,8 +18,8 @@ import type { PlatformInvoice } from '../platform/types';
 /** Sheets the admin organisation page and the admin invoices list share. */
 
 /**
- * "Record payment" (`POST /platform/payments`): money an organisation paid Hodi by bank
- * transfer, cheque or otherwise. Hodi pays its oldest invoices first and keeps any excess
+ * "Record payment" (`POST /platform/payments`): money an organisation paid KodiHub by bank
+ * transfer, cheque or otherwise. KodiHub pays its oldest invoices first and keeps any excess
  * as credit; a payment that clears what is overdue lifts a suspension.
  */
 export function RecordHodiPaymentSheet({ org, onClose }: {

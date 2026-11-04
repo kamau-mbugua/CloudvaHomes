@@ -15,9 +15,9 @@ import type { PlatformOrganization } from '../platform/types';
 import { CustomBadge, OrgStatusBadge } from '../platform/ui';
 
 /**
- * Admin → Organisations (`/admin/organizations`): every organisation on Hodi, searchable
+ * Admin → Organisations (`/admin/organizations`): every organisation on KodiHub, searchable
  * and filtered by status (both in the address), with its plan and price ("Custom" when it
- * has its own), let units now and what it owes Hodi. A row opens the organisation.
+ * has its own), let units now and what it owes KodiHub. A row opens the organisation.
  */
 export function OrganizationsPage() {
   const filters = useListFilters();

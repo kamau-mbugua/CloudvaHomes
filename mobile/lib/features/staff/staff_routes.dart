@@ -9,6 +9,7 @@ import 'more/expenses_screens.dart';
 import 'more/meters_screen.dart';
 import 'more/more_screen.dart';
 import 'more/parity_screens.dart';
+import 'tenants/inspection_screen.dart';
 import 'tenants/tenants_screens.dart';
 import 'units/units_screens.dart';
 
@@ -45,6 +46,19 @@ RouteBase staffRoutes() => StatefulShellRoute.indexedStack(
               parentNavigatorKey: rootNavigatorKey,
               builder: (_, s) =>
                   UnitDetailScreen(unitId: s.pathParameters['unitId']!),
+              routes: [
+                GoRoute(
+                  path: 'tenancies/:tenancyId/inspection/:kind',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (_, s) => InspectionScreen(
+                    tenancyId: s.pathParameters['tenancyId']!,
+                    kind: s.pathParameters['kind'] == 'MOVE_OUT'
+                        ? 'MOVE_OUT'
+                        : 'MOVE_IN',
+                    title: s.extra is String ? s.extra! as String : '',
+                  ),
+                ),
+              ],
             ),
           ],
         ),

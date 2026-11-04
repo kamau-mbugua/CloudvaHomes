@@ -38,7 +38,7 @@ import type { BillingPayDto, PlatformSettingsDto, UpdateLandingPageDto } from '.
 
 const SECRETS_CONTEXT = 'platform.daraja.secrets';
 
-/** Hodi's own Daraja app: organisations pay their Hodi bill by STK push or to the paybill. */
+/** KodiHub's own Daraja app: organisations pay their KodiHub bill by STK push or to the paybill. */
 @Injectable()
 export class PlatformPayService {
   private readonly log = new Logger(PlatformPayService.name);
@@ -105,6 +105,7 @@ export class PlatformPayService {
       appStoreUrl: s.appStoreUrl,
       maintenanceMode: s.maintenanceMode,
       maintenanceMessage: s.maintenanceMessage,
+      mriRateBps: s.mriRateBps,
       invoiceInstructions: sysInstructions.invoiceInstructions,
       receiptInstructions: sysInstructions.receiptInstructions,
       landingPage: readLandingPageContent(s.emailTemplates),
@@ -263,6 +264,7 @@ export class PlatformPayService {
         ...(dto.maintenanceMessage !== undefined
           ? { maintenanceMessage: dto.maintenanceMessage?.trim() || null }
           : {}),
+        ...(dto.mriRateBps !== undefined ? { mriRateBps: dto.mriRateBps } : {}),
       };
       if (dto.clearAtApiKey) {
         data.atApiKeyEnc = null;
@@ -327,7 +329,7 @@ export class PlatformPayService {
     });
   }
 
-  /** Daraja target + STK fields, or null when Hodi's M-Pesa isn't set up. */
+  /** Daraja target + STK fields, or null when KodiHub's M-Pesa isn't set up. */
   private stkSetup(s: PlatformSettings) {
     const creds = this.credentials(s);
     if (!creds?.passkey || !s.darajaEnv || !s.paybill || !s.callbackToken) return null;
@@ -346,7 +348,7 @@ export class PlatformPayService {
     return this.stkSetup(s) !== null;
   }
 
-  // ── Organisation pays Hodi ──
+  // ── Organisation pays KodiHub ──
 
   private viewStk(r: PlatformStkRequest) {
     return {
@@ -423,8 +425,8 @@ export class PlatformPayService {
         amountKes: Number(amount / 100n),
         phone: toMsisdn(phone),
         callbackUrl: setup.callbackUrl,
-        accountReference: org.billingRef ?? 'HODI',
-        description: 'Hodi bill',
+        accountReference: org.billingRef ?? 'KODIHUB',
+        description: 'KodiHub bill',
         password: setup.password,
         timestamp: setup.timestamp,
       });
@@ -519,7 +521,7 @@ export class PlatformPayService {
     });
   }
 
-  /** Paybill payment to Hodi: the account number is the organisation's billing ref. */
+  /** Paybill payment to KodiHub: the account number is the organisation's billing ref. */
   handleC2b(c: C2bConfirmation, body: unknown) {
     return withoutOrgScope(async () => {
       const ref = normalizeAccountRef(c.accountRef);
@@ -530,10 +532,10 @@ export class PlatformPayService {
           })
         : null;
       if (!org) {
-        // Unmatched money to Hodi's paybill: a platform admin records it by hand.
+        // Unmatched money to KodiHub's paybill: a platform admin records it by hand.
         this.log.warn(
           { receipt: c.receipt },
-          'Hodi paybill payment with an unknown account number',
+          'KodiHub paybill payment with an unknown account number',
         );
         return;
       }

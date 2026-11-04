@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import type { FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -51,6 +52,7 @@ export function PaymentDetailPage() {
     enabled: Boolean(payment.data?.reversesId),
   });
 
+  useDocumentTitle(payment.data?.number);
   if (payment.isPending) return <CardSkeleton count={3} />;
   if (payment.isError) {
     return (
@@ -81,11 +83,11 @@ export function PaymentDetailPage() {
 
       <div className="pf__head">
         <div>
-          <h1><span className="num">{p.number}</span> <PaymentBadges payment={p} /></h1>
+          <h1><span className="code">{p.number}</span> <PaymentBadges payment={p} /></h1>
           <p>
             {reversal ? 'Reversal for ' : 'From '}
             {canSeeTenants ? <Link to={`/app/tenants/${p.tenant.id}`}>{personName(p.tenant)}</Link> : personName(p.tenant)}
-            {' · '}<span className="num">{p.tenant.code}</span> · received {formatDay(p.receivedAt)}
+            {' · '}<span className="code">{p.tenant.code}</span> · received {formatDay(p.receivedAt)}
           </p>
         </div>
         <div className="sl__headactions">
@@ -100,13 +102,13 @@ export function PaymentDetailPage() {
         <div className="ad__callout ad__callout--note py__reversalnote" role="note">
           This reverses{' '}
           {p.reversesId ? (
-            <Link to={`/app/payments/${p.reversesId}`} className="num">{original.data?.number ?? 'the original payment'}</Link>
+            <Link to={`/app/payments/${p.reversesId}`} className="code">{original.data?.number ?? 'the original payment'}</Link>
           ) : 'a payment'}
           {p.reversalReason ? ` — ${p.reversalReason}` : ''}. Every amount it had paid towards invoices was taken back, and those invoices are open again.
         </div>
       ) : p.reversedBy ? (
         <div className="ad__callout ad__callout--note py__reversalnote" role="note">
-          Reversed by <Link to={`/app/payments/${p.reversedBy.id}`} className="num">{p.reversedBy.number}</Link>
+          Reversed by <Link to={`/app/payments/${p.reversedBy.id}`} className="code">{p.reversedBy.number}</Link>
           {p.reversalReason ? ` — ${p.reversalReason}` : ''}. It no longer counts towards the tenant’s balance.
         </div>
       ) : null}
@@ -138,7 +140,7 @@ export function PaymentDetailPage() {
             <Fact label="Reference"><span className="num">{p.reference}</span></Fact>
             <Fact label="Received on">{formatDay(p.receivedAt)}</Fact>
             <Fact label="Paid by">{p.paidBy}</Fact>
-            <Fact label="Tenant"><>{personName(p.tenant)}<span className="ad__sub num">{p.tenant.code} · {p.tenant.phone}</span></></Fact>
+            <Fact label="Tenant"><>{personName(p.tenant)}<span className="ad__sub code">{p.tenant.code} · {p.tenant.phone}</span></></Fact>
             <Fact label="Recorded">{`${formatDateTime(p.createdAt)}${p.recordedBy ? ` by ${p.recordedBy.name}` : ''}`}</Fact>
             {p.inboundId ? (
               <Fact label="Source">
@@ -164,8 +166,8 @@ export function PaymentDetailPage() {
                     <tr key={a.invoice.id}>
                       <td>
                         {canSeeInvoices
-                          ? <Link className="ad__link" to={`/app/invoices/${a.invoice.id}`}><strong className="num">{a.invoice.number}</strong></Link>
-                          : <strong className="num">{a.invoice.number}</strong>}
+                          ? <Link className="ad__link" to={`/app/invoices/${a.invoice.id}`}><strong className="code">{a.invoice.number}</strong></Link>
+                          : <strong className="code">{a.invoice.number}</strong>}
                       </td>
                       <td>{formatPeriod(a.invoice.period)}</td>
                       <td>{INVOICE_KIND[a.invoice.kind]?.label ?? a.invoice.kind}</td>

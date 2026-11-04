@@ -35,7 +35,9 @@ body {
 }
 
 /* Digits that line up in a column of money. */
-.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.num { font-family: var(--font-figures); font-variant-numeric: tabular-nums; }
+/* Identifiers — tenant codes, invoice and receipt numbers, unit numbers — stay monospace. */
+.code { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 
 /* Every interactive element is visibly focusable. */
 :where(button, a, input, select, textarea):focus-visible {

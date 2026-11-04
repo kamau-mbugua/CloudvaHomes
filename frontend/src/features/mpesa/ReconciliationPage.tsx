@@ -20,7 +20,7 @@ import { isMpesaKind } from './rules';
 import type { InboundTransaction, MatchStatus } from './types';
 
 /**
- * Reconciliation (`/app/reconciliation`): every M-Pesa transaction Safaricom told Hodi
+ * Reconciliation (`/app/reconciliation`): every M-Pesa transaction Safaricom told KodiHub
  * about (`GET /inbound-transactions`), newest first, in three tabs — Unmatched (waiting
  * for someone to say whose money it is), Matched (recorded as a payment) and Ignored.
  * Filters (channel, source, received dates, search) live in the address. A row opens the
@@ -164,8 +164,8 @@ function InboundTable({ rows, status }: { rows: InboundTransaction[]; status: Ma
               <td className="num">{formatKES(r.amount)}</td>
               {status === 'MATCHED' ? (
                 <td>
-                  {r.payment ? <Link to={`/app/payments/${r.payment.id}`} className="num">{r.payment.number}</Link> : <span className="nx-muted">—</span>}
-                  {r.tenant ? <span className="ad__sub">{personName(r.tenant)} · <span className="num">{r.tenant.code}</span></span> : null}
+                  {r.payment ? <Link to={`/app/payments/${r.payment.id}`} className="code">{r.payment.number}</Link> : <span className="nx-muted">—</span>}
+                  {r.tenant ? <span className="ad__sub">{personName(r.tenant)} · <span className="code">{r.tenant.code}</span></span> : null}
                   {r.matchedBy ? <span className="ad__sub">{MATCHED_BY[r.matchedBy] ?? r.matchedBy}</span> : null}
                 </td>
               ) : status === 'IGNORED' ? (

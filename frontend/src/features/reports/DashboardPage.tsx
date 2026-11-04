@@ -15,6 +15,7 @@ import { personName } from '../portfolio/labels';
 import { reportsErrorMessage, useDashboard } from './api';
 import { daysBetween, formatRate, periodRange } from './rules';
 import { TrendChart } from './TrendChart';
+import { ActionList } from './ActionList';
 import type { Dashboard } from './types';
 
 /**
@@ -69,22 +70,19 @@ function DashboardFigures() {
       <div className="ad__filters">
         <MonthPicker value={period} max={thisMonth} onChange={(p) => filters.setFilter({ period: p === thisMonth ? '' : p })} />
         {properties.length > 1 ? (
-          <label className="ad__field ad__field--inline">
-            <span className="ad__label">Property scope</span>
-            <select
-              className="nx-input"
-              aria-label="Property scope"
-              value={activePropertyId ?? ''}
-              onChange={(e) => handlePropertySwitch(e.target.value ? e.target.value : null)}
-            >
-              <option value="">All properties (Consolidated · {properties.length})</option>
-              {properties.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.code})
-                </option>
-              ))}
-            </select>
-          </label>
+          <select
+            className="ad__select"
+            aria-label="Show figures for"
+            value={activePropertyId ?? ''}
+            onChange={(e) => handlePropertySwitch(e.target.value ? e.target.value : null)}
+          >
+            <option value="">All {properties.length} properties</option>
+            {properties.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.code})
+              </option>
+            ))}
+          </select>
         ) : null}
         {dashboard.isFetching && !dashboard.isPending ? <span className="ad__muted" role="status">Updating…</span> : null}
       </div>
@@ -139,6 +137,7 @@ function Figures({
 
   return (
     <>
+      <ActionList items={data.actions ?? []} />
       <div className="ad__stats rp__tiles">
         <Tile label={`Invoiced · ${month}`} value={formatKES(data.invoiced)} sub="Billed to tenants this month" />
         <Tile
@@ -183,7 +182,7 @@ function Figures({
                   <th className="num">Collected</th>
                   <th className="num">Expenses</th>
                   <th className="num">Net</th>
-                  <th></th>
+                  <th className="ad__rowactions"><span className="nx-sr">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -191,7 +190,7 @@ function Figures({
                   <tr key={row.property.id}>
                     <td>
                       <strong>{row.property.name}</strong>
-                      <span className="ad__sub num">{row.property.code}</span>
+                      <span className="ad__sub code">{row.property.code}</span>
                     </td>
                     <td>
                       {formatRate(row.rate)}
@@ -203,14 +202,17 @@ function Figures({
                     <td className="num">{formatKES(row.collected)}</td>
                     <td className="num">{formatKES(row.expenses)}</td>
                     <td className="num"><SignedAmount minor={row.net} /></td>
-                    <td className="num">
-                      <button
-                        type="button"
-                        className="nx-btn nx-btn--sm"
-                        onClick={() => onSwitchProperty(row.property.id)}
-                      >
-                        Switch
-                      </button>
+                    <td className="ad__rowactions">
+                      <div>
+                        <button
+                          type="button"
+                          className="nx-btn nx-btn--sm"
+                          aria-label={`View ${row.property.name} on the dashboard`}
+                          onClick={() => onSwitchProperty(row.property.id)}
+                        >
+                          View property
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -250,7 +252,7 @@ function Figures({
                         {canTenants
                           ? <Link className="ad__link" to={`/app/tenants/${row.tenant.id}`}><strong>{personName(row.tenant)}</strong></Link>
                           : <strong>{personName(row.tenant)}</strong>}
-                        <span className="ad__sub num">{row.tenant.code}{row.tenant.phone ? ` · ${row.tenant.phone}` : ''}</span>
+                        <span className="ad__sub code">{row.tenant.code}{row.tenant.phone ? ` · ${row.tenant.phone}` : ''}</span>
                       </td>
                       <td>
                         {formatDay(row.oldestDueDate)}

@@ -31,8 +31,8 @@ export const PlatformAdminOnly = () => SetMetadata(PLATFORM_ADMIN_ONLY, true);
 export const PlatformOperatorOnly = () => SetMetadata(PLATFORM_OPERATOR_ONLY, true);
 
 /**
- * Still allowed while the organisation is SUSPENDED for an unpaid Hodi bill (design §5.4):
- * paying Hodi, signing in, and taking money in — rent collection is never blocked.
+ * Still allowed while the organisation is SUSPENDED for an unpaid KodiHub bill (design §5.4):
+ * paying KodiHub, signing in, and taking money in — rent collection is never blocked.
  */
 export const AllowWhenSuspended = () => SetMetadata(ALLOW_WHEN_SUSPENDED, true);
 

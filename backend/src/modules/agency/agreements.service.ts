@@ -40,6 +40,7 @@ export function toAgreement(a: Row, today = todayInNairobi()) {
     remittanceDay: a.remittanceDay,
     deductExpenses: a.deductExpenses,
     holdDeposits: a.holdDeposits,
+    lateFeeRecipient: a.lateFeeRecipient,
     ...range(a),
     active: covers({ ...range(a), propertyIds: [] }, '', today),
     createdAt: a.createdAt,
@@ -117,6 +118,7 @@ export class AgreementsService {
           remittanceDay: dto.remittanceDay,
           deductExpenses: dto.deductExpenses ?? true,
           holdDeposits: dto.holdDeposits ?? true,
+          lateFeeRecipient: dto.lateFeeRecipient ?? null,
           startDate: parseDateOnly(dto.startDate),
           endDate: dto.endDate ? parseDateOnly(dto.endDate) : null,
         },
@@ -139,7 +141,12 @@ export class AgreementsService {
   async update(id: string, dto: UpdateAgreementDto) {
     const before = await this.find(id);
     const used = await this.db.landlordLedgerEntry.count({ where: { agreementId: id } });
-    const termsChanging = Object.entries(dto).some(([k, v]) => k !== 'endDate' && v !== undefined);
+    // The end date, and who keeps late fees, can change under booked money: each fee invoice
+    // records who kept it when it was issued, so nothing already booked moves.
+    const ALWAYS_EDITABLE = new Set(['endDate', 'lateFeeRecipient']);
+    const termsChanging = Object.entries(dto).some(
+      ([k, v]) => !ALWAYS_EDITABLE.has(k) && v !== undefined,
+    );
     if (used && termsChanging) {
       throw AppError.conflict(
         'Money was already booked under these terms. End this agreement and start a new one.',
@@ -174,6 +181,7 @@ export class AgreementsService {
           ...(dto.remittanceDay ? { remittanceDay: dto.remittanceDay } : {}),
           ...(dto.deductExpenses !== undefined ? { deductExpenses: dto.deductExpenses } : {}),
           ...(dto.holdDeposits !== undefined ? { holdDeposits: dto.holdDeposits } : {}),
+          ...(dto.lateFeeRecipient !== undefined ? { lateFeeRecipient: dto.lateFeeRecipient } : {}),
         },
         include: LANDLORD,
       });

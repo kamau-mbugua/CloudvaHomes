@@ -8,6 +8,7 @@ import {
   IsString,
   IsUUID,
   Max,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
@@ -45,6 +46,18 @@ export class ListTenanciesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   tenantId?: string;
+
+  @ApiPropertyOptional({
+    minimum: 1,
+    maximum: 365,
+    description: 'Current tenancies whose lease ends within this many days (or already ended)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  expiring?: number;
 }
 
 class BillingFieldsDto {
@@ -95,9 +108,63 @@ export class CreateTenancyDto extends BillingFieldsDto {
   @IsOptional()
   @IsBoolean()
   issueMoveInInvoice?: boolean;
+
+  @IsDateOnly({ optional: true, description: 'When the lease runs out (optional)' })
+  @IsOptional()
+  leaseEndDate?: string;
 }
 
-export class UpdateTenancyDto extends BillingFieldsDto {}
+export class UpdateTenancyDto extends BillingFieldsDto {
+  @IsDateOnly({ optional: true, description: 'When the lease runs out; null clears it' })
+  @IsOptional()
+  leaseEndDate?: string | null;
+}
+
+const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export class RentChangeDto {
+  @IsMinorAmount({ description: 'The new monthly rent, in cents' })
+  newRent!: number;
+
+  @ApiProperty({ example: '2027-01', description: 'First month (YYYY-MM) billed at the new rent' })
+  @Matches(PERIOD, { message: 'effectivePeriod must be a month like 2027-01' })
+  effectivePeriod!: string;
+
+  @ApiPropertyOptional({ example: 'Annual review' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  note?: string;
+
+  @ApiPropertyOptional({
+    description: 'Text the tenant (and notify them in the app) about the change',
+  })
+  @IsOptional()
+  @IsBoolean()
+  notifyTenant?: boolean;
+}
+
+export class RenewTenancyDto {
+  @IsDateOnly({ description: 'The new lease end date' })
+  leaseEndDate!: string;
+
+  @IsMinorAmount({
+    optional: true,
+    description: 'With the renewal, a new rent from effectivePeriod',
+  })
+  @IsOptional()
+  newRent?: number;
+
+  @ApiPropertyOptional({ example: '2027-01' })
+  @IsOptional()
+  @Matches(PERIOD, { message: 'effectivePeriod must be a month like 2027-01' })
+  effectivePeriod?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  notifyTenant?: boolean;
+}
 
 export class NoticeDto {
   @IsDateOnly({ description: 'Expected move-out date' })

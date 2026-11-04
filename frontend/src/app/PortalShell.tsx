@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { PageBoundary } from '../components/ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 import { BrandLockup } from '../components/BrandMark';
 import { TopRouteProgress } from '../components/Loading';
@@ -9,6 +10,7 @@ import { portalsOf } from '../lib/auth/portals';
 import { logout } from '../lib/auth/session';
 import { useSession } from '../lib/auth/useAuth';
 import { useTheme } from '../lib/theme';
+import { scrollEdges } from '../lib/scrollEdges';
 
 /**
  * The minimal, phone-first shell the outside portals share — the owner portal (`/owner`)
@@ -95,14 +97,14 @@ export function PortalShell({
         <TopRouteProgress />
       </header>
 
-      <nav className="ow__tabs" aria-label={label}>
+      <PortalTabs label={label}>
         {tabs.map((t) => (
           <NavLink key={t.to} to={`${t.to}${search}`} end={t.end} className={({ isActive }) => `ow__tab ${isActive ? 'is-on' : ''}`}>{t.label}</NavLink>
         ))}
-      </nav>
+      </PortalTabs>
 
       <main className="ow__page">
-        <Outlet context={context} />
+        <PageBoundary homePath={`/${portal}`}><Outlet context={context} /></PageBoundary>
       </main>
 
       <footer className="ow__foot">
@@ -119,5 +121,43 @@ export function PortalShell({
         </span>
       </footer>
     </div>
+  );
+}
+
+/**
+ * The portal's tab row. On a phone the tabs scroll sideways: the active tab is scrolled into
+ * view on every navigation, and a fade marks each edge that hides more tabs.
+ */
+function PortalTabs({ label, children }: { label: string; children: ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  const [edges, setEdges] = useState({ start: false, end: false });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const update = () => {
+      const next = scrollEdges(el);
+      setEdges((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener('scroll', update);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('.ow__tab.is-on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [pathname]);
+
+  const fade = `${edges.start ? ' has-more-start' : ''}${edges.end ? ' has-more-end' : ''}`;
+  return (
+    <nav ref={ref} className={`ow__tabs${fade}`} aria-label={label}>
+      {children}
+    </nav>
   );
 }

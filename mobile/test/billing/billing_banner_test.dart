@@ -29,7 +29,7 @@ void main() {
       adapter: adapter,
       session: sessionJson(permissions: ['settings:view']),
     );
-    expect(find.textContaining('Hodi bill'), findsNothing);
+    expect(find.textContaining('KodiHub bill'), findsNothing);
     expect(adapter.calls, isEmpty);
   });
 
@@ -47,7 +47,7 @@ void main() {
       ),
     );
     expect(
-      find.text('Your Hodi bill of KES 2,000.00 was due on 20 Oct 2026.'),
+      find.text('Your KodiHub bill of KES 2,000.00 was due on 20 Oct 2026.'),
       findsOneWidget,
     );
     expect(find.text('Pay now'), findsOneWidget);
@@ -64,7 +64,7 @@ void main() {
         session: sessionJson(status: 'SUSPENDED'),
       );
       expect(
-        find.textContaining('read-only until the Hodi bill is paid'),
+        find.textContaining('read-only until the KodiHub bill is paid'),
         findsOneWidget,
       );
       expect(

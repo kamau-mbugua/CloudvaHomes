@@ -27,7 +27,7 @@ import type { ListPlatformInvoicesDto, ListPlatformPaymentsDto } from './platfor
 import { renderPlatformInvoicePdf } from './platform-pdf.js';
 
 /**
- * Hodi billing organisations (design §5.4). Platform data spans organisations, so this uses
+ * KodiHub billing organisations (design §5.4). Platform data spans organisations, so this uses
  * the unscoped client and filters by orgId explicitly everywhere.
  */
 @Injectable()
@@ -556,7 +556,7 @@ export class PlatformBillingService {
     return this.toPayment(p);
   }
 
-  /** What an organisation owes Hodi now. */
+  /** What an organisation owes KodiHub now. */
   async balance(orgId: string) {
     const today = todayInNairobi();
     const open = await this.prisma.platformInvoice.findMany({

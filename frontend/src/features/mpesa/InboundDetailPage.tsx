@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import type { FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,6 +42,7 @@ export function InboundDetailPage() {
   const [tab, setTab] = useState<'details' | 'suggestions' | 'raw'>('details');
   const inbound = useInboundDetail(inboundId);
 
+  useDocumentTitle(inbound.data?.providerRef);
   if (inbound.isPending) return <CardSkeleton count={3} />;
   if (inbound.isError) {
     return (
@@ -83,8 +85,8 @@ export function InboundDetailPage() {
         <div className="ad__callout ad__callout--info mp__resolved" role="note">
           <p>
             Recorded as{' '}
-            {t.payment ? <Link to={`/app/payments/${t.payment.id}`} className="num">{t.payment.number}</Link> : 'a payment'}
-            {t.tenant ? <> for {tenantLink(t.tenant)} (<span className="num">{t.tenant.code}</span>)</> : null}
+            {t.payment ? <Link to={`/app/payments/${t.payment.id}`} className="code">{t.payment.number}</Link> : 'a payment'}
+            {t.tenant ? <> for {tenantLink(t.tenant)} (<span className="code">{t.tenant.code}</span>)</> : null}
             {t.matchedBy ? ` — ${(MATCHED_BY[t.matchedBy] ?? t.matchedBy).toLowerCase()}` : ''}
             {t.resolvedBy ? `, by ${t.resolvedBy.name}` : ''}{t.resolvedAt ? ` on ${formatDateTime(t.resolvedAt)}` : ''}.
           </p>
@@ -148,7 +150,7 @@ export function InboundDetailPage() {
               {suggestions.map((s) => (
                 <li key={s.tenant.id} className="mp__suggestion">
                   <div>
-                    <strong>{tenantLink(s.tenant)}</strong> <span className="ad__muted num">{s.tenant.code}</span>
+                    <strong>{tenantLink(s.tenant)}</strong> <span className="ad__muted code">{s.tenant.code}</span>
                     <span className="ad__sub">{s.reason}</span>
                   </div>
                   {canUpdate ? (
@@ -353,7 +355,7 @@ function AssignSheet({ inbound, suggestions, initial, onClose }: {
           <span className="fld__label">Tenant</span>
           {picked ? (
             <div className="py__picked">
-              <span><strong>{personName(picked)}</strong> <span className="ad__muted num">{picked.code}{picked.phone ? ` · ${picked.phone}` : ''}</span></span>
+              <span><strong>{personName(picked)}</strong> <span className="ad__muted code">{picked.code}{picked.phone ? ` · ${picked.phone}` : ''}</span></span>
               <button type="button" className="nx-btn nx-btn--sm" onClick={() => pick(null)}>Change</button>
             </div>
           ) : (
@@ -377,7 +379,7 @@ function AssignSheet({ inbound, suggestions, initial, onClose }: {
                       {results.map((r) => (
                         <button key={r.id} type="button" role="option" aria-selected={false} className="pf__result" onClick={() => pick(r)}>
                           <strong>{personName(r)}</strong>
-                          <span className="num">{r.code} · {r.phone}</span>
+                          <span className="code">{r.code} · {r.phone}</span>
                         </button>
                       ))}
                       {tenants.isSuccess && results.length === 0 ? <span className="hint">No tenants match.</span> : null}

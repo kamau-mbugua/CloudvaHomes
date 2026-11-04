@@ -3,7 +3,7 @@ import { api } from '../../lib/api/client';
 import { csvFilename, saveBlob } from '../../lib/files';
 import { expensesErrorMessage, reportKeys } from '../expenses/api';
 import { unwrap } from '../payments/rules';
-import type { ArrearsReport, Dashboard, OccupancyReport, PnlReport } from './types';
+import type { ArrearsReport, Dashboard, OccupancyReport, PnlReport, MriReport } from './types';
 
 /**
  * Reads and CSV downloads for the dashboard and the reports. Every key starts with
@@ -29,9 +29,10 @@ const PATHS = {
   pnl: '/reports/property-pnl',
   arrears: '/reports/arrears',
   occupancy: '/reports/occupancy',
+  mri: '/reports/rental-income-tax',
 } as const;
 
-interface Shapes { pnl: PnlReport; arrears: ArrearsReport; occupancy: OccupancyReport }
+interface Shapes { pnl: PnlReport; arrears: ArrearsReport; occupancy: OccupancyReport; mri: MriReport }
 
 export function useReport<K extends keyof Shapes>(kind: K, params: Params, enabled = true) {
   return useQuery({
@@ -46,6 +47,7 @@ const NAMES: Record<keyof Shapes, string> = {
   pnl: 'profit-and-loss',
   arrears: 'arrears',
   occupancy: 'occupancy',
+  mri: 'rental-income-tax',
 };
 
 /**

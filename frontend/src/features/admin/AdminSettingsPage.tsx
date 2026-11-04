@@ -12,6 +12,7 @@ import { DARAJA_ENV } from '../mpesa/labels';
 import { checkDaraja } from '../mpesa/rules';
 import type { DarajaDraft } from '../mpesa/rules';
 import { useListFilters } from '../portfolio/hooks';
+import { mriRate, parseRatePercent } from '../reports/rules';
 import { Badge, Field } from '../portfolio/ui';
 import { keys, platformErrorMessage, usePlans, usePlatformLocks, usePlatformSettings } from '../platform/api';
 import { checkSettings, darajaSettingsBody, settingsDraft } from '../platform/rules';
@@ -117,10 +118,13 @@ export function AdminSettingsPage() {
         ) : tab === 'sms' ? (
           <SmsSettingsForm key={`${s.sms?.username ?? ''}-${s.sms?.senderId ?? ''}-${s.sms?.apiKey}`} settings={s} />
         ) : (
-          <AppAndMaintenanceForm
-            key={`${s.allowPublicSignup}-${s.minAppVersionCode}-${s.minAppVersionName}-${s.maintenanceMode}`}
-            settings={s}
-          />
+          <>
+            <AppAndMaintenanceForm
+              key={`${s.allowPublicSignup}-${s.minAppVersionCode}-${s.minAppVersionName}-${s.maintenanceMode}`}
+              settings={s}
+            />
+            <TaxSettingsForm key={`tax-${s.mriRateBps}`} settings={s} />
+          </>
         )}
       </div>
     </div>
@@ -1607,6 +1611,44 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
         <button type="submit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
           {save.isPending ? 'Publishing…' : 'Publish landing page'}
         </button>
+      </div>
+    </form>
+  );
+}
+
+/** The monthly rental income tax rate used by organisations' MRI report (phase 13). */
+function TaxSettingsForm({ settings }: { settings: PlatformSettings }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const saved = settings.mriRateBps ?? 750;
+  const [rate, setRate] = useState(String(saved / 100));
+  const [error, setError] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (mriRateBps: number) => api.put<unknown>('/platform/settings', { mriRateBps }),
+    onSuccess: async (_r, bps) => {
+      toast.saved(`Rental income tax rate set to ${mriRate(bps)}.`);
+      await queryClient.invalidateQueries({ queryKey: keys.platform });
+    },
+    onError: (e) => toast.failed(platformErrorMessage(e)),
+  });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const parsed = parseRatePercent(rate);
+    if (!parsed.ok) return setError(parsed.error);
+    setError(null);
+    save.mutate(parsed.bps);
+  };
+  return (
+    <form className="fm__section" onSubmit={submit} noValidate>
+      <h2>Rental income tax (MRI)</h2>
+      <p>The rate organisations’ “Rental income tax” report uses on residential rent received. Check it against current KRA rules.</p>
+      <div className="fm__grid">
+        <Field id="tx-rate" label="Rate (%)" error={error ?? undefined} hint={`Now ${mriRate(saved)}.`}>
+          <input id="tx-rate" inputMode="decimal" value={rate} aria-invalid={Boolean(error)} onChange={(e) => setRate(e.target.value)} />
+        </Field>
+      </div>
+      <div className="pg-actions">
+        <button type="submit" className="nx-btn nx-btn--primary" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save tax rate'}</button>
       </div>
     </form>
   );

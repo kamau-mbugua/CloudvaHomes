@@ -31,15 +31,15 @@ class BillingBanner extends ConsumerWidget {
 
     final String text;
     if (status == 'CLOSED') {
-      text = 'This organisation is closed on Hodi. Contact Hodi to reopen it.';
+      text = 'This organisation is closed on KodiHub. Contact KodiHub to reopen it.';
     } else if (suspended) {
       text =
-          'Your account is read-only until the Hodi bill is paid. Tenants can still pay rent.'
+          'Your account is read-only until the KodiHub bill is paid. Tenants can still pay rent.'
           '${billing != null && billing.balance > 0 ? ' ${formatKes(billing.balance)} is owed.' : ''}';
     } else {
       text = billing?.overdueAmount != null
-          ? 'Your Hodi bill of ${formatKes(billing!.overdueAmount!)} was due on ${formatDay(billing.overdueSince)}.'
-          : 'Your Hodi bill is overdue.';
+          ? 'Your KodiHub bill of ${formatKes(billing!.overdueAmount!)} was due on ${formatDay(billing.overdueSince)}.'
+          : 'Your KodiHub bill is overdue.';
     }
 
     return Material(
@@ -67,7 +67,7 @@ class BillingBanner extends ConsumerWidget {
                   if (billing != null &&
                       billing.canPayInApp &&
                       session.can('settings:update')) {
-                    showPayHodi(context, ref, billing, session.user.phone);
+                    showPayKodiHub(context, ref, billing, session.user.phone);
                   } else {
                     context.push('/staff/billing');
                   }

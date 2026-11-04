@@ -1,4 +1,4 @@
-package com.qnex.hodi
+package co.ke.kodihub
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

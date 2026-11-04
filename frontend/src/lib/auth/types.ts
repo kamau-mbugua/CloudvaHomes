@@ -34,9 +34,9 @@ export interface OrganizationMembership {
 }
 
 /**
- * Where an organisation stands with its Hodi bill (phase 8). GRACE: overdue, nothing is
+ * Where an organisation stands with its KodiHub bill (phase 8). GRACE: overdue, nothing is
  * blocked yet. SUSPENDED: read-only for staff until paid (tenants can still pay rent).
- * CLOSED: closed by Hodi.
+ * CLOSED: closed by KodiHub.
  */
 export type OrgStatus = 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'CLOSED';
 
@@ -167,6 +167,8 @@ export interface Organization {
   receiptInstructions?: string | null;
   /** Phase 7: SMS rent reminders. Absent from older servers; read as the defaults (off). */
   reminders?: ReminderSettings;
+  /** Phase 13: late fees, plus (agencies) agreements that don't say who keeps them. */
+  lateFees?: import('../../features/settings/lateFees').LateFeeView;
 }
 
 /** `Organization.reminders` (phase 7). */

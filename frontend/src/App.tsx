@@ -5,6 +5,7 @@ import { queryClient } from './lib/api/queryClient';
 import { ToastProvider } from './components/Toast';
 import { RouteDrawer, WithRouteDrawer } from './components/RouteDrawer';
 import { AppShell } from './app/AppShell';
+import { UpdatePrompt } from './app/UpdatePrompt';
 import { RequireAdmin, RequireAuth, RequireOwner, RequirePermission, RequireSuperAdmin, RequireTenant } from './app/guards';
 import { NotFoundPage, PlaceholderPage } from './app/PlaceholderPage';
 import { ORG_NAV, destinations } from './app/navigation';
@@ -16,6 +17,7 @@ import { AcceptInvitationPage } from './features/auth/AcceptInvitationPage';
 import { StepUpProvider } from './features/auth/StepUpProvider';
 import { DashboardPage } from './features/reports/DashboardPage';
 
+const MessagesPage = lazy(() => import('./features/messages/MessagesPage').then((m) => ({ default: m.MessagesPage })));
 const AccountPage = lazy(() => import('./features/account/AccountPage').then((m) => ({ default: m.AccountPage })));
 const OrganizationPage = lazy(() => import('./features/settings/OrganizationPage').then((m) => ({ default: m.OrganizationPage })));
 const UsersPage = lazy(() => import('./features/settings/UsersPage').then((m) => ({ default: m.UsersPage })));
@@ -113,6 +115,7 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; tit
   maintenance: { element: <MaintenancePage /> },
   tenants: { element: <TenantsPage />, children: [{ path: ':tenantId', title: 'Tenant details', element: <TenantDetailPage /> }] },
   tenancies: { element: <TenanciesPage /> },
+  messages: { element: <MessagesPage /> },
   // `invoices/run` is its own nav entry and route. React Router ranks the static `run`
   // above the dynamic `:invoiceId`, so the detail route never swallows it (tested in
   // routes.test.ts).
@@ -134,6 +137,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
+        <UpdatePrompt />
         <BrowserRouter>
           <StepUpProvider>
             <Suspense fallback={<div className="p-8 text-sm text-slate-500">Loading…</div>}>

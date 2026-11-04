@@ -103,7 +103,7 @@ const sharedStepUp = singleFlight(async (cause: ApiError) => {
 
 export const NETWORK_ERROR = 'NETWORK_ERROR';
 
-/** `403 ORG_SUSPENDED` (phase 8): staff changes are refused until the Hodi bill is paid. */
+/** `403 ORG_SUSPENDED` (phase 8): staff changes are refused until the KodiHub bill is paid. */
 export const ORG_SUSPENDED = 'ORG_SUSPENDED';
 
 /**

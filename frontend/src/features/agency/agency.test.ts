@@ -3,7 +3,7 @@ import { ApiError } from '../../lib/api/client';
 import { agencyErrorMessage, ownerErrorMessage, payoutErrorMessage } from './api';
 import {
   agreementState, agreementToDraft, bpsToPercent, checkAdjustment, checkAgreement, checkEndDate, checkPaid, checkPayout,
-  describeNet, describePayable, describeRate, groupCollections, newAgreementDraft, ordinal, parsePercent, personLabel,
+  describeNet, describePayable, describeRate, lateFeeRecipientText, groupCollections, newAgreementDraft, ordinal, parsePercent, personLabel,
   rangeText, remittanceActions, statementFilename, withRunningBalance,
   bulkFilename, bulkSelectable, canSendByMpesa, checkResolve, describePayout, isWholeShillings, payoutInFlight, payoutPollDelay,
   PAYOUT_POLL_MS, PAYOUT_WAIT_MS,
@@ -18,7 +18,7 @@ const apiError = (code: string, status = 409) => new ApiError({ status, code, me
 const agreement = (over: Partial<Agreement> = {}): Agreement => ({
   id: 'ag-1', landlord: { id: 'll-1', code: 'L0001', name: 'Test Landlord One' }, propertyIds: [],
   commissionBasis: 'PERCENT_OF_COLLECTED', commissionBps: 1000, fixedAmount: null, commissionableLines: ['RENT'],
-  collection: 'AGENCY_COLLECTS', remittanceDay: 5, deductExpenses: true, holdDeposits: true,
+  collection: 'AGENCY_COLLECTS', remittanceDay: 5, deductExpenses: true, holdDeposits: true, lateFeeRecipient: null,
   startDate: '2026-01-01', endDate: null, active: true, createdAt: '2026-01-01T00:00:00Z', ...over,
 });
 
@@ -72,9 +72,22 @@ describe('checkAgreement', () => {
       body: {
         landlordId: 'll-1', propertyIds: [], commissionBasis: 'PERCENT_OF_COLLECTED', commissionBps: 1000, fixedAmount: null,
         commissionableLines: ['RENT'], collection: 'AGENCY_COLLECTS', remittanceDay: 5, deductExpenses: true, holdDeposits: true,
-        startDate: '2026-10-01', endDate: null,
+        lateFeeRecipient: null, startDate: '2026-10-01', endDate: null,
       },
     });
+  });
+
+  it('leaves who keeps late fees unset unless chosen (no default — no late fees until set)', () => {
+    expect(newAgreementDraft('2026-10-27').lateFeeRecipient).toBe('');
+    expect(checkAgreement(draft({ lateFeeRecipient: 'AGENCY' }))).toMatchObject({ ok: true, body: { lateFeeRecipient: 'AGENCY' } });
+    expect(agreementToDraft(agreement({ lateFeeRecipient: 'LANDLORD' })).lateFeeRecipient).toBe('LANDLORD');
+    expect(agreementToDraft(agreement()).lateFeeRecipient).toBe('');
+  });
+
+  it('describes who keeps late fees', () => {
+    expect(lateFeeRecipientText(null)).toBe('Not set — no late fees');
+    expect(lateFeeRecipientText('LANDLORD')).toBe('The landlord');
+    expect(lateFeeRecipientText('AGENCY')).toBe('The agency');
   });
 
   it('sends a fixed fee in cents and no rate', () => {

@@ -108,7 +108,7 @@ export function InvoiceRunPage() {
               <tbody>
                 {items.map((item) => (
                   <tr key={item.tenancyId}>
-                    <td>{personName(item.tenant)}<span className="ad__sub num">{item.tenant.code}</span></td>
+                    <td>{personName(item.tenant)}<span className="ad__sub code">{item.tenant.code}</span></td>
                     <td>{item.unit.number}<span className="ad__sub">{item.property.name}</span></td>
                     <td>
                       <ul className="bl__runlines">

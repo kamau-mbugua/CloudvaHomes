@@ -110,6 +110,16 @@ details[open] > .ag__line--sub .ag__linelabel::before { content: '▾ '; }
 .ow__tabs {
   display: flex; gap: 4px; overflow-x: auto;
   padding: 6px 16px 0; border-bottom: 1px solid var(--border); background: var(--card);
+  /* scroll-padding matches the side padding, or snapping parks the first tab 16px in. */
+  scroll-snap-type: x proximity; scroll-padding-inline: 16px; scrollbar-width: none;
+}
+.ow__tabs::-webkit-scrollbar { display: none; }
+.ow__tab { scroll-snap-align: start; }
+/* Fade whichever edge hides more tabs (PortalTabs sets these classes). */
+.ow__tabs.has-more-end { mask-image: linear-gradient(to right, #000 82%, transparent); }
+.ow__tabs.has-more-start { mask-image: linear-gradient(to left, #000 82%, transparent); }
+.ow__tabs.has-more-start.has-more-end {
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
 }
 .ow__tab {
   min-height: var(--touch-min); display: inline-flex; align-items: center;

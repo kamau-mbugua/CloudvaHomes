@@ -6,6 +6,8 @@ import { MaintenanceModule } from '../maintenance/maintenance.module.js';
 import { MpesaModule } from '../mpesa/mpesa.module.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { PortfolioModule } from '../portfolio/portfolio.module.js';
+import { BroadcastsController } from './broadcasts.controller.js';
+import { BroadcastsService } from './broadcasts.service.js';
 import { MessagesService } from './messages.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
 import {
@@ -25,9 +27,15 @@ import { TenantPortalService } from './tenant-portal.service.js';
     FilesModule,
     MaintenanceModule,
   ],
-  controllers: [TenantAccessController, TenantPortalController, ReminderJobsController],
+  controllers: [
+    TenantAccessController,
+    TenantPortalController,
+    ReminderJobsController,
+    BroadcastsController,
+  ],
   providers: [
     MessagesService,
+    BroadcastsService,
     TenantAccountsService,
     TenantPortalService,
     JobTokenVerifier,

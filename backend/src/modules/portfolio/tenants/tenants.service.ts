@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AppError } from '../../../common/errors/app-error.js';
 import { parseCsv, toCsv } from '../../../common/http/csv.js';
+import { readSort } from '../../../common/http/sort.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
 import { paginated } from '../../../common/http/response.js';
 import type { Prisma, Tenant } from '../../../generated/prisma/client.js';
@@ -170,11 +171,14 @@ export class TenantsService {
           : {},
       ],
     };
+    const { field, desc } = readSort(q.sort, 'name');
+    if (field === 'balance') return this.listByBalance(where, q, desc);
+    const dir = desc ? 'desc' : 'asc';
     const [rows, total] = await Promise.all([
       this.db.tenant.findMany({
         where,
         include: INCLUDE,
-        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+        orderBy: [{ firstName: dir }, { lastName: dir }, { code: 'asc' }],
         ...toSkipTake(q),
       }),
       this.db.tenant.count({ where }),
@@ -183,6 +187,44 @@ export class TenantsService {
     return paginated(
       rows.map((r) => this.toTenant(r, balances.get(r.id))),
       total,
+      q,
+    );
+  }
+
+  /**
+   * Balances are computed (invoices less payments), not stored, so this sorts every matching
+   * tenant in memory and then pages. Fine at an organisation's size (hundreds to a few
+   * thousand tenants); move the balance into SQL if that stops being true.
+   */
+  private async listByBalance(
+    where: Prisma.TenantWhereInput,
+    q: ListTenantsQueryDto,
+    desc: boolean,
+  ) {
+    const all = await this.db.tenant.findMany({
+      where,
+      select: { id: true, firstName: true, lastName: true, code: true },
+    });
+    const balances = await this.balances(all.map((t) => t.id));
+    const name = (t: (typeof all)[number]) => `${t.firstName} ${t.lastName} ${t.code}`;
+    all.sort((a, b) => {
+      const d = (balances.get(a.id) ?? 0n) - (balances.get(b.id) ?? 0n);
+      if (d !== 0n) return (d > 0n ? 1 : -1) * (desc ? -1 : 1);
+      return name(a).localeCompare(name(b));
+    });
+    const { skip, take } = toSkipTake(q);
+    const pageIds = all.slice(skip, skip + take).map((t) => t.id);
+    const rows = await this.db.tenant.findMany({
+      where: { id: { in: pageIds } },
+      include: INCLUDE,
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return paginated(
+      pageIds.flatMap((id) => {
+        const r = byId.get(id);
+        return r ? [this.toTenant(r, balances.get(id))] : [];
+      }),
+      all.length,
       q,
     );
   }

@@ -17,9 +17,41 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { IsMinorAmount } from '../portfolio/money.dto.js';
 
 // KRA PIN: letter, 9 digits, letter (e.g. A123456789Z).
 export const KRA_PIN = /^[A-Za-z]\d{9}[A-Za-z]$/;
+
+export class LateFeesDto {
+  @ApiProperty({ description: 'Charge late fees on overdue monthly invoices (default off)' })
+  @IsBoolean()
+  enabled!: boolean;
+
+  @ApiProperty({ enum: ['FLAT', 'PERCENT'] })
+  @IsIn(['FLAT', 'PERCENT'])
+  mode!: 'FLAT' | 'PERCENT';
+
+  @IsMinorAmount({ description: 'FLAT: the fee, in cents' })
+  amount!: number;
+
+  @ApiProperty({
+    minimum: 1,
+    maximum: 2500,
+    description: 'PERCENT: basis points of the unpaid balance (500 = 5%)',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(2500)
+  percentBps!: number;
+
+  @ApiProperty({ minimum: 0, maximum: 60, description: 'Days after the due date before the fee' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(60)
+  graceDays!: number;
+}
 
 export class RemindersDto {
   @ApiProperty({ description: 'Send automatic SMS reminders to tenants (default off)' })
@@ -91,6 +123,12 @@ export class UpdateOrganizationDto {
   @ValidateNested()
   @Type(() => RemindersDto)
   reminders?: RemindersDto;
+
+  @ApiPropertyOptional({ type: LateFeesDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LateFeesDto)
+  lateFees?: LateFeesDto;
 
   @ApiPropertyOptional({
     nullable: true,

@@ -11,6 +11,7 @@ import '../../core/money.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/stk_sheet.dart';
 import 'staff_models.dart';
+import 'inspections.dart';
 
 /// Every staff-mode call, with the exact paths the web app uses. Unpaged endpoints never
 /// get `pageSize` (the server answers 422).
@@ -314,6 +315,24 @@ class StaffApi {
         },
       ],
     },
+  );
+
+  // ── inspections (phase 13)
+  Future<List<Inspection>> inspections(String tenancyId) async {
+    final body = await _api.get('/tenancies/$tenancyId/inspections');
+    return [
+      for (final i in body['data'] as List) Inspection.fromJson(i as Json),
+    ];
+  }
+
+  Future<Inspection> saveInspection(
+    String tenancyId,
+    String kind,
+    Json body,
+  ) async => Inspection.fromJson(
+    _data(
+      await _api.put('/tenancies/$tenancyId/inspections/$kind', body: body),
+    ),
   );
 
   // ── expenses

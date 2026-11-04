@@ -11,6 +11,7 @@ import { addDays, todayInNairobi } from '../billing/billing-math.js';
 import { readOrgDocumentInstructions } from '../../common/pdf/pdf.js';
 import { RolesService } from '../roles/roles.service.js';
 import { readReminders } from '../tenant-portal/reminders.js';
+import { readLateFees, storeLateFees } from '../billing/late-fees/late-fees.js';
 import { InvitationsService } from '../users/invitations.service.js';
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './organizations.dto.js';
 
@@ -30,6 +31,7 @@ function toOrg(o: Organization) {
     settings: o.settings,
     invoiceDueDays: o.invoiceDueDays,
     reminders: readReminders(o.settings),
+    lateFees: readLateFees(o.settings),
     invoiceInstructions: docInstructions.invoiceInstructions,
     receiptInstructions: docInstructions.receiptInstructions,
     createdAt: o.createdAt,
@@ -58,7 +60,27 @@ export class OrganizationsService {
 
   async current() {
     const { orgId } = orgContext();
-    return toOrg(await this.db.organization.findUniqueOrThrow({ where: { id: orgId } }));
+    return this.withLateFeeGaps(
+      toOrg(await this.db.organization.findUniqueOrThrow({ where: { id: orgId } })),
+    );
+  }
+
+  /**
+   * Agencies: how many current agreements don't say who keeps late fees — their properties
+   * get none (owner decision 2026-11-04), and the settings page says so.
+   */
+  private async withLateFeeGaps(org: ReturnType<typeof toOrg>) {
+    if (org.kind !== 'AGENCY')
+      return { ...org, lateFees: { ...org.lateFees, agreementsMissingRecipient: 0 } };
+    const today = parseDateOnly(todayInNairobi());
+    const agreementsMissingRecipient = await this.db.managementAgreement.count({
+      where: {
+        lateFeeRecipient: null,
+        startDate: { lte: today },
+        OR: [{ endDate: null }, { endDate: { gte: today } }],
+      },
+    });
+    return { ...org, lateFees: { ...org.lateFees, agreementsMissingRecipient } };
   }
 
   async updateCurrent(dto: UpdateOrganizationDto) {
@@ -70,57 +92,69 @@ export class OrganizationsService {
       ...(dto.kraPin !== undefined ? { kraPin: dto.kraPin ? dto.kraPin.toUpperCase() : null } : {}),
       ...(dto.invoiceDueDays !== undefined ? { invoiceDueDays: dto.invoiceDueDays } : {}),
     };
-    return this.db.$transaction(async (tx) => {
-      const before = await tx.organization.findUniqueOrThrow({ where: { id: orgId } });
-      const prevSettings = (before.settings as Prisma.JsonObject | null) ?? {};
-      const prevDocInstructions = readOrgDocumentInstructions(before.settings);
-      let nextSettings: Prisma.JsonObject | undefined;
-      if (
-        dto.reminders ||
-        dto.invoiceInstructions !== undefined ||
-        dto.receiptInstructions !== undefined
-      ) {
-        nextSettings = { ...prevSettings };
-        if (dto.reminders) {
-          const overdueDays = [...new Set(dto.reminders.overdueDays)].sort((a, b) => a - b);
-          nextSettings.reminders = {
-            enabled: dto.reminders.enabled,
-            daysBefore: dto.reminders.daysBefore,
-            overdueDays,
-          };
+    return this.db
+      .$transaction(async (tx) => {
+        const before = await tx.organization.findUniqueOrThrow({ where: { id: orgId } });
+        const prevSettings = (before.settings as Prisma.JsonObject | null) ?? {};
+        const prevDocInstructions = readOrgDocumentInstructions(before.settings);
+        let nextSettings: Prisma.JsonObject | undefined;
+        if (
+          dto.reminders ||
+          dto.lateFees ||
+          dto.invoiceInstructions !== undefined ||
+          dto.receiptInstructions !== undefined
+        ) {
+          nextSettings = { ...prevSettings };
+          if (dto.reminders) {
+            const overdueDays = [...new Set(dto.reminders.overdueDays)].sort((a, b) => a - b);
+            nextSettings.reminders = {
+              enabled: dto.reminders.enabled,
+              daysBefore: dto.reminders.daysBefore,
+              overdueDays,
+            };
+          }
+          if (dto.lateFees) {
+            nextSettings.lateFees = storeLateFees({
+              enabled: dto.lateFees.enabled,
+              mode: dto.lateFees.mode,
+              amount: BigInt(dto.lateFees.amount),
+              percentBps: dto.lateFees.percentBps,
+              graceDays: dto.lateFees.graceDays,
+            });
+          }
+          if (dto.invoiceInstructions !== undefined || dto.receiptInstructions !== undefined) {
+            nextSettings.documentInstructions = {
+              invoiceInstructions:
+                dto.invoiceInstructions !== undefined
+                  ? dto.invoiceInstructions?.trim() || null
+                  : prevDocInstructions.invoiceInstructions,
+              receiptInstructions:
+                dto.receiptInstructions !== undefined
+                  ? dto.receiptInstructions?.trim() || null
+                  : prevDocInstructions.receiptInstructions,
+            };
+          }
+          data.settings = nextSettings;
         }
-        if (dto.invoiceInstructions !== undefined || dto.receiptInstructions !== undefined) {
-          nextSettings.documentInstructions = {
-            invoiceInstructions:
-              dto.invoiceInstructions !== undefined
-                ? dto.invoiceInstructions?.trim() || null
-                : prevDocInstructions.invoiceInstructions,
-            receiptInstructions:
-              dto.receiptInstructions !== undefined
-                ? dto.receiptInstructions?.trim() || null
-                : prevDocInstructions.receiptInstructions,
-          };
-        }
-        data.settings = nextSettings;
-      }
-      const after = await tx.organization.update({ where: { id: orgId }, data });
-      await this.audit.record(
-        {
-          action: 'organization.update',
-          entity: 'organization',
-          entityId: orgId,
-          before: toOrg(before),
-          after: toOrg(after),
-        },
-        tx,
-      );
-      return toOrg(after);
-    });
+        const after = await tx.organization.update({ where: { id: orgId }, data });
+        await this.audit.record(
+          {
+            action: 'organization.update',
+            entity: 'organization',
+            entityId: orgId,
+            before: toOrg(before),
+            after: toOrg(after),
+          },
+          tx,
+        );
+        return toOrg(after);
+      })
+      .then((org) => this.withLateFeeGaps(org));
   }
 
   // ── Platform admin ──
 
-  /** Creates an organisation with its system roles and invites its owner (design: Hodi onboards customers). */
+  /** Creates an organisation with its system roles and invites its owner (design: KodiHub onboards customers). */
   async create(dto: CreateOrganizationDto) {
     const ctx = authContext();
     const phone = requirePhone(dto.phone, 'phone');
@@ -131,7 +165,7 @@ export class OrganizationsService {
     // Platform work spans organisations: org scoping off, everything filtered explicitly.
     return withoutOrgScope(async () => {
       const { org, membershipId, token } = await this.db.$transaction(async (tx) => {
-        // Hodi billing (phase 8): account number, default plan and its free trial.
+        // KodiHub billing (phase 8): account number, default plan and its free trial.
         const [{ n }] = await tx.$queryRaw<
           { n: bigint }[]
         >`SELECT nextval('"billing_ref_seq"') AS n`;

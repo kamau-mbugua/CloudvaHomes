@@ -273,13 +273,18 @@ describe('Tenant portal & reminders (e2e)', () => {
 
   it('reminders are off by default; when on, each tenant gets one SMS a day, opted-out tenants none', async () => {
     const x = await setUp();
-    const run = (today: string) =>
+    const run = (today: string, opts?: { dryRun?: boolean }) =>
       runWithContext(emptyContext({ orgId: owner.body.activeOrganization!.id }), () =>
-        t.app.get(TenantAccountsService).runReminders(today),
+        t.app.get(TenantAccountsService).runReminders(today, opts),
       );
     const due = formatDateOnly(addDays(parseDateOnly(RUN_DATE), 7)); // invoices due 7 days after issue
     const threeBefore = formatDateOnly(addDays(parseDateOnly(due), -3));
-    expect(await run(threeBefore)).toMatchObject({ sent: 0, skipped: 'reminders are off' });
+    expect(await run(threeBefore)).toEqual({
+      sent: 0,
+      due: 0,
+      overdue: 0,
+      skipped: 'reminders are off',
+    });
 
     const org = (
       await patch(owner, '/organization', {
@@ -289,14 +294,31 @@ describe('Tenant portal & reminders (e2e)', () => {
     expect(org.reminders).toEqual({ enabled: true, daysBefore: 3, overdueDays: [3, 10] });
     await patch(owner, `/tenants/${x.ann.tenant.id}`, { remindersOff: true });
 
-    expect(await run(threeBefore)).toEqual({ sent: 1 });
-    expect(await run(threeBefore)).toEqual({ sent: 0 }); // same day again: nothing
+    // A dry run counts who would be texted, and sends and records nothing.
+    const outboxBefore = outbox.length;
+    expect(await run(threeBefore, { dryRun: true })).toEqual({
+      sent: 0,
+      due: 1,
+      overdue: 0,
+      dryRun: true,
+    });
+    expect(outbox.length).toBe(outboxBefore);
+    expect(await t.prisma.message.count()).toBe(0);
+    expect((await post(owner, '/tenants/run-reminders', { dryRun: true })).data).toMatchObject({
+      sent: 0,
+      dryRun: true,
+    });
+    expect(await t.prisma.message.count()).toBe(0);
+    await post(owner, '/tenants/run-reminders', { dryRun: 'yes' }, 422);
+
+    expect(await run(threeBefore)).toEqual({ sent: 1, due: 1, overdue: 0 });
+    expect(await run(threeBefore)).toEqual({ sent: 0, due: 0, overdue: 0 }); // same day again: nothing
     const sms = outbox.filter((m) => m.to === '+254711000701').at(-1)!;
     expect(sms.text).toMatch(
       /^Hi Tom, KES 20,000\.00 is due on \d+ \w{3} \d{4}\. Pay to paybill 600111, account T00001\. Home Org$/,
     );
     const overdueDay = formatDateOnly(addDays(parseDateOnly(due), 3));
-    expect(await run(overdueDay)).toEqual({ sent: 1 });
+    expect(await run(overdueDay)).toEqual({ sent: 1, due: 0, overdue: 1 });
     expect(outbox.filter((m) => m.to === '+254711000701').at(-1)!.text).toContain('is overdue');
     expect(outbox.some((m) => m.to === '+254711000702' && m.text.startsWith('Hi Ann'))).toBe(false);
 

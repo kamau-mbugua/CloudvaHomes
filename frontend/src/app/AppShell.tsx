@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { PageBoundary } from '../components/ErrorBoundary';
+import { composeTitle, usePageTitleOverride } from '../lib/pageTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';
 import { AccountMenu } from './AccountMenu';
@@ -64,9 +66,10 @@ export function AppShell() {
     ? (here.group.children.length > 0 ? `${here.group.label} · ${here.entry.hint}` : here.entry.hint)
     : onAccount ? ACCOUNT_ENTRY.hint : 'There is nothing at this address.';
 
+  const pageTitle = usePageTitleOverride();
   useEffect(() => {
-    document.title = `${title} · KodiHub`;
-  }, [title]);
+    document.title = composeTitle(pageTitle, title);
+  }, [pageTitle, title]);
 
   useEffect(() => {
     if (session.user.mustChangePassword && (!onAccount || location.search !== '?tab=password')) {
@@ -209,7 +212,7 @@ export function AppShell() {
         <BillingBanner />
 
         <main className="ms__page">
-          <Outlet />
+          <PageBoundary homePath="/app"><Outlet /></PageBoundary>
         </main>
       </div>
 

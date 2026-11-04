@@ -17,10 +17,10 @@ import { stkView } from './rules';
 import type { PlatformStk } from './types';
 
 /**
- * "Pay now" for the organisation's Hodi bill (`POST /billing/pay`): an M-Pesa prompt to the
- * payer's phone from Hodi's own paybill, then followed (`GET /billing/pay/:id` every 3 s)
+ * "Pay now" for the organisation's KodiHub bill (`POST /billing/pay`): an M-Pesa prompt to the
+ * payer's phone from KodiHub's own paybill, then followed (`GET /billing/pay/:id` every 3 s)
  * until they pay, cancel or let it lapse — the same flow as the tenant portal's "Pay now".
- * Hodi records the payment, pays the oldest invoice first and lifts a suspension; closing
+ * KodiHub records the payment, pays the oldest invoice first and lifts a suspension; closing
  * this stops only the watching.
  *
  * The `Idempotency-Key` stays the same while the input does, so pressing Pay again after

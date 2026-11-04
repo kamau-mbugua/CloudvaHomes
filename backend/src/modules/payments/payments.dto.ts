@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import { IsDateOnly } from '../../common/dates/date-only.js';
 import { PaginationQueryDto } from '../../common/http/pagination.js';
+import { sortValues } from '../../common/http/sort.js';
 import { IsMinorAmount } from '../portfolio/money.dto.js';
 
 const METHODS = [
@@ -24,6 +25,8 @@ const METHODS = [
   'CHEQUE',
   'DEPOSIT',
 ] as const;
+
+export const PAYMENT_SORT_FIELDS = ['receivedAt', 'amount'] as const;
 
 export class ListPaymentsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
@@ -64,6 +67,15 @@ export class ListPaymentsQueryDto extends PaginationQueryDto {
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   reversed?: boolean;
+
+  @ApiPropertyOptional({
+    enum: sortValues(PAYMENT_SORT_FIELDS),
+    default: '-receivedAt',
+    description: 'Field to sort by; a leading minus sorts descending',
+  })
+  @IsOptional()
+  @IsIn(sortValues(PAYMENT_SORT_FIELDS))
+  sort?: string;
 }
 
 class AllocationDto {

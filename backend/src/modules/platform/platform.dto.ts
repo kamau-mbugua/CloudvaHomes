@@ -170,7 +170,7 @@ export class PlatformSettingsDto {
   @ValidateIf((_, v) => v !== null)
   @IsUUID()
   defaultPlanId?: string | null;
-  @ApiPropertyOptional({ nullable: true, description: 'Hodi’s paybill' })
+  @ApiPropertyOptional({ nullable: true, description: 'KodiHub’s paybill' })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @Matches(/^\d{5,7}$/, { message: 'paybill must be 5–7 digits' })
@@ -255,6 +255,18 @@ export class PlatformSettingsDto {
   @IsString()
   @MaxLength(500)
   maintenanceMessage?: string | null;
+
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: 5000,
+    description: 'Monthly rental income tax rate for the MRI report, basis points (750 = 7.5%)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(5000)
+  mriRateBps?: number;
 
   // ── System Document Instructions for PDFs (Invoices & Receipts) ──
   @ApiPropertyOptional({

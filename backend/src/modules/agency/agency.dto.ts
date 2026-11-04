@@ -98,6 +98,16 @@ export class CreateAgreementDto {
   @IsBoolean()
   holdDeposits?: boolean;
 
+  @ApiPropertyOptional({
+    enum: ['LANDLORD', 'AGENCY'],
+    nullable: true,
+    description:
+      'Who keeps late fees on these properties. Null/absent = not decided: no late fees are charged on them.',
+  })
+  @IsOptional()
+  @IsIn(['LANDLORD', 'AGENCY'])
+  lateFeeRecipient?: 'LANDLORD' | 'AGENCY' | null;
+
   @IsDateOnly()
   startDate!: string;
 
@@ -153,6 +163,15 @@ export class UpdateAgreementDto {
   @IsOptional()
   @IsBoolean()
   holdDeposits?: boolean;
+  @ApiPropertyOptional({
+    enum: ['LANDLORD', 'AGENCY'],
+    nullable: true,
+    description:
+      'Who keeps late fees on these properties. Null/absent = not decided: no late fees are charged on them.',
+  })
+  @IsOptional()
+  @IsIn(['LANDLORD', 'AGENCY'])
+  lateFeeRecipient?: 'LANDLORD' | 'AGENCY' | null;
 }
 
 export class LedgerQueryDto extends PaginationQueryDto {

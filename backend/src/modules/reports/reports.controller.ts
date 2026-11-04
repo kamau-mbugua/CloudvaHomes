@@ -32,6 +32,22 @@ class DashboardQueryDto {
   propertyId?: string;
 }
 
+class RentalIncomeTaxQueryDto {
+  @IsPeriod({ optional: true })
+  @IsOptional()
+  period?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  landlordId?: string;
+
+  @ApiPropertyOptional({ enum: ['json', 'csv'] })
+  @IsOptional()
+  @IsIn(['json', 'csv'])
+  format?: 'json' | 'csv';
+}
+
 class PnlQueryDto extends FormatDto {
   @IsPeriod({ optional: true })
   @IsOptional()
@@ -66,6 +82,22 @@ export class ReportsController {
     });
     return q.format === 'csv'
       ? sendCsv(res, `profit-and-loss-${r.from}-to-${r.to}.csv`, this.reports.pnlCsv(r))
+      : ok(r);
+  }
+
+  /** Monthly rental income tax (MRI) estimate: residential rent received (phase 13). */
+  @Get('rental-income-tax')
+  @RequirePermission('reports:view')
+  async rentalIncomeTax(
+    @Query() q: RentalIncomeTaxQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.reports.rentalIncomeTax({
+      period: q.period ?? periodOf(todayInNairobi()),
+      landlordId: q.landlordId,
+    });
+    return q.format === 'csv'
+      ? sendCsv(res, `rental-income-tax-${r.period}.csv`, this.reports.rentalIncomeTaxCsv(r))
       : ok(r);
   }
 

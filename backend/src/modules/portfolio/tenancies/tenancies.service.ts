@@ -15,6 +15,8 @@ import { orgContext } from '../../auth/decorators.js';
 import { UploadsService } from '../../files/uploads.service.js';
 import { formatKesMinor, NotificationsService } from '../../notifications/notifications.service.js';
 import { readOrgDocumentInstructions } from '../../../common/pdf/pdf.js';
+// Pure date helpers only — no billing module dependency.
+import { addDays, todayInNairobi } from '../../billing/billing-math.js';
 import { tenancyScope } from '../property-scope.js';
 import { mapTenantConflict, TenantsService } from '../tenants/tenants.service.js';
 import { CURRENT, lockUnit, UnitsService } from '../units/units.service.js';
@@ -33,6 +35,11 @@ const INCLUDE = {
   unit: {
     select: { id: true, number: true, property: { select: { id: true, code: true, name: true } } },
   },
+  rentChanges: {
+    where: { appliedAt: null },
+    orderBy: { effectivePeriod: 'asc' },
+    select: { id: true, effectivePeriod: true, newRent: true, note: true, createdAt: true },
+  },
 } satisfies Prisma.TenancyInclude;
 
 type TenancyRow = Prisma.TenancyGetPayload<{ include: typeof INCLUDE }>;
@@ -50,6 +57,9 @@ function toTenancy(t: TenancyRow) {
     billingDay: t.billingDay,
     startDate: formatDateOnly(t.startDate),
     endDate: formatDateOnlyOrNull(t.endDate),
+    leaseEndDate: formatDateOnlyOrNull(t.leaseEndDate),
+    /** Scheduled rent changes not applied yet, earliest first (phase 13). */
+    rentChanges: t.rentChanges,
     noticeGivenAt: t.noticeGivenAt,
     depositHeld: t.depositHeld,
     moveOutReason: t.moveOutReason,
@@ -73,6 +83,7 @@ function snapshot(t: TenancyRow) {
     billingDay: t.billingDay,
     startDate: formatDateOnly(t.startDate),
     endDate: formatDateOnlyOrNull(t.endDate),
+    leaseEndDate: formatDateOnlyOrNull(t.leaseEndDate),
     depositHeld: t.depositHeld,
     moveOutReason: t.moveOutReason,
   };
@@ -130,6 +141,12 @@ export class TenanciesService {
         q.propertyId ? { unit: { propertyId: q.propertyId } } : {},
         q.unitId ? { unitId: q.unitId } : {},
         q.tenantId ? { tenantId: q.tenantId } : {},
+        q.expiring
+          ? {
+              status: { in: ['ACTIVE', 'NOTICE'] },
+              leaseEndDate: { lte: addDays(parseDateOnly(todayInNairobi()), q.expiring) },
+            }
+          : {},
         term
           ? {
               OR: [
@@ -215,6 +232,7 @@ export class TenanciesService {
             rentAmount: dto.rentAmount !== undefined ? BigInt(dto.rentAmount) : unit.rentAmount,
             billingDay: dto.billingDay ?? defaultBillingDay(start),
             startDate: start,
+            leaseEndDate: dto.leaseEndDate ? leaseEnd(dto.leaseEndDate, start) : null,
             depositHeld: BigInt(dto.depositHeld ?? 0),
           },
           include: INCLUDE,
@@ -392,9 +410,19 @@ export class TenanciesService {
   }
 
   async update(id: string, dto: UpdateTenancyDto) {
-    return this.transition(id, ['ACTIVE', 'NOTICE'], 'tenancy.update', () => ({
+    return this.transition(id, ['ACTIVE', 'NOTICE'], 'tenancy.update', (t) => ({
       ...(dto.rentAmount !== undefined ? { rentAmount: BigInt(dto.rentAmount) } : {}),
       ...(dto.billingDay !== undefined ? { billingDay: dto.billingDay } : {}),
+      ...(dto.leaseEndDate !== undefined
+        ? { leaseEndDate: dto.leaseEndDate ? leaseEnd(dto.leaseEndDate, t.startDate) : null }
+        : {}),
+    }));
+  }
+
+  /** Renewal: a later lease end (rent changes are scheduled separately, by the caller). */
+  async setLeaseEnd(id: string, leaseEndDate: string) {
+    return this.transition(id, ['ACTIVE', 'NOTICE'], 'tenancy.renew', (t) => ({
+      leaseEndDate: leaseEnd(leaseEndDate, t.startDate),
     }));
   }
 
@@ -537,7 +565,8 @@ export class TenanciesService {
         billingDay: t.billingDay,
         depositHeld: t.depositHeld,
         startDate: formatDateOnly(t.startDate),
-        endDate: formatDateOnlyOrNull(t.endDate),
+        // The PDF's "Expiry / End": the move-out date if known, else the lease end (phase 13).
+        endDate: formatDateOnlyOrNull(t.endDate ?? t.leaseEndDate),
         unit: {
           id: t.unit.id,
           number: t.unit.number,
@@ -612,6 +641,14 @@ export class TenanciesService {
     if (!t.leaseUploadId) throw AppError.notFound('Signed lease document');
     return this.uploads.content(t.leaseUploadId);
   }
+}
+
+function leaseEnd(value: string, start: Date): Date {
+  const end = parseDateOnly(value);
+  if (end <= start) {
+    throw AppError.fieldInvalid('leaseEndDate', 'The lease must end after the move-in date');
+  }
+  return end;
 }
 
 function assertNotBefore(end: Date, start: Date) {

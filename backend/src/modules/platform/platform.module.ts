@@ -16,7 +16,7 @@ import {
   PublicLandingController,
 } from './platform.controller.js';
 
-/** Hodi billing organisations (phase 8) and platform admin suite (phase 11). */
+/** KodiHub billing organisations (phase 8) and platform admin suite (phase 11). */
 @Module({
   imports: [MpesaModule],
   controllers: [
@@ -38,7 +38,7 @@ import {
 export class PlatformModule implements OnModuleInit {
   constructor(private readonly moduleRef: ModuleRef) {}
 
-  /** The simulator calls back in-process; chain Hodi's own STK requests after the rent ones. */
+  /** The simulator calls back in-process; chain KodiHub's own STK requests after the rent ones. */
   onModuleInit() {
     const client = this.moduleRef.get(DarajaClient, { strict: false });
     if (!(client instanceof SimulatedDarajaClient)) return;

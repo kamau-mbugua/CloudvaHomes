@@ -419,7 +419,7 @@ export function CsvImportSheet<T>({
                       const outcome = rowOutcomes[row.rowNumber];
                       return (
                         <tr key={row.rowNumber}>
-                          <td className="num">{row.rowNumber}</td>
+                          <td className="code">{row.rowNumber}</td>
                           {previewColumns.map((col) => (
                             <td key={col.key} className={col.numeric ? 'num' : undefined}>
                               {row.cells[col.key] || <span className="ad__muted">—</span>}

@@ -51,6 +51,8 @@ export interface Agreement {
   remittanceDay: number;
   deductExpenses: boolean;
   holdDeposits: boolean;
+  /** Who keeps late fees on these properties; null = not set, so no late fees (phase 13). */
+  lateFeeRecipient: LateFeeRecipient | null;
   /** YYYY-MM-DD. */
   startDate: string;
   endDate: string | null;
@@ -208,3 +210,5 @@ export interface OwnerLandlord {
   occupancy?: OccupancyReport;
   arrears?: OwnerStatement['arrears'];
 }
+
+export type LateFeeRecipient = 'LANDLORD' | 'AGENCY';

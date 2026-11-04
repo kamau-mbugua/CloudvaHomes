@@ -22,7 +22,7 @@ import { HodiInvoicesTable } from '../platform/ui';
 import { AdminInvoiceActions, VoidHodiInvoiceSheet } from './sheets';
 
 /**
- * Admin → Invoices (`/admin/invoices`): Hodi's invoices to every organisation, filtered by
+ * Admin → Invoices (`/admin/invoices`): KodiHub's invoices to every organisation, filtered by
  * status and month (in the address), each with its PDF and Void. "Run a month" bills a
  * finished month by hand (`POST /platform/invoices/run`); it is idempotent, so running a
  * month twice never bills an organisation twice.

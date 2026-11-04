@@ -25,7 +25,14 @@ export class MessagesService {
   ) {}
 
   /** Returns the message, or null when this automatic reminder was already sent today. */
-  async sms(p: { orgId: string; tenantId: string; kind: MessageKind; to: string; text: string }) {
+  async sms(p: {
+    orgId: string;
+    tenantId: string;
+    kind: MessageKind;
+    to: string;
+    text: string;
+    broadcastId?: string;
+  }) {
     let row;
     try {
       row = await this.db.message.create({
@@ -38,6 +45,7 @@ export class MessagesService {
           text: p.text,
           status: 'SENT',
           day: parseDateOnly(todayInNairobi()),
+          broadcastId: p.broadcastId ?? null,
           createdById: currentContext()?.userId ?? null,
         },
       });

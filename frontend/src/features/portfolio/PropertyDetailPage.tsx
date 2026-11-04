@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
@@ -70,6 +71,7 @@ export function PropertyDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
+  useDocumentTitle(property.data?.name);
   if (property.isPending) return <CardSkeleton count={3} />;
   if (property.isError) {
     return (
@@ -93,7 +95,7 @@ export function PropertyDetailPage() {
         <div>
           <h1>
             {p.name}
-            <span className="ad__badge ad__badge--off num">{p.code}</span>
+            <span className="ad__badge ad__badge--off code">{p.code}</span>
             {p.status === 'INACTIVE' ? <Badge table={RECORD_STATUS} value={p.status} /> : null}
           </h1>
           <p>
@@ -157,7 +159,7 @@ export function PropertyDetailPage() {
         <section className="fm__section">
           <h2>Details</h2>
           <dl className="pf__facts">
-            <Fact label="Code"><span className="num">{p.code}</span></Fact>
+            <Fact label="Code"><span className="code">{p.code}</span></Fact>
             <Fact label="Floors">{p.floors != null ? String(p.floors) : null}</Fact>
             <Fact label="Location">{p.location}</Fact>
             <Fact label="County">{p.county}</Fact>

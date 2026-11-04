@@ -37,7 +37,7 @@ class PlanBillingScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               CurvedHeroCard(
-                label: 'Owed to Hodi',
+                label: 'Owed to KodiHub',
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -97,7 +97,7 @@ class PlanBillingScreen extends ConsumerWidget {
                     FilledButton(
                       style: KodiHubButtonStyles.money(height: 48),
                       onPressed: () =>
-                          showPayHodi(context, ref, b, session?.user.phone),
+                          showPayKodiHub(context, ref, b, session?.user.phone),
                       child: const Text('Pay now'),
                     ),
                   ],
@@ -131,7 +131,7 @@ class PlanBillingScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 12),
               SectionCard(
-                title: 'Hodi invoices',
+                title: 'KodiHub invoices',
                 children: [
                   AsyncBody(
                     value: invoices,

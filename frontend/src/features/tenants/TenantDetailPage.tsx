@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
@@ -20,6 +21,8 @@ import { MoveInSheet } from './MoveInSheet';
 import { TenancyTable } from './TenancyTable';
 import { TenantPortalPanel } from './TenantPortalPanel';
 import { TenantSheet } from './TenantSheet';
+import { tenantPrimaryAction } from './actionLayout';
+import { MoreMenu } from '../../components/MoreMenu';
 
 /**
  * One tenant: balance, credit and deposit tiles (with "Record payment" and "Apply
@@ -74,6 +77,7 @@ export function TenantDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
+  useDocumentTitle(tenant.data ? personName(tenant.data) : undefined);
   if (tenant.isPending) return <CardSkeleton count={3} />;
   if (tenant.isError) {
     return (
@@ -96,11 +100,19 @@ export function TenantDetailPage() {
       <div className="pf__head">
         <div>
           <h1>{personName(t)} <Badge table={TENANT_STATUS} value={t.status} /></h1>
-          <p><span className="num">{t.code}</span> · <span className="num">{t.phone}</span>{t.email ? ` · ${t.email}` : ''}</p>
+          <p><span className="code">{t.code}</span> · <span className="num">{t.phone}</span>{t.email ? ` · ${t.email}` : ''}</p>
         </div>
         <div className="sl__headactions">
-          {canMoveIn ? <button type="button" className="nx-btn nx-btn--primary" onClick={() => setMovingIn(true)}>Move in</button> : null}
+          {/* A current tenant's main action is "Record payment" (money tiles below); moving
+              them into a second unit is rare, so it waits in More. */}
+          {canMoveIn && tenantPrimaryAction(t.status) === 'moveIn'
+            ? <button type="button" className="nx-btn nx-btn--primary" onClick={() => setMovingIn(true)}>Move in</button>
+            : null}
           {canUpdate ? <button type="button" className="nx-btn" onClick={() => setEditing(true)}>Edit</button> : null}
+          {canMoveIn && tenantPrimaryAction(t.status) === 'recordPayment' ? (
+            <MoreMenu size="md" ariaLabel={`More actions for ${personName(t)}`}
+              items={[{ label: 'Move into another unit', onSelect: () => setMovingIn(true) }]} />
+          ) : null}
           {canDelete && t.status === 'PROSPECT' ? (
             <ConfirmDelete size="md" what={personName(t)}
               consequence="Only someone who has never had a tenancy can be deleted. This cannot be undone."

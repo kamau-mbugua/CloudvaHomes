@@ -13,7 +13,7 @@ export interface BankCredit {
 
 /**
  * One bank's push notifications (design §5.2). Each bank gets its own implementation once
- * the owner picks banks and gets partner access; `HODI_JSON` is Hodi's own signed format for
+ * the owner picks banks and gets partner access; `HODI_JSON` is KodiHub's own signed format for
  * banks or middleware that can post to us. A statement API would add `fetchStatement(range)`.
  */
 export interface BankAdapter {
@@ -41,14 +41,14 @@ const header = (h: Record<string, string | string[] | undefined>, name: string) 
 };
 
 /**
- * Hodi's JSON webhook:
+ * KodiHub's JSON webhook:
  *   X-Hodi-Timestamp: <unix seconds>
  *   X-Hodi-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<raw body>" with the secret>
  *   { "transactions": [{ "id", "amount": "1500.00", "reference", "payerName"?, "payerAccount"?, "occurredAt": ISO }] }
  */
 export const hodiJsonAdapter: BankAdapter = {
   code: 'HODI_JSON',
-  name: 'Hodi signed JSON',
+  name: 'KodiHub signed JSON',
 
   verify(headers, rawBody, secret, now = new Date()) {
     const ts = header(headers, 'x-hodi-timestamp');

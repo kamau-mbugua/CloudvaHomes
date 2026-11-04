@@ -1,7 +1,7 @@
 /** Pure agency-accounting rules (BigInt cents). */
 
 export interface WaterfallLine {
-  kind: 'RENT' | 'CHARGE' | 'MOVE_IN' | 'ADJUSTMENT';
+  kind: 'RENT' | 'CHARGE' | 'MOVE_IN' | 'ADJUSTMENT' | 'LATE_FEE';
   refundable: boolean;
   amount: bigint;
   position: number;

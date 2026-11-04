@@ -15,7 +15,7 @@ import { authErrorMessage } from './authErrors';
 /**
  * `/invite/:token` — join an organisation from an emailed or texted link.
  *
- * Someone new to Hodi chooses a password here; someone who already has an account just
+ * Someone new to KodiHub chooses a password here; someone who already has an account just
  * accepts. Either way they come out signed in to the organisation that invited them.
  */
 export function AcceptInvitationPage() {

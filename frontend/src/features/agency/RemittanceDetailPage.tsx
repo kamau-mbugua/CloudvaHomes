@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import type { FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -91,6 +92,7 @@ export function RemittanceDetailPage() {
     onError: (error) => toast.failed(agencyErrorMessage(error)),
   });
 
+  useDocumentTitle(remittance.data?.number);
   if (remittance.isPending) return <CardSkeleton count={3} />;
   if (remittance.isError) {
     return (
@@ -114,7 +116,7 @@ export function RemittanceDetailPage() {
 
       <div className="pf__head">
         <div>
-          <h1><span className="num">{r.number}</span> <Badge table={REMITTANCE_STATUS} value={r.status} /></h1>
+          <h1><span className="code">{r.number}</span> <Badge table={REMITTANCE_STATUS} value={r.status} /></h1>
           <p>
             <Link to={`/app/landlords/${r.landlord.id}`}>{r.landlord.name}</Link> · {formatPeriod(r.period, true)} ·{' '}
             {REMITTANCE_DIRECTION[r.direction] ?? r.direction}

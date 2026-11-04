@@ -53,7 +53,7 @@ export interface B2cAccepted {
   originatorConversationId: string;
 }
 
-/** What Hodi needs from Daraja. Real and simulated implementations; tests supply their own. */
+/** What KodiHub needs from Daraja. Real and simulated implementations; tests supply their own. */
 export abstract class DarajaClient {
   /**
    * Business-to-customer payment (phase 10: landlord remittances). Accepted only means queued:

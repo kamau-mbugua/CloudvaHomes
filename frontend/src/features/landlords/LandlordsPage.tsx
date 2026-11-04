@@ -97,7 +97,7 @@ export function LandlordsPage() {
                 <tr key={landlord.id}>
                   <td>
                     <Link className="ad__link" to={`/app/landlords/${landlord.id}`}><strong>{landlord.name}</strong></Link>
-                    <span className="ad__sub"><span className="num">{landlord.code}</span> · {LANDLORD_KIND[landlord.kind] ?? landlord.kind}</span>
+                    <span className="ad__sub"><span className="code">{landlord.code}</span> · {LANDLORD_KIND[landlord.kind] ?? landlord.kind}</span>
                   </td>
                   <td>
                     <span className="num">{landlord.phone}</span>

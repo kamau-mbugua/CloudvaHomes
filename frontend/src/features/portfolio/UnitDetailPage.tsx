@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
@@ -60,6 +61,7 @@ export function UnitDetailPage() {
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
+  useDocumentTitle(unit.data ? `Unit ${unit.data.number}` : undefined);
   if (unit.isPending) return <CardSkeleton count={3} />;
   if (unit.isError) {
     return (
@@ -181,7 +183,7 @@ export function UnitDetailPage() {
                       : personName(current.tenant)}
                   </strong>{' '}
                   <Badge table={TENANCY_STATUS} value={current.status} />
-                  <span className="ad__sub num">{current.tenant.code} · {current.tenant.phone}</span>
+                  <span className="ad__sub code">{current.tenant.code} · {current.tenant.phone}</span>
                   <span className="ad__sub">
                     Since {formatDay(current.startDate)}
                     {current.status === 'NOTICE' && current.endDate ? ` · leaving ${formatDay(current.endDate)}` : ''}

@@ -47,7 +47,7 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * Hodi invoices as a table. The organisation's page passes `actions` (PDF, details); the
+ * KodiHub invoices as a table. The organisation's page passes `actions` (PDF, details); the
  * admin area adds the organisation column and its void action.
  */
 export function HodiInvoicesTable({ rows, showOrg = false, actions }: {
@@ -75,7 +75,7 @@ export function HodiInvoicesTable({ rows, showOrg = false, actions }: {
           {rows.map((inv) => (
             <tr key={inv.id} className={inv.status === 'VOID' ? 'bl__void' : undefined}>
               <td>
-                <strong className="num">{inv.number}</strong>
+                <strong className="code">{inv.number}</strong>
                 <span className="ad__sub">Issued {formatDayish(inv.issueDate)}</span>
               </td>
               {showOrg ? (

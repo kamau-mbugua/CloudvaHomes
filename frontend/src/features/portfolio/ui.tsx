@@ -70,7 +70,9 @@ export function Fact({ label, children, wide = false }: { label: string; childre
   return (
     <div className={wide ? 'pf__wide' : undefined}>
       <dt>{label}</dt>
-      <dd>{empty ? <span className="nx-muted">—</span> : children}</dd>
+      <dd title={typeof children === 'string' || typeof children === 'number' ? String(children) : undefined}>
+        {empty ? <span className="nx-muted">—</span> : children}
+      </dd>
     </div>
   );
 }

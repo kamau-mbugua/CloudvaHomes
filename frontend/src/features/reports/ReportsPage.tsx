@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { useCan } from '../../lib/auth/useAuth';
+import { useCan, useSession } from '../../lib/auth/useAuth';
 import { formatDay, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { currentPeriod, formatPeriod, isPeriod } from '../../lib/periods';
@@ -11,11 +11,11 @@ import { TableSkeleton } from '../../components/Loading';
 import { categoryText } from '../expenses/labels';
 import { MonthPicker, PropertySelect } from '../billing/ui';
 import { SignedAmount } from '../payments/ui';
-import { usePropertyOptions } from '../portfolio/api';
+import { useLandlordOptions, usePropertyOptions } from '../portfolio/api';
 import { useListFilters } from '../portfolio/hooks';
 import { personName } from '../portfolio/labels';
 import { downloadReportCsv, reportsErrorMessage, useReport } from './api';
-import { checkMonthRange, daysBetween, formatRate, pnlCategories, readReportTab } from './rules';
+import { checkMonthRange, daysBetween, formatRate, mriNotice, mriRate, pnlCategories, readReportTab } from './rules';
 import type { ReportTab } from './rules';
 import type { ArrearsReport, OccupancyReport, PnlReport } from './types';
 
@@ -30,6 +30,7 @@ const TABS: { id: ReportTab; label: string }[] = [
   { id: 'pnl', label: 'Profit & loss' },
   { id: 'arrears', label: 'Arrears' },
   { id: 'occupancy', label: 'Occupancy' },
+  { id: 'mri', label: 'Rental income tax' },
 ];
 
 export function ReportsPage() {
@@ -51,7 +52,8 @@ export function ReportsPage() {
       </div>
       {tab === 'pnl' ? <PnlTab propertyId={propertyId} />
         : tab === 'arrears' ? <ArrearsTab propertyId={propertyId} />
-          : <OccupancyTab propertyId={propertyId} />}
+          : tab === 'mri' ? <MriTab />
+            : <OccupancyTab propertyId={propertyId} />}
     </div>
   );
 }
@@ -161,7 +163,7 @@ function PnlTables({ report }: { report: PnlReport }) {
           <tbody>
             {report.rows.map((r) => (
               <tr key={r.property.id}>
-                <th scope="row">{r.property.name}<span className="ad__sub num">{r.property.code}</span></th>
+                <th scope="row">{r.property.name}<span className="ad__sub code">{r.property.code}</span></th>
                 <td className="num">{formatKES(r.invoiced.rent)}</td>
                 <td className="num">{formatKES(r.invoiced.charges)}</td>
                 <td className="num">{formatKES(r.invoiced.moveIn)}</td>
@@ -275,7 +277,7 @@ function ArrearsTab({ propertyId }: { propertyId: string }) {
                       {canTenants
                         ? <Link className="ad__link" to={`/app/tenants/${r.tenant.id}`}><strong>{personName(r.tenant)}</strong></Link>
                         : <strong>{personName(r.tenant)}</strong>}
-                      <span className="ad__sub"><span className="num">{r.tenant.code}</span>{r.units.length ? ` · ${r.units.join(', ')}` : ''}</span>
+                      <span className="ad__sub"><span className="code">{r.tenant.code}</span>{r.units.length ? ` · ${r.units.join(', ')}` : ''}</span>
                       {r.oldestDueDate && r.total > r.current ? <span className="ad__sub">Oldest unpaid due {formatDay(r.oldestDueDate)}</span> : null}
                     </th>
                     {BUCKETS.map((b) => (
@@ -387,7 +389,7 @@ function OccupancyTable({ report }: { report: OccupancyReport }) {
         <tbody>
           {report.rows.map((r) => (
             <tr key={r.property.id}>
-              <th scope="row">{r.property.name}<span className="ad__sub num">{r.property.code}</span></th>
+              <th scope="row">{r.property.name}<span className="ad__sub code">{r.property.code}</span></th>
               <td className="num">{r.units}</td>
               <td className="num">{r.occupied}</td>
               <td className="num">{r.notice}</td>
@@ -410,5 +412,78 @@ function OccupancyTable({ report }: { report: OccupancyReport }) {
         </tfoot>
       </table>
     </div>
+  );
+}
+
+/**
+ * Rental income tax (MRI, phase 13): residential rent received in a month, per landlord in
+ * an agency, with the tax at the platform rate. Labelled as an estimate.
+ */
+function MriTab() {
+  const filters = useListFilters();
+  const month = isPeriod(filters.get('month')) ? filters.get('month') : currentPeriod();
+  const landlordId = filters.get('landlordId');
+  const params = { period: month, landlordId: landlordId || undefined };
+  const report = useReport('mri', params);
+  const session = useSession();
+  const isAgency = session.activeOrganization?.kind === 'AGENCY';
+  const landlords = useLandlordOptions(isAgency);
+  const data = report.data;
+
+  return (
+    <section>
+      <div className="ad__filters">
+        <MonthPicker value={month} max={currentPeriod()} onChange={(p) => filters.setFilter({ month: p })} />
+        {isAgency ? (
+          <select className="ad__select" aria-label="Landlord" value={landlordId} onChange={(e) => filters.setFilter({ landlordId: e.target.value })}>
+            <option value="">All landlords</option>
+            {(landlords.data?.data ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+          </select>
+        ) : null}
+        <DownloadCsv onDownload={() => downloadReportCsv('mri', params, { from: month, to: month })} />
+      </div>
+      {data ? <p className="lf__notice lf__notice--warn rp__note">{mriNotice(data.rateBps, data.dueDate)}</p> : null}
+      <ReportState query={report} empty={false}>
+        {data && data.rows.length === 0 ? (
+          <div className="ad__tablewrap"><EmptyState title="No residential rent received" detail={`Nothing was received for residential properties in ${formatPeriod(month)}.`} /></div>
+        ) : data ? (
+          <div className="ad__tablewrap">
+            <table className="ad__table rp__table">
+              <thead>
+                <tr>
+                  <th scope="col">{isAgency ? 'Landlord' : 'Organisation'}</th>
+                  <th scope="col">KRA PIN</th>
+                  <th scope="col" className="num">Rent received</th>
+                  <th scope="col" className="num">Rate</th>
+                  <th scope="col" className="num">Tax due</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((r) => (
+                  <tr key={r.landlordId ?? 'org'}>
+                    <th scope="row">{r.landlordName}</th>
+                    <td>{r.kraPin ? <span className="code">{r.kraPin}</span> : <span className="ad__muted">Not recorded</span>}</td>
+                    <td className="num">{formatKES(r.grossRentReceived)}</td>
+                    <td className="num">{mriRate(r.rateBps)}</td>
+                    <td className="num"><strong>{formatKES(r.taxDue)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+              {data.rows.length > 1 ? (
+                <tfoot>
+                  <tr>
+                    <th scope="row">Total</th>
+                    <td />
+                    <td className="num">{formatKES(data.totals.grossRentReceived)}</td>
+                    <td />
+                    <td className="num"><strong>{formatKES(data.totals.taxDue)}</strong></td>
+                  </tr>
+                </tfoot>
+              ) : null}
+            </table>
+          </div>
+        ) : null}
+      </ReportState>
+    </section>
   );
 }

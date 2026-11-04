@@ -206,7 +206,7 @@ export function MaintenancePage() {
               {rows.map((r) => (
                 <tr key={r.id} className="pf__row" onClick={() => setSelected(r)}>
                   <td>
-                    <strong className="num">{r.number}</strong>
+                    <strong className="code">{r.number}</strong>
                     <span className="ad__sub">
                       {r.title} · {formatDay(r.createdAt.slice(0, 10))}
                     </span>

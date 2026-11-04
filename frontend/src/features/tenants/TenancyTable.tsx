@@ -5,6 +5,8 @@ import { TENANCY_STATUS, personName } from '../portfolio/labels';
 import type { Tenancy } from '../portfolio/types';
 import { Badge } from '../portfolio/ui';
 import { TenancyActions } from './TenancyActions';
+import { todayInNairobi } from '../../lib/dates';
+import { leaseEndText, pendingChangeText } from './leaseTerms';
 
 /**
  * Tenancies as a table — the tenancies list, a unit's history and a tenant's history.
@@ -39,7 +41,7 @@ export function TenancyTable({
               {showTenant ? (
                 <td>
                   <Link className="ad__link" to={`/app/tenants/${t.tenant.id}`}><strong>{personName(t.tenant)}</strong></Link>
-                  <span className="ad__sub num">{t.tenant.code} · {t.tenant.phone}</span>
+                  <span className="ad__sub code">{t.tenant.code} · {t.tenant.phone}</span>
                 </td>
               ) : null}
               {showUnit ? (
@@ -51,11 +53,15 @@ export function TenancyTable({
               <td className="num">
                 {formatKES(t.rentAmount)}
                 <span className="ad__sub">Due day {t.billingDay}</span>
+                {(t.rentChanges ?? []).slice(0, 1).map((c) => (
+                  <span key={c.id} className="ad__sub ls__change">{pendingChangeText(c)}</span>
+                ))}
               </td>
               <td>
                 {formatDay(t.startDate)} – {t.endDate ? formatDay(t.endDate) : 'now'}
                 {t.status === 'NOTICE' && t.endDate ? <span className="ad__sub">Leaving {formatDay(t.endDate)}</span> : null}
                 {t.status === 'ENDED' && t.moveOutReason ? <span className="ad__sub">{t.moveOutReason}</span> : null}
+                {t.status !== 'ENDED' ? <LeaseEnd leaseEndDate={t.leaseEndDate} /> : null}
               </td>
               <td className="num">{formatKES(t.depositHeld)}</td>
               <td><Badge table={TENANCY_STATUS} value={t.status} /></td>
@@ -66,4 +72,10 @@ export function TenancyTable({
       </table>
     </div>
   );
+}
+
+function LeaseEnd({ leaseEndDate }: { leaseEndDate?: string | null }) {
+  if (!leaseEndDate) return null;
+  const end = leaseEndText(leaseEndDate, todayInNairobi());
+  return <span className={`ad__sub${end.soon ? ' ls__soon' : ''}`}>{end.text}</span>;
 }

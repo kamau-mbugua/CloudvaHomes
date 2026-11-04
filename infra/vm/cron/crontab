@@ -1,7 +1,9 @@
 # m   h  dom mon dow  command  (TZ=Africa/Nairobi; same schedule as infra/gcp/README.md)
 *     *  *   *   *    /usr/local/bin/job.sh stk-sweep
 */5   *  *   *   *    /usr/local/bin/job.sh payout-sweep
+*     *  *   *   *    /usr/local/bin/job.sh broadcast-sweep
 30    0  *   *   *    /usr/local/bin/job.sh invoice-run
+45    0  *   *   *    /usr/local/bin/job.sh late-fees
 15    1  *   *   *    /usr/local/bin/job.sh recurring-expenses
 20    1  *   *   *    /usr/local/bin/job.sh upload-cleanup
 25    1  *   *   *    /usr/local/bin/job.sh remittance-drafts

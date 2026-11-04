@@ -67,6 +67,14 @@ export class CreatePropertyDto {
   @Max(200)
   floors?: number;
 
+  @ApiPropertyOptional({
+    enum: ['RESIDENTIAL', 'COMMERCIAL'],
+    description: 'Residential rent counts for rental income tax (MRI); commercial does not',
+  })
+  @IsOptional()
+  @IsIn(['RESIDENTIAL', 'COMMERCIAL'])
+  use?: 'RESIDENTIAL' | 'COMMERCIAL';
+
   @ApiPropertyOptional({ description: 'Required for agencies; not allowed for landlords' })
   @IsOptional()
   @IsUUID()
@@ -106,6 +114,14 @@ export class UpdatePropertyDto {
   @Min(1)
   @Max(200)
   floors?: number;
+
+  @ApiPropertyOptional({
+    enum: ['RESIDENTIAL', 'COMMERCIAL'],
+    description: 'Residential rent counts for rental income tax (MRI); commercial does not',
+  })
+  @IsOptional()
+  @IsIn(['RESIDENTIAL', 'COMMERCIAL'])
+  use?: 'RESIDENTIAL' | 'COMMERCIAL';
 
   @ApiPropertyOptional({ description: 'Agencies only: move the property to another landlord' })
   @IsOptional()

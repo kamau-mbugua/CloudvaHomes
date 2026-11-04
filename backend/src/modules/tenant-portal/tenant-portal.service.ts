@@ -1,3 +1,5 @@
+import type { InspectionKind } from '../../generated/prisma/client.js';
+import { InspectionsService } from '../portfolio/inspections/inspections.service.js';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   currentContext,
@@ -41,6 +43,7 @@ export class TenantPortalService {
     private readonly tenantAccounts: TenantAccountsService,
     private readonly maintenance: MaintenanceService,
     private readonly uploads: UploadsService,
+    private readonly inspectionRecords: InspectionsService,
   ) {}
 
   async mine() {
@@ -106,6 +109,11 @@ export class TenantPortalService {
               property: { select: { id: true, code: true, name: true } },
             },
           },
+          rentChanges: {
+            where: { appliedAt: null },
+            orderBy: { effectivePeriod: 'asc' },
+            select: { effectivePeriod: true, newRent: true },
+          },
         },
       });
       const current = tenancies.filter((x) => x.status !== 'ENDED');
@@ -137,6 +145,8 @@ export class TenantPortalService {
           status: x.status,
           startDate: formatDateOnly(x.startDate),
           endDate: formatDateOnlyOrNull(x.endDate),
+          leaseEndDate: formatDateOnlyOrNull(x.leaseEndDate),
+          upcomingRentChanges: x.rentChanges,
           hasSignedLease: Boolean(x.leaseUploadId),
         })),
         openInvoices: await this.payments.openInvoices(tenantId),
@@ -269,6 +279,43 @@ export class TenantPortalService {
       const req = await this.maintenance.get(requestId);
       if (req.tenant?.id !== tenantId) throw AppError.notFound('Maintenance request');
       return this.maintenance.photoContent(requestId, uploadId);
+    });
+  }
+
+  /** The tenant's own tenancy, or 404. */
+  private async ownTenancy(tenantId: string, tenancyId: string) {
+    const t = await this.db.tenancy.findFirst({
+      where: { id: tenancyId, tenantId },
+      select: { id: true },
+    });
+    if (!t) throw AppError.notFound('Tenancy');
+  }
+
+  inspections(tenantId: string, tenancyId: string) {
+    return this.as(tenantId, async () => {
+      await this.ownTenancy(tenantId, tenancyId);
+      return this.inspectionRecords.list(tenancyId);
+    });
+  }
+
+  acknowledgeInspection(tenantId: string, tenancyId: string, kind: InspectionKind) {
+    return this.as(tenantId, async () => {
+      await this.ownTenancy(tenantId, tenancyId);
+      return this.inspectionRecords.acknowledge(tenancyId, kind);
+    });
+  }
+
+  inspectionPhoto(tenantId: string, tenancyId: string, kind: InspectionKind, uploadId: string) {
+    return this.as(tenantId, async () => {
+      await this.ownTenancy(tenantId, tenancyId);
+      return this.inspectionRecords.photo(tenancyId, kind, uploadId);
+    });
+  }
+
+  inspectionPdf(tenantId: string, tenancyId: string, kind: InspectionKind) {
+    return this.as(tenantId, async () => {
+      await this.ownTenancy(tenantId, tenancyId);
+      return this.inspectionRecords.pdf(tenancyId, kind);
     });
   }
 

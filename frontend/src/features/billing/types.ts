@@ -8,9 +8,9 @@ import type { CodedRef, RecordStatus, TenantRef } from '../portfolio/types';
 
 export type ChargeKind = 'FIXED' | 'VARIABLE' | 'METERED';
 export type MoveInKind = 'DEPOSIT' | 'FEE';
-export type InvoiceKind = 'MONTHLY' | 'MOVE_IN' | 'ADHOC';
+export type InvoiceKind = 'MONTHLY' | 'MOVE_IN' | 'ADHOC' | 'LATE_FEE';
 export type InvoiceStatus = 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'VOID';
-export type LineKind = 'RENT' | 'CHARGE' | 'MOVE_IN' | 'ADJUSTMENT';
+export type LineKind = 'RENT' | 'CHARGE' | 'MOVE_IN' | 'ADJUSTMENT' | 'LATE_FEE';
 
 export interface ChargeType {
   id: string;
@@ -93,6 +93,10 @@ export interface Invoice {
   unit: { id: string; number: string };
   property: CodedRef;
   tenancyId: string;
+  /** LATE_FEE: the overdue invoice it is for (phase 13). */
+  lateFeeForId?: string | null;
+  /** LATE_FEE in an agency: who keeps it. */
+  lateFeeKeptBy?: 'LANDLORD' | 'AGENCY' | null;
   voidedAt: string | null;
   voidReason: string | null;
   createdAt: string;

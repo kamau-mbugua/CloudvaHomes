@@ -48,7 +48,7 @@ export interface BillingSummary {
   trialEndsAt: string | null;
   noSuspendUntil: string | null;
   billingRef: string;
-  /** What is owed on Hodi invoices now. */
+  /** What is owed on KodiHub invoices now. */
   balance: number;
   /** Paid in advance, used by the next invoice. */
   credit: number;
@@ -256,10 +256,12 @@ export interface LandingPageContent {
 }
 
 export interface PlatformSettings {
+  /** Phase 13: MRI rate, basis points. */
+  mriRateBps?: number;
   dueDays: number;
   suspendAfterDays: number;
   defaultPlanId: string | null;
-  /** Hodi's paybill shortcode. */
+  /** KodiHub's paybill shortcode. */
   paybill: string | null;
   daraja: {
     configured: boolean;

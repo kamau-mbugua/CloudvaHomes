@@ -25,7 +25,7 @@ import { AdminInvoiceActions, RecordHodiPaymentSheet, VoidHodiInvoiceSheet } fro
  * Admin → an organisation (`/admin/organizations/:id`): its status, billing account, owner
  * and let units; its billing terms — plan, its own price and minimum (empty = the plan's,
  * shown "Custom" when set), trial end and "no suspension until"; close or reopen; and its
- * Hodi invoices (void) and payments ("Record payment"). Every change is audited.
+ * KodiHub invoices (void) and payments ("Record payment"). Every change is audited.
  */
 export function OrganizationDetailPage() {
   const { organizationId = '' } = useParams();

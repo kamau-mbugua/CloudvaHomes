@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { inOpenMenu } from './menu';
 
 /**
  * Escape to close, Tab trapped inside, focus moved in on open and returned on close.
@@ -35,6 +36,9 @@ export function useDialogBehaviour(
       const panel = resolve();
 
       if (!panel) return;
+
+      // A "More" menu opened inside this dialog handles its own Escape and Tab.
+      if (inOpenMenu(event.target)) return;
 
       // When a sheet or confirmation is opened inside a route drawer, only the topmost
       // dialog in the DOM handles Escape and Tab.

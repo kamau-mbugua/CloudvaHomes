@@ -23,6 +23,7 @@ import { RECORD_STATUS } from '../portfolio/labels';
 import { Badge } from '../portfolio/ui';
 import { keys, settingsErrorMessage } from './api';
 import { checkReminders, describeReminders, overdueDaysText, readReminders } from './reminders';
+import { LateFeesPanel } from './LateFeesPanel';
 
 /**
  * Settings → Organisation: the active organisation's name and contacts, billing
@@ -61,7 +62,7 @@ export function OrganizationPage() {
   return <OrganizationForm key={query.data.id} org={query.data} />;
 }
 
-type OrgTab = 'details' | 'payments' | 'billing' | 'reminders';
+type OrgTab = 'details' | 'payments' | 'billing' | 'reminders' | 'late-fees';
 
 function OrganizationForm({ org }: { org: Organization }) {
   const queryClient = useQueryClient();
@@ -70,7 +71,7 @@ function OrganizationForm({ org }: { org: Organization }) {
   const [params, setParams] = useSearchParams();
   const rawTab = params.get('tab');
   const tab: OrgTab =
-    rawTab === 'payments' || rawTab === 'billing' || rawTab === 'reminders' ? rawTab : 'details';
+    rawTab === 'payments' || rawTab === 'billing' || rawTab === 'reminders' || rawTab === 'late-fees' ? rawTab : 'details';
 
   const setTab = (next: OrgTab) => {
     setParams(
@@ -240,6 +241,15 @@ function OrganizationForm({ org }: { org: Organization }) {
               >
                 Rent reminders
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'late-fees'}
+                className="pf__tab"
+                onClick={() => setTab('late-fees')}
+              >
+                Late fees
+              </button>
             </div>
           </div>
 
@@ -345,9 +355,11 @@ function OrganizationForm({ org }: { org: Organization }) {
             </section>
           ) : null}
 
+          {tab === 'late-fees' ? <LateFeesPanel org={org} canEdit={canEdit} /> : null}
+
           {showServerError ? <p className="ad__error" role="alert">{settingsErrorMessage(save.error)}</p> : null}
 
-          {tab !== 'payments' ? (
+          {tab !== 'payments' && tab !== 'late-fees' ? (
             canEdit ? (
               <div className="pg-actions">
                 <button type="button" className="nx-btn" disabled={!dirty || save.isPending}

@@ -15,11 +15,14 @@ import {
 } from 'class-validator';
 import { IsDateOnly } from '../../../common/dates/date-only.js';
 import { PaginationQueryDto } from '../../../common/http/pagination.js';
+import { sortValues } from '../../../common/http/sort.js';
 import { IsMinorAmount } from '../../portfolio/money.dto.js';
 import { IsPeriod } from '../billing.dto.js';
 
 const STATUSES = ['ISSUED', 'PARTIALLY_PAID', 'PAID', 'VOID'] as const;
-const KINDS = ['MONTHLY', 'MOVE_IN', 'ADHOC'] as const;
+const KINDS = ['MONTHLY', 'MOVE_IN', 'ADHOC', 'LATE_FEE'] as const;
+
+export const INVOICE_SORT_FIELDS = ['issueDate', 'dueDate', 'total', 'number'] as const;
 
 export class ListInvoicesQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: 'Invoice number, tenant name/code/phone, or unit number' })
@@ -67,6 +70,15 @@ export class ListInvoicesQueryDto extends PaginationQueryDto {
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   overdue?: boolean;
+
+  @ApiPropertyOptional({
+    enum: sortValues(INVOICE_SORT_FIELDS),
+    default: '-issueDate',
+    description: 'Field to sort by; a leading minus sorts descending',
+  })
+  @IsOptional()
+  @IsIn(sortValues(INVOICE_SORT_FIELDS))
+  sort?: string;
 }
 
 class AdhocLineDto {

@@ -10,11 +10,14 @@ import {
   MinLength,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../../common/http/pagination.js';
+import { sortValues } from '../../../common/http/sort.js';
 import { KRA_PIN } from '../../organizations/organizations.dto.js';
 
 const STATUSES = ['CURRENT', 'PAST', 'PROSPECT'] as const;
 export type TenantStatus = (typeof STATUSES)[number];
 const KRA_OR_EMPTY = new RegExp(`^$|${KRA_PIN.source}`);
+
+export const TENANT_SORT_FIELDS = ['name', 'balance'] as const;
 
 export class ListTenantsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: 'Search name, phone, code or email' })
@@ -35,6 +38,15 @@ export class ListTenantsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   propertyId?: string;
+
+  @ApiPropertyOptional({
+    enum: sortValues(TENANT_SORT_FIELDS),
+    default: 'name',
+    description: 'Field to sort by; a leading minus sorts descending. balance = owing less credit',
+  })
+  @IsOptional()
+  @IsIn(sortValues(TENANT_SORT_FIELDS))
+  sort?: string;
 }
 
 export class CreateTenantDto {

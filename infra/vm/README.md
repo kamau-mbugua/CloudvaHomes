@@ -132,5 +132,15 @@ To move to real domains:
 ## Not set up yet
 
 - **SMS and e-mail are in log mode.** Codes and invitations appear in the API logs.
+- **Push notifications (phase 13).** The mobile app is `co.ke.kodihub` (`co.ke.kodihub.dev` for
+  the dev flavour). To turn push on:
+  1. Create a Firebase project and add the Android apps `co.ke.kodihub` and `co.ke.kodihub.dev`
+     and the iOS app `co.ke.kodihub`; run `flutterfire configure` in `mobile/` (adds
+     `google-services.json` / `GoogleService-Info.plist`).
+  2. iOS: upload an APNs key in Firebase, and add the *Push Notifications* capability to the
+     Runner target in Xcode (needs the Apple team's provisioning).
+  3. On each server, in `/opt/hodi/envs/api.env`: `FCM_PROVIDER=fcm`, `FCM_PROJECT_ID=<project>`,
+     `FCM_SERVICE_ACCOUNT_JSON=<service-account JSON, one line>`; then redeploy.
+  Without these the app runs normally with no push (it checks at start-up).
 - **Protect the branches.** A push to `dev` or `main` deploys as soon as CI passes. Add a
   required reviewer to the `production` environment, and/or require pull requests on `main`.

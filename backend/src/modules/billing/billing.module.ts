@@ -13,6 +13,7 @@ import { InvoiceIssuer } from './invoices/invoice-issuer.js';
 import { InvoiceRunService } from './invoices/invoice-run.service.js';
 import { InvoicesController } from './invoices/invoices.controller.js';
 import { InvoicesService } from './invoices/invoices.service.js';
+import { LateFeesService } from './late-fees/late-fees.service.js';
 import { MetersController } from './meters/meters.controller.js';
 import { MetersService } from './meters/meters.service.js';
 
@@ -30,10 +31,11 @@ import { MetersService } from './meters/meters.service.js';
     InvoiceIssuer,
     InvoicesService,
     InvoiceRunService,
+    LateFeesService,
     JobTokenVerifier,
     JobsGuard,
   ],
-  exports: [InvoicesService, InvoiceIssuer],
+  exports: [InvoicesService, InvoiceIssuer, LateFeesService],
 })
 export class BillingModule implements OnModuleInit {
   constructor(

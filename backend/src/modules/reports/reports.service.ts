@@ -1,14 +1,25 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { currentContext } from '../../common/context/request-context.js';
-import { formatDateOnly } from '../../common/dates/date-only.js';
+import { formatDateOnly, parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { toCsv } from '../../common/http/csv.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { orgContext } from '../auth/decorators.js';
-import { periodOf, todayInNairobi } from '../billing/billing-math.js';
-import { allowedPropertyIds, propertyScope } from '../portfolio/property-scope.js';
-import { ageBucket, BUCKETS, type Bucket, lastMonths, monthBounds, ratio } from './report-math.js';
+import { addDays, isDueForRun, periodOf, todayInNairobi } from '../billing/billing-math.js';
+import { allowedPropertyIds, propertyScope, tenancyScope } from '../portfolio/property-scope.js';
+import {
+  ageBucket,
+  BUCKETS,
+  type Bucket,
+  buildActionItems,
+  lastMonths,
+  monthBounds,
+  mriDue,
+  mriDueDate,
+  ratio,
+  rentShare,
+} from './report-math.js';
 
 const CATEGORIES = [
   'REPAIRS',
@@ -161,6 +172,7 @@ export class ReportsService {
         ? await this.db.inboundTransaction.count({ where: { matchStatus: 'UNMATCHED' } })
         : null,
       topOverdue: overdue,
+      actions: await this.actionItems(today, propertyId, arrears),
       trend: months.map((m) => ({
         period: m,
         invoiced: invoiced.get(m) ?? 0n,
@@ -169,6 +181,75 @@ export class ReportsService {
       })),
       asOf: today,
     };
+  }
+
+  /**
+   * The "Needs attention" list. Always about today, whatever month the dashboard shows.
+   * Counts the caller may not see (reconciliation, remittances) are left at zero, so they
+   * drop out of the list.
+   */
+  private async actionItems(
+    today: string,
+    propertyId: string | undefined,
+    arrears: Awaited<ReturnType<ReportsService['arrears']>>,
+  ) {
+    const perms = currentContext()?.permissions;
+    const period = periodOf(today);
+    const day = parseDateOnly(today);
+    const inProperty = propertyId ? { unit: { propertyId } } : {};
+    // Same rule as the invoice run (InvoiceRunService.candidates), so the two always agree.
+    const unbilled = await this.db.tenancy.findMany({
+      where: {
+        AND: [
+          tenancyScope(),
+          inProperty,
+          { status: { in: ['ACTIVE', 'NOTICE'] } },
+          { startDate: { lte: day } },
+          { invoices: { none: { period, kind: 'MONTHLY', status: { not: 'VOID' } } } },
+        ],
+      },
+      select: { status: true, billingDay: true, startDate: true, endDate: true },
+    });
+    const noticeEnding = await this.db.tenancy.count({
+      where: {
+        AND: [
+          tenancyScope(),
+          inProperty,
+          { status: 'NOTICE' },
+          { endDate: { lte: addDays(day, 14) } },
+        ],
+      },
+    });
+    const unmatched = perms?.has('reconciliation:view')
+      ? await this.db.inboundTransaction.count({ where: { matchStatus: 'UNMATCHED' } })
+      : 0;
+    // Remittances belong to landlords, not properties: only for callers who see everything.
+    const drafts =
+      perms?.has('remittances:view') && !allowedPropertyIds() && !propertyId
+        ? await this.db.remittance.count({ where: { status: 'DRAFT' } })
+        : 0;
+    const leasesExpiring = perms?.has('tenancies:view')
+      ? await this.db.tenancy.count({
+          where: {
+            AND: [
+              tenancyScope(),
+              inProperty,
+              { status: { in: ['ACTIVE', 'NOTICE'] } },
+              { leaseEndDate: { lte: addDays(day, 60) } },
+            ],
+          },
+        })
+      : 0;
+    const overdue = arrears.rows.filter((r) => r.total - r.current > 0n);
+    return buildActionItems({
+      uninvoicedTenancies: unbilled.filter((t) => isDueForRun(t, today)).length,
+      unmatchedInbound: unmatched,
+      overdueTenants: overdue.length,
+      overdueAmount: arrears.totals.total - arrears.totals.current,
+      noticeEndingIn14Days: noticeEnding,
+      draftRemittances: drafts,
+      leasesExpiringIn60Days: leasesExpiring,
+    });
   }
 
   // ── Profit and loss per property ──
@@ -425,6 +506,99 @@ export class ReportsService {
       ...r.rows.map((x) => line(`${x.property.name} (${x.property.code})`, x)),
       line('Total', r.totals),
     ]);
+  }
+
+  // ── Rental income tax (MRI, phase 13) ──
+
+  /**
+   * Residential rent received in `period` (cash basis: payment allocations by the day the
+   * money came in, reversals netted), per landlord in an agency or for the organisation
+   * itself, with the tax at the platform rate. An estimate — the page says so.
+   */
+  async rentalIncomeTax(q: { period: string; landlordId?: string }) {
+    const { start, end } = monthBounds(q.period);
+    const org = await this.db.organization.findUniqueOrThrow({
+      where: { id: this.org() },
+      select: { name: true, kraPin: true },
+    });
+    const settings = await this.db.platformSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1 },
+      update: {},
+      select: { mriRateBps: true },
+    });
+    const byLandlord = q.landlordId
+      ? Prisma.sql`AND pr."landlordId" = ${q.landlordId}::uuid`
+      : Prisma.empty;
+    const rows = await this.db.$queryRaw<
+      { landlordId: string | null; total: bigint; allocated: bigint; rent: bigint }[]
+    >`
+      SELECT pr."landlordId" AS "landlordId", i."total" AS total,
+             sum(a."amount")::bigint AS allocated,
+             (SELECT coalesce(sum(l."amount"), 0) FROM "invoice_lines" l
+               WHERE l."invoiceId" = i."id" AND l."kind" = 'RENT' AND NOT l."refundable")::bigint AS rent
+        FROM "payment_allocations" a
+        JOIN "payments" p ON p."id" = a."paymentId"
+        JOIN "invoices" i ON i."id" = a."invoiceId"
+        JOIN "properties" pr ON pr."id" = i."propertyId"
+       WHERE a."orgId" = ${this.org()}::uuid
+         AND p."receivedAt" BETWEEN ${start} AND ${end}
+         AND pr."use" = 'RESIDENTIAL' ${byLandlord} ${this.scope(Prisma.sql`i."propertyId"`)}
+       GROUP BY i."id", i."total", pr."landlordId"`;
+    const gross = new Map<string | null, bigint>();
+    for (const r of rows) {
+      const share = rentShare(BigInt(r.allocated), BigInt(r.rent), BigInt(r.total));
+      gross.set(r.landlordId, (gross.get(r.landlordId) ?? 0n) + share);
+    }
+    const ids = [...gross.keys()].filter((k): k is string => k !== null);
+    const landlords = ids.length
+      ? await this.db.landlord.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, name: true, kraPin: true },
+        })
+      : [];
+    const named = new Map(landlords.map((l) => [l.id, l]));
+    const rateBps = settings.mriRateBps;
+    const dueDate = mriDueDate(q.period);
+    const out = [...gross.entries()]
+      .map(([landlordId, grossRentReceived]) => {
+        const l = landlordId ? named.get(landlordId) : null;
+        return {
+          landlordId,
+          landlordName: l?.name ?? org.name,
+          kraPin: landlordId ? (l?.kraPin ?? null) : org.kraPin,
+          grossRentReceived,
+          rateBps,
+          taxDue: mriDue(grossRentReceived, rateBps),
+          dueDate,
+        };
+      })
+      .sort((a, b) => a.landlordName.localeCompare(b.landlordName));
+    const totalGross = out.reduce((s, r) => s + r.grossRentReceived, 0n);
+    return {
+      period: q.period,
+      rateBps,
+      dueDate,
+      rows: out,
+      totals: {
+        grossRentReceived: totalGross,
+        taxDue: out.reduce((s, r) => s + r.taxDue, 0n),
+      },
+    };
+  }
+
+  rentalIncomeTaxCsv(r: Awaited<ReturnType<ReportsService['rentalIncomeTax']>>): string {
+    return toCsv(
+      ['Landlord', 'KRA PIN', 'Gross rent received (KES)', 'Rate', 'Tax due (KES)', 'Due date'],
+      r.rows.map((x) => [
+        x.landlordName,
+        x.kraPin ?? '',
+        x.grossRentReceived, // bigint cents → exact KES (toCsv)
+        `${(x.rateBps / 100).toFixed(2)}%`,
+        x.taxDue,
+        x.dueDate,
+      ]),
+    );
   }
 
   arrearsCsv(r: Awaited<ReturnType<ReportsService['arrears']>>): string {

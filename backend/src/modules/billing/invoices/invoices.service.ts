@@ -3,6 +3,7 @@ import { formatDateOnly, parseDateOnly } from '../../../common/dates/date-only.j
 import { AppError } from '../../../common/errors/app-error.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
 import { paginated } from '../../../common/http/response.js';
+import { readSort } from '../../../common/http/sort.js';
 import {
   readOrgDocumentInstructions,
   readSystemDocumentInstructions,
@@ -65,6 +66,14 @@ const TENANCY_FOR_ISSUE = {
   unit: { select: { propertyId: true } },
 } as const;
 
+/** `?sort=` → Prisma order; the invoice number breaks ties so paging is stable. */
+function invoiceOrder(sort: string | undefined): Prisma.InvoiceOrderByWithRelationInput[] {
+  const { field, desc } = readSort(sort, '-issueDate');
+  const dir = desc ? 'desc' : 'asc';
+  const key = field as 'issueDate' | 'dueDate' | 'total' | 'number';
+  return key === 'number' ? [{ number: dir }] : [{ [key]: dir }, { number: dir }];
+}
+
 export function toInvoice(i: ListRow, today = todayInNairobi()) {
   const balance = balanceOf(i);
   const due = formatDateOnly(i.dueDate);
@@ -85,6 +94,8 @@ export function toInvoice(i: ListRow, today = todayInNairobi()) {
     unit: { id: i.tenancy.unit.id, number: i.tenancy.unit.number },
     property: i.tenancy.unit.property,
     tenancyId: i.tenancyId,
+    lateFeeForId: i.lateFeeForId,
+    lateFeeKeptBy: i.lateFeeKeptBy,
     voidedAt: i.voidedAt,
     voidReason: i.voidReason,
     createdAt: i.createdAt,
@@ -155,7 +166,7 @@ export class InvoicesService {
       this.db.invoice.findMany({
         where,
         include: LIST_INCLUDE,
-        orderBy: [{ issueDate: 'desc' }, { number: 'desc' }],
+        orderBy: invoiceOrder(q.sort),
         ...toSkipTake(q),
       }),
       this.db.invoice.count({ where }),
@@ -347,6 +358,29 @@ export class InvoicesService {
         );
       }
       for (const hook of this.voidedHooks) await hook(tx, { id, orgId: before.orgId });
+      // Its late fee goes too, if nothing has been paid or credited on it (D3).
+      const fees = await tx.invoice.findMany({
+        where: { lateFeeForId: id, status: { not: 'VOID' }, amountPaid: 0n, creditedAmount: 0n },
+        select: { id: true, number: true, total: true, status: true },
+      });
+      for (const fee of fees) {
+        const reason = `Late fee for ${before.number}, which was voided`;
+        await tx.invoice.update({
+          where: { id: fee.id },
+          data: { status: 'VOID', voidedAt: new Date(), voidReason: reason },
+        });
+        for (const hook of this.voidedHooks) await hook(tx, { id: fee.id, orgId: before.orgId });
+        await this.audit.record(
+          {
+            action: 'invoice.void',
+            entity: 'invoice',
+            entityId: fee.id,
+            before: { number: fee.number, status: fee.status, total: fee.total },
+            after: { status: 'VOID', reason },
+          },
+          tx,
+        );
+      }
       await tx.meterReading.updateMany({ where: { invoiceId: id }, data: { invoiceId: null } });
       await tx.chargeEntry.updateMany({ where: { invoiceId: id }, data: { invoiceId: null } });
       await this.audit.record(

@@ -183,6 +183,14 @@ export function AgreementSheet({ agreement, landlordId, onClose }: { agreement?:
           </Field>
         </div>
 
+        <Field id="ag-latefee" label="Late fees go to">
+          <select id="ag-latefee" value={draft.lateFeeRecipient} onChange={(e) => set('lateFeeRecipient', e.target.value as AgreementDraft['lateFeeRecipient'])}>
+            <option value="">Not set — no late fees on these properties</option>
+            <option value="LANDLORD">The landlord (paid out with the rent)</option>
+            <option value="AGENCY">The agency (kept as agency income)</option>
+          </select>
+        </Field>
+
         <div className="fld">
           <label className="fld__check">
             <input type="checkbox" checked={draft.deductExpenses} onChange={(e) => set('deductExpenses', e.target.checked)} />

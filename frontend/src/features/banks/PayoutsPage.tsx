@@ -19,7 +19,7 @@ import type { PayoutAccount } from './types';
 
 /**
  * Settings → Payouts (`/app/settings/payouts`): the organisation's M-Pesa B2C account,
- * which sends landlords' remittances by M-Pesa from Hodi. Everyone with `settings:view`
+ * which sends landlords' remittances by M-Pesa from KodiHub. Everyone with `settings:view`
  * sees whether it is set up and its callback addresses; `settings:update` sets it up,
  * changes it and removes it, each with a verification code. Keys and the security
  * credential are write-only.

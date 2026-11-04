@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { SortHeader, type TableSort } from '../../components/SortHeader';
 import { formatDay } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { formatPeriod, isPeriod, shiftPeriod } from '../../lib/periods';
@@ -82,22 +83,25 @@ export function InvoicesTable({
   rows,
   showTenant = true,
   showUnit = true,
+  sort,
 }: {
   rows: Invoice[];
   showTenant?: boolean;
   showUnit?: boolean;
+  /** Present on the invoices list: the Invoice (issue date), Due and Total headers sort it. */
+  sort?: TableSort;
 }) {
   return (
     <div className="ad__tablewrap">
       <table className="ad__table bl__invoices">
         <thead>
           <tr>
-            <th>Invoice</th>
+            {sort ? <SortHeader field="issueDate" label="Invoice" sort={sort} /> : <th>Invoice</th>}
             {showTenant ? <th>Tenant</th> : null}
             {showUnit ? <th>Unit</th> : null}
             <th>Period</th>
-            <th>Due</th>
-            <th className="num">Total</th>
+            {sort ? <SortHeader field="dueDate" label="Due" sort={sort} /> : <th>Due</th>}
+            {sort ? <SortHeader field="total" label="Total" sort={sort} className="num" /> : <th className="num">Total</th>}
             <th className="num">Balance</th>
             <th>Status</th>
           </tr>
@@ -106,13 +110,13 @@ export function InvoicesTable({
           {rows.map((inv) => (
             <tr key={inv.id} className={inv.status === 'VOID' ? 'bl__void' : undefined}>
               <td>
-                <Link className="ad__link" to={`/app/invoices/${inv.id}`}><strong className="num">{inv.number}</strong></Link>
+                <Link className="ad__link" to={`/app/invoices/${inv.id}`}><strong className="code">{inv.number}</strong></Link>
                 <span className="ad__sub">{INVOICE_KIND[inv.kind]?.label ?? inv.kind} · {formatDay(inv.issueDate)}</span>
               </td>
               {showTenant ? (
                 <td>
                   {personName(inv.tenant)}
-                  <span className="ad__sub num">{inv.tenant.code} · {inv.tenant.phone}</span>
+                  <span className="ad__sub code">{inv.tenant.code} · {inv.tenant.phone}</span>
                 </td>
               ) : null}
               {showUnit ? (

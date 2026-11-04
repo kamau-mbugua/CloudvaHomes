@@ -17,6 +17,7 @@ const KIND_LABEL = {
   MONTHLY: 'Monthly invoice',
   MOVE_IN: 'Move-in invoice',
   ADHOC: 'Invoice',
+  LATE_FEE: 'Late fee',
 } as const;
 const METHOD_LABEL = {
   MPESA_PAYBILL: 'M-Pesa',

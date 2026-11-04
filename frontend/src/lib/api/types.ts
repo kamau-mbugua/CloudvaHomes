@@ -1,5 +1,5 @@
 /**
- * Response envelopes from the Hodi API (docs/specs §4 — the backend's `ok()` and
+ * Response envelopes from the KodiHub API (docs/specs §4 — the backend's `ok()` and
  * `paginated()` helpers). Generated endpoint types (openapi-typescript) arrive with the
  * first real endpoints in phase 1; these are the shapes every endpoint shares.
  */

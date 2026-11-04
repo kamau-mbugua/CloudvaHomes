@@ -39,6 +39,8 @@ import {
 import { PaySheet } from './PaySheet';
 import { accountSearch, currentTenancies, homeText, howToPaySteps, ordinal, payNumber, shortcodeLabel } from './rules';
 import type { HowToPay, PortalOpenInvoice, PortalTenancy, TenantOverview } from './types';
+import { pendingChangeText } from '../tenants/leaseTerms';
+import { TenantInspections } from './TenantInspections';
 
 /**
  * The tenant portal (`/tenant`): a tenant sees their own account and pays by M-Pesa.
@@ -174,6 +176,10 @@ export function TenantHomePage() {
               <div><dt>Rent a month</dt><dd className="num">{formatKES(t.rentAmount)}</dd></div>
               <div><dt>Billed on</dt><dd>the {ordinal(t.billingDay)} of each month</dd></div>
               <div><dt>Since</dt><dd>{formatDay(t.startDate)}</dd></div>
+              {t.leaseEndDate ? <div><dt>Lease ends</dt><dd>{formatDay(t.leaseEndDate)}</dd></div> : null}
+              {(t.upcomingRentChanges ?? []).map((c) => (
+                <div key={c.effectivePeriod}><dt>Rent change</dt><dd>{pendingChangeText(c)}</dd></div>
+              ))}
               {t.status === 'NOTICE' ? <div><dt>Leaving</dt><dd>{t.endDate ? formatDay(t.endDate) : 'On notice'}</dd></div> : null}
             </dl>
             <div className="pf__actions" style={{ marginTop: '0.5rem' }}>
@@ -192,6 +198,7 @@ export function TenantHomePage() {
                 />
               ) : null}
             </div>
+            <TenantInspections tenantId={account.tenantId} tenancyId={t.id} />
           </div>
         ))}
         <dl className="tp__facts">
@@ -223,7 +230,7 @@ function OpenInvoiceRow({ invoice, search }: { invoice: PortalOpenInvoice; searc
       <Link className="tp__row" to={`/tenant/invoices/${encodeURIComponent(invoice.id)}${search}`}>
         <span className="tp__rowmain">
           <strong>{formatPeriod(invoice.period, true)}</strong>
-          <span className="ad__sub"><span className="num">{invoice.number}</span> · {invoice.overdue ? <span className="tp__overdue">overdue</span> : 'due'} {formatDay(invoice.dueDate)}</span>
+          <span className="ad__sub"><span className="code">{invoice.number}</span> · {invoice.overdue ? <span className="tp__overdue">overdue</span> : 'due'} {formatDay(invoice.dueDate)}</span>
         </span>
         <strong className={`num ${invoice.overdue ? 'ad__owed' : ''}`}>{formatKES(invoice.balance)}</strong>
       </Link>
@@ -349,7 +356,7 @@ function InvoiceRow({ invoice, search }: { invoice: Invoice; search: string }) {
       <Link className={`tp__row ${invoice.status === 'VOID' ? 'bl__void' : ''}`} to={`/tenant/invoices/${encodeURIComponent(invoice.id)}${search}`}>
         <span className="tp__rowmain">
           <strong>{formatPeriod(invoice.period, true)} <InvoiceBadges invoice={invoice} /></strong>
-          <span className="ad__sub"><span className="num">{invoice.number}</span> · due {formatDay(invoice.dueDate)}</span>
+          <span className="ad__sub"><span className="code">{invoice.number}</span> · due {formatDay(invoice.dueDate)}</span>
         </span>
         <span className="tp__rowamt">
           <strong className="num">{formatKES(invoice.total)}</strong>
@@ -380,7 +387,7 @@ export function TenantInvoicePage() {
       {back}
       <div>
         <h1 className="ow__h1">{formatPeriod(inv.period, true)} <InvoiceBadges invoice={inv} /></h1>
-        <p className="ad__muted"><span className="num">{inv.number}</span> · {inv.unit.number}, {inv.property.name}</p>
+        <p className="ad__muted"><span className="code">{inv.number}</span> · {inv.unit.number}, {inv.property.name}</p>
       </div>
 
       <section className={`tp__due ${inv.balance > 0 && inv.status !== 'VOID' ? 'tp__due--owed' : ''}`}>
@@ -426,7 +433,7 @@ export function TenantInvoicePage() {
               <li key={`${p.id}-${p.amount}`} className="ag__line">
                 <span className="ag__linelabel">
                   {formatDay(p.receivedAt)} · {labelFor(PAYMENT_METHOD, p.method).label}
-                  <span className="ad__sub num">{p.number}{p.amount < 0 ? ' · reversal' : ''}</span>
+                  <span className="ad__sub code">{p.number}{p.amount < 0 ? ' · reversal' : ''}</span>
                 </span>
                 <SignedAmount minor={p.amount} />
               </li>
@@ -441,7 +448,7 @@ export function TenantInvoicePage() {
           <ul className="ag__lines">
             {inv.creditNotes.map((cn) => (
               <li key={cn.id} className="ag__line">
-                <span className="ag__linelabel">{cn.reason}<span className="ad__sub num">{cn.number}</span></span>
+                <span className="ag__linelabel">{cn.reason}<span className="ad__sub code">{cn.number}</span></span>
                 <span className="num">−{formatKES(cn.amount)}</span>
               </li>
             ))}
@@ -571,7 +578,7 @@ function PaymentRow({ payment: p, tenantId, orgName }: { payment: Payment; tenan
       <span className="tp__rowmain">
         <strong>{formatDay(p.receivedAt)} <PaymentBadges payment={p} /></strong>
         <span className="ad__sub">{methodText(p)}{p.reference ? <> · <span className="num">{p.reference}</span></> : null}</span>
-        <span className="ad__sub num">{p.number}</span>
+        <span className="ad__sub code">{p.number}</span>
       </span>
       <span className="tp__rowamt">
         <strong><SignedAmount minor={p.amount} struck={Boolean(p.reversedBy)} /></strong>
@@ -646,7 +653,7 @@ export function TenantRequestsPage() {
                   </span>
                 </strong>
                 <span className="ad__sub">
-                  <span className="num">{r.number}</span> · {r.property.name} Unit {r.unit.number} ·{' '}
+                  <span className="code">{r.number}</span> · {r.property.name} Unit {r.unit.number} ·{' '}
                   {MAINTENANCE_CATEGORIES[r.category] ?? r.category} · {formatDay(r.createdAt.slice(0, 10))}
                 </span>
                 <span className="ad__sub">{r.description}</span>

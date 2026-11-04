@@ -23,12 +23,14 @@ const KIND_TITLE = {
   MONTHLY: 'Invoice',
   MOVE_IN: 'Move-in invoice',
   ADHOC: 'Invoice',
+  LATE_FEE: 'Late fee invoice',
 } as const;
 
 const KIND_SUBTITLE = {
   MONTHLY: 'Monthly Rent & Utilities',
   MOVE_IN: 'Move-In Charges & Deposit',
   ADHOC: 'One-Off / Adjustment Invoice',
+  LATE_FEE: 'Late Payment Fee',
 } as const;
 
 function statusBadgeFor(status: string, overdue?: boolean): StatusBadgeOptions {

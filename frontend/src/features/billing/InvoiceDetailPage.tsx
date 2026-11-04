@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '../../lib/pageTitle';
 import type { FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -55,6 +56,7 @@ export function InvoiceDetailPage() {
     queryFn: () => api.get<DataEnvelope<InvoiceDetail>>(`/invoices/${invoiceId}`).then((r) => r.data),
   });
 
+  useDocumentTitle(invoice.data?.number);
   if (invoice.isPending) return <CardSkeleton count={3} />;
   if (invoice.isError) {
     return (
@@ -83,7 +85,7 @@ export function InvoiceDetailPage() {
 
       <div className="pf__head">
         <div>
-          <h1><span className="num">{inv.number}</span> <InvoiceBadges invoice={inv} /></h1>
+          <h1><span className="code">{inv.number}</span> <InvoiceBadges invoice={inv} /></h1>
           <p>
             {INVOICE_KIND[inv.kind]?.label ?? inv.kind} invoice for {formatPeriod(inv.period, true)} ·{' '}
             {canSeeTenants ? <Link to={`/app/tenants/${inv.tenant.id}`}>{personName(inv.tenant)}</Link> : personName(inv.tenant)} ·{' '}
@@ -149,7 +151,15 @@ export function InvoiceDetailPage() {
             <Fact label="Issued">{formatDay(inv.issueDate)}</Fact>
             <Fact label="Due">{formatDay(inv.dueDate)}</Fact>
             <Fact label="Period">{formatPeriod(inv.period, true)}</Fact>
-            <Fact label="Tenant"><>{personName(inv.tenant)}<span className="ad__sub num">{inv.tenant.code} · {inv.tenant.phone}</span></></Fact>
+            {inv.lateFeeForId ? (
+              <Fact label="Late fee for">
+                <Link className="ad__link" to={`/app/invoices/${inv.lateFeeForId}`}>The overdue rent invoice</Link>
+              </Fact>
+            ) : null}
+            {inv.lateFeeKeptBy ? (
+              <Fact label="Kept by">{inv.lateFeeKeptBy === 'AGENCY' ? 'The agency (not paid out to the landlord)' : 'The landlord (paid out with the rent)'}</Fact>
+            ) : null}
+            <Fact label="Tenant"><>{personName(inv.tenant)}<span className="ad__sub code">{inv.tenant.code} · {inv.tenant.phone}</span></></Fact>
             <Fact label="Unit">{inv.unit.number}, {inv.property.name}</Fact>
             <Fact label="Created">{formatDateTime(inv.createdAt)}</Fact>
           </dl>
@@ -198,7 +208,7 @@ export function InvoiceDetailPage() {
                 <tbody>
                   {inv.creditNotes.map((cn) => (
                     <tr key={cn.id}>
-                      <td><strong className="num">{cn.number}</strong><span className="ad__sub">{formatDateTime(cn.createdAt)}</span></td>
+                      <td><strong className="code">{cn.number}</strong><span className="ad__sub">{formatDateTime(cn.createdAt)}</span></td>
                       <td>{cn.reason}</td>
                       <td>{cn.createdBy?.name ?? '—'}</td>
                       <td className="num">{formatKES(cn.amount)}</td>
@@ -223,8 +233,8 @@ export function InvoiceDetailPage() {
                     <tr key={`${p.id}-${p.amount}`} className={p.amount < 0 ? 'py__reversalrow' : undefined}>
                       <td>
                         {canSeePayments
-                          ? <Link className="ad__link" to={`/app/payments/${p.id}`}><strong className="num">{p.number}</strong></Link>
-                          : <strong className="num">{p.number}</strong>}
+                          ? <Link className="ad__link" to={`/app/payments/${p.id}`}><strong className="code">{p.number}</strong></Link>
+                          : <strong className="code">{p.number}</strong>}
                         {p.amount < 0 ? <span className="ad__sub">Reversal</span> : null}
                       </td>
                       <td>{formatDay(p.receivedAt)}</td>

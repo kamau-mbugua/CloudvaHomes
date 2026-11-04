@@ -15,7 +15,7 @@ val keyProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.qnex.hodi"
+    namespace = "co.ke.kodihub"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -29,8 +29,9 @@ android {
     }
 
     defaultConfig {
-        // Same id as the legacy app so a release can update the existing store listing.
-        applicationId = "com.qnex.hodi"
+        // KodiHub's own id (owner decision 2026-11-04): releases go to a new store listing;
+        // the legacy Hodi app (com.qnex.hodi) is not updated in place.
+        applicationId = "co.ke.kodihub"
         minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -45,11 +46,11 @@ android {
             isDefault = true
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            resValue("string", "app_name", "Hodi Dev")
+            resValue("string", "app_name", "KodiHub Dev")
         }
         create("prod") {
             dimension = "env"
-            resValue("string", "app_name", "Hodi")
+            resValue("string", "app_name", "KodiHub")
         }
     }
 

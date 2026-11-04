@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import { MoreMenu } from '../../components/MoreMenu';
+import { reminderPreview, reminderResult, type ReminderRun } from './reminderRun';
+import { SortHeader, type TableSort } from '../../components/SortHeader';
+import { balanceCell } from './balance';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
@@ -36,6 +40,7 @@ export function TenantsPage() {
   const { q, page } = filters;
   const status = filters.get('status');
   const propertyId = filters.get('propertyId');
+  const sortParam = filters.get('sort');
 
   const canCreate = useCan('tenants:create');
   const canUpdate = useCan('tenants:update');
@@ -50,8 +55,8 @@ export function TenantsPage() {
   const [importingCsv, setImportingCsv] = useState(false);
 
   const list = useQuery({
-    queryKey: [...keys.tenants, { q, status, propertyId, page }],
-    queryFn: () => api.get<PageEnvelope<Tenant>>('/tenants', { page, pageSize: PAGE_SIZE, q, status, propertyId }),
+    queryKey: [...keys.tenants, { q, status, propertyId, sort: sortParam, page }],
+    queryFn: () => api.get<PageEnvelope<Tenant>>('/tenants', { page, pageSize: PAGE_SIZE, q, status, propertyId, sort: sortParam }),
     placeholderData: keepPreviousData,
   });
   const properties = usePropertyOptions(canSeeProperties);
@@ -79,18 +84,21 @@ export function TenantsPage() {
     },
     onError: (error) => toast.failed(tenantMessagingError(error)),
   });
+  const [confirmingReminders, setConfirmingReminders] = useState(false);
+  const reminderPreviewQuery = useQuery({
+    queryKey: ['tenants', 'run-reminders', 'preview'],
+    queryFn: () => api.post<unknown>('/tenants/run-reminders', { dryRun: true }).then((body) => unwrap<ReminderRun>(body)),
+    enabled: confirmingReminders,
+    staleTime: 0,
+    gcTime: 0,
+  });
   const runReminders = useMutation({
-    mutationFn: () =>
-      api
-        .post<unknown>('/tenants/run-reminders', {})
-        .then((body) => unwrap<{ dueSent?: number; overdueSent?: number } | undefined>(body)),
+    mutationFn: () => api.post<unknown>('/tenants/run-reminders', {}).then((body) => unwrap<ReminderRun>(body)),
     onSuccess: async (out) => {
-      const total = (out?.dueSent ?? 0) + (out?.overdueSent ?? 0);
-      toast.saved(
-        total === 0
-          ? 'No due or overdue reminders were needed right now.'
-          : `Sent ${total} rent reminder${total === 1 ? '' : 's'} (${out?.dueSent ?? 0} due soon, ${out?.overdueSent ?? 0} overdue).`,
-      );
+      setConfirmingReminders(false);
+      const result = reminderResult(out);
+      if (result.ok) toast.saved(result.text);
+      else toast.failed(result.text);
       await queryClient.invalidateQueries({ queryKey: messageKeys.messages });
     },
     onError: (error) => toast.failed(tenantMessagingError(error)),
@@ -99,6 +107,12 @@ export function TenantsPage() {
 
   const rows = list.data?.data ?? [];
   const filtered = Boolean(q || status || propertyId);
+  const sort: TableSort = {
+    value: sortParam,
+    fields: TENANT_SORT_FIELDS,
+    fallback: 'name',
+    onChange: (next) => filters.setFilter({ sort: next }),
+  };
 
   return (
     <div className="pg">
@@ -115,27 +129,27 @@ export function TenantsPage() {
             {(properties.data?.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         ) : null}
-        {canUpdate ? (
-          <>
-            <button
-              type="button"
-              className="nx-btn pg-push"
-              disabled={runReminders.isPending}
-              onClick={() => runReminders.mutate()}
-            >
-              {runReminders.isPending ? 'Sending reminders…' : 'Send due reminders'}
-            </button>
-            <button type="button" className="nx-btn" onClick={() => setInvitingAll(true)}>
-              {propertyId ? 'Give portal access to this property’s tenants' : 'Give portal access to all current tenants'}
-            </button>
-          </>
-        ) : null}
-        {canCreate ? (
-          <>
-            <button type="button" className={`nx-btn ${canUpdate ? '' : 'pg-push'}`} onClick={() => setImportingCsv(true)}>Import CSV</button>
+        <div className="pg-push ad__toolbar-actions">
+          <MoreMenu
+            size="md"
+            ariaLabel="More tenant actions"
+            items={[
+              ...(canCreate ? [{ label: 'Import CSV', onSelect: () => setImportingCsv(true) }] : []),
+              ...(canUpdate
+                ? [
+                    { label: 'Send due reminders…', onSelect: () => setConfirmingReminders(true) },
+                    {
+                      label: propertyId ? 'Give portal access to this property’s tenants…' : 'Give portal access to all current tenants…',
+                      onSelect: () => setInvitingAll(true),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+          {canCreate ? (
             <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Add tenant</button>
-          </>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       {list.isError ? <p className="ad__error" role="alert">{portfolioErrorMessage(list.error)}</p> : null}
@@ -156,9 +170,10 @@ export function TenantsPage() {
           <table className="ad__table">
             <thead>
               <tr>
-                <th>Tenant</th>
+                <SortHeader field="name" label="Tenant" sort={sort} />
                 <th>Contact</th>
                 <th>Lives in</th>
+                <SortHeader field="balance" label="Balance" sort={sort} className="num" />
                 <th>Status</th>
                 <th className="ad__rowactions"><span className="nx-sr">Actions</span></th>
               </tr>
@@ -168,7 +183,7 @@ export function TenantsPage() {
                 <tr key={tenant.id}>
                   <td>
                     <Link className="ad__link" to={`/app/tenants/${tenant.id}`}><strong>{personName(tenant)}</strong></Link>
-                    <span className="ad__sub num">{tenant.code}</span>
+                    <span className="ad__sub code">{tenant.code}</span>
                   </td>
                   <td>
                     <span className="num">{tenant.phone}</span>
@@ -182,10 +197,11 @@ export function TenantsPage() {
                       </span>
                     ))}
                   </td>
+                  <td className="num"><BalanceAmount balance={tenant.balance} /></td>
                   <td><Badge table={TENANT_STATUS} value={tenant.status} /></td>
                   <td className="ad__rowactions">
                     <div>
-                      {canMoveIn ? (
+                      {canMoveIn && tenant.status !== 'CURRENT' ? (
                         <button type="button" className="nx-btn nx-btn--sm" onClick={() => setMovingIn(tenant)}>Move in</button>
                       ) : null}
                       {canUpdate ? <button type="button" className="nx-btn nx-btn--sm" onClick={() => setEditing(tenant)}>Edit</button> : null}
@@ -209,6 +225,16 @@ export function TenantsPage() {
       {editing ? <TenantSheet tenant={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /> : null}
       {movingIn ? <MoveInSheet tenant={movingIn} onClose={() => setMovingIn(null)} /> : null}
       {importingCsv ? <TenantsCsvImportSheet onClose={() => setImportingCsv(false)} /> : null}
+      {confirmingReminders ? (
+        <ReminderConfirm
+          preview={reminderPreviewQuery.data}
+          loading={reminderPreviewQuery.isFetching}
+          error={reminderPreviewQuery.isError ? tenantMessagingError(reminderPreviewQuery.error) : null}
+          sending={runReminders.isPending}
+          onSend={() => runReminders.mutate()}
+          onClose={() => setConfirmingReminders(false)}
+        />
+      ) : null}
       {invitingAll ? (
         <Sheet
           title="Give portal access?"
@@ -231,5 +257,55 @@ export function TenantsPage() {
         </Sheet>
       ) : null}
     </div>
+  );
+}
+
+/** What `GET /tenants?sort=` accepts. */
+const TENANT_SORT_FIELDS = ['name', 'balance'] as const;
+
+function BalanceAmount({ balance }: { balance: number | null | undefined }) {
+  const cell = balanceCell(balance);
+  const cls = cell.tone === 'owed' ? 'ad__owed' : cell.tone === 'credit' ? 'tn__credit' : 'ad__muted';
+  return <span className={cls}>{cell.text}</span>;
+}
+
+/** "Send due reminders": shows who would be texted (a dry run) before anything is sent. */
+function ReminderConfirm({
+  preview,
+  loading,
+  error,
+  sending,
+  onSend,
+  onClose,
+}: {
+  preview: ReminderRun | undefined;
+  loading: boolean;
+  error: string | null;
+  sending: boolean;
+  onSend: () => void;
+  onClose: () => void;
+}) {
+  const read = preview ? reminderPreview(preview) : null;
+  return (
+    <Sheet
+      title="Send rent reminders?"
+      busy={sending}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="nx-btn" onClick={onClose} disabled={sending}>Cancel</button>
+          <button type="button" className="nx-btn nx-btn--primary" disabled={sending || loading || !read?.canSend} onClick={onSend}>
+            {sending ? 'Sending…' : 'Send reminders'}
+          </button>
+        </>
+      )}
+    >
+      {error ? <p className="ad__error" role="alert">{error}</p> : null}
+      {loading && !read ? <p className="ad__muted" role="status">Checking who needs a reminder…</p> : null}
+      {read ? <p role="status">{read.text}</p> : null}
+      <p className="ad__muted">
+        Uses your organisation’s reminder settings. Tenants who opted out, and anyone already texted today, are skipped.
+      </p>
+    </Sheet>
   );
 }

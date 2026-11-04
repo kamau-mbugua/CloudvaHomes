@@ -199,7 +199,7 @@ void main() {
 
       // The first attempt failed with no answer: nothing retried by itself.
       expect(adapter.sent('POST', '/payments'), hasLength(1));
-      expect(find.textContaining('Can’t reach Hodi'), findsOneWidget);
+      expect(find.textContaining('Can’t reach KodiHub'), findsOneWidget);
 
       await _submit(tester);
       await tester.pumpAndSettle();

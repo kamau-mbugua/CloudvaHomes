@@ -19,7 +19,7 @@ import { Field } from './ui';
  * rejects one).
  */
 
-const FIELDS = ['name', 'code', 'location', 'county', 'floors', 'landlordId', 'status'] as const;
+const FIELDS = ['name', 'code', 'location', 'county', 'floors', 'use', 'landlordId', 'status'] as const;
 type PropertyField = (typeof FIELDS)[number];
 
 export function PropertySheet({
@@ -46,6 +46,7 @@ export function PropertySheet({
     location: property?.location ?? '',
     county: property?.county ?? '',
     floors: property?.floors != null ? String(property.floors) : '',
+    use: property?.use ?? 'RESIDENTIAL',
     landlordId: property?.landlord?.id ?? landlordId ?? '',
     status: property?.status ?? 'ACTIVE',
   });
@@ -95,6 +96,7 @@ export function PropertySheet({
           location: nullable(values.location),
           county: nullable(values.county),
           floors,
+          use: values.use,
           status: values.status,
         }
       : {
@@ -103,6 +105,7 @@ export function PropertySheet({
           location: optional(values.location),
           county: optional(values.county),
           floors: floors ?? undefined,
+          use: values.use,
         };
     if (isAgency) body.landlordId = values.landlordId;
     save.mutate(body);
@@ -137,6 +140,12 @@ export function PropertySheet({
           <Field id="pr-floors" label="Floors" error={errors.floors} optional>
             <input id="pr-floors" value={values.floors} onChange={(e) => set('floors', e.target.value)}
               inputMode="numeric" autoComplete="off" aria-invalid={Boolean(errors.floors)} />
+          </Field>
+          <Field id="pr-use" label="Use" hint="Residential rent counts for rental income tax (MRI); commercial doesn't.">
+            <select id="pr-use" value={values.use} onChange={(e) => set('use', e.target.value)}>
+              <option value="RESIDENTIAL">Residential</option>
+              <option value="COMMERCIAL">Commercial</option>
+            </select>
           </Field>
           <Field id="pr-location" label="Location" error={errors.location} optional>
             <input id="pr-location" value={values.location} onChange={(e) => set('location', e.target.value)}

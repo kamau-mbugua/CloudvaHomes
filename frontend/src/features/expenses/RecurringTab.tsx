@@ -132,7 +132,7 @@ export function RecurringTab() {
                     <strong>{r.name}</strong>
                     <span className="ad__sub">{categoryText(r.category)}{r.payee ? ` · ${r.payee}` : ''}</span>
                   </td>
-                  <td>{r.property.name}<span className="ad__sub num">{r.property.code}</span></td>
+                  <td>{r.property.name}<span className="ad__sub code">{r.property.code}</span></td>
                   <td>
                     {describeSchedule(r.everyMonths, r.dayOfMonth)}
                     {r.endDate ? <span className="ad__sub">Until {formatDay(r.endDate)}</span> : null}

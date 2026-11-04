@@ -16,6 +16,7 @@ export const INVOICE_KIND: Record<InvoiceKind, Label> = {
   MONTHLY: { label: 'Monthly', tone: 'ad__badge--off' },
   MOVE_IN: { label: 'Move-in', tone: 'ad__badge--off' },
   ADHOC: { label: 'One-off', tone: 'ad__badge--off' },
+  LATE_FEE: { label: 'Late fee', tone: 'ad__badge--alert' },
 };
 
 export const CHARGE_KIND: Record<ChargeKind, Label> = {
@@ -40,4 +41,5 @@ export const LINE_KIND: Record<LineKind, string> = {
   CHARGE: 'Charge',
   MOVE_IN: 'Move-in',
   ADJUSTMENT: 'Adjustment',
+  LATE_FEE: 'Late fee',
 };

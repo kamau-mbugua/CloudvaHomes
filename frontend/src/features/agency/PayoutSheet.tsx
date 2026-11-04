@@ -16,7 +16,7 @@ import type { PayoutMethod, PayoutSummary } from './types';
  *
  * Write-only: the API never returns the details in full, so the form always starts empty
  * and shows only the masked version on file. Saving asks for a verification code
- * (step-up, handled by the app-wide StepUpProvider) and Hodi tells the landlord — quietly
+ * (step-up, handled by the app-wide StepUpProvider) and KodiHub tells the landlord — quietly
  * changed payout details are a known fraud route.
  */
 export function PayoutSheet({ landlord, current, onClose }: {

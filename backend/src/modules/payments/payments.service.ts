@@ -4,6 +4,7 @@ import { formatDateOnly, parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError, type ErrorDetail } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
+import { readSort } from '../../common/http/sort.js';
 import {
   money,
   readOrgDocumentInstructions,
@@ -61,6 +62,13 @@ export function balanceText(owed: bigint): string {
   if (owed > 0n) return `Balance KES ${money(owed)}`;
   if (owed < 0n) return `Credit KES ${money(-owed)}`;
   return 'Nothing owing';
+}
+
+/** `?sort=` → Prisma order; creation time breaks ties so paging is stable. */
+function paymentOrder(sort: string | undefined): Prisma.PaymentOrderByWithRelationInput[] {
+  const { field, desc } = readSort(sort, '-receivedAt');
+  const dir = desc ? 'desc' : 'asc';
+  return [{ [field as 'receivedAt' | 'amount']: dir }, { createdAt: dir }];
 }
 
 @Injectable()
@@ -151,7 +159,7 @@ export class PaymentsService {
       this.db.payment.findMany({
         where,
         include: LIST_INCLUDE,
-        orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
+        orderBy: paymentOrder(q.sort),
         ...toSkipTake(q),
       }),
       this.db.payment.count({ where }),

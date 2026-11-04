@@ -61,7 +61,7 @@ export function updateSessionDetails(payload: SessionPayload): void {
 }
 
 /**
- * Re-read the session (`GET /me`) — e.g. when the organisation's Hodi status changed
+ * Re-read the session (`GET /me`) — e.g. when the organisation's KodiHub status changed
  * (paid, or a change was refused as suspended), so the billing banner catches up.
  * Single-flight; a failure leaves the session as it was.
  */

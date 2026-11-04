@@ -1,4 +1,5 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
+import { LateFeesService } from '../billing/late-fees/late-fees.service.js';
 import { BillingModule } from '../billing/billing.module.js';
 import { InvoiceIssuer } from '../billing/invoices/invoice-issuer.js';
 import { InvoicesService } from '../billing/invoices/invoices.service.js';
@@ -63,6 +64,8 @@ export class AgencyModule implements OnModuleInit {
     private readonly daraja: DarajaClient,
     private readonly prisma: PrismaService,
     private readonly payouts: PayoutsService,
+    private readonly lateFees: LateFeesService,
+    private readonly agreements: AgreementsService,
   ) {}
 
   onModuleInit() {
@@ -71,6 +74,24 @@ export class AgencyModule implements OnModuleInit {
     this.issuer.onIssued((tx, i) => this.landlordLedger.onIssued(tx, i.id, 1n, i.createdById));
     this.invoices.onVoided((tx, i) => this.landlordLedger.onIssued(tx, i.id, -1n, null));
     this.expenses.onChanged((tx, c) => this.landlordLedger.onExpenseChanged(tx, c));
+    // Late fees on an agency's property only once its agreement says who keeps them.
+    this.lateFees.onEligibility(async (tx, inv) => {
+      const p = await tx.property.findUnique({
+        where: { id: inv.propertyId },
+        select: { landlordId: true, organization: { select: { kind: true } } },
+      });
+      if (p?.organization.kind !== 'AGENCY') return { allowed: true, keptBy: null };
+      if (!p.landlordId) return { allowed: false, keptBy: null };
+      const agreement = await this.agreements.applicable(
+        tx,
+        p.landlordId,
+        inv.propertyId,
+        inv.date,
+      );
+      return agreement?.lateFeeRecipient
+        ? { allowed: true, keptBy: agreement.lateFeeRecipient }
+        : { allowed: false, keptBy: null };
+    });
     // The simulator "posts" B2C results in-process, the way Safaricom would over HTTP.
     if (this.daraja instanceof SimulatedDarajaClient) {
       this.daraja.onB2cResult = async (payload) => {

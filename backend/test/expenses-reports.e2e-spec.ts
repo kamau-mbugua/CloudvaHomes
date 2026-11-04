@@ -501,4 +501,93 @@ describe('Expenses, files and reports (e2e)', () => {
       expenses: 0,
     });
   });
+
+  it('lists what needs attention on the dashboard', async () => {
+    type Action = { kind: string; count: number; amount?: number };
+    const kinds = (d: { actions: Action[] }) => d.actions.map((x) => x.kind);
+    const p = await property(owner, 'NAP');
+    const q = await property(owner, 'NAQ');
+    await post(
+      owner,
+      '/units/bulk',
+      { propertyId: p.id, numbers: ['N1', 'N2'], rentAmount: KES(10000) },
+      201,
+    );
+    const units = (await get(owner, '/units?pageSize=50')).data as { id: string; number: string }[];
+    const id = (n: string) => units.find((u) => u.number === n)!.id;
+    const moveIn = async (unit: string, phone: string) =>
+      (
+        await post(
+          owner,
+          '/tenancies',
+          {
+            unitId: id(unit),
+            tenant: { firstName: unit, lastName: 'Tenant', phone },
+            startDate: RUN_DATE,
+            billingDay: 1,
+          },
+          201,
+        )
+      ).data;
+    const t1 = await moveIn('N1', '0711000601');
+    const t2 = await moveIn('N2', '0711000602');
+
+    // Both are due this month and not billed yet — the same tenancies the run would bill.
+    let dash = (await get(owner, '/reports/dashboard')).data;
+    const preview = (await get(owner, '/invoices/run/preview')).data;
+    expect(preview.items).toHaveLength(2);
+    expect(dash.actions).toContainEqual({ kind: 'INVOICE_RUN_PENDING', count: 2 });
+
+    await post(owner, '/invoices/run', {});
+    const old = formatDateOnly(addDays(parseDateOnly(TODAY), -10));
+    await post(
+      owner,
+      '/invoices',
+      { tenancyId: t1.id, lines: [{ description: 'Damage', amount: KES(3000) }], dueDate: old },
+      201,
+    );
+    const soon = formatDateOnly(addDays(parseDateOnly(TODAY), 7));
+    const later = formatDateOnly(addDays(parseDateOnly(TODAY), 40));
+    await post(owner, `/tenancies/${t2.id}/notice`, { endDate: soon });
+
+    dash = (await get(owner, '/reports/dashboard')).data;
+    expect(kinds(dash)).not.toContain('INVOICE_RUN_PENDING');
+    const arrears = (await get(owner, '/reports/arrears')).data;
+    const overdueRows = arrears.rows.filter(
+      (r: { total: number; current: number }) => r.total - r.current > 0,
+    );
+    expect(overdueRows.length).toBeGreaterThanOrEqual(1);
+    expect(dash.actions).toContainEqual({
+      kind: 'OVERDUE_TENANTS',
+      count: overdueRows.length,
+      amount: arrears.totals.total - arrears.totals.current,
+    });
+    expect(dash.actions).toContainEqual({ kind: 'NOTICE_ENDING', count: 1 });
+    // Fixed order: overdue before notice.
+    expect(kinds(dash).indexOf('OVERDUE_TENANTS')).toBeLessThan(
+      kinds(dash).indexOf('NOTICE_ENDING'),
+    );
+
+    // A notice ending in more than 14 days is not "ending soon".
+    await post(owner, `/tenancies/${t2.id}/notice`, { endDate: later });
+    expect(kinds((await get(owner, '/reports/dashboard')).data)).not.toContain('NOTICE_ENDING');
+
+    // The property filter and property-limited staff only count their properties.
+    expect((await get(owner, `/reports/dashboard?propertyId=${q.id}`)).data.actions).toEqual([]);
+    const role = await roleId(t, owner, 'ACCOUNTANT');
+    await post(
+      owner,
+      '/users/invitations',
+      {
+        firstName: 'Acc',
+        lastName: 'Q',
+        email: 'accq@example.invalid',
+        roleId: role,
+        propertyIds: [q.id],
+      },
+      201,
+    );
+    const accQ = await acceptInvite(t, 'accq@example.invalid');
+    expect((await get(accQ, '/reports/dashboard')).data.actions).toEqual([]);
+  });
 });

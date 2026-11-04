@@ -126,7 +126,7 @@ export function StatementView({ statement: s, audience = 'agency' }: { statement
             <li key={g.key} className="ag__group">
               <details open={groups.length <= 3}>
                 <summary className="ag__line ag__line--sub">
-                  <span className="ag__linelabel">{g.property?.name ?? 'Other'}{g.property ? <span className="ad__sub num">{g.property.code}</span> : null}</span>
+                  <span className="ag__linelabel">{g.property?.name ?? 'Other'}{g.property ? <span className="ad__sub code">{g.property.code}</span> : null}</span>
                   <SignedAmount minor={g.total} />
                 </summary>
                 <ul className="ag__lines">
@@ -170,7 +170,7 @@ export function OccupancySummary({ report, title = 'Occupancy now' }: { report: 
           <li key={row.property.id} className="ag__prop">
             <div className="ag__prophead">
               <strong>{row.property.name}</strong>
-              <span className="ad__sub num">{row.property.code}</span>
+              <span className="ad__sub code">{row.property.code}</span>
             </div>
             <dl className="ag__propfacts">
               <div><dt>Units</dt><dd className="num">{row.units}</dd></div>
@@ -221,7 +221,7 @@ export function PayoutCards({ rows }: { rows: Remittance[] }) {
           <div className="ag__payouthead">
             <div>
               <strong>{formatPeriod(r.period, true)}</strong>
-              <span className="ad__sub num">{r.number}</span>
+              <span className="ad__sub code">{r.number}</span>
             </div>
             <Badge table={REMITTANCE_STATUS} value={r.status} />
           </div>

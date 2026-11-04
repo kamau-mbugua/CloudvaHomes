@@ -5,7 +5,7 @@ import {
   readOrgDocumentInstructions,
   readSystemDocumentInstructions,
 } from '../../../common/pdf/pdf.js';
-import type { InvoiceKind } from '../../../generated/prisma/client.js';
+import type { InvoiceKind, LateFeeRecipient } from '../../../generated/prisma/client.js';
 import type { Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { formatKesMinor, NotificationsService } from '../../notifications/notifications.service.js';
@@ -24,6 +24,8 @@ export interface IssueRequest {
   dueDate?: Date;
   lines: DraftLine[];
   createdById: string | null;
+  /** LATE_FEE only: the overdue invoice it is for, and (agencies) who keeps it. */
+  lateFee?: { forId: string; keptBy: LateFeeRecipient | null };
 }
 
 export type IssuedHook = (
@@ -73,6 +75,8 @@ export class InvoiceIssuer {
         total,
         status: total === 0n ? 'PAID' : 'ISSUED',
         createdById: r.createdById,
+        lateFeeForId: r.lateFee?.forId ?? null,
+        lateFeeKeptBy: r.lateFee?.keptBy ?? null,
       },
     });
     await tx.invoiceLine.createMany({
@@ -257,6 +261,8 @@ export class InvoiceIssuer {
           voidedAt: fullInvoice.voidedAt,
           voidReason: fullInvoice.voidReason,
           tenancyId: fullInvoice.tenancy.id,
+          lateFeeForId: fullInvoice.lateFeeForId,
+          lateFeeKeptBy: fullInvoice.lateFeeKeptBy,
           tenant: {
             id: tenant.id,
             code: tenant.code,

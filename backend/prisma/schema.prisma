@@ -1,4 +1,4 @@
-// Hodi database schema. Domain models arrive phase by phase — see
+// KodiHub database schema. Domain models arrive phase by phase — see
 // docs/specs/2026-10-27-hodi-platform-design.md §5.5 for the target model.
 //
 // Conventions: UUID v7 ids; org-owned rows carry `orgId` (scoped automatically by the Prisma
@@ -18,23 +18,23 @@ datasource db {
 // ───────────────────────────── Identity ─────────────────────────────
 
 model User {
-  id              String        @id @default(uuid(7)) @db.Uuid
-  email           String?       @unique // lower-cased
-  phone           String?       @unique // E.164, e.g. +254712345678
-  passwordHash    String?
-  firstName       String
-  lastName        String
+  id                 String        @id @default(uuid(7)) @db.Uuid
+  email              String?       @unique // lower-cased
+  phone              String?       @unique // E.164, e.g. +254712345678
+  passwordHash       String?
+  firstName          String
+  lastName           String
   isPlatformAdmin    Boolean       @default(false)
   platformRole       PlatformRole?
   mustChangePassword Boolean       @default(false)
   status             UserStatus    @default(ACTIVE)
-  defaultOrgId      String?       @db.Uuid
-  defaultPropertyId String?       @db.Uuid
-  defaultTenantId   String?       @db.Uuid
-  defaultLandlordId String?       @db.Uuid
-  lastLoginAt       DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  defaultOrgId       String?       @db.Uuid
+  defaultPropertyId  String?       @db.Uuid
+  defaultTenantId    String?       @db.Uuid
+  defaultLandlordId  String?       @db.Uuid
+  lastLoginAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   memberships            Membership[]
   refreshTokens          RefreshToken[]
@@ -65,8 +65,8 @@ model Organization {
   settings        Json      @default("{}")
   /// Days between an invoice's issue date and its due date.
   invoiceDueDays  Int       @default(7)
-  // ── Hodi billing (phase 8) ──
-  billingRef      String?   @unique // "H00001": account number when paying Hodi
+  // ── KodiHub billing (phase 8) ──
+  billingRef      String?   @unique // "H00001": account number when paying KodiHub
   planId          String?   @db.Uuid
   priceOverride   BigInt? // per occupied unit; null = the plan's
   minimumOverride BigInt?
@@ -176,20 +176,20 @@ model Invitation {
 
 /// Opaque refresh tokens (stored hashed). One family per sign-in; every refresh rotates.
 model RefreshToken {
-  id        String    @id @default(uuid(7)) @db.Uuid
-  userId    String    @db.Uuid
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @db.Uuid
   familyId   String    @db.Uuid
   orgId      String?   @db.Uuid // organisation the session is currently acting in
   propertyId String?   @db.Uuid // property the session is currently scoped to (null = consolidated)
   tenantId   String?   @db.Uuid // tenant account the session is currently focused on (null = consolidated)
   landlordId String?   @db.Uuid // landlord account the session is currently focused on (null = consolidated)
   tokenHash  String    @unique
-  expiresAt DateTime
-  usedAt    DateTime? // set when rotated; a second use means the token was stolen
-  revokedAt DateTime?
-  userAgent String?
-  ip        String?
-  createdAt DateTime  @default(now())
+  expiresAt  DateTime
+  usedAt     DateTime? // set when rotated; a second use means the token was stolen
+  revokedAt  DateTime?
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -294,6 +294,8 @@ model Property {
   location   String?
   county     String?
   floors     Int          @default(1)
+  /// Residential rent is subject to monthly rental income tax (MRI, phase 13); commercial isn't.
+  use        PropertyUse  @default(RESIDENTIAL)
   status     RecordStatus @default(ACTIVE)
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
@@ -311,6 +313,11 @@ model Property {
   @@index([orgId, name])
   @@index([landlordId])
   @@map("properties")
+}
+
+enum PropertyUse {
+  RESIDENTIAL
+  COMMERCIAL
 }
 
 /// "Bedsitter", "2 Bedroom"
@@ -430,6 +437,8 @@ model Tenancy {
   billingDay    Int // 1–28
   startDate     DateTime      @db.Date
   endDate       DateTime?     @db.Date // expected (NOTICE) or actual (ENDED) move-out
+  /// When the lease runs out (phase 13). Not a move-out: renewing just sets a later date.
+  leaseEndDate  DateTime?     @db.Date
   noticeGivenAt DateTime?
   depositHeld   BigInt        @default(0)
   status        TenancyStatus @default(ACTIVE)
@@ -438,15 +447,68 @@ model Tenancy {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  unit     Unit                 @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  invoices Invoice[]
-  deposits DepositTransaction[]
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  unit        Unit                 @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  invoices    Invoice[]
+  deposits    DepositTransaction[]
+  rentChanges RentChange[]
+  inspections Inspection[]
 
   @@index([orgId, status])
   @@index([unitId])
   @@index([tenantId])
   @@map("tenancies")
+}
+
+/// A scheduled rent change (phase 13): `newRent` from the first day of `effectivePeriod`.
+/// Applied (tenancy.rentAmount updated, appliedAt set) by the invoice run for that month.
+model RentChange {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  orgId           String    @db.Uuid
+  tenancyId       String    @db.Uuid
+  effectivePeriod String // "2027-01"
+  newRent         BigInt
+  note            String?
+  appliedAt       DateTime?
+  createdById     String?   @db.Uuid
+  createdAt       DateTime  @default(now())
+
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  @@unique([tenancyId, effectivePeriod])
+  @@index([orgId, appliedAt])
+  @@map("rent_changes")
+}
+
+/// A move-in or move-out inspection of a tenancy's unit (phase 13). `items` is a JSON list
+/// of { area, condition: GOOD|FAIR|POOR|DAMAGED, note?, photoUploadIds[] };
+/// `photoUploadIds` repeats every photo id so access checks can find them.
+model Inspection {
+  id                   String         @id @default(uuid(7)) @db.Uuid
+  orgId                String         @db.Uuid
+  tenancyId            String         @db.Uuid
+  unitId               String         @db.Uuid
+  kind                 InspectionKind
+  inspectedOn          DateTime       @db.Date
+  items                Json
+  notes                String?
+  inspectorName        String?
+  photoUploadIds       String[]       @db.Uuid
+  tenantAcknowledgedAt DateTime?
+  createdById          String?        @db.Uuid
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  @@unique([tenancyId, kind])
+  @@index([orgId, createdAt])
+  @@map("inspections")
+}
+
+enum InspectionKind {
+  MOVE_IN
+  MOVE_OUT
 }
 
 enum TenancyStatus {
@@ -577,26 +639,32 @@ model MeterReading {
 
 /// Never edited after issue: changes are credit notes or a void (design §5.1).
 model Invoice {
-  id             String        @id @default(uuid(7)) @db.Uuid
-  orgId          String        @db.Uuid
+  id             String            @id @default(uuid(7)) @db.Uuid
+  orgId          String            @db.Uuid
   number         String // "INV-2026-000123"
-  tenancyId      String        @db.Uuid
-  tenantId       String        @db.Uuid
-  unitId         String        @db.Uuid
-  propertyId     String        @db.Uuid
+  tenancyId      String            @db.Uuid
+  tenantId       String            @db.Uuid
+  unitId         String            @db.Uuid
+  propertyId     String            @db.Uuid
   period         String // "2026-10"
   kind           InvoiceKind
-  issueDate      DateTime      @db.Date
-  dueDate        DateTime      @db.Date
+  issueDate      DateTime          @db.Date
+  dueDate        DateTime          @db.Date
   total          BigInt
-  amountPaid     BigInt        @default(0) // maintained from payment allocations (phase 4)
-  creditedAmount BigInt        @default(0) // sum of credit notes
-  status         InvoiceStatus @default(ISSUED)
+  amountPaid     BigInt            @default(0) // maintained from payment allocations (phase 4)
+  creditedAmount BigInt            @default(0) // sum of credit notes
+  status         InvoiceStatus     @default(ISSUED)
   voidedAt       DateTime?
   voidReason     String?
-  createdById    String?       @db.Uuid // null = the scheduled invoice run
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdById    String?           @db.Uuid // null = the scheduled invoice run
+  /// LATE_FEE only: the overdue invoice it is for. Unique even when voided, so a waived fee
+  /// (voided) is never charged again.
+  lateFeeForId   String?           @unique @db.Uuid
+  /// LATE_FEE in an agency: who keeps it, copied from the agreement when issued. AGENCY =
+  /// never written to the landlord ledger.
+  lateFeeKeptBy  LateFeeRecipient?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   tenancy     Tenancy             @relation(fields: [tenancyId], references: [id], onDelete: Restrict)
   lines       InvoiceLine[]
@@ -615,6 +683,13 @@ enum InvoiceKind {
   MONTHLY
   MOVE_IN
   ADHOC
+  LATE_FEE // phase 13: one per overdue MONTHLY invoice, same period (see lateFeeForId)
+}
+
+/// Who keeps a late fee in an agency (phase 13). Set per management agreement; no default.
+enum LateFeeRecipient {
+  LANDLORD
+  AGENCY
 }
 
 enum InvoiceStatus {
@@ -653,6 +728,7 @@ enum LineKind {
   CHARGE
   MOVE_IN
   ADJUSTMENT
+  LATE_FEE
 }
 
 model CreditNote {
@@ -803,7 +879,7 @@ model DepositTransaction {
 }
 
 enum DepositKind {
-  OPENING // held before Hodi (entered at move-in)
+  OPENING // held before KodiHub (entered at move-in)
   RECEIVED // paid on a refundable move-in line
   APPLIED // used to pay the tenant's invoices
   REFUNDED // paid back to the tenant
@@ -925,6 +1001,7 @@ enum UploadPurpose {
   METER_PHOTO
   MAINTENANCE_PHOTO
   LEASE_DOCUMENT
+  INSPECTION_PHOTO
 }
 
 enum ExpenseCategory {
@@ -1056,22 +1133,25 @@ model MaintenanceRequest {
 
 /// Terms between an agency and a landlord (design §5.3). A change of terms is a new agreement.
 model ManagementAgreement {
-  id                  String          @id @default(uuid(7)) @db.Uuid
-  orgId               String          @db.Uuid
-  landlordId          String          @db.Uuid
-  propertyIds         String[]        @db.Uuid // empty = all the landlord's properties
+  id                  String            @id @default(uuid(7)) @db.Uuid
+  orgId               String            @db.Uuid
+  landlordId          String            @db.Uuid
+  propertyIds         String[]          @db.Uuid // empty = all the landlord's properties
   commissionBasis     CommissionBasis
   commissionBps       Int? // 1000 = 10%
   fixedAmount         BigInt? // FIXED_MONTHLY
-  commissionableLines LineKind[]      @default([RENT])
-  collection          CollectionMode  @default(AGENCY_COLLECTS)
+  commissionableLines LineKind[]        @default([RENT])
+  collection          CollectionMode    @default(AGENCY_COLLECTS)
   remittanceDay       Int // 1–28
-  deductExpenses      Boolean         @default(true)
-  holdDeposits        Boolean         @default(true)
-  startDate           DateTime        @db.Date
-  endDate             DateTime?       @db.Date
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  deductExpenses      Boolean           @default(true)
+  holdDeposits        Boolean           @default(true)
+  /// Who keeps late fees on these properties. Null = not decided: no late fees are charged
+  /// on them (owner decision 2026-11-04 — there is deliberately no default).
+  lateFeeRecipient    LateFeeRecipient?
+  startDate           DateTime          @db.Date
+  endDate             DateTime?         @db.Date
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   landlord Landlord @relation(fields: [landlordId], references: [id], onDelete: Restrict)
 
@@ -1275,11 +1355,13 @@ model Message {
   status      MessageStatus
   error       String?
   day         DateTime       @db.Date // Nairobi date it was sent for (reminder de-duplication)
+  broadcastId String?        @db.Uuid // phase 13: the broadcast it was part of
   createdById String?        @db.Uuid // null = automatic
   createdAt   DateTime       @default(now())
 
   // + partial unique (raw migration): one automatic reminder of a kind per tenant per day
   @@index([orgId, tenantId, createdAt])
+  @@index([broadcastId])
   @@map("messages")
 }
 
@@ -1288,6 +1370,37 @@ enum MessageKind {
   REMINDER_OVERDUE
   REMINDER_MANUAL
   PORTAL_ACCESS
+  BROADCAST // phase 13: a notice to the tenants of chosen properties
+}
+
+/// A notice to every current tenant of some properties (phase 13): SMS always, plus an
+/// optional email copy and an in-app notice/push for tenants with portal access.
+model Broadcast {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  orgId       String          @db.Uuid
+  propertyIds String[]        @db.Uuid
+  text        String
+  alsoEmail   Boolean         @default(false)
+  status      BroadcastStatus @default(QUEUED)
+  recipients  Int             @default(0)
+  sent        Int             @default(0)
+  failed      Int             @default(0)
+  emailed     Int             @default(0)
+  notified    Int             @default(0)
+  createdById String          @db.Uuid
+  createdAt   DateTime        @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@index([orgId, createdAt])
+  @@index([status, startedAt])
+  @@map("broadcasts")
+}
+
+enum BroadcastStatus {
+  QUEUED
+  SENDING
+  DONE
 }
 
 enum MessageChannel {
@@ -1300,7 +1413,7 @@ enum MessageStatus {
   FAILED
 }
 
-// ───────────────────────────── Platform billing (Hodi → organisations) ─────────────────────────────
+// ───────────────────────────── Platform billing (KodiHub → organisations) ─────────────────────────────
 // Not org-scoped by the extension: platform code reads across organisations, and
 // organisation-facing endpoints filter by the caller's orgId explicitly.
 
@@ -1410,7 +1523,7 @@ model PlatformStkRequest {
   @@map("platform_stk_requests")
 }
 
-/// The single row of Hodi's own billing and platform settings (id = 1).
+/// The single row of KodiHub's own billing and platform settings (id = 1).
 model PlatformSettings {
   id                    Int            @id @default(1)
   dueDays               Int            @default(10)
@@ -1445,6 +1558,8 @@ model PlatformSettings {
   appStoreUrl           String?
   maintenanceMode       Boolean        @default(false)
   maintenanceMessage    String?
+  /// Monthly rental income tax rate for the MRI report, basis points (750 = 7.5%). Phase 13.
+  mriRateBps            Int            @default(750)
   updatedAt             DateTime       @updatedAt
 
   @@map("platform_settings")

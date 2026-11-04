@@ -70,7 +70,7 @@ export class BanksController {
     return ok(await this.banks.preview(id, file, body.mapping));
   }
 
-  /** Money in: allowed while the organisation's Hodi account is suspended. */
+  /** Money in: allowed while the organisation's KodiHub account is suspended. */
   @Post('statement-imports')
   @AllowWhenSuspended()
   @RequirePermission('reconciliation:update')

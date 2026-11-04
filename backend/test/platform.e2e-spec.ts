@@ -23,11 +23,15 @@ const ADMIN_PHONE = '+254700000099';
 const day = (offset: number) => formatDateOnly(addDays(parseDateOnly(TODAY), offset));
 
 class FakeDaraja extends DarajaClient {
-  pushes: { checkoutRequestId: string; accountReference: string }[] = [];
+  pushes: { checkoutRequestId: string; accountReference: string; description: string }[] = [];
   answers = new Map<string, StkQueryResult>();
-  stkPush(_t: unknown, r: { accountReference: string }) {
+  stkPush(_t: unknown, r: { accountReference: string; description: string }) {
     const checkoutRequestId = `ws_CO_PL_${this.pushes.length + 1}`;
-    this.pushes.push({ checkoutRequestId, accountReference: r.accountReference });
+    this.pushes.push({
+      checkoutRequestId,
+      accountReference: r.accountReference,
+      description: r.description,
+    });
     return Promise.resolve({ merchantRequestId: 'M', checkoutRequestId });
   }
   stkQuery(_t: unknown, q: { checkoutRequestId: string }) {
@@ -367,6 +371,7 @@ describe('Platform billing (e2e)', () => {
     ).data;
     expect(req).toMatchObject({ state: 'PENDING', phone: ownerPhone });
     expect(fake.pushes[0]!.accountReference).toBe(me.billingRef);
+    expect(fake.pushes[0]!.description).toBe('KodiHub bill');
     const again = (
       await post(session, '/billing/pay', { amount: KES(1000) }, 202, {
         'Idempotency-Key': 'hodi-1',

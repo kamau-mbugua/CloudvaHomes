@@ -404,7 +404,18 @@ export class TenantAccountsService {
   }
 
   /** Today's automatic reminders for the active organisation (if it has them switched on). */
-  async runReminders(today = todayInNairobi()) {
+  /**
+   * Today's automatic reminders for the active organisation. `due` / `overdue` count the
+   * tenants texted (or, with `dryRun`, who would be — nothing is sent or recorded then);
+   * `sent` counts the texts the SMS provider accepted.
+   */
+  async runReminders(
+    today = todayInNairobi(),
+    opts: { dryRun?: boolean } = {},
+  ): Promise<{ sent: number; due: number; overdue: number; skipped?: string; dryRun?: true }> {
+    const dryRun = opts.dryRun === true;
+    const done = (r: { sent: number; due: number; overdue: number; skipped?: string }) =>
+      dryRun ? { ...r, dryRun: true as const } : r;
     const ctxOrg = currentContext()?.orgId;
     if (!ctxOrg) throw new Error('No active organisation');
     const org = await this.db.organization.findUniqueOrThrow({
@@ -412,10 +423,11 @@ export class TenantAccountsService {
       select: { name: true, settings: true },
     });
     const settings = readReminders(org.settings);
-    if (!settings.enabled) return { sent: 0, skipped: 'reminders are off' };
+    if (!settings.enabled)
+      return done({ sent: 0, due: 0, overdue: 0, skipped: 'reminders are off' });
     const open = await this.openInvoices();
     const plans = planReminders(open, settings, today);
-    if (!plans.size) return { sent: 0 };
+    if (!plans.size) return done({ sent: 0, due: 0, overdue: 0 });
     const tenants = await this.db.tenant.findMany({
       where: { id: { in: [...plans.keys()] }, remindersOff: false },
       select: {
@@ -429,6 +441,8 @@ export class TenantAccountsService {
       },
     });
     let sent = 0;
+    let due = 0;
+    let overdue = 0;
     for (const t of tenants) {
       const plan = plans.get(t.id)!;
       // One automatic SMS per tenant per day, whichever kind.
@@ -440,6 +454,11 @@ export class TenantAccountsService {
         },
       });
       if (already) continue;
+      const count = () => (plan.kind === 'REMINDER_OVERDUE' ? overdue++ : due++);
+      if (dryRun) {
+        count();
+        continue;
+      }
       const tenantOpen = open.filter((i) => i.tenantId === t.id);
       const props = [...new Set(tenantOpen.map((i) => i.propertyId))];
       const channels = await this.channelsFor(props);
@@ -474,9 +493,11 @@ export class TenantAccountsService {
         });
       }
       await this.sendReminderEmailIfPossible(t, org.name, plan, tenantOpen, channels);
+      // null = the once-a-day guard (unique index) found today's reminder already logged.
+      if (msg) count();
       if (msg?.status === 'SENT') sent++;
     }
-    return { sent };
+    return done({ sent, due, overdue });
   }
 
   /** Scheduled, every organisation with reminders on. */

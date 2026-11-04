@@ -46,7 +46,7 @@
 .py__allocinv { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .py__allocinv .ad__sub { flex-basis: 100%; margin-top: 0; }
 .fld.py__allocamt { gap: 2px; }
-.fld.py__allocamt > input { height: 38px; text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.fld.py__allocamt > input { height: 38px; text-align: right; font-family: var(--font-figures); font-variant-numeric: tabular-nums; }
 .fld.py__allocamt > input:disabled { opacity: 1; color: var(--text-secondary); background: var(--secondary); }
 .py__allocamt .fld__err { text-align: left; }
 .py__resuggest { align-self: flex-start; }

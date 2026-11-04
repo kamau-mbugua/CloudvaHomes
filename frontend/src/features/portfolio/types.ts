@@ -41,6 +41,8 @@ export interface Property {
   location: string | null;
   county: string | null;
   floors: number | null;
+  /** Phase 13: residential rent counts for rental income tax; commercial doesn't. */
+  use?: 'RESIDENTIAL' | 'COMMERCIAL';
   status: RecordStatus;
   /** Always set in an agency, always null in a landlord organisation. */
   landlord: CodedRef | null;
@@ -129,6 +131,10 @@ export interface Tenancy {
   depositHeld: number;
   moveOutReason: string | null;
   hasSignedLease?: boolean;
+  /** Phase 13: when the lease runs out (not a move-out). */
+  leaseEndDate?: string | null;
+  /** Phase 13: scheduled rent changes not applied yet, earliest first. */
+  rentChanges?: { id: string; effectivePeriod: string; newRent: number; note: string | null }[];
   tenant: TenantRef;
   unit: { id: string; number: string; property: CodedRef };
   createdAt: string;

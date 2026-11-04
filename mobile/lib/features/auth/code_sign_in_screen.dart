@@ -80,7 +80,7 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
       kicker: _sent ? 'Step 2 of 2 · Verify' : 'Step 1 of 2 · One-time code',
       title: _sent ? 'Enter the 6-digit code' : 'Sign in with a code',
       subtitle: _sent
-          ? 'If $target has a Hodi account, a 6-digit code is on its way by $channelWord.'
+          ? 'If $target has a KodiHub account, a 6-digit code is on its way by $channelWord.'
           : 'We’ll send a 6-digit code to your phone or email.',
       children: [
         TextField(

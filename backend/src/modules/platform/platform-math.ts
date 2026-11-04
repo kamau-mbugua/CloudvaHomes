@@ -8,7 +8,7 @@ export type OrgStatus = 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'CLOSED';
 
 /**
  * Computes when an organisation's paid subscription starts (`firstPaidDate`) and when its first
- * monthly Hodi invoice will be issued (`firstInvoiceDate`, the 1st of the month following the
+ * monthly KodiHub invoice will be issued (`firstInvoiceDate`, the 1st of the month following the
  * first billable calendar month).
  */
 export function firstPlatformBillingDates(
@@ -25,7 +25,7 @@ export function firstPlatformBillingDates(
   return { firstPaidDate, firstBillablePeriod, firstInvoiceDate };
 }
 
-/** The month's Hodi charge: units × price, never below the minimum. */
+/** The month's KodiHub charge: units × price, never below the minimum. */
 export function platformTotal(units: number, rate: bigint, minimum: bigint): bigint {
   const t = BigInt(units) * rate;
   return t > minimum ? t : minimum;

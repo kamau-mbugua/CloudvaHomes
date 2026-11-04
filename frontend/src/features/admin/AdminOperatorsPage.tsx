@@ -17,7 +17,7 @@ import { OrgStatusBadge } from '../platform/ui';
 type RoleFilter = 'ALL' | 'SUPERADMIN' | 'SALESPERSON';
 
 /**
- * Admin → Admins & Salespeople (`/admin/admins`): manages Hodi's internal staff —
+ * Admin → Admins & Salespeople (`/admin/admins`): manages KodiHub's internal staff —
  * Superadmins (full platform access) and Salespeople (scoped to their onboarded/assigned
  * book of organisations). Also assigns unassigned organisations to an operator's book.
  */

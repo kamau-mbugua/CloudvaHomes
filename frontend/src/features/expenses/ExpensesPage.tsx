@@ -190,7 +190,7 @@ function ExpensesTab() {
                         ) : null}
                         {isVoid ? <span className="ad__sub">Voided {formatDateTime(x.voidedAt)}{x.voidReason ? ` — ${x.voidReason}` : ''}</span> : null}
                       </td>
-                      <td>{x.property.name}<span className="ad__sub num">{x.property.code}</span></td>
+                      <td>{x.property.name}<span className="ad__sub code">{x.property.code}</span></td>
                       <td>{categoryText(x.category)}</td>
                       <td>
                         {x.receipt ? (

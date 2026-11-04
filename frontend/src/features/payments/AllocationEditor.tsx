@@ -54,7 +54,7 @@ export function AllocationEditor({
                   return (
                     <li key={inv.id} className={`py__allocrow ${err ? 'is-bad' : ''}`}>
                       <div className="py__allocinv">
-                        <strong className="num">{inv.number}</strong>{inv.id === preferId ? <span className="ad__badge ad__badge--info">This invoice</span> : null}
+                        <strong className="code">{inv.number}</strong>{inv.id === preferId ? <span className="ad__badge ad__badge--info">This invoice</span> : null}
                         <span className="ad__sub">
                           {formatPeriod(inv.period)} · due {formatDay(inv.dueDate)}{inv.overdue ? ' · overdue' : ''} · balance <span className="num">{formatKES(inv.balance)}</span>
                         </span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkMonthRange, columnPath, daysBetween, formatCompactKES, formatRate, niceScale, periodRange, pnlCategories, readReportTab } from './rules';
+import { actionLink, checkMonthRange, mriNotice, mriRate, parseRatePercent, columnPath, daysBetween, formatCompactKES, formatRate, niceScale, periodRange, pnlCategories, readReportTab } from './rules';
 import type { PnlFigures } from './types';
 
 describe('formatRate', () => {
@@ -97,5 +97,60 @@ describe('columnPath', () => {
     expect(columnPath(0, 10, 12, 0)).toBe('');
     expect(columnPath(0, 98, 12, 2)).toContain('V100');
     expect(columnPath(10, 20, 12, 80)).toBe('M10,100 V24 Q10,20 14,20 H18 Q22,20 22,24 V100 Z');
+  });
+});
+
+describe('actionLink', () => {
+  it('sends unmatched M-Pesa payments to reconciliation, with a counted label', () => {
+    const link = actionLink('UNMATCHED_PAYMENTS');
+    expect(link.to).toBe('/app/reconciliation');
+    expect(link.permission).toBe('reconciliation:view');
+    expect(link.label(1)).toBe('1 M-Pesa payment to match');
+    expect(link.label(3)).toBe('3 M-Pesa payments to match');
+  });
+
+  it('points every kind at the page that fixes it', () => {
+    expect(actionLink('INVOICE_RUN_PENDING')).toMatchObject({ to: '/app/invoices/run', permission: 'invoices:view' });
+    expect(actionLink('OVERDUE_TENANTS')).toMatchObject({ to: '/app/reports?tab=arrears', permission: 'reports:view' });
+    expect(actionLink('NOTICE_ENDING')).toMatchObject({ to: '/app/tenancies?status=NOTICE', permission: 'tenancies:view' });
+    expect(actionLink('REMITTANCES_TO_APPROVE')).toMatchObject({ to: '/app/remittances?status=DRAFT', permission: 'remittances:view' });
+    expect(actionLink('LEASES_EXPIRING')).toMatchObject({ to: '/app/tenancies?expiring=60', permission: 'tenancies:view' });
+  });
+
+  it('words singular and plural counts', () => {
+    expect(actionLink('INVOICE_RUN_PENDING').label(1)).toBe('Invoice run: 1 tenancy not billed yet');
+    expect(actionLink('INVOICE_RUN_PENDING').label(4)).toBe('Invoice run: 4 tenancies not billed yet');
+    expect(actionLink('OVERDUE_TENANTS').label(2)).toBe('2 tenants overdue');
+    expect(actionLink('NOTICE_ENDING').label(1)).toBe('1 tenancy ends within 14 days');
+    expect(actionLink('REMITTANCES_TO_APPROVE').label(2)).toBe('2 remittances to approve');
+    expect(actionLink('LEASES_EXPIRING').label(2)).toBe('2 leases end within 60 days');
+  });
+});
+
+describe('rental income tax (MRI) tab', () => {
+  it('opens from ?tab=mri', () => {
+    expect(readReportTab('mri')).toBe('mri');
+  });
+
+  it('shows the rate and says it is an estimate', () => {
+    expect(mriRate(750)).toBe('7.5%');
+    expect(mriRate(1000)).toBe('10%');
+    expect(mriNotice(750, '2026-12-20')).toBe(
+      'Estimate: residential rent received this month at 7.5%, due by 20 Dec 2026. Commercial properties, water and other charges, deposits and late fees are left out. Confirm with your tax advisor before filing on KRA iTax.',
+    );
+  });
+});
+
+describe('parseRatePercent', () => {
+  it('turns a percentage into basis points', () => {
+    expect(parseRatePercent('7.5')).toEqual({ ok: true, bps: 750 });
+    expect(parseRatePercent(' 10 ')).toEqual({ ok: true, bps: 1000 });
+    expect(parseRatePercent('0')).toEqual({ ok: true, bps: 0 });
+  });
+
+  it('rejects anything else', () => {
+    expect(parseRatePercent('7.555')).toEqual({ ok: false, error: 'Enter a rate from 0 to 50, with at most two decimals.' });
+    expect(parseRatePercent('51')).toEqual({ ok: false, error: 'Enter a rate from 0 to 50, with at most two decimals.' });
+    expect(parseRatePercent('')).toEqual({ ok: false, error: 'Enter a rate from 0 to 50, with at most two decimals.' });
   });
 });

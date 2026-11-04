@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../auth/session_controller.dart';
 import '../providers.dart';
+import 'firebase_push.dart';
 
 /// Resolves the device's FCM / APNs token and platform name (`android`, `ios`, `web`).
 /// Uses the `co.ke.kodihub.push` platform channel when available, and degrades gracefully
@@ -38,8 +41,13 @@ class MethodChannelPushTokenSource implements PushTokenSource {
   }
 }
 
+/// Firebase when this build is configured for it (phase 13), else the native bridge.
 final pushTokenSourceProvider = Provider<PushTokenSource>(
-  (_) => MethodChannelPushTokenSource(),
+  (_) => Firebase.apps.isNotEmpty
+      ? FirebasePushTokenSource(
+          FirebasePushMessaging(FirebaseMessaging.instance),
+        )
+      : MethodChannelPushTokenSource(),
 );
 
 /// Maps a backend notification `actionUrl` to the corresponding mobile route and [AppMode].

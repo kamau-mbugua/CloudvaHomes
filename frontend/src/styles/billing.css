@@ -27,7 +27,7 @@
 }
 .bl__lines-table tfoot tr + tr th { border-top: 0; padding-top: 2px; }
 .fld.bl__cell { gap: 2px; min-width: 110px; }
-.fld.bl__cell > input { height: 36px; text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.fld.bl__cell > input { height: 36px; text-align: right; font-family: var(--font-figures); font-variant-numeric: tabular-nums; }
 .fld.bl__note { min-width: 140px; }
 .fld.bl__note > input { text-align: left; font-family: inherit; }
 .bl__cell .fld__err { text-align: left; white-space: normal; max-width: 200px; }
@@ -47,7 +47,7 @@
 }
 .bl__line .fld { gap: 2px; }
 .bl__line > .nx-btn { min-height: 44px; width: 44px; padding: 0; justify-content: center; font-size: 18px; }
-.bl__lineamt > input { text-align: right; font-family: var(--font-num); }
+.bl__lineamt > input { text-align: right; font-family: var(--font-figures); font-variant-numeric: tabular-nums; }
 .bl__lineerr { grid-column: 1 / -1; }
 .bl__linefoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
 

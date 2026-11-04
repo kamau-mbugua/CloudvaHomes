@@ -16,6 +16,9 @@ import { InvoiceSheet } from './InvoiceSheet';
 import type { Invoice } from './types';
 import { InvoicesTable, PropertySelect } from './ui';
 
+/** What `GET /invoices?sort=` accepts. */
+const INVOICE_SORT_FIELDS = ['issueDate', 'dueDate', 'total', 'number'] as const;
+
 /**
  * Invoices, newest first, with filters in the address (status, kind, month, property,
  * overdue) and search by number, tenant or unit. "New invoice" is a one-off (ADHOC)
@@ -38,13 +41,14 @@ export function InvoicesPage() {
   const period = filters.get('period');
   const propertyId = filters.get('propertyId');
   const overdue = filters.get('overdue') === 'true' ? 'true' : '';
+  const sort = filters.get('sort');
   const canCreate = useCan('invoices:create');
   const [creating, setCreating] = useState(false);
 
   const list = useQuery({
-    queryKey: [...keys.invoices, 'list', { q, status, kind, period, propertyId, overdue, page }],
+    queryKey: [...keys.invoices, 'list', { q, status, kind, period, propertyId, overdue, sort, page }],
     queryFn: () => api.get<PageEnvelope<Invoice>>('/invoices', {
-      page, pageSize: PAGE_SIZE, q, status, kind, period, propertyId, overdue,
+      page, pageSize: PAGE_SIZE, q, status, kind, period, propertyId, overdue, sort,
     }),
     placeholderData: keepPreviousData,
   });
@@ -99,7 +103,10 @@ export function InvoicesPage() {
           )}
         </div>
       ) : (
-        <InvoicesTable rows={rows} />
+        <InvoicesTable
+          rows={rows}
+          sort={{ value: sort, fields: INVOICE_SORT_FIELDS, fallback: '-issueDate', onChange: (next) => filters.setFilter({ sort: next }) }}
+        />
       )}
 
       <Pager meta={list.data?.meta} onPage={(next) => filters.setFilter({ page: String(next) })} />

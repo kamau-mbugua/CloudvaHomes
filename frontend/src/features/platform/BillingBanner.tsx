@@ -6,13 +6,13 @@ import { PayHodiSheet } from './PayHodiSheet';
 import { bannerFor, suggestedPayment } from './rules';
 
 /**
- * The staff app's Hodi billing banner, above every page while the organisation is
+ * The staff app's KodiHub billing banner, above every page while the organisation is
  * overdue (GRACE), read-only (SUSPENDED) or closed. Its status comes from the session
  * (`activeOrganization.status`); the amount and due date from `GET /billing` for those who
  * may see it (`settings:view`). It sits in the page flow above the content — never over
  * it — so everything stays readable.
  *
- * "Pay now" opens the M-Pesa prompt (`settings:update`, when Hodi can take it in the app);
+ * "Pay now" opens the M-Pesa prompt (`settings:update`, when KodiHub can take it in the app);
  * otherwise it leads to Plan & billing, which shows the paybill.
  */
 export function BillingBanner() {

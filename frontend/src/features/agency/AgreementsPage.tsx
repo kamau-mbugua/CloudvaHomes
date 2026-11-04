@@ -14,8 +14,9 @@ import { Badge } from '../portfolio/ui';
 import { agencyErrorMessage, agencyKeys, useAgreements } from './api';
 import { AgreementSheet, EndAgreementSheet } from './AgreementSheet';
 import { AGREEMENT_STATE, COLLECTION_MODE, COMMISSIONABLE_LINE } from './labels';
-import { agreementState, describeRate, ordinal } from './rules';
-import type { Agreement } from './types';
+import { agreementState, describeRate, lateFeeRecipientText, ordinal } from './rules';
+import type { Agreement, LateFeeRecipient } from './types';
+import { keys as settingsKeys } from '../settings/api';
 
 /**
  * Agreements (`/app/agreements`): the management terms per landlord — commission, who
@@ -100,6 +101,7 @@ export function AgreementsTable({ rows, canUpdate, canDelete, onEdit, onEnd, sho
             <th>Commission</th>
             <th>Collection</th>
             <th>Remittance day</th>
+            <th>Late fees go to</th>
             <th>Dates</th>
             <th>Status</th>
             <th className="ad__rowactions"><span className="nx-sr">Actions</span></th>
@@ -115,7 +117,7 @@ export function AgreementsTable({ rows, canUpdate, canDelete, onEdit, onEnd, sho
                   <td>
                     <Link className="ad__link" to={`/app/landlords/${a.landlord.id}`}><strong>{a.landlord.name}</strong></Link>
                     <span className="ad__sub">
-                      <span className="num">{a.landlord.code}</span> · {a.propertyIds.length === 0 ? 'All properties' : `${a.propertyIds.length} ${a.propertyIds.length === 1 ? 'property' : 'properties'}`}
+                      <span className="code">{a.landlord.code}</span> · {a.propertyIds.length === 0 ? 'All properties' : `${a.propertyIds.length} ${a.propertyIds.length === 1 ? 'property' : 'properties'}`}
                     </span>
                   </td>
                 ) : null}
@@ -132,6 +134,7 @@ export function AgreementsTable({ rows, canUpdate, canDelete, onEdit, onEnd, sho
                   </span>
                 </td>
                 <td>{ordinal(a.remittanceDay)} of the month</td>
+                <td><LateFeeRecipientCell agreement={a} editable={canUpdate && state !== 'ENDED'} /></td>
                 <td>
                   {formatDay(a.startDate.slice(0, 10))}
                   <span className="ad__sub">{a.endDate ? `to ${formatDay(a.endDate.slice(0, 10))}` : 'No end date'}</span>
@@ -154,5 +157,43 @@ export function AgreementsTable({ rows, canUpdate, canDelete, onEdit, onEnd, sho
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Who keeps late fees, changeable in place: it is the one term that may change after money
+ * was booked (each fee records who kept it when issued). Unset = no late fees here.
+ */
+function LateFeeRecipientCell({ agreement, editable }: { agreement: Agreement; editable: boolean }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const change = useMutation({
+    mutationFn: (lateFeeRecipient: LateFeeRecipient | null) =>
+      api.patch(`/agreements/${agreement.id}`, { lateFeeRecipient }),
+    onSuccess: async (_r, next) => {
+      toast.saved(next ? `Late fees on ${agreement.landlord.name}’s properties now go to ${lateFeeRecipientText(next).toLowerCase()}.` : `No late fees on ${agreement.landlord.name}’s properties until you choose who keeps them.`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agencyKeys.agreements }),
+        queryClient.invalidateQueries({ queryKey: settingsKeys.organization }),
+      ]);
+    },
+    onError: (error) => toast.failed(agencyErrorMessage(error)),
+  });
+  const unset = agreement.lateFeeRecipient === null;
+  if (!editable) {
+    return <span className={unset ? 'lf__unset' : undefined}>{lateFeeRecipientText(agreement.lateFeeRecipient)}</span>;
+  }
+  return (
+    <select
+      className={`ad__select lf__select${unset ? ' lf__select--unset' : ''}`}
+      aria-label={`Who keeps late fees on ${agreement.landlord.name}’s properties`}
+      value={agreement.lateFeeRecipient ?? ''}
+      disabled={change.isPending}
+      onChange={(e) => change.mutate((e.target.value || null) as LateFeeRecipient | null)}
+    >
+      <option value="">Not set — no late fees</option>
+      <option value="LANDLORD">The landlord</option>
+      <option value="AGENCY">The agency</option>
+    </select>
   );
 }

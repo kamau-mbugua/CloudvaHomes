@@ -46,6 +46,8 @@ export interface Dashboard {
   unmatchedMpesa: number | null;
   /** `overdue` is past-due only; not-yet-due balances are left out. */
   topOverdue: { tenant: TenantRef; overdue: number; oldestDueDate: string }[];
+  /** The "Needs attention" list: only kinds with something to do, in display order. */
+  actions: ActionItem[];
   /** 12 months, oldest first. */
   trend: TrendPoint[];
   /** Per-property breakdown when in consolidated portfolio mode. */
@@ -89,4 +91,36 @@ export interface OccupancyReport {
     vacantUnits: { id: string; number: string; vacantSince: string | null }[];
   })[];
   totals: OccupancyFigures;
+}
+
+export type ActionKind =
+  | 'INVOICE_RUN_PENDING'
+  | 'UNMATCHED_PAYMENTS'
+  | 'OVERDUE_TENANTS'
+  | 'NOTICE_ENDING'
+  | 'REMITTANCES_TO_APPROVE'
+  | 'LEASES_EXPIRING';
+
+export interface ActionItem {
+  kind: ActionKind;
+  count: number;
+  /** Minor units; only on OVERDUE_TENANTS. */
+  amount?: number;
+}
+
+/** GET /reports/rental-income-tax (phase 13): residential rent received in a month. */
+export interface MriReport {
+  period: string;
+  rateBps: number;
+  dueDate: string;
+  rows: {
+    landlordId: string | null;
+    landlordName: string;
+    kraPin: string | null;
+    grossRentReceived: number;
+    rateBps: number;
+    taxDue: number;
+    dueDate: string;
+  }[];
+  totals: { grossRentReceived: number; taxDue: number };
 }

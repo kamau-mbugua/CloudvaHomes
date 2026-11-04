@@ -10,7 +10,7 @@ import type { StkState } from './types';
  * sweep job finishes it either way. "Check again" starts another three minutes.
  *
  * Shared by the staff "Request M-Pesa payment" dialog, the tenant portal's "Pay now" and
- * an organisation paying its Hodi bill (phase 8); only the URL and the shape differ.
+ * an organisation paying its KodiHub bill (phase 8); only the URL and the shape differ.
  */
 export function useStkFollow<T extends { state: StkState }>({ queryKey, fetchStk, first, startedAt: initialStart }: {
   queryKey: QueryKey;

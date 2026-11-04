@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { RentChangesService } from '../../portfolio/tenancies/rent-changes.service.js';
 import {
   currentContext,
   emptyContext,
@@ -24,6 +25,11 @@ const CANDIDATE_INCLUDE = {
       property: { select: { id: true, code: true, name: true } },
     },
   },
+  // Scheduled rent changes not applied yet: the builder prices the month with them.
+  rentChanges: {
+    where: { appliedAt: null },
+    select: { effectivePeriod: true, newRent: true },
+  },
 } as const;
 
 export const LIVE_INVOICE_INDEX = 'invoices_one_live_per_tenancy_period';
@@ -42,6 +48,7 @@ export class InvoiceRunService {
     private readonly prisma: PrismaService,
     private readonly builder: InvoiceBuilder,
     private readonly issuer: InvoiceIssuer,
+    private readonly rentChanges: RentChangesService,
   ) {}
 
   /** `date` defaults to today in Nairobi; it may not be in the future. */
@@ -107,6 +114,8 @@ export class InvoiceRunService {
     const ctx = currentContext();
     const orgId = ctx?.orgId;
     if (!orgId) throw new Error('Invoice run needs an active organisation');
+    // Rent changes that start by this month take effect before it is billed (phase 13).
+    await this.rentChanges.applyDue(period);
     const invoiceIds: string[] = [];
     for (const t of await this.candidates(d)) {
       try {

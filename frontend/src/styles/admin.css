@@ -68,7 +68,10 @@
   color: var(--text-subtle);
 }
 .ad__table tbody tr:last-child td { border-bottom: 0; }
-.ad__table td.num, .ad__table th.num { text-align: right; font-family: var(--font-num); }
+.ad__table td.num, .ad__table th.num { text-align: right; }
+/* Headers keep the header font; only the figures use the number font. */
+.ad__table td.num { font-family: var(--font-figures); white-space: nowrap; }
+.ad__table th.num { font-family: inherit; }
 .ad__sub { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
 /* The cell must stay a table-cell — making the <td> itself a flex container drops it out
    of the table layout, and the buttons render outside the table's right edge. The flex
@@ -98,7 +101,7 @@
 .ad__badge--neutral { background: var(--muted); color: var(--text-muted); }
 
 /* Money: tabular so columns of digits line up. */
-.ad__money { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.ad__money { font-family: var(--font-figures); font-variant-numeric: tabular-nums; }
 
 .ad__owed { color: var(--destructive); font-weight: 600; }
 
@@ -147,3 +150,64 @@
   color: var(--text-secondary);
   max-width: 88ch;
 }
+
+/* ---- phone: tables become cards ------------------------------------------- */
+/* Each row is a card; each cell shows its column name (data-label, stamped by
+   lib/tableLabels.ts) on the left and its value on the right, so amount and status are
+   never scrolled off-screen. `table.ad__table.ad__table` outranks the page-specific
+   min-widths (e.g. `.ad__table.bl__readings`). */
+@media (max-width: 640px) {
+  /* Only a wrapper holding a table drops its card — an empty state inside keeps it. */
+  .ad__tablewrap:has(> table.ad__table) { overflow-x: visible; background: transparent; border: 0; box-shadow: none; }
+  table.ad__table.ad__table { display: block; min-width: 0; }
+  .ad__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .ad__table tbody, .ad__table tfoot { display: block; }
+  .ad__table tr {
+    display: block;
+    margin-bottom: 10px;
+    padding: 4px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-sm);
+  }
+  .ad__table td,
+  .ad__table tbody tr:last-child td {
+    display: block;
+    padding: 9px 0;
+    text-align: right;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .ad__table tr > td:last-child { border-bottom: 0; }
+  .ad__table td[data-label]::before {
+    content: attr(data-label);
+    float: left;
+    max-width: 45%;
+    margin-right: 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-subtle);
+  }
+  .ad__table td[data-label]::after { content: ''; display: block; clear: both; }
+  .ad__table td:not([data-label]) { text-align: left; }
+  .ad__table td:not([data-label]):empty { display: none; }
+  .ad__table td.ad__rowactions { text-align: left; }
+  .ad__table td.ad__rowactions > div { justify-content: flex-start; }
+}
+
+/* ---- sortable column headers (components/SortHeader) ---- */
+.sorth {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit;
+}
+.sorth:hover, .sorth.is-on { color: var(--foreground); }
+.sorth:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+.sorth__arrow { font-size: 11px; opacity: 0.45; }
+.sorth.is-on .sorth__arrow { opacity: 1; }
+th.num .sorth { flex-direction: row-reverse; }
+.tn__credit { color: var(--success); font-weight: 500; }
+.ad__toolbar-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }

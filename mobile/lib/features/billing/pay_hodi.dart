@@ -8,7 +8,7 @@ import '../../core/providers.dart';
 import 'billing_api.dart';
 
 /// "Pay now" for the Hodi bill, through Hodi's own paybill.
-Future<void> showPayHodi(
+Future<void> showPayKodiHub(
   BuildContext context,
   WidgetRef ref,
   HodiBilling billing,
@@ -18,9 +18,9 @@ Future<void> showPayHodi(
   return StkPaySheet.show(
     context,
     StkPaySheet(
-      title: 'Pay your Hodi bill',
+      title: 'Pay your KodiHub bill',
       intro:
-          'An M-Pesa prompt goes to the phone below. The payment pays the oldest Hodi invoice '
+          'An M-Pesa prompt goes to the phone below. The payment pays the oldest KodiHub invoice '
           'first; anything extra is kept as credit.',
       defaultAmount: wholeShillingsUp(billing.balance),
       defaultPhone: phone,

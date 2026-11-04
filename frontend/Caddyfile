@@ -14,6 +14,9 @@
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 	@html path / /index.html
 	header @html Cache-Control "no-cache"
+	# The service worker and manifest decide when an update is seen: always revalidate them.
+	@pwa path /sw.js /manifest.webmanifest
+	header @pwa Cache-Control "no-cache"
 
 	# Client-side routes (/app/…, /tenant/…) fall back to the app shell.
 	try_files {path} /index.html

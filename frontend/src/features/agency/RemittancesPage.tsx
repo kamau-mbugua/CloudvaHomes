@@ -181,10 +181,10 @@ function RemittancesTable({ rows, selection }: { rows: Remittance[]; selection?:
                 </td>
               ) : null}
               <td>
-                <Link className="ad__link" to={`/app/remittances/${r.id}`}><strong className="num">{r.number}</strong></Link>
+                <Link className="ad__link" to={`/app/remittances/${r.id}`}><strong className="code">{r.number}</strong></Link>
                 <span className="ad__sub">Drafted {formatDateTime(r.createdAt)}</span>
               </td>
-              <td>{r.landlord.name}<span className="ad__sub num">{r.landlord.code}</span></td>
+              <td>{r.landlord.name}<span className="ad__sub code">{r.landlord.code}</span></td>
               <td>{formatPeriod(r.period)}</td>
               <td>{REMITTANCE_DIRECTION[r.direction] ?? r.direction}</td>
               <td className="num"><SignedAmount minor={r.net} /></td>

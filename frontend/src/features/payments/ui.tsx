@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { SortHeader, type TableSort } from '../../components/SortHeader';
 import { formatDateTime, formatDay } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { personName } from '../portfolio/labels';
@@ -25,7 +26,16 @@ export function SignedAmount({ minor, struck = false }: { minor: number; struck?
 }
 
 /** Payments as a table — the payments list and the tenant page. */
-export function PaymentsTable({ rows, showTenant = true }: { rows: Payment[]; showTenant?: boolean }) {
+export function PaymentsTable({
+  rows,
+  showTenant = true,
+  sort,
+}: {
+  rows: Payment[];
+  showTenant?: boolean;
+  /** Present on the payments list: the Received and Amount headers sort it. */
+  sort?: TableSort;
+}) {
   return (
     <div className="ad__tablewrap">
       <table className="ad__table py__table">
@@ -33,10 +43,10 @@ export function PaymentsTable({ rows, showTenant = true }: { rows: Payment[]; sh
           <tr>
             <th>Receipt</th>
             {showTenant ? <th>Tenant</th> : null}
-            <th>Received</th>
+            {sort ? <SortHeader field="receivedAt" label="Received" sort={sort} /> : <th>Received</th>}
             <th>Method</th>
             <th>Reference</th>
-            <th className="num">Amount</th>
+            {sort ? <SortHeader field="amount" label="Amount" sort={sort} className="num" /> : <th className="num">Amount</th>}
             <th className="num">Credit left</th>
           </tr>
         </thead>
@@ -46,14 +56,14 @@ export function PaymentsTable({ rows, showTenant = true }: { rows: Payment[]; sh
             return (
               <tr key={p.id} className={reversal ? 'py__reversalrow' : p.reversedBy ? 'py__reversedrow' : undefined}>
                 <td>
-                  <Link className="ad__link" to={`/app/payments/${p.id}`}><strong className="num">{p.number}</strong></Link>{' '}
+                  <Link className="ad__link" to={`/app/payments/${p.id}`}><strong className="code">{p.number}</strong></Link>{' '}
                   <PaymentBadges payment={p} />
                   <span className="ad__sub">Recorded {formatDateTime(p.createdAt)}</span>
                 </td>
                 {showTenant ? (
                   <td>
                     {personName(p.tenant)}
-                    <span className="ad__sub num">{p.tenant.code} · {p.tenant.phone}</span>
+                    <span className="ad__sub code">{p.tenant.code} · {p.tenant.phone}</span>
                   </td>
                 ) : null}
                 <td>{formatDay(p.receivedAt)}</td>

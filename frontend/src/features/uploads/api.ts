@@ -12,7 +12,8 @@ export type UploadPurpose =
   | 'EXPENSE_RECEIPT'
   | 'METER_PHOTO'
   | 'MAINTENANCE_PHOTO'
-  | 'LEASE_DOCUMENT';
+  | 'LEASE_DOCUMENT'
+  | 'INSPECTION_PHOTO';
 
 export interface Upload {
   id: string;

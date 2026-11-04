@@ -96,6 +96,9 @@
 
   --font: Lufga, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-num: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Money and other figures: the system sans has true tabular digits (Lufga doesn't), so
+     columns of amounts line up without the width of a monospace font. */
+  --font-figures: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
   /* Minimum hit target for primary controls; phones are a first-class surface. */
   --touch-min: 44px;

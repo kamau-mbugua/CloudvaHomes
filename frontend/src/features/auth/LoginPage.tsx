@@ -18,7 +18,7 @@ import { useAppConfig } from './useAppConfig';
 import { useCountdown } from './useCountdown';
 
 /**
- * Sign in — the pos-react auth layout with Hodi branding.
+ * Sign in — the pos-react auth layout with KodiHub branding.
  *
  * One identifier field takes an email address OR a phone number; the server decides
  * which it is. "Use a one-time code instead" is the phone-only path (most tenants and

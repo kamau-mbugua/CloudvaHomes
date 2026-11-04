@@ -1,4 +1,7 @@
+import { InspectionsController } from './inspections/inspections.controller.js';
+import { InspectionsService } from './inspections/inspections.service.js';
 import { Module } from '@nestjs/common';
+import { RentChangesService } from './tenancies/rent-changes.service.js';
 import { FilesModule } from '../files/files.module.js';
 import {
   UnitCategoriesController,
@@ -33,6 +36,7 @@ import { UnitsService } from './units/units.service.js';
     UnitsController,
     TenantsController,
     TenanciesController,
+    InspectionsController,
   ],
   providers: [
     IdNumbers,
@@ -42,7 +46,16 @@ import { UnitsService } from './units/units.service.js';
     UnitsService,
     TenantsService,
     TenanciesService,
+    RentChangesService,
+    InspectionsService,
   ],
-  exports: [PropertiesService, UnitsService, TenantsService, TenanciesService],
+  exports: [
+    PropertiesService,
+    UnitsService,
+    TenantsService,
+    TenanciesService,
+    RentChangesService,
+    InspectionsService,
+  ],
 })
 export class PortfolioModule {}

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { IsDateOnly } from '../../common/dates/date-only.js';
 import { PaginationQueryDto } from '../../common/http/pagination.js';
 import { IsMinorAmount } from '../portfolio/money.dto.js';
@@ -54,4 +54,13 @@ export class TenantInvoicesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(['ISSUED', 'PARTIALLY_PAID', 'PAID', 'VOID'])
   status?: 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'VOID';
+}
+
+export class RunRemindersDto {
+  @ApiPropertyOptional({
+    description: 'true = only count who would be texted today; nothing is sent or recorded',
+  })
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
 }

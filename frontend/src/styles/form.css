@@ -548,3 +548,98 @@
   overflow-x: auto;
 }
 
+
+/* ---- page error (ErrorBoundary) ------------------------------------------- */
+.eb {
+  margin: 24px auto;
+  max-width: 520px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+/* ---- "More" menu (components/MoreMenu) ------------------------------------- */
+/* Above sheets and route drawers (z 18–40), since it opens from inside them. */
+.mm {
+  position: fixed; z-index: 60;
+  min-width: 200px; max-width: calc(100vw - 16px);
+  padding: 6px;
+  background: var(--card); color: var(--foreground);
+  border: 1px solid var(--border); border-radius: var(--radius-dialog, 12px);
+  box-shadow: var(--shadow-lg);
+}
+.mm__item {
+  display: flex; align-items: center; width: 100%;
+  min-height: 38px; padding: 0 12px;
+  border: 0; border-radius: 8px; background: none;
+  font: inherit; font-size: 13.5px; text-align: left; color: inherit; cursor: pointer;
+}
+.mm__item:hover, .mm__item:focus-visible { background: var(--accent-soft); outline: none; }
+.mm__item:focus-visible { box-shadow: inset 0 0 0 2px var(--ring); }
+.mm__item[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.mm__item--danger { color: var(--destructive); }
+.mm__sep { height: 1px; margin: 6px 4px; background: var(--border); }
+.mm__caret { margin-left: 4px; font-size: 10px; opacity: 0.7; }
+
+/* ---- settings → late fees ---- */
+.lf__notice { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--secondary); font-size: 13.5px; }
+.lf__notice--warn { background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--foreground); }
+.lf__mode { margin: 14px 0 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
+.lf__mode legend { margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.lf__radio { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.lf__mode:disabled { opacity: 0.6; }
+.lf__unset, .lf__select--unset { color: var(--warning); }
+.lf__select { min-width: 190px; }
+
+/* ---- lease terms (tenants/LeaseSheets, TenancyTable) ---- */
+.ls__pending { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ls__pending li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--secondary); font-size: 13.5px; }
+.ls__change { color: var(--accent); }
+.ls__soon { color: var(--warning); font-weight: 600; }
+
+/* ---- tenants → messages ---- */
+.ms__lede { margin: 0; max-width: 62ch; }
+.ms__text { max-width: 40ch; white-space: pre-wrap; }
+.ms__warn { color: var(--warning); }
+.ms__props { margin: 0 0 6px; padding: 0; border: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+.ms__props legend { margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.ms__area { min-height: 110px; resize: vertical; }
+.ms__quote { margin: 0 0 12px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--secondary); border-radius: 8px; white-space: pre-wrap; }
+
+/* ---- inspections (tenants/InspectionSheet) ---- */
+.ins__list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ins__item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ins__item--worse { border-color: var(--warning); }
+.ins__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ins__area { flex: 1 1 160px; min-width: 0; font-weight: 600; }
+.ins__conds { display: flex; flex-wrap: wrap; gap: 4px; }
+.ins__cond { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 12.5px; cursor: pointer; }
+.ins__cond input { position: absolute; opacity: 0; pointer-events: none; }
+.ins__cond:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; }
+.ins__cond.is-on.ins__cond--good { background: color-mix(in srgb, var(--success) 15%, transparent); border-color: var(--success); }
+.ins__cond.is-on.ins__cond--fair { background: var(--secondary); border-color: var(--text-subtle); }
+.ins__cond.is-on.ins__cond--poor { background: color-mix(in srgb, var(--warning) 15%, transparent); border-color: var(--warning); }
+.ins__cond.is-on.ins__cond--damaged { background: color-mix(in srgb, var(--destructive) 15%, transparent); border-color: var(--destructive); }
+.ins__before { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.ins__before--worse { color: var(--warning); font-weight: 600; }
+.ins__photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ins__photo { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+.ins__reopen { margin-top: 6px; }
+/* The checklist's own inputs get the same look as form fields. */
+.ins__item input.nx-input {
+  height: 36px; padding: 0 10px; width: 100%;
+  border-radius: var(--radius); border: 1px solid var(--input); background: var(--input-background);
+  font-family: inherit; font-size: 13.5px; color: var(--foreground); outline: none;
+}
+.ins__item .ins__row input.ins__area { width: auto; }
+.ins__item input.nx-input:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 25%, transparent); }
+.ins__item input.nx-input:disabled { opacity: 0.75; }
+
+/* ---- "new version" prompt (app/UpdatePrompt) ---- */
+.upd {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 70;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  max-width: calc(100vw - 32px); padding: 10px 14px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg);
+  font-size: 13.5px;
+}

@@ -48,6 +48,7 @@ export const PERMISSION_CATALOGUE: PermissionGroup[] = [
     permissions: [
       ...crud('tenants', 'tenants'),
       ...crud('tenancies', 'tenancies (move-in / move-out)'),
+      { key: 'messages:send', label: 'Send notices to tenants (SMS, email, app)' },
     ],
   },
   {

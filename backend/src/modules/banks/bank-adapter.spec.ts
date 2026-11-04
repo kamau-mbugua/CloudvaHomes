@@ -22,6 +22,11 @@ const sign = (t: string, b: Buffer, s = secret) =>
   `sha256=${createHmac('sha256', s).update(`${t}.`).update(b).digest('hex')}`;
 
 describe('HODI_JSON adapter', () => {
+  it('is listed under the KodiHub name (the code and headers stay HODI for existing banks)', () => {
+    expect(hodiJsonAdapter.name).toBe('KodiHub signed JSON');
+    expect(hodiJsonAdapter.code).toBe('HODI_JSON');
+  });
+
   it('accepts a fresh, correctly signed body', () => {
     expect(
       hodiJsonAdapter.verify(

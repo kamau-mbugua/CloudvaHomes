@@ -1,13 +1,15 @@
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
+import { PWA_OPTIONS } from './src/app/pwa.js';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const apiOrigin = env.VITE_DEV_API_ORIGIN || 'http://localhost:8080';
 
   return {
-    plugins: [react()],
+    plugins: [react(), VitePWA(PWA_OPTIONS)],
 
     server: {
       port: 5173,

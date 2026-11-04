@@ -125,7 +125,7 @@ export function PropertiesPage() {
                 <tr key={property.id}>
                   <td>
                     <Link className="ad__link" to={`/app/properties/${property.id}`}><strong>{property.name}</strong></Link>
-                    <span className="ad__sub num">{property.code}</span>
+                    <span className="ad__sub code">{property.code}</span>
                   </td>
                   {isAgency ? (
                     <td>

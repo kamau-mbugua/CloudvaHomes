@@ -31,8 +31,6 @@ export function ConfirmDelete({
 }) {
   const [asking, setAsking] = useState(false);
 
-  const close = () => setAsking(false);
-
   return (
     <>
       <button
@@ -44,29 +42,59 @@ export function ConfirmDelete({
         {label}
       </button>
 
-      {asking
-        ? createPortal(
-            <div className="nx-sheet" role="dialog" aria-modal="true" aria-label={`${verb} ${what}`}>
-              <DialogBehaviour onClose={close} busy={busy} />
-              <div className="nx-sheet__panel">
-                <header className="nx-sheet__head"><h2>{verb} {what}?</h2></header>
-                <p>{consequence ?? 'This cannot be undone.'}</p>
-                <div className="nx-sheet__actions">
-                  <button type="button" className="nx-btn" onClick={close}>Keep it</button>
-                  <button
-                    type="button"
-                    className="nx-btn nx-btn--danger-solid"
-                    disabled={busy}
-                    onClick={() => { close(); onConfirm(); }}
-                  >
-                    {busy ? 'Working…' : verb}
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {asking ? (
+        <ConfirmDialog
+          what={what}
+          consequence={consequence}
+          verb={verb}
+          busy={busy}
+          onClose={() => setAsking(false)}
+          onConfirm={onConfirm}
+        />
+      ) : null}
     </>
+  );
+}
+
+/**
+ * The "Delete …?" question on its own — for when the action starts somewhere other than a
+ * delete button, e.g. a "More" menu item. Render it while asking; it closes itself before
+ * confirming.
+ */
+export function ConfirmDialog({
+  what,
+  consequence,
+  verb = 'Delete',
+  busy = false,
+  onClose,
+  onConfirm,
+}: {
+  what: string;
+  consequence?: string;
+  verb?: string;
+  busy?: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return createPortal(
+    <div className="nx-sheet" role="dialog" aria-modal="true" aria-label={`${verb} ${what}`}>
+      <DialogBehaviour onClose={onClose} busy={busy} />
+      <div className="nx-sheet__panel">
+        <header className="nx-sheet__head"><h2>{verb} {what}?</h2></header>
+        <p>{consequence ?? 'This cannot be undone.'}</p>
+        <div className="nx-sheet__actions">
+          <button type="button" className="nx-btn" onClick={onClose}>Keep it</button>
+          <button
+            type="button"
+            className="nx-btn nx-btn--danger-solid"
+            disabled={busy}
+            onClick={() => { onClose(); onConfirm(); }}
+          >
+            {busy ? 'Working…' : verb}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

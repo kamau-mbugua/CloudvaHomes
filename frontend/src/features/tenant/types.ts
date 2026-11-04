@@ -29,6 +29,8 @@ export interface PortalTenancy {
   property: PropertyLike;
   rentAmount: number;
   billingDay: number;
+  leaseEndDate?: string | null;
+  upcomingRentChanges?: { effectivePeriod: string; newRent: number }[];
   status: TenancyStatus;
   startDate: string;
   endDate: string | null;

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { PageBoundary } from '../../components/ErrorBoundary';
 import { Sidebar } from '../../app/Sidebar';
 import { AccountMenu } from '../../app/AccountMenu';
 import { NotificationBell } from '../../app/NotificationBell';
@@ -149,7 +150,7 @@ export function AdminShell() {
         </header>
 
         <main className="ms__page">
-          <Outlet />
+          <PageBoundary homePath="/admin"><Outlet /></PageBoundary>
         </main>
       </div>
     </div>

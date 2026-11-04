@@ -346,7 +346,7 @@ function CollectionsView({ data }: { data: Record<string, unknown> }) {
                   <td>{row.salesperson ?? '—'}</td>
                   <td className="num">{row.reference}</td>
                   <td>{row.method} · {row.source}</td>
-                  <td className="num">{row.invoiceNumbers ?? 'Credit'}</td>
+                  <td className="code">{row.invoiceNumbers ?? 'Credit'}</td>
                   <td className="num">{kes(row.amount)}</td>
                 </tr>
               ))}
@@ -759,7 +759,7 @@ function InvoicesReportView({ data }: { data: Record<string, unknown> }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td><strong className="num">{r.number}</strong></td>
+                  <td><strong className="code">{r.number}</strong></td>
                   <td>
                     {r.orgId ? (
                       <Link className="ad__link" to={`/admin/organizations/${encodeURIComponent(r.orgId)}`}>

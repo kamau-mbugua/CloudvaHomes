@@ -16,6 +16,9 @@ import { checkStatementRange } from './rules';
 import type { Payment } from './types';
 import { PaymentsTable } from './ui';
 
+/** What `GET /payments?sort=` accepts. */
+const PAYMENT_SORT_FIELDS = ['receivedAt', 'amount'] as const;
+
 /**
  * Payments, newest first (`GET /payments`), with filters in the address: search (receipt,
  * reference, tenant), channel, method, received-date range and reversals. "Record
@@ -33,6 +36,7 @@ export function PaymentsPage() {
   const from = filters.get('from');
   const to = filters.get('to');
   const reversedParam = filters.get('reversed');
+  const sort = filters.get('sort');
   const reversed = reversedParam === 'true' || reversedParam === 'false' ? reversedParam : '';
   const canCreate = useCan('payments:create');
   const canSeeChannels = useCan('channels:view');
@@ -41,9 +45,9 @@ export function PaymentsPage() {
   const rangeError = checkStatementRange(from, to);
 
   const list = useQuery({
-    queryKey: [...keys.payments, 'list', { q, tenantId, channelId, method, from, to, reversed, page }],
+    queryKey: [...keys.payments, 'list', { q, tenantId, channelId, method, from, to, reversed, sort, page }],
     queryFn: () => api.get<PageEnvelope<Payment>>('/payments', {
-      page, pageSize: PAGE_SIZE, q, tenantId, channelId, method, from, to, reversed,
+      page, pageSize: PAGE_SIZE, q, tenantId, channelId, method, from, to, reversed, sort,
     }),
     placeholderData: keepPreviousData,
     enabled: !rangeError,
@@ -113,7 +117,10 @@ export function PaymentsPage() {
           )}
         </div>
       ) : (
-        <PaymentsTable rows={rows} />
+        <PaymentsTable
+          rows={rows}
+          sort={{ value: sort, fields: PAYMENT_SORT_FIELDS, fallback: '-receivedAt', onChange: (next) => filters.setFilter({ sort: next }) }}
+        />
       )}
 
       <Pager meta={list.data?.meta} onPage={(next) => filters.setFilter({ page: String(next) })} />

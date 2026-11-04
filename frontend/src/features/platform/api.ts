@@ -15,7 +15,7 @@ import type {
  * unknown query parameters (422), so they are called bare.
  */
 export const keys = {
-  /** The organisation's own Hodi billing — summary, invoices, payments, pay requests. */
+  /** The organisation's own KodiHub billing — summary, invoices, payments, pay requests. */
   billing: ['hodi-billing'] as const,
   /** Everything under /platform. */
   platform: ['platform'] as const,
@@ -114,7 +114,7 @@ export function usePlatformLocks(enabled = true) {
 }
 
 /**
- * A Hodi invoice as a PDF, saved as `HODI-2026-000001.pdf` — the organisation's own
+ * A KodiHub invoice as a PDF, saved as `HODI-2026-000001.pdf` — the organisation's own
  * (`/billing/…`) or, for a platform admin, any (`/platform/…`).
  */
 export async function downloadHodiInvoicePdf(invoice: { id: string; number: string }, from: 'billing' | 'platform' = 'billing'): Promise<void> {

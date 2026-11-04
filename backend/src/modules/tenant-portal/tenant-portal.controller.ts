@@ -1,3 +1,4 @@
+import { inspectionKind } from '../portfolio/inspections/inspections.controller.js';
 import {
   Body,
   Controller,
@@ -39,9 +40,11 @@ import { renderReceiptPdf, renderStatementPdf } from '../payments/pdfs.js';
 import { renderLeasePdf } from '../portfolio/tenancies/lease-pdf.js';
 import { MessagesService } from './messages.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
+import { BroadcastsService } from './broadcasts.service.js';
 import {
   BulkPortalDto,
   ListMessagesQueryDto,
+  RunRemindersDto,
   TenantInvoicesQueryDto,
   TenantPayDto,
 } from './tenant-portal.dto.js';
@@ -103,8 +106,8 @@ export class TenantAccessController {
   @Post('tenants/run-reminders')
   @HttpCode(200)
   @RequirePermission('tenants:update')
-  async runReminders() {
-    return ok(await this.accounts.runReminders());
+  async runReminders(@Body() dto: RunRemindersDto) {
+    return ok(await this.accounts.runReminders(undefined, { dryRun: dto.dryRun }));
   }
 
   @Get('messages')
@@ -247,6 +250,58 @@ export class TenantPortalController {
     return sendFile(res, upload, data);
   }
 
+  /** Move-in / move-out inspections of the tenant's own tenancy (phase 13). */
+  @Get(':id/tenancies/:tenancyId/inspections')
+  async inspections(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+  ) {
+    return ok(await this.portal.inspections(id, tenancyId));
+  }
+
+  @Post(':id/tenancies/:tenancyId/inspections/:kind/acknowledge')
+  @HttpCode(200)
+  async acknowledgeInspection(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+    @Param('kind') kind: string,
+  ) {
+    return ok(await this.portal.acknowledgeInspection(id, tenancyId, inspectionKind(kind)));
+  }
+
+  @Get(':id/tenancies/:tenancyId/inspections/:kind/photos/:uploadId')
+  async inspectionPhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+    @Param('kind') kind: string,
+    @Param('uploadId', ParseUUIDPipe) uploadId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { upload, data } = await this.portal.inspectionPhoto(
+      id,
+      tenancyId,
+      inspectionKind(kind),
+      uploadId,
+    );
+    return sendFile(res, upload, data);
+  }
+
+  @Get(':id/tenancies/:tenancyId/inspections/:kind/pdf')
+  @ApiProduces('application/pdf')
+  async inspectionPdf(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+    @Param('kind') kind: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const k = inspectionKind(kind);
+    return pdf(
+      res,
+      `${k === 'MOVE_IN' ? 'Move-in' : 'Move-out'}-inspection.pdf`,
+      await this.portal.inspectionPdf(id, tenancyId, k),
+    );
+  }
+
   @Get(':id/tenancies/:tenancyId/lease/pdf')
   @ApiProduces('application/pdf')
   async leasePdf(
@@ -275,7 +330,18 @@ export class TenantPortalController {
 @UseGuards(JobsGuard)
 @Controller('internal/jobs')
 export class ReminderJobsController {
-  constructor(private readonly accounts: TenantAccountsService) {}
+  constructor(
+    private readonly accounts: TenantAccountsService,
+    private readonly broadcasts: BroadcastsService,
+  ) {}
+
+  /** Every minute: finish broadcasts a restart interrupted. */
+  @Post('broadcast-sweep')
+  @HttpCode(200)
+  @ApiExcludeEndpoint()
+  async broadcastSweep() {
+    return { data: await this.broadcasts.sweep() };
+  }
 
   @Post('reminders')
   @HttpCode(200)

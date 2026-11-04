@@ -104,6 +104,7 @@ export const ORG_NAV: NavGroup[] = [
     children: [
       { label: 'Tenants', to: '/app/tenants', permission: 'tenants:view', phase: '2', hint: 'People renting your units' },
       { label: 'Tenancies', to: '/app/tenancies', permission: 'tenancies:view', phase: '2', hint: 'Move-ins, move-outs and occupancy history' },
+      { label: 'Messages', to: '/app/messages', permission: 'tenants:view', phase: '13', hint: 'Notices to tenants by SMS, email and the tenant app' },
     ],
   },
   {

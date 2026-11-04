@@ -4,8 +4,7 @@ import { formatPeriod } from '../../lib/periods';
 import { normaliseKenyanPhone } from '../mpesa/rules';
 import type {
   Agreement, CollectionMode, CommissionBasis, CommissionableLine, LedgerBucket, LedgerEntry, PayoutMethod, PersonRef,
-  Remittance, RemittancePayout,
-} from './types';
+  Remittance, RemittancePayout, LateFeeRecipient } from './types';
 
 /**
  * Pure agency-accounting rules: commission rates, agreement and payout forms, running
@@ -71,6 +70,8 @@ export interface AgreementDraft {
   remittanceDay: string;
   deductExpenses: boolean;
   holdDeposits: boolean;
+  /** '' = not set: no late fees on these properties. */
+  lateFeeRecipient: '' | LateFeeRecipient;
   startDate: string;
   endDate: string;
 }
@@ -90,6 +91,7 @@ export interface AgreementBody {
   remittanceDay: number;
   deductExpenses: boolean;
   holdDeposits: boolean;
+  lateFeeRecipient: LateFeeRecipient | null;
   startDate: string;
   endDate: string | null;
 }
@@ -108,6 +110,7 @@ export function newAgreementDraft(today: string, landlordId = ''): AgreementDraf
     remittanceDay: '5',
     deductExpenses: true,
     holdDeposits: true,
+    lateFeeRecipient: '',
     startDate: `${today.slice(0, 7)}-01`,
     endDate: '',
   };
@@ -126,6 +129,7 @@ export function agreementToDraft(a: Agreement): AgreementDraft {
     remittanceDay: String(a.remittanceDay),
     deductExpenses: a.deductExpenses,
     holdDeposits: a.holdDeposits,
+    lateFeeRecipient: a.lateFeeRecipient ?? '',
     startDate: a.startDate.slice(0, 10),
     endDate: a.endDate ? a.endDate.slice(0, 10) : '',
   };
@@ -179,6 +183,7 @@ export function checkAgreement(d: AgreementDraft): CheckedAgreement {
       remittanceDay: day,
       deductExpenses: d.deductExpenses,
       holdDeposits: d.holdDeposits,
+      lateFeeRecipient: d.lateFeeRecipient || null,
       startDate: d.startDate,
       endDate: d.endDate || null,
     },
@@ -515,4 +520,11 @@ export function ordinal(n: number): string {
 /** "October 2026" or "Jan 2026 – Mar 2026". */
 export function rangeText(from: string, to: string): string {
   return from === to ? formatPeriod(from, true) : `${formatPeriod(from)} – ${formatPeriod(to)}`;
+}
+
+/** Who keeps late fees, as the agreements list and sheet word it. */
+export function lateFeeRecipientText(r: LateFeeRecipient | null): string {
+  if (r === 'LANDLORD') return 'The landlord';
+  if (r === 'AGENCY') return 'The agency';
+  return 'Not set — no late fees';
 }

@@ -1,7 +1,7 @@
-import { isDay } from '../../lib/dates';
+import { formatDay, isDay } from '../../lib/dates';
 import { isPeriod } from '../../lib/periods';
 import { CATEGORY_KEYS } from '../expenses/labels';
-import type { PnlFigures } from './types';
+import type { ActionKind, PnlFigures } from './types';
 
 /**
  * Pure report rules: rates as percentages, compact money for chart axes, a "nice" axis
@@ -89,10 +89,10 @@ export function pnlCategories(report: { rows: readonly Pick<PnlFigures, 'expense
 }
 
 /** The tab on the reports page, from the address. */
-export type ReportTab = 'pnl' | 'arrears' | 'occupancy';
+export type ReportTab = 'pnl' | 'arrears' | 'occupancy' | 'mri';
 
 export function readReportTab(value: string): ReportTab {
-  return value === 'arrears' || value === 'occupancy' ? value : 'pnl';
+  return value === 'arrears' || value === 'occupancy' || value === 'mri' ? value : 'pnl';
 }
 
 /**
@@ -112,4 +112,61 @@ export function columnPath(x: number, y: number, width: number, height: number, 
     `V${bottom}`,
     'Z',
   ].join(' ');
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** Where each "Needs attention" item leads, who may follow it, and how it reads. */
+const ACTION_LINKS: Record<ActionKind, { to: string; permission: string; label: (n: number) => string }> = {
+  INVOICE_RUN_PENDING: {
+    to: '/app/invoices/run',
+    permission: 'invoices:view',
+    label: (n) => `Invoice run: ${plural(n, 'tenancy', 'tenancies')} not billed yet`,
+  },
+  UNMATCHED_PAYMENTS: {
+    to: '/app/reconciliation',
+    permission: 'reconciliation:view',
+    label: (n) => `${plural(n, 'M-Pesa payment', 'M-Pesa payments')} to match`,
+  },
+  OVERDUE_TENANTS: {
+    to: '/app/reports?tab=arrears',
+    permission: 'reports:view',
+    label: (n) => `${plural(n, 'tenant', 'tenants')} overdue`,
+  },
+  NOTICE_ENDING: {
+    to: '/app/tenancies?status=NOTICE',
+    permission: 'tenancies:view',
+    label: (n) => (n === 1 ? '1 tenancy ends within 14 days' : `${n} tenancies end within 14 days`),
+  },
+  REMITTANCES_TO_APPROVE: {
+    to: '/app/remittances?status=DRAFT',
+    permission: 'remittances:view',
+    label: (n) => `${plural(n, 'remittance', 'remittances')} to approve`,
+  },
+  LEASES_EXPIRING: {
+    to: '/app/tenancies?expiring=60',
+    permission: 'tenancies:view',
+    label: (n) => (n === 1 ? '1 lease ends within 60 days' : `${n} leases end within 60 days`),
+  },
+};
+
+export function actionLink(kind: ActionKind) {
+  return ACTION_LINKS[kind];
+}
+
+/** 750 → "7.5%" (basis points). */
+export function mriRate(bps: number): string {
+  return `${Number((bps / 100).toFixed(2))}%`;
+}
+
+/** The notice above the MRI table: what is counted, and that it is an estimate. */
+export function mriNotice(rateBps: number, dueDate: string): string {
+  return `Estimate: residential rent received this month at ${mriRate(rateBps)}, due by ${formatDay(dueDate)}. Commercial properties, water and other charges, deposits and late fees are left out. Confirm with your tax advisor before filing on KRA iTax.`;
+}
+
+/** "7.5" → 750 basis points; 0–50% with at most two decimals. */
+export function parseRatePercent(text: string): { ok: true; bps: number } | { ok: false; error: string } {
+  const m = /^(\d{1,2})(?:\.(\d{1,2}))?$/.exec(text.trim());
+  const bps = m ? Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0')) : NaN;
+  return m && bps <= 5000 ? { ok: true, bps } : { ok: false, error: 'Enter a rate from 0 to 50, with at most two decimals.' };
 }

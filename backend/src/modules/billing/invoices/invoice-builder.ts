@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { rentForPeriod } from '../../portfolio/tenancies/rent-changes.js';
 import type { LineKind } from '../../../generated/prisma/client.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
 import { fromMilli, meteredAmount, moveInAmount, toMilli } from '../billing-math.js';
@@ -26,6 +27,8 @@ export interface BillableTenancy {
   unitId: string;
   rentAmount: bigint;
   unit: { propertyId: string };
+  /** Scheduled, not-yet-applied rent changes (phase 13). */
+  rentChanges?: { effectivePeriod: string; newRent: bigint }[];
 }
 
 const MONTHS = [
@@ -83,7 +86,8 @@ export class InvoiceBuilder {
     client: Db | Tx = this.db,
   ): Promise<MonthlyDraft> {
     const label = periodLabel(period);
-    const lines: DraftLine[] = [one('RENT', `Rent — ${label}`, t.rentAmount)];
+    const rent = rentForPeriod(t.rentAmount, t.rentChanges ?? [], period);
+    const lines: DraftLine[] = [one('RENT', `Rent — ${label}`, rent)];
     const missingReadings: MonthlyDraft['missingReadings'] = [];
 
     const charges = await client.chargeType.findMany({

@@ -544,6 +544,24 @@ class _CurrentTenancy extends ConsumerWidget {
                     ),
                   ),
               ],
+              if (can(ref, 'tenancies:view'))
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: const Text('Move-in inspection'),
+                  onPressed: () => context.push(
+                    '/staff/units/${u.id}/tenancies/${t.id}/inspection/MOVE_IN',
+                    extra: '${u.number} · ${t.tenant.name}',
+                  ),
+                ),
+              if (can(ref, 'tenancies:view') && t.status != 'ACTIVE')
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: const Text('Move-out inspection'),
+                  onPressed: () => context.push(
+                    '/staff/units/${u.id}/tenancies/${t.id}/inspection/MOVE_OUT',
+                    extra: '${u.number} · ${t.tenant.name}',
+                  ),
+                ),
               if (can(ref, 'tenancies:update') && t.status == 'ACTIVE')
                 OutlinedButton(
                   onPressed: () => _TenancyLifecycleSheet.giveNotice(

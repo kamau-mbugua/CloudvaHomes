@@ -11,6 +11,7 @@ import '../staff_api.dart';
 import '../staff_models.dart';
 import '../staff_widgets.dart';
 import 'photo.dart';
+import 'reading_queue.dart';
 
 /// Meter readings: pick a property, then a meter; enter this month's reading with a photo.
 /// Readings go in with `PUT /meter-readings` for the month (Nairobi), photos first through
@@ -23,6 +24,23 @@ class MetersScreen extends ConsumerStatefulWidget {
 
 class _MetersScreenState extends ConsumerState<MetersScreen> {
   String? _propertyId;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // Readings saved offline go up when this screen opens and when the app comes back.
+    Future.microtask(() => flushPendingReadings(ref));
+    _lifecycle = AppLifecycleListener(
+      onResume: () => flushPendingReadings(ref),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +71,7 @@ class _MetersScreenState extends ConsumerState<MetersScreen> {
               _propertyId ?? (list.length == 1 ? list.first.id : null);
           return Column(
             children: [
+              const PendingReadingsBanner(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: DropdownButtonFormField<String>(
@@ -292,6 +311,29 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     super.dispose();
   }
 
+  /// No signal (a basement, a rooftop tank): keep the reading on the phone (phase 13).
+  Future<void> _saveOffline(String current) async {
+    final queue = await ref.read(readingQueueProvider.future);
+    await queue.enqueue(
+      PendingReading(
+        meterId: widget.meter.id,
+        propertyId: widget.meter.propertyId,
+        period: _period,
+        current: current,
+        note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+        savedAt: DateTime.now(),
+      ),
+      photo: _photo,
+    );
+    ref.invalidate(pendingReadingsProvider);
+    if (!mounted) return;
+    showMessage(
+      context,
+      'No connection — saved on this phone. It will upload when you’re back online.',
+    );
+    Navigator.of(context).pop();
+  }
+
   Future<void> _save(SheetRow? row) async {
     final current = normaliseQuantity(_current.text);
     final found = <String, String>{};
@@ -315,6 +357,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         try {
           _photoUploadId = await api.upload('METER_PHOTO', _photo!);
         } on ApiError catch (e) {
+          if (e.isNetworkError) {
+            await _saveOffline(current!);
+            return;
+          }
           if (mounted) {
             setState(() => _errors = {'photo': staffErrorMessage(e)});
           }
@@ -334,6 +380,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       showMessage(context, 'Reading saved for ${formatPeriod(_period)}.');
       Navigator.of(context).pop();
     } on ApiError catch (e) {
+      if (e.isNetworkError) {
+        await _saveOffline(current!);
+        return;
+      }
       if (!mounted) return;
       final f = e.fieldErrors;
       final photoError = f['readings[0].photoUploadId'];
@@ -498,6 +548,120 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Readings waiting on this phone (phase 13).
+final pendingReadingsProvider = FutureProvider<List<PendingReading>>((
+  ref,
+) async {
+  final queue = await ref.watch(readingQueueProvider.future);
+  return queue.pending();
+});
+
+/// Sends readings saved offline; quietly does nothing without a connection.
+Future<FlushResult?> flushPendingReadings(WidgetRef ref) async {
+  try {
+    final queue = await ref.read(readingQueueProvider.future);
+    if ((await queue.pending()).isEmpty) return null;
+    final api = ref.read(staffApiProvider);
+    final result = await queue.flush(
+      uploadPhoto: (jpeg) => api.upload('METER_PHOTO', jpeg),
+      save: (r, photoId) => api.saveReading(
+        period: r.period,
+        meterId: r.meterId,
+        current: r.current,
+        note: r.note,
+        photoUploadId: photoId,
+      ),
+    );
+    ref.invalidate(pendingReadingsProvider);
+    if (result.sent > 0) ref.invalidate(sheetProvider);
+    return result;
+  } catch (_) {
+    return null;
+  }
+}
+
+class PendingReadingsBanner extends ConsumerStatefulWidget {
+  const PendingReadingsBanner({super.key});
+  @override
+  ConsumerState<PendingReadingsBanner> createState() =>
+      _PendingReadingsBannerState();
+}
+
+class _PendingReadingsBannerState extends ConsumerState<PendingReadingsBanner> {
+  bool _busy = false;
+
+  Future<void> _upload() async {
+    setState(() => _busy = true);
+    final r = await flushPendingReadings(ref);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (r == null) return;
+    showMessage(
+      context,
+      r.remaining == 0
+          ? 'All readings uploaded.'
+          : r.sent == 0 && r.failed == 0
+          ? 'Still no connection. They’ll upload later.'
+          : '${r.sent} uploaded, ${r.remaining} still waiting.',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pending =
+        ref.watch(pendingReadingsProvider).value ?? const <PendingReading>[];
+    if (pending.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final refused = pending.where((r) => r.lastError != null).toList();
+    return Card(
+      key: const Key('pending-readings'),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      color: scheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.cloud_upload_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${pending.length} ${pending.length == 1 ? 'reading' : 'readings'} waiting to upload',
+                  ),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : _upload,
+                  child: Text(_busy ? 'Uploading…' : 'Upload now'),
+                ),
+              ],
+            ),
+            for (final r in refused)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text('Reading ${r.current} (${r.period})'),
+                subtitle: Text(
+                  r.lastError!,
+                  style: TextStyle(color: scheme.error),
+                ),
+                trailing: TextButton(
+                  onPressed: () async {
+                    final queue = await ref.read(readingQueueProvider.future);
+                    await queue.remove(r.meterId, r.period);
+                    ref.invalidate(pendingReadingsProvider);
+                  },
+                  child: const Text('Discard'),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

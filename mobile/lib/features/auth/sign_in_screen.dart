@@ -319,13 +319,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       children: [
         if (appConfig?.maintenanceMode == true) ...[
           const ErrorBox(
-            'Hodi is currently in maintenance mode. Only platform administrators can sign in right now.',
+            'KodiHub is currently in maintenance mode. Only platform administrators can sign in right now.',
           ),
           const SizedBox(height: 12),
         ],
         if (appConfig?.forceUpdateRequired == true) ...[
           ErrorBox(
-            'Please update the Hodi app${appConfig?.minimumMobileVersion != null ? ' to v${appConfig!.minimumMobileVersion} or newer' : ''} for the latest features.',
+            'Please update the KodiHub app${appConfig?.minimumMobileVersion != null ? ' to v${appConfig!.minimumMobileVersion} or newer' : ''} for the latest features.',
           ),
           const SizedBox(height: 12),
         ],

@@ -616,7 +616,7 @@ class _UnmatchedList extends ConsumerWidget {
             border: Border.all(color: HodiColors.info.withValues(alpha: 0.22)),
           ),
           child: Text(
-            'M-Pesa payments Hodi couldn’t match to a tenant. Assign each one, or ignore it if it isn’t rent.',
+            'M-Pesa payments KodiHub couldn’t match to a tenant. Assign each one, or ignore it if it isn’t rent.',
             style: TextStyle(
               fontSize: 12.5,
               height: 1.4,

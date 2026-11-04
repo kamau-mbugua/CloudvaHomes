@@ -6,7 +6,11 @@ import { useCan } from '../../lib/auth/useAuth';
 import { formatDay, isDay, todayInNairobi } from '../../lib/dates';
 import { saveBlob } from '../../lib/files';
 import { useToast } from '../../lib/useToast';
-import { ConfirmDelete } from '../../components/ConfirmDelete';
+import { ConfirmDialog } from '../../components/ConfirmDelete';
+import { MoreMenu, type MoreMenuItem } from '../../components/MoreMenu';
+import { tenancyActionLayout, type TenancyAction } from './actionLayout';
+import { RenewLeaseSheet, RentChangeSheet } from './LeaseSheets';
+import { InspectionSheet } from './InspectionSheet';
 import { Sheet } from '../../components/Sheet';
 import { MoveInInvoiceDialog } from '../billing/MoveInCharges';
 import { OCCUPANCY_KEYS, portfolioErrorMessage } from '../portfolio/api';
@@ -19,15 +23,16 @@ import { Field } from '../portfolio/ui';
 import { uploadErrorMessage, uploadFile } from '../uploads/api';
 
 /**
- * The buttons for one tenancy: give notice, withdraw notice, move out, issue a move-in
- * invoice (phase 3 — for a tenancy moved in without one), and delete (for a tenancy
- * recorded by mistake). Used on list rows, the unit page and the tenant page.
+ * The actions for one tenancy: at most two buttons for the next step (give notice, move
+ * out…) and a "More" menu for the rest — lease PDF, signed lease, move-in invoice, withdraw
+ * notice, and delete last (for a tenancy recorded by mistake). Which goes where is decided
+ * in actionLayout.ts. Used on list rows, the unit page and the tenant page.
  *
  * Only `ACTIVE` and `NOTICE` tenancies change; an ended one only offers delete. Each
  * change moves occupancy, so units, properties, tenants and tenancies are all refreshed.
  */
 
-type TenancyLike = Pick<Tenancy, 'id' | 'status' | 'startDate' | 'endDate' | 'hasSignedLease'> & {
+type TenancyLike = Pick<Tenancy, 'id' | 'status' | 'startDate' | 'endDate' | 'hasSignedLease' | 'leaseEndDate' | 'rentChanges'> & {
   tenant: Pick<Tenancy['tenant'], 'firstName' | 'lastName'>;
   unit?: Pick<Tenancy['unit'], 'number'> & { property?: { id: string; code?: string } };
   /** For listing the move-in charges; taken from `unit.property` when absent. */
@@ -42,7 +47,7 @@ export function TenancyActions({ tenancy, size = 'sm' }: { tenancy: TenancyLike;
   const canUpdate = useCan('tenancies:update');
   const canDelete = useCan('tenancies:delete');
   const canInvoice = useCan('invoices:create');
-  const [dialog, setDialog] = useState<'notice' | 'moveOut' | 'moveInInvoice' | 'signedLease' | null>(null);
+  const [dialog, setDialog] = useState<'notice' | 'moveOut' | 'moveInInvoice' | 'signedLease' | 'withdraw' | 'delete' | 'renew' | 'rentChange' | 'inspectIn' | 'inspectOut' | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const who = personName(tenancy.tenant);
@@ -80,57 +85,67 @@ export function TenancyActions({ tenancy, size = 'sm' }: { tenancy: TenancyLike;
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
-  const live = tenancy.status === 'ACTIVE' || tenancy.status === 'NOTICE';
   const btn = `nx-btn ${size === 'sm' ? 'nx-btn--sm' : ''}`;
   const busy = withdraw.isPending || remove.isPending || downloadingPdf;
 
   if (!canView && !canUpdate && !canDelete && !canInvoice) return null;
 
+  const layout = tenancyActionLayout(
+    tenancy.status,
+    { view: canView, update: canUpdate, delete: canDelete, invoice: canInvoice },
+    { hasSignedLease: tenancy.hasSignedLease, pendingRentChanges: tenancy.rentChanges?.length ?? 0 },
+  );
+  const ACTIONS: Record<TenancyAction, MoreMenuItem> = {
+    notice: { label: 'Give notice', onSelect: () => setDialog('notice') },
+    changeNotice: { label: 'Change notice', onSelect: () => setDialog('notice') },
+    withdrawNotice: { label: 'Withdraw notice', onSelect: () => setDialog('withdraw') },
+    moveOut: { label: 'Move out', onSelect: () => setDialog('moveOut') },
+    leasePdf: { label: downloadingPdf ? 'Preparing lease PDF…' : 'Lease PDF', onSelect: () => void downloadLeasePdf(), disabled: downloadingPdf },
+    attachLease: { label: tenancy.hasSignedLease ? 'Signed lease' : 'Attach signed lease', onSelect: () => setDialog('signedLease') },
+    moveInInvoice: { label: 'Issue move-in invoice', onSelect: () => setDialog('moveInInvoice') },
+    inspectIn: { label: 'Move-in inspection', onSelect: () => setDialog('inspectIn') },
+    inspectOut: { label: 'Move-out inspection', onSelect: () => setDialog('inspectOut') },
+    renew: { label: 'Renew lease', onSelect: () => setDialog('renew') },
+    rentChange: { label: tenancy.rentChanges?.length ? 'Change rent (1 scheduled)' : 'Change rent', onSelect: () => setDialog('rentChange') },
+    delete: { label: 'Delete tenancy', onSelect: () => setDialog('delete'), danger: true },
+  };
+
   return (
     <>
-      {canView ? (
-        <button type="button" className={btn} disabled={busy} onClick={downloadLeasePdf}>
-          {downloadingPdf ? 'Preparing…' : 'Lease PDF'}
+      {layout.buttons.map((a) => (
+        <button key={a} type="button" className={btn} disabled={busy} onClick={ACTIONS[a].onSelect}>
+          {ACTIONS[a].label}
         </button>
+      ))}
+      <MoreMenu
+        size={size}
+        items={layout.menu.map((a) => ({ ...ACTIONS[a], disabled: ACTIONS[a].disabled || busy }))}
+        ariaLabel={`More actions for ${who}${tenancy.unit ? `’s tenancy in ${tenancy.unit.number}` : ''}`}
+      />
+
+      {dialog === 'inspectIn' ? <InspectionSheet tenancyId={tenancy.id} kind="MOVE_IN" who={who} onClose={() => setDialog(null)} /> : null}
+      {dialog === 'inspectOut' ? <InspectionSheet tenancyId={tenancy.id} kind="MOVE_OUT" who={who} onClose={() => setDialog(null)} /> : null}
+      {dialog === 'renew' ? <RenewLeaseSheet tenancy={tenancy} who={who} onClose={() => setDialog(null)} /> : null}
+      {dialog === 'rentChange' ? <RentChangeSheet tenancy={tenancy} who={who} onClose={() => setDialog(null)} /> : null}
+      {dialog === 'withdraw' ? (
+        <ConfirmDialog
+          verb="Withdraw"
+          what={`${who}’s notice`}
+          consequence="The tenancy becomes active again with no end date."
+          busy={withdraw.isPending}
+          onClose={() => setDialog(null)}
+          onConfirm={() => withdraw.mutate()}
+        />
       ) : null}
-      {canUpdate || (canView && tenancy.hasSignedLease) ? (
-        <button type="button" className={btn} disabled={busy} onClick={() => setDialog('signedLease')}>
-          {tenancy.hasSignedLease ? 'Signed lease' : 'Attach lease'}
-        </button>
-      ) : null}
-      {canUpdate && tenancy.status === 'ACTIVE' ? (
-        <button type="button" className={btn} disabled={busy} onClick={() => setDialog('notice')}>Give notice</button>
-      ) : null}
-      {canUpdate && tenancy.status === 'NOTICE' ? (
-        <>
-          <button type="button" className={btn} disabled={busy} onClick={() => setDialog('notice')}>Change notice</button>
-          <ConfirmDelete
-            size={size}
-            label="Withdraw notice"
-            verb="Withdraw"
-            what={`${who}’s notice`}
-            consequence="The tenancy becomes active again with no end date."
-            busy={withdraw.isPending}
-            onConfirm={() => withdraw.mutate()}
-          />
-        </>
-      ) : null}
-      {canUpdate && live ? (
-        <button type="button" className={btn} disabled={busy} onClick={() => setDialog('moveOut')}>Move out</button>
-      ) : null}
-      {canInvoice && live ? (
-        <button type="button" className={btn} disabled={busy} onClick={() => setDialog('moveInInvoice')}>Issue move-in invoice</button>
-      ) : null}
-      {canDelete ? (
-        <ConfirmDelete
-          size={size}
+      {dialog === 'delete' ? (
+        <ConfirmDialog
           what={`the tenancy for ${who}${where}`}
           consequence="Only for a tenancy recorded by mistake and never invoiced — to end a real one, use Move out. This cannot be undone."
           busy={remove.isPending}
+          onClose={() => setDialog(null)}
           onConfirm={() => remove.mutate()}
         />
       ) : null}
-
       {dialog === 'notice' ? <NoticeDialog tenancy={tenancy} who={who} onClose={() => setDialog(null)} onDone={refresh} /> : null}
       {dialog === 'moveInInvoice' ? (
         <MoveInInvoiceDialog

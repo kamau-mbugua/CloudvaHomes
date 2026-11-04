@@ -235,7 +235,7 @@ function StkProgress({ first, startedAt: initialStart, onAgain, onClose }: {
             : describeStk(stk)}
         </p>
         <dl className="pf__facts mp__stkfacts">
-          <div><dt>Tenant</dt><dd>{personName(stk.tenant)} <span className="ad__muted num">{stk.tenant.code}</span></dd></div>
+          <div><dt>Tenant</dt><dd>{personName(stk.tenant)} <span className="ad__muted code">{stk.tenant.code}</span></dd></div>
           <div><dt>Phone</dt><dd className="num">{stk.phone}</dd></div>
           <div><dt>Into</dt><dd>{stk.channel.name}</dd></div>
           {stk.accountRef ? <div><dt>Account</dt><dd className="num">{stk.accountRef}</dd></div> : null}

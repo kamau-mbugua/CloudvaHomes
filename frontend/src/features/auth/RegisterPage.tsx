@@ -12,7 +12,7 @@ import { Splash } from '../../components/Splash';
 import { AuthLayout } from './AuthLayout';
 import { EyeIcon } from './EyeIcon';
 import { authErrorMessage } from './authErrors';
-import { useAppConfig } from './useAppConfig';
+import { signupOpen, useAppConfig } from './useAppConfig';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ export function RegisterPage() {
   if (status === 'loading' || config.isPending) return <Splash />;
 
   const cfg = config.data;
-  if (cfg && !cfg.allowPublicSignup) {
+  if (!signupOpen(cfg)) {
     return (
       <AuthLayout>
         <div className="au__form">

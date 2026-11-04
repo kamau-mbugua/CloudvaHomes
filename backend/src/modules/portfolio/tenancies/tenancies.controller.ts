@@ -1,3 +1,4 @@
+import { RentChangesService } from './rent-changes.service.js';
 import {
   Body,
   Controller,
@@ -24,6 +25,8 @@ import {
   ListTenanciesQueryDto,
   MoveOutDto,
   NoticeDto,
+  RenewTenancyDto,
+  RentChangeDto,
   UpdateTenancyDto,
 } from './tenancies.dto.js';
 import { TenanciesService } from './tenancies.service.js';
@@ -32,7 +35,10 @@ import { TenanciesService } from './tenancies.service.js';
 @ApiBearerAuth()
 @Controller('tenancies')
 export class TenanciesController {
-  constructor(private readonly tenancies: TenanciesService) {}
+  constructor(
+    private readonly tenancies: TenanciesService,
+    private readonly rentChanges: RentChangesService,
+  ) {}
 
   @Get()
   @RequirePermission('tenancies:view')
@@ -113,6 +119,31 @@ export class TenanciesController {
   @RequirePermission('tenancies:update')
   async moveOut(@Param('id', ParseUUIDPipe) id: string, @Body() dto: MoveOutDto) {
     return ok(await this.tenancies.moveOut(id, dto));
+  }
+
+  /** Schedule a new rent from a month not yet invoiced (phase 13). */
+  @Post(':id/rent-changes')
+  @RequirePermission('tenancies:update')
+  async scheduleRentChange(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RentChangeDto) {
+    return ok(await this.rentChanges.schedule(id, dto));
+  }
+
+  @Delete(':id/rent-changes/:changeId')
+  @HttpCode(204)
+  @RequirePermission('tenancies:update')
+  async cancelRentChange(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('changeId', ParseUUIDPipe) changeId: string,
+  ) {
+    await this.rentChanges.cancel(id, changeId);
+  }
+
+  /** A later lease end date, optionally with a new rent (phase 13). */
+  @Post(':id/renew')
+  @HttpCode(200)
+  @RequirePermission('tenancies:update')
+  async renew(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RenewTenancyDto) {
+    return ok(await this.rentChanges.renew(id, dto));
   }
 
   @Delete(':id')

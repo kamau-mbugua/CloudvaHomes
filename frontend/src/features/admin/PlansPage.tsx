@@ -15,7 +15,7 @@ import type { PlanBody, PlanDraft } from '../platform/rules';
 import type { Plan } from '../platform/types';
 
 /**
- * Admin → Plans (`/admin/plans`): Hodi's prices. A plan is a price per let unit a month, a
+ * Admin → Plans (`/admin/plans`): KodiHub's prices. A plan is a price per let unit a month, a
  * monthly minimum and free trial days; one is the default for new organisations. Add,
  * edit, make default, delete (only when no organisation is on it — `409 PLAN_IN_USE`).
  * Inactive plans stay on their organisations but aren't offered for new ones.

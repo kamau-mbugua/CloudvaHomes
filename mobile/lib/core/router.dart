@@ -158,7 +158,7 @@ class _Offline extends ConsumerWidget {
     final error = ref.watch(sessionProvider).error;
     return Scaffold(
       body: ErrorState(
-        message: error == null ? 'Can’t reach Hodi.' : messageOf(error),
+        message: error == null ? 'Can’t reach KodiHub.' : messageOf(error),
         onRetry: () => ref.invalidate(sessionProvider),
       ),
     );
