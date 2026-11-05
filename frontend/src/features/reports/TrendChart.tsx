@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatKES } from '../../lib/money';
 import { formatPeriod } from '../../lib/periods';
 import { columnPath, formatCompactKES, niceScale } from './rules';
@@ -25,10 +25,11 @@ const TREND_SERIES: readonly TrendSeries[] = [
   { key: 'expenses', label: 'Expenses', color: 'var(--viz-3)' },
 ];
 
-const W = 720;
+/** Drawn at its real width (measured), so text and bars never scale up on wide screens. */
+const DEFAULT_W = 720;
+const MIN_W = 560;
 const H = 250;
 const M = { top: 12, right: 8, bottom: 28, left: 68 };
-const PLOT_W = W - M.left - M.right;
 const PLOT_H = H - M.top - M.bottom;
 const GAP = 2;
 
@@ -48,13 +49,29 @@ export function TrendChart({
   series = TREND_SERIES,
   title = 'Last 12 months',
   description = 'Invoiced, collected and expenses per month',
+  emptyText,
 }: {
   points: TrendPoint[];
   series?: readonly TrendSeries[];
   title?: string;
   description?: string;
+  /** Shown instead of an empty grid when every figure is zero. */
+  emptyText?: string;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [W, setW] = useState(DEFAULT_W);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry?.contentRect.width ?? 0);
+      if (width > 0) setW(Math.max(MIN_W, width));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const PLOT_W = W - M.left - M.right;
   const count = Math.max(points.length, 1);
   const band = PLOT_W / count;
   const barW = Math.max(3, Math.min(16, (band - 14 - GAP * (series.length - 1)) / series.length));
@@ -78,10 +95,13 @@ export function TrendChart({
         </ul>
       </figcaption>
 
-      <div className="rp__chartscroll">
+      {emptyText && peak === 0 ? <p className="ad__muted rp__empty">{emptyText}</p> : null}
+      <div className="rp__chartscroll" ref={box} hidden={Boolean(emptyText && peak === 0)}>
         <div className="rp__chartinner" onMouseLeave={() => setActive(null)}>
           <svg
             viewBox={`0 0 ${W} ${H}`}
+            width={W}
+            height={H}
             className="rp__svg"
             role="img"
             aria-label={`${description}, ${formatPeriod(first)} to ${formatPeriod(last)}. The figures are in the table below.`}
@@ -131,7 +151,7 @@ export function TrendChart({
         </div>
       </div>
 
-      <details className="rp__tabledetails">
+      <details className="rp__tabledetails" hidden={Boolean(emptyText && peak === 0)}>
         <summary>Show the figures as a table</summary>
         <div className="ad__tablewrap">
           <table className="ad__table rp__table rp__table--compact">

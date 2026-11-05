@@ -124,6 +124,7 @@ export function TenantDashboard() {
               series={PAID_SERIES}
               title={`Billed vs paid · last ${monthly.data.length} months`}
               description="Billed and paid per month"
+              emptyText="Nothing billed or paid in these months yet."
             />
           ) : <p className="ad__muted">Loading…</p>}
         </section>

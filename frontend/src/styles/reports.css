@@ -160,3 +160,4 @@
   .rp__tick { font-size: 14px; }
   .rp__table--compact th, .rp__table--compact td { padding: 10px; }
 }
+.rp__empty { margin: 24px 0; text-align: center; }
