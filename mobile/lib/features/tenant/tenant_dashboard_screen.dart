@@ -173,7 +173,13 @@ class TenantDashboardScreen extends ConsumerWidget {
                       Row(
                         children: [
                           Expanded(child: Text(a.orgName)),
-                          Text(formatKes(a.depositHeld)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              formatKes(a.depositHeld),
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
                         ],
                       ),
                 ],
@@ -220,7 +226,14 @@ class _Hero extends ConsumerWidget {
             Row(
               children: [
                 Expanded(child: Text(r.orgName, style: light)),
-                Text(formatKes(r.owed), style: light),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    formatKes(r.owed),
+                    style: light,
+                    textAlign: TextAlign.end,
+                  ),
+                ),
               ],
             ),
         for (final r in rows.where((r) => r.credit > 0))
@@ -329,13 +342,19 @@ class _HomeCard extends ConsumerWidget {
     return Card(
       child: ListTile(
         title: Text(homeLabel(home)),
-        subtitle: Text(
-          '${home.orgName} · Rent ${formatKes(home.rent)}${home.leaseEndDate != null ? ' · lease ends ${formatDay(home.leaseEndDate)}' : ''}',
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              text,
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '${home.orgName} · Rent ${formatKes(home.rent)}${home.leaseEndDate != null ? ' · lease ends ${formatDay(home.leaseEndDate)}' : ''}',
+            ),
+          ],
         ),
-        trailing: Text(
-          text,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600),
-        ),
+        trailing: const Icon(Icons.chevron_right),
         onTap: () => ref
             .read(homeScopeRawProvider.notifier)
             .set(OneHome(home.tenantId, home.id)),
@@ -344,58 +363,131 @@ class _HomeCard extends ConsumerWidget {
   }
 }
 
-class _BilledVsPaid extends ConsumerWidget {
+const _chartMonths = 6;
+
+/// Billed (navy) vs paid (lime) per month. Bars scale to the space left after the month
+/// labels, so larger text never overflows; tap a month for its figures (the latest month
+/// shows by default).
+class _BilledVsPaid extends ConsumerStatefulWidget {
   const _BilledVsPaid({required this.tenancyId});
   final String? tenancyId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final points =
-        ref.watch(_monthlyProvider(tenancyId)).valueOrNull ??
-        const <MonthlyPoint>[];
+  ConsumerState<_BilledVsPaid> createState() => _BilledVsPaidState();
+}
+
+class _BilledVsPaidState extends ConsumerState<_BilledVsPaid> {
+  int? _picked;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = ref.watch(_monthlyProvider(widget.tenancyId)).valueOrNull;
+    final theme = Theme.of(context);
+    final title = 'Billed vs paid · last $_chartMonths months';
+    if (points == null) {
+      return SectionCard(title: title, children: const [SizedBox(height: 120)]);
+    }
     final peak = points.fold<int>(
-      1,
+      0,
       (m, p) => [m, p.invoiced, p.paid].reduce((a, b) => a > b ? a : b),
     );
-    Widget bar(int v, Color c) =>
-        Container(width: 8, height: 80 * v / peak, color: c);
+    if (peak == 0) {
+      return SectionCard(
+        title: title,
+        children: const [Text('Nothing billed or paid in these months yet.')],
+      );
+    }
+    final picked = (_picked ?? points.length - 1).clamp(0, points.length - 1);
+    final shown = points[picked];
+    final scaler = MediaQuery.textScalerOf(context);
+    final labelHeight =
+        scaler.scale(theme.textTheme.labelSmall?.fontSize ?? 11) * 1.4 + 6;
+
     return SectionCard(
-      title: 'Billed vs paid · last ${points.length} months',
+      title: title,
       children: [
         SizedBox(
-          height: 100,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final p in points)
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          bar(p.invoiced, HodiColors.navy),
-                          const SizedBox(width: 2),
-                          bar(p.paid, HodiColors.lime),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        formatPeriodShort(p.period),
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                    ],
+          height: 110 + labelHeight,
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final barMax = box.maxHeight - labelHeight;
+              Widget bar(int v, Color c) => Container(
+                width: 8,
+                height: v <= 0 ? 0 : (barMax * v / peak).clamp(2, barMax),
+                decoration: BoxDecoration(
+                  color: c,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(2),
                   ),
                 ),
-            ],
+              );
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final (i, p) in points.indexed)
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () => setState(() => _picked = i),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: i == picked
+                                ? theme.colorScheme.primary.withValues(
+                                    alpha: 0.06,
+                                  )
+                                : null,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  bar(p.invoiced, HodiColors.navy),
+                                  const SizedBox(width: 2),
+                                  bar(p.paid, HodiColors.lime),
+                                ],
+                              ),
+                              SizedBox(
+                                height: labelHeight,
+                                child: Center(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      formatPeriodShort(p.period),
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            fontWeight: i == picked
+                                                ? FontWeight.w700
+                                                : null,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
-        const Row(
+        const SizedBox(height: 6),
+        Text(
+          '${formatPeriod(shown.period)}: billed ${formatKes(shown.invoiced)} · paid ${formatKes(shown.paid)}',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 6),
+        const Wrap(
+          spacing: 12,
+          runSpacing: 4,
           children: [
             _Key(HodiColors.navy, 'Billed'),
-            SizedBox(width: 12),
             _Key(HodiColors.lime, 'Paid'),
           ],
         ),

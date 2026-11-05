@@ -56,11 +56,18 @@ class TenantShell extends ConsumerWidget {
     final accounts = session.valueOrNull?.tenantOf ?? const [];
     final currentId = ref.watch(currentTenantIdProvider);
     final current = accounts.where((a) => a.tenantId == currentId).firstOrNull;
+    // With several homes the switcher button fills the title; the name would be clipped.
+    final homes = ref.watch(allHomesProvider).valueOrNull?.homes ?? const [];
+    final switcher =
+        homes
+            .where((h) => h.status == 'ACTIVE' || h.status == 'NOTICE')
+            .length >
+        1;
     return Scaffold(
       drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         loading: session.isLoading,
-        subtitle: current?.name,
+        subtitle: switcher ? null : current?.name,
         title: const _ShellTitle(),
         actions: const [NotificationButton(), AccountButton()],
       ),

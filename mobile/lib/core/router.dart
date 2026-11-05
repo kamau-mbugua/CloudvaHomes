@@ -94,7 +94,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/forgot', builder: (_, _) => const ForgotPasswordScreen()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
-      tenantRoutes(),
+      ...tenantRoutes(),
       ownerRoutes(),
       staffRoutes(),
       platformRoutes(),
