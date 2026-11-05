@@ -31,7 +31,8 @@ class BillingBanner extends ConsumerWidget {
 
     final String text;
     if (status == 'CLOSED') {
-      text = 'This organisation is closed on KodiHub. Contact KodiHub to reopen it.';
+      text =
+          'This organisation is closed on KodiHub. Contact KodiHub to reopen it.';
     } else if (suspended) {
       text =
           'Your account is read-only until the KodiHub bill is paid. Tenants can still pay rent.'

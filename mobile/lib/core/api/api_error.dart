@@ -79,7 +79,8 @@ class ApiError implements Exception {
   factory ApiError.network() => ApiError(
     status: 0,
     code: networkError,
-    message: 'Can’t reach KodiHub. Check your internet connection and try again.',
+    message:
+        'Can’t reach KodiHub. Check your internet connection and try again.',
   );
 
   @override
