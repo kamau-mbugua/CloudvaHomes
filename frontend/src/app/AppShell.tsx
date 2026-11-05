@@ -20,6 +20,7 @@ import { useSession } from '../lib/auth/useAuth';
 import { useToast } from '../lib/useToast';
 import { useUnmatchedCount } from '../features/mpesa/api';
 import { BillingBanner } from '../features/platform/BillingBanner';
+import { PropertyScopeBanner } from './PropertyScopeBanner';
 import { keys as hodiBillingKeys } from '../features/platform/api';
 
 /**
@@ -210,6 +211,7 @@ export function AppShell() {
         </header>
 
         <BillingBanner />
+        <PropertyScopeBanner />
 
         <main className="ms__page">
           <PageBoundary homePath="/app"><Outlet /></PageBoundary>

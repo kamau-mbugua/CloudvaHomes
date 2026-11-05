@@ -183,6 +183,17 @@ describe('Tenant portal & reminders (e2e)', () => {
       tenancies: [{ unit: { number: 'H1' }, property: { code: 'HOM' }, rentAmount: KES(20000) }],
     });
     expect(home.openInvoices).toHaveLength(1);
+    // Each home says what it owes (tenant portal redesign).
+    const open = home.openInvoices[0];
+    expect(open.tenancyId).toBe(home.tenancies[0].id);
+    expect(home.tenancies[0]).toMatchObject({
+      due: KES(20000),
+      overdue: open.overdue ? KES(20000) : 0,
+      nextDueDate: open.overdue ? null : open.dueDate,
+    });
+    const all = (await get(tom, '/tenant/accounts/overview')).data;
+    expect(all).toMatchObject({ homes: 1, balance: KES(20000) });
+    expect(all.tenancies[0]).toMatchObject({ due: KES(20000), orgName: expect.any(String) });
     const invoices = await get(tom, `/tenant/accounts/${x.tom.tenant.id}/invoices`);
     expect(invoices.meta.total).toBe(1);
     await get(tom, `/tenant/accounts/${x.tom.tenant.id}/invoices/${invoices.data[0].id}`);
@@ -255,6 +266,28 @@ describe('Tenant portal & reminders (e2e)', () => {
       .get(`/api/v1/tenant/accounts/${x.tom.tenant.id}/payments/${payments[0].id}/receipt`)
       .set(auth(tom));
     expect(receipt.headers['content-type']).toBe('application/pdf');
+    // Dashboard: billed vs paid per month, and the latest activity first.
+    const inv = (await get(tom, `/tenant/accounts/${x.tom.tenant.id}/invoices`)).data[0];
+    const monthly = (await get(tom, '/tenant/accounts/overview/monthly')).data;
+    expect(monthly).toHaveLength(6);
+    expect(monthly.at(-1)).toMatchObject({ period: TODAY.slice(0, 7), paid: KES(20000) });
+    expect(monthly.find((m: { period: string }) => m.period === inv.period)?.invoiced).toBe(
+      inv.total,
+    );
+    expect((await get(tom, '/tenant/accounts/overview/monthly?months=12')).data).toHaveLength(12);
+    await get(tom, '/tenant/accounts/overview/monthly?months=7', 422);
+    const activity = (await get(tom, `/tenant/accounts/overview/activity?tenancyId=${x.tom.id}`))
+      .data;
+    expect(activity.find((a: { kind: string }) => a.kind === 'PAYMENT')).toMatchObject({
+      amount: KES(20000),
+      link: '/tenant/payments',
+    });
+    const times = activity.map((a: { at: string }) => a.at);
+    expect(times).toEqual([...times].sort((a: string, b: string) => b.localeCompare(a)));
+    expect(activity.some((a: { kind: string }) => a.kind === 'INVOICE')).toBe(true);
+    // Someone else's home is not mine.
+    await get(tom, `/tenant/accounts/overview/activity?tenancyId=${x.ann.id}`, 404);
+    await get(tom, `/tenant/accounts/overview/monthly?tenancyId=${x.ann.id}`, 404);
     // Tom can't see someone else's prompt.
     const annReq = (
       await post(
@@ -269,6 +302,79 @@ describe('Tenant portal & reminders (e2e)', () => {
       )
     ).data;
     await get(tom, `/tenant/accounts/${x.tom.tenant.id}/pay/${annReq.id}`, 404);
+  });
+
+  it('a tenant with two homes sees invoices per home, and only tenant notices', async () => {
+    const x = await setUp();
+    await post(owner, `/tenants/${x.tom.tenant.id}/portal-access`);
+    const tom = await signInAsTenant('0711000701');
+    // Tom also rents a second unit from the same landlord, billed in the same run.
+    const unit2 = (
+      await post(
+        owner,
+        '/units',
+        {
+          propertyId: (await get(owner, '/properties')).data[0].id,
+          number: 'H3',
+          rentAmount: KES(5000),
+        },
+        201,
+      )
+    ).data;
+    const second = (
+      await post(
+        owner,
+        '/tenancies',
+        {
+          unitId: unit2.id,
+          tenantId: x.tom.tenant.id,
+          startDate: RUN_DATE,
+          billingDay: 1,
+        },
+        201,
+      )
+    ).data;
+    await post(owner, '/invoices/run', { date: RUN_DATE });
+    const all = await get(tom, `/tenant/accounts/${x.tom.tenant.id}/invoices`);
+    const mine = all.data.filter((i: { tenancyId: string }) => i.tenancyId === second.id);
+    expect(mine.length).toBeGreaterThan(0);
+    const onlySecond = await get(
+      tom,
+      `/tenant/accounts/${x.tom.tenant.id}/invoices?tenancyId=${second.id}`,
+    );
+    expect(onlySecond.meta.total).toBe(mine.length);
+    expect(onlySecond.meta.total).toBeLessThan(all.meta.total);
+
+    // Notices: a staff alert for the same person is not a tenant notice.
+    const userId = (await t.prisma.tenant.findUniqueOrThrow({ where: { id: x.tom.tenant.id } }))
+      .userId!;
+    await t.prisma.userNotification.createMany({
+      data: [
+        { userId, kind: 'staff.alert', title: 'Staff only', body: 'x' },
+        {
+          userId,
+          tenantId: x.tom.tenant.id,
+          orgId: owner.body.activeOrganization!.id,
+          kind: 'broadcast',
+          title: 'Water off Saturday',
+          body: 'From 9am',
+          actionUrl: '/tenant',
+        },
+      ],
+    });
+    const notices = await get(tom, '/tenant/notices');
+    expect(notices.data.map((n: { title: string }) => n.title)).toContain('Water off Saturday');
+    expect(notices.data.map((n: { title: string }) => n.title)).not.toContain('Staff only');
+    expect(
+      notices.data.find((n: { title: string }) => n.title === 'Water off Saturday'),
+    ).toMatchObject({
+      orgName: expect.any(String),
+      tenantId: x.tom.tenant.id,
+    });
+    expect((await get(tom, `/tenant/notices?tenantId=${x.tom.tenant.id}`)).meta.total).toBe(
+      notices.meta.total,
+    );
+    await get(tom, `/tenant/notices?tenantId=${x.ann.tenant.id}`, 404);
   });
 
   it('reminders are off by default; when on, each tenant gets one SMS a day, opted-out tenants none', async () => {

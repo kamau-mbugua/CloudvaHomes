@@ -1,20 +1,25 @@
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation.dart';
-import 'tenant_home_screen.dart';
+import 'tenant_dashboard_screen.dart';
 import 'tenant_invoices_screen.dart';
+import 'tenant_more_pages.dart';
+import 'tenant_more_screen.dart';
 import 'tenant_requests_screen.dart';
 import 'tenant_shell.dart';
 
-/// Tenant mode (`/tenant/...`): 3 bottom nav branches (`Home`, `Statements`, `Repairs`).
-/// Deep links `/tenant/invoices`, `/tenant/payments`, and `/tenant/statement` all open
-/// the unified [TenantLedgerScreen] on the corresponding segmented tab.
+/// Tenant mode (`/tenant/...`, tenant portal redesign): 5 bottom tabs — Home, Bills,
+/// Payments, Repairs, More. Bills and Payments open the ledger on its invoices / payments
+/// tab; `/tenant/statement` opens its statement tab (reached from More).
 RouteBase tenantRoutes() => StatefulShellRoute.indexedStack(
   builder: (_, _, shell) => TenantShell(shell: shell),
   branches: [
     StatefulShellBranch(
       routes: [
-        GoRoute(path: '/tenant', builder: (_, _) => const TenantHomeScreen()),
+        GoRoute(
+          path: '/tenant',
+          builder: (_, _) => const TenantDashboardScreen(),
+        ),
       ],
     ),
     StatefulShellBranch(
@@ -33,10 +38,6 @@ RouteBase tenantRoutes() => StatefulShellRoute.indexedStack(
           ],
         ),
         GoRoute(
-          path: '/tenant/payments',
-          builder: (_, _) => const TenantLedgerScreen(initialTab: 1),
-        ),
-        GoRoute(
           path: '/tenant/statement',
           builder: (_, _) => const TenantLedgerScreen(initialTab: 2),
         ),
@@ -45,8 +46,39 @@ RouteBase tenantRoutes() => StatefulShellRoute.indexedStack(
     StatefulShellBranch(
       routes: [
         GoRoute(
+          path: '/tenant/payments',
+          builder: (_, _) => const TenantLedgerScreen(initialTab: 1),
+        ),
+      ],
+    ),
+    StatefulShellBranch(
+      routes: [
+        GoRoute(
           path: '/tenant/requests',
           builder: (_, _) => const TenantRequestsScreen(),
+        ),
+      ],
+    ),
+    StatefulShellBranch(
+      routes: [
+        GoRoute(
+          path: '/tenant/more',
+          builder: (_, _) => const TenantMoreScreen(),
+        ),
+        GoRoute(
+          path: '/tenant/documents',
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (_, _) => const TenantDocumentsScreen(),
+        ),
+        GoRoute(
+          path: '/tenant/notices',
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (_, _) => const TenantNoticesScreen(),
+        ),
+        GoRoute(
+          path: '/tenant/profile',
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (_, _) => const TenantProfileScreen(),
         ),
       ],
     ),

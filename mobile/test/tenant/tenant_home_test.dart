@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hodi/features/tenant/tenant_home_screen.dart';
+import 'package:hodi/features/tenant/tenant_dashboard_screen.dart';
 
 import '../helpers/app_harness.dart';
 import '../helpers/fake_http.dart';
@@ -61,50 +61,84 @@ Map<String, Object?> overview({
   'canPayInApp': canPay,
 };
 
+/// The dashboard's calls for one landlord account built from [overview] (tenant portal redesign).
+Map<String, Object?> consolidatedFrom(Map<String, Object?> o) {
+  final tenancies = [
+    for (final t in o['tenancies']! as List)
+      {
+        ...(t as Map<String, Object?>),
+        'tenantId': 't1',
+        'tenantCode': 'T00001',
+        'orgName': 'Test Org',
+      },
+  ];
+  return {
+    'balance': o['balance'],
+    'credit': o['credit'],
+    'depositHeld': o['depositHeld'],
+    'homes': 1,
+    'tenancies': tenancies,
+    'openInvoices': [],
+    'accounts': [o],
+  };
+}
+
+(int, Object?)? dashboardCall(Call c, Map<String, Object?> o) =>
+    switch (c.path) {
+      '/tenant/accounts/overview' => (200, {'data': consolidatedFrom(o)}),
+      '/tenant/accounts/overview/monthly' ||
+      '/tenant/accounts/overview/activity' => (200, {'data': []}),
+      _ when c.path.endsWith('/requests') => (
+        200,
+        {
+          'data': [],
+          'meta': {'page': 1, 'totalPages': 1},
+        },
+      ),
+      _ when c.path.endsWith('/inspections') => (200, {'data': []}),
+      _ => null,
+    };
+
 void main() {
-  testWidgets('owing: amount, overdue invoice, paybill and Pay now', (
-    tester,
-  ) async {
-    final adapter = FakeAdapter(
-      (c) => (200, {'data': overview(balance: 2050050)}),
-    );
+  testWidgets('owing: amount, the home and Pay now', (tester) async {
+    final o = overview(balance: 2050050);
+    final adapter = FakeAdapter((c) => dashboardCall(c, o) ?? (404, null));
     await pumpWithApi(
       tester,
-      const TenantHomeScreen(),
+      const TenantDashboardScreen(),
       adapter: adapter,
       session: sessionJson(staff: false, tenant: true),
     );
-    expect(adapter.calls.single.path, '/tenant/accounts/t1');
-    expect(find.text('You owe'), findsOneWidget);
+    expect(adapter.calls.first.path, '/tenant/accounts/overview');
+    expect(find.text('TO PAY'), findsOneWidget);
     expect(find.text('KES 20,500.50'), findsWidgets);
-    expect(find.text('Overdue'), findsOneWidget);
-    expect(find.text('600111'), findsOneWidget);
-    expect(find.text('T00001'), findsOneWidget);
+    expect(find.text('A1, Test Court'), findsOneWidget);
     expect(find.text('Pay now'), findsOneWidget);
   });
 
   testWidgets(
     'in credit: nothing to pay, credit shown, pay in advance; no button without M-Pesa',
     (tester) async {
-      final adapter = FakeAdapter(
-        (c) => (200, {'data': overview(balance: -100000, credit: 100000)}),
-      );
+      var o = overview(balance: -100000, credit: 100000);
+      final adapter = FakeAdapter((c) => dashboardCall(c, o) ?? (404, null));
       await pumpWithApi(
         tester,
-        const TenantHomeScreen(),
+        const TenantDashboardScreen(),
         adapter: adapter,
         session: sessionJson(staff: false, tenant: true),
       );
-      expect(find.text('Nothing to pay'), findsOneWidget);
+      expect(find.text('NOTHING TO PAY'), findsOneWidget);
       expect(find.text('KES 0.00'), findsOneWidget);
-      expect(find.textContaining('KES 1,000.00 in credit'), findsOneWidget);
+      expect(
+        find.textContaining('KES 1,000.00 in credit with Test Org'),
+        findsOneWidget,
+      );
       expect(find.text('Pay in advance'), findsOneWidget);
 
-      adapter.respond = (c) =>
-          (200, {'data': overview(balance: 0, canPay: false)});
+      o = overview(balance: 0, canPay: false);
       await pumpWithApi(
         tester,
-        const TenantHomeScreen(),
+        const TenantDashboardScreen(),
         adapter: adapter,
         session: sessionJson(staff: false, tenant: true),
       );
@@ -118,10 +152,9 @@ void main() {
       var polls = 0;
       final adapter = FakeAdapter(
         (c) => switch ((c.method, c.path)) {
-          ('GET', '/tenant/accounts/t1') => (
-            200,
-            {'data': overview(balance: 2050050)},
-          ),
+          ('GET', _)
+              when dashboardCall(c, overview(balance: 2050050)) != null =>
+            dashboardCall(c, overview(balance: 2050050))!,
           ('POST', '/tenant/accounts/t1/pay') => (
             202,
             {
@@ -150,7 +183,7 @@ void main() {
       );
       await pumpWithApi(
         tester,
-        const TenantHomeScreen(),
+        const TenantDashboardScreen(),
         adapter: adapter,
         session: sessionJson(staff: false, tenant: true),
       );
@@ -174,7 +207,9 @@ void main() {
       expect(find.textContaining('SIMTEST01'), findsOneWidget);
       // Refreshes the balance after success.
       expect(
-        adapter.calls.where((c) => c.path == '/tenant/accounts/t1').length,
+        adapter.calls
+            .where((c) => c.path == '/tenant/accounts/overview')
+            .length,
         greaterThanOrEqualTo(2),
       );
     },

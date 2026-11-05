@@ -9,6 +9,8 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
+import 'home_scope.dart';
+import 'home_scope_widgets.dart';
 import 'tenant_api.dart';
 import 'tenant_home_screen.dart';
 import 'tenant_payments_screen.dart';
@@ -39,6 +41,7 @@ class _TenantLedgerScreenState extends State<TenantLedgerScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        const LedgerScopeHeader(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: KodiHubSegmentedTabs(
@@ -71,11 +74,13 @@ class TenantInvoicesScreen extends ConsumerWidget {
           : const SizedBox.shrink();
     }
     final api = ref.watch(tenantApiProvider);
+    final scope = ref.watch(homeScopeProvider);
+    final tenancyId = scope is OneHome ? scope.tenancyId : null;
     return PagedList<InvoiceRow>(
-      resetKey: id,
+      resetKey: (id, tenancyId),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       load: (page) async {
-        final p = await api.invoices(id, page: page);
+        final p = await api.invoices(id, page: page, tenancyId: tenancyId);
         return (rows: p.rows, hasMore: p.hasMore);
       },
       empty: const EmptyState(

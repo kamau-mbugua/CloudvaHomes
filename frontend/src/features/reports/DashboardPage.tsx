@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { propertySwitchRequest } from '../../lib/auth/propertyScope';
 import { switchContext } from '../../lib/auth/session';
 import { useAuthState, useCan } from '../../lib/auth/useAuth';
 import { formatDay, todayInNairobi } from '../../lib/dates';
@@ -62,7 +63,7 @@ function DashboardFigures() {
   const properties = session?.properties ?? [];
 
   const handlePropertySwitch = (nextPropertyId: string | null) => {
-    void switchContext({ propertyId: nextPropertyId });
+    void switchContext(propertySwitchRequest(nextPropertyId));
   };
 
   return (
@@ -72,7 +73,7 @@ function DashboardFigures() {
         {properties.length > 1 ? (
           <select
             className="ad__select"
-            aria-label="Show figures for"
+            aria-label="Property shown across the app"
             value={activePropertyId ?? ''}
             onChange={(e) => handlePropertySwitch(e.target.value ? e.target.value : null)}
           >
@@ -207,10 +208,11 @@ function Figures({
                         <button
                           type="button"
                           className="nx-btn nx-btn--sm"
-                          aria-label={`View ${row.property.name} on the dashboard`}
+                          aria-label={`Show only ${row.property.name} across the app`}
+                          title="Narrows every page to this property until you choose Show all properties"
                           onClick={() => onSwitchProperty(row.property.id)}
                         >
-                          View property
+                          Show only this property
                         </button>
                       </div>
                     </td>

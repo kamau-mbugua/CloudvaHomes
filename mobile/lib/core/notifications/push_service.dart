@@ -60,8 +60,14 @@ final pushTokenSourceProvider = Provider<PushTokenSource>(
   if (raw.startsWith('/tenant/payments')) {
     return (route: '/tenant/payments', mode: AppMode.tenant);
   }
-  if (raw.startsWith('/tenant/maintenance')) {
-    return (route: '/tenant/maintenance', mode: AppMode.tenant);
+  if (raw.startsWith('/tenant/maintenance') ||
+      raw.startsWith('/tenant/requests')) {
+    return (route: '/tenant/requests', mode: AppMode.tenant);
+  }
+  for (final page in const ['notices', 'documents', 'statement', 'profile']) {
+    if (raw.startsWith('/tenant/$page')) {
+      return (route: '/tenant/$page', mode: AppMode.tenant);
+    }
   }
   if (raw.startsWith('/tenant')) {
     return (route: '/tenant', mode: AppMode.tenant);

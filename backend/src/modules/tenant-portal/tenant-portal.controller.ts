@@ -45,7 +45,9 @@ import {
   BulkPortalDto,
   ListMessagesQueryDto,
   RunRemindersDto,
+  TenantActivityQueryDto,
   TenantInvoicesQueryDto,
+  TenantMonthlyQueryDto,
   TenantPayDto,
 } from './tenant-portal.dto.js';
 import { TenantPortalService } from './tenant-portal.service.js';
@@ -132,6 +134,18 @@ export class TenantPortalController {
   @Get('overview')
   async consolidatedOverview() {
     return ok(await this.portal.consolidatedOverview());
+  }
+
+  /** Billed vs paid per month across my homes (or one). Declared before `:id`. */
+  @Get('overview/monthly')
+  async monthly(@Query() q: TenantMonthlyQueryDto) {
+    return ok(await this.portal.monthly(q));
+  }
+
+  /** Latest payments, invoices, rent changes and notices across my homes (or one). */
+  @Get('overview/activity')
+  async activity(@Query() q: TenantActivityQueryDto) {
+    return ok(await this.portal.activity(q));
   }
 
   @Get(':id')

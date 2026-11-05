@@ -227,6 +227,7 @@ export class PaymentsService {
     const today = todayInNairobi();
     return rows.map((i) => ({
       id: i.id,
+      tenancyId: i.tenancyId,
       number: i.number,
       kind: i.kind,
       period: i.period,

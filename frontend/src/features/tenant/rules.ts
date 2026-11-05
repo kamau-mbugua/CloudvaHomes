@@ -101,3 +101,12 @@ export function checkPay(draft: PayDraft): CheckedPay {
 export function accountSearch(count: number, tenantId: string): string {
   return count > 1 ? `?account=${encodeURIComponent(tenantId)}` : '';
 }
+
+/**
+ * Where a notice opens in the tenant portal: only same-site `/tenant…` paths; anything else
+ * (staff pages, other sites) has no link here.
+ */
+export function noticeLink(actionUrl: string | null | undefined): string | null {
+  if (!actionUrl) return null;
+  return actionUrl === '/tenant' || actionUrl.startsWith('/tenant/') ? actionUrl : null;
+}

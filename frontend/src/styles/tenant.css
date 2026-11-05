@@ -123,3 +123,42 @@ a.orgpick__row { text-decoration: none; }
 .tp__inspections { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .tp__inspection { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; }
 .tp__inspection summary { cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+
+/* ── Tenant portal shell (tenant portal redesign) ─────────────────────── */
+.tsb__switch { display: flex; flex-direction: column; gap: 4px; margin: 4px 12px 10px; padding: 8px 10px; border-radius: 10px; background: rgb(255 255 255 / 8%); }
+.tsb__switchlabel { font-size: 11px; color: rgb(255 255 255 / 60%); text-transform: uppercase; letter-spacing: 0.06em; }
+.tsb__select { width: 100%; border: 0; border-radius: 8px; padding: 6px 8px; background: rgb(255 255 255 / 12%); color: #fff; font: inherit; font-size: 13.5px; }
+.tsb__select option { color: var(--foreground); background: var(--card); }
+.tsh__page { display: flex; flex-direction: column; gap: 16px; }
+.tsh__foot { margin-top: auto; padding-top: 24px; display: flex; gap: 16px; font-size: 13px; }
+.tsh__foot:empty { display: none; }
+.tsh__signout { display: inline-flex; align-items: center; gap: 6px; }
+.tsh__signout svg { width: 16px; height: 16px; }
+@media (max-width: 640px) { .tsh__signout span { display: none; } }
+
+/* ── Tenant dashboard ──────────────────────────────────────────────────── */
+.td__split { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; font-size: 13.5px; }
+.td__split li { display: flex; justify-content: space-between; gap: 12px; color: rgb(255 255 255 / 85%); }
+.td__homes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.td__home {
+  display: flex; flex-direction: column; gap: 4px; text-align: left; cursor: pointer;
+  padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); border-left: 4px solid var(--lime, #84bd00);
+  background: var(--card); color: var(--foreground); font: inherit;
+}
+.td__home:hover, .td__home:focus-visible { border-color: var(--primary); }
+.td__status { font-weight: 600; }
+.td__status--owed { color: var(--destructive); }
+.td__status--ok { color: var(--success, #3d7d16); }
+.td__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.td__chart { grid-column: 1 / -1; }
+.td__big { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+.td__icon { width: 24px; flex-shrink: 0; text-align: center; }
+.tdp__row { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.tdp__line { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.tdp__more { justify-self: start; background: none; border: 0; padding: 0; color: var(--primary); font: inherit; font-size: 13px; cursor: pointer; }
+.td .tp__row { justify-content: flex-start; gap: 10px; }
+.td .tp__row > .num { margin-left: auto; }
+.td .tp__rowmain { min-width: 0; }
+.tps__section { display: flex; flex-direction: column; gap: 10px; }
+.tpn__new { margin-left: 8px; }
+.tpn__body { white-space: pre-line; }

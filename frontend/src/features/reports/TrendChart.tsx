@@ -4,6 +4,12 @@ import { formatPeriod } from '../../lib/periods';
 import { columnPath, formatCompactKES, niceScale } from './rules';
 import type { TrendPoint } from './types';
 
+export interface TrendSeries {
+  key: 'invoiced' | 'collected' | 'expenses';
+  label: string;
+  color: string;
+}
+
 /**
  * Invoiced / collected / expenses for 12 months as grouped columns, drawn in plain SVG.
  * One y-axis (all three are KES). Hover or tap a month for its exact figures; the same
@@ -13,11 +19,11 @@ import type { TrendPoint } from './types';
  * (validated as a set in light and dark), defined as --viz-1..3 in reports.css.
  */
 
-const SERIES = [
+const TREND_SERIES: readonly TrendSeries[] = [
   { key: 'invoiced', label: 'Invoiced', color: 'var(--viz-1)' },
   { key: 'collected', label: 'Collected', color: 'var(--viz-2)' },
   { key: 'expenses', label: 'Expenses', color: 'var(--viz-3)' },
-] as const;
+];
 
 const W = 720;
 const H = 250;
@@ -33,13 +39,27 @@ function monthLabel(period: string, index: number): string {
   return index === 0 || period.endsWith('-01') ? `${month} ’${year.slice(2)}` : month;
 }
 
-export function TrendChart({ points }: { points: TrendPoint[] }) {
+/**
+ * `series` picks which bars to draw (default: invoiced, collected, expenses); the tenant
+ * dashboard draws billed vs paid only.
+ */
+export function TrendChart({
+  points,
+  series = TREND_SERIES,
+  title = 'Last 12 months',
+  description = 'Invoiced, collected and expenses per month',
+}: {
+  points: TrendPoint[];
+  series?: readonly TrendSeries[];
+  title?: string;
+  description?: string;
+}) {
   const [active, setActive] = useState<number | null>(null);
   const count = Math.max(points.length, 1);
   const band = PLOT_W / count;
-  const barW = Math.max(3, Math.min(16, (band - 14 - GAP * (SERIES.length - 1)) / SERIES.length));
-  const groupW = barW * SERIES.length + GAP * (SERIES.length - 1);
-  const peak = Math.max(0, ...points.flatMap((p) => SERIES.map((s) => p[s.key])));
+  const barW = Math.max(3, Math.min(16, (band - 14 - GAP * (series.length - 1)) / series.length));
+  const groupW = barW * series.length + GAP * (series.length - 1);
+  const peak = Math.max(0, ...points.flatMap((p) => series.map((s) => p[s.key])));
   const scale = niceScale(peak);
   const y = (minor: number) => M.top + PLOT_H - (Math.max(0, minor) / scale.max) * PLOT_H;
   const first = points[0]?.period;
@@ -50,9 +70,9 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
   return (
     <figure className="rp__chart">
       <figcaption className="rp__charthead">
-        <span className="ad__h2">Last 12 months</span>
+        <span className="ad__h2">{title}</span>
         <ul className="rp__legend" aria-label="Series">
-          {SERIES.map((s) => (
+          {series.map((s) => (
             <li key={s.key}><span className="rp__swatch" style={{ background: s.color }} aria-hidden="true" />{s.label}</li>
           ))}
         </ul>
@@ -64,7 +84,7 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
             viewBox={`0 0 ${W} ${H}`}
             className="rp__svg"
             role="img"
-            aria-label={`Invoiced, collected and expenses per month, ${formatPeriod(first)} to ${formatPeriod(last)}. The figures are in the table below.`}
+            aria-label={`${description}, ${formatPeriod(first)} to ${formatPeriod(last)}. The figures are in the table below.`}
           >
             {scale.ticks.map((t) => (
               <g key={t}>
@@ -78,7 +98,7 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
               return (
                 <g key={p.period}>
                   {active === i ? <rect x={x0 + 2} y={M.top} width={band - 4} height={PLOT_H} rx={6} className="rp__hover" /> : null}
-                  {SERIES.map((s, k) => {
+                  {series.map((s, k) => {
                     const top = y(p[s.key]);
                     return (
                       <path key={s.key} d={columnPath(x0 + (band - groupW) / 2 + k * (barW + GAP), top, barW, M.top + PLOT_H - top)}
@@ -99,7 +119,7 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
           {shown ? (
             <div className="rp__tip" style={{ left: `${tipLeft}%` }} aria-hidden="true">
               <strong>{formatPeriod(shown.period, true)}</strong>
-              {SERIES.map((s) => (
+              {series.map((s) => (
                 <span key={s.key} className="rp__tiprow">
                   <span className="rp__swatch" style={{ background: s.color }} />
                   <span>{s.label}</span>
@@ -115,18 +135,18 @@ export function TrendChart({ points }: { points: TrendPoint[] }) {
         <summary>Show the figures as a table</summary>
         <div className="ad__tablewrap">
           <table className="ad__table rp__table rp__table--compact">
-            <caption className="nx-sr">Invoiced, collected and expenses per month</caption>
+            <caption className="nx-sr">{description}</caption>
             <thead>
               <tr>
                 <th scope="col">Month</th>
-                {SERIES.map((s) => <th key={s.key} scope="col" className="num">{s.label}</th>)}
+                {series.map((s) => <th key={s.key} scope="col" className="num">{s.label}</th>)}
               </tr>
             </thead>
             <tbody>
               {points.map((p) => (
                 <tr key={p.period}>
                   <th scope="row">{formatPeriod(p.period)}</th>
-                  {SERIES.map((s) => <td key={s.key} className="num">{formatKES(p[s.key])}</td>)}
+                  {series.map((s) => <td key={s.key} className="num">{formatKES(p[s.key])}</td>)}
                 </tr>
               ))}
             </tbody>

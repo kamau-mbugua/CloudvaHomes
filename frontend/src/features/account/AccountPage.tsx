@@ -65,7 +65,7 @@ export function AccountPage() {
   );
 }
 
-function ProfileSection() {
+export function ProfileSection() {
   const session = useSession();
   const toast = useToast();
   const [firstName, setFirstName] = useState(session.user.firstName);
@@ -141,7 +141,7 @@ function ProfileSection() {
 
 type PwField = 'currentPassword' | 'password' | 'confirm';
 
-function PasswordSection() {
+export function PasswordSection() {
   const session = useSession();
   const toast = useToast();
   const [current, setCurrent] = useState('');

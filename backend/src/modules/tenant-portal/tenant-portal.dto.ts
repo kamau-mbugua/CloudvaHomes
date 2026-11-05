@@ -1,5 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { IsDateOnly } from '../../common/dates/date-only.js';
 import { PaginationQueryDto } from '../../common/http/pagination.js';
 import { IsMinorAmount } from '../portfolio/money.dto.js';
@@ -54,6 +65,41 @@ export class TenantInvoicesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(['ISSUED', 'PARTIALLY_PAID', 'PAID', 'VOID'])
   status?: 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'VOID';
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Only this home’s invoices' })
+  @IsOptional()
+  @IsUUID()
+  tenancyId?: string;
+}
+
+/** `GET /tenant/accounts/overview/monthly` — billed vs paid per month (tenant dashboard). */
+export class TenantMonthlyQueryDto {
+  @ApiPropertyOptional({ enum: [6, 12], default: 6 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsIn([6, 12])
+  months: 6 | 12 = 6;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'One home; omit for all my homes' })
+  @IsOptional()
+  @IsUUID()
+  tenancyId?: string;
+}
+
+/** `GET /tenant/accounts/overview/activity` — latest events across my homes. */
+export class TenantActivityQueryDto {
+  @ApiPropertyOptional({ minimum: 1, maximum: 20, default: 8 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  limit: number = 8;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'One home; omit for all my homes' })
+  @IsOptional()
+  @IsUUID()
+  tenancyId?: string;
 }
 
 export class RunRemindersDto {
@@ -63,4 +109,12 @@ export class RunRemindersDto {
   @IsOptional()
   @IsBoolean()
   dryRun?: boolean;
+}
+
+/** `GET /tenant/notices` — my tenant notices, optionally one landlord account's. */
+export class TenantNoticesQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ format: 'uuid', description: 'One of my tenant accounts' })
+  @IsOptional()
+  @IsUUID()
+  tenantId?: string;
 }

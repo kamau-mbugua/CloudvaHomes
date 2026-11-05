@@ -73,8 +73,11 @@ const OwnerOverviewPage = lazy(() => import('./features/owner/OwnerPortal').then
 const OwnerPortalStatementsPage = lazy(() => import('./features/owner/OwnerPortal').then((m) => ({ default: m.OwnerStatementsPage })));
 const OwnerPayoutsPage = lazy(() => import('./features/owner/OwnerPortal').then((m) => ({ default: m.OwnerPayoutsPage })));
 
-const TenantShell = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantShell })));
-const TenantHomePage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantHomePage })));
+const TenantShell = lazy(() => import('./features/tenant/TenantShell').then((m) => ({ default: m.TenantShell })));
+const TenantDocumentsPage = lazy(() => import('./features/tenant/TenantMorePages').then((m) => ({ default: m.TenantDocumentsPage })));
+const TenantNoticesPage = lazy(() => import('./features/tenant/TenantMorePages').then((m) => ({ default: m.TenantNoticesPage })));
+const TenantProfilePage = lazy(() => import('./features/tenant/TenantMorePages').then((m) => ({ default: m.TenantProfilePage })));
+const TenantDashboard = lazy(() => import('./features/tenant/TenantDashboard').then((m) => ({ default: m.TenantDashboard })));
 const TenantInvoicesPage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantInvoicesPage })));
 const TenantInvoicePage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantInvoicePage })));
 const TenantStatementPage = lazy(() => import('./features/tenant/TenantPortal').then((m) => ({ default: m.TenantStatementPage })));
@@ -229,7 +232,7 @@ export default function App() {
 
               {/* The tenant portal: a tenant's own account and paying by M-Pesa, its own shell. */}
               <Route path="/tenant" element={<RequireTenant><TenantShell /></RequireTenant>}>
-                <Route index element={<TenantHomePage />} />
+                <Route index element={<TenantDashboard />} />
                 <Route path="invoices" element={<WithRouteDrawer><TenantInvoicesPage /></WithRouteDrawer>}>
                   <Route
                     path=":invoiceId"
@@ -243,6 +246,9 @@ export default function App() {
                 <Route path="statement" element={<TenantStatementPage />} />
                 <Route path="payments" element={<TenantPaymentsPage />} />
                 <Route path="requests" element={<TenantRequestsPage />} />
+                <Route path="documents" element={<TenantDocumentsPage />} />
+                <Route path="notices" element={<TenantNoticesPage />} />
+                <Route path="profile" element={<TenantProfilePage />} />
                 <Route path="*" element={<Navigate to="/tenant" replace />} />
               </Route>
 

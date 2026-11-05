@@ -10,6 +10,8 @@ import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
 import '../staff/more/photo.dart';
 import '../staff/staff_widgets.dart';
+import 'home_scope.dart';
+import 'home_scope_widgets.dart';
 import 'tenant_api.dart';
 
 final _tenantRequestsVersionProvider = StateProvider<int>((ref) => 0);
@@ -22,6 +24,15 @@ class TenantRequestsScreen extends ConsumerWidget {
     final tenantId = ref.watch(currentTenantIdProvider);
     final api = ref.watch(tenantApiProvider);
     final version = ref.watch(_tenantRequestsVersionProvider);
+    final scope = ref.watch(homeScopeProvider);
+    final home = scope is OneHome
+        ? ref
+              .watch(allHomesProvider)
+              .valueOrNull
+              ?.homes
+              .where((h) => h.id == scope.tenancyId)
+              .firstOrNull
+        : null;
     if (tenantId == null) {
       return ref.watch(sessionProvider).isLoading
           ? const KodiHubPageLoader()
@@ -36,66 +47,80 @@ class TenantRequestsScreen extends ConsumerWidget {
         onPressed: () => _CreateTenantRequestSheet.show(context, tenantId),
       ),
       body: PagedList<TenantMaintenanceRequest>(
-        resetKey: (tenantId, version),
+        resetKey: (tenantId, version, home?.id),
         padding: const EdgeInsets.only(bottom: 88),
-        header: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () => _CreateTenantRequestSheet.show(context, tenantId),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: HodiColors.limeSoft,
+        header: Column(
+          children: [
+            const LedgerScopeHeader(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: InkWell(
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: HodiColors.limeText.withValues(alpha: 0.25),
+                onTap: () => _CreateTenantRequestSheet.show(context, tenantId),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: HodiColors.limeSoft,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: HodiColors.limeText.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          color: HodiColors.navy,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add, color: Colors.white),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Report a problem',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: HodiColors.navy,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Add a photo and we’ll tell the caretaker',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: HodiColors.limeHover,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: HodiColors.limeHover,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: HodiColors.navy,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.add, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Report a problem',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: HodiColors.navy,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Add a photo and we’ll tell the caretaker',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: HodiColors.limeHover,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: HodiColors.limeHover),
-                ],
-              ),
             ),
-          ),
+          ],
         ),
         load: (page) async {
           final p = await api.requests(tenantId, page: page);
-          return (rows: p.rows, hasMore: p.hasMore);
+          final rows = home == null
+              ? p.rows
+              : [
+                  for (final r in p.rows)
+                    if (r.unitNumber == home.unit) r,
+                ];
+          return (rows: rows, hasMore: p.hasMore);
         },
         empty: const EmptyState(
           icon: Icons.handyman_outlined,

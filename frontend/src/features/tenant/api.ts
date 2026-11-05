@@ -8,7 +8,7 @@ import { unwrap, unwrapList } from '../payments/rules';
 import type { Payment, Statement } from '../payments/types';
 import type { MaintenanceRequestItem } from '../maintenance/types';
 import type { Upload } from '../uploads/api';
-import type { TenantOverview } from './types';
+import type { ActivityItem, ConsolidatedOverview, MonthlyPoint, TenantNotice, TenantOverview } from './types';
 
 /**
  * Reads, PDF downloads and error messages for the tenant portal. Only
@@ -30,6 +30,39 @@ export function useTenantOverview(tenantId: string) {
   });
 }
 
+/** Every home across every landlord/agency (tenant portal redesign). */
+export function useConsolidatedOverview() {
+  return useQuery({
+    queryKey: [...keys.all, 'overview'],
+    queryFn: () => api.get<unknown>('/tenant/accounts/overview').then((body) => unwrap<ConsolidatedOverview>(body)),
+  });
+}
+
+/** Billed vs paid per month, for all homes or one. */
+export function useTenantMonthly(months: 6 | 12, tenancyId?: string) {
+  return useQuery({
+    queryKey: [...keys.all, 'monthly', months, tenancyId ?? null],
+    queryFn: () => api.get<unknown>('/tenant/accounts/overview/monthly', { months, tenancyId }).then((body) => unwrapList<MonthlyPoint>(body)),
+  });
+}
+
+/** Latest payments, invoices, rent changes and notices, for all homes or one. */
+export function useTenantActivity(limit: number, tenancyId?: string) {
+  return useQuery({
+    queryKey: [...keys.all, 'activity', limit, tenancyId ?? null],
+    queryFn: () => api.get<unknown>('/tenant/accounts/overview/activity', { limit, tenancyId }).then((body) => unwrapList<ActivityItem>(body)),
+  });
+}
+
+/** The tenant's notices, paged; `tenantId` narrows to one landlord account. */
+export function useTenantNotices(page: number, tenantId?: string) {
+  return useQuery({
+    queryKey: [...keys.all, 'notices', page, tenantId ?? null],
+    queryFn: () => api.get<unknown>('/tenant/notices', { page: page > 1 ? page : undefined, tenantId }).then((body) => readPage<TenantNotice>(body)),
+    placeholderData: keepPreviousData,
+  });
+}
+
 /** `{ data, meta }` from a paged list; a bare array reads as one page. */
 function readPage<T>(body: unknown): { rows: T[]; meta: PageMeta | undefined } {
   const meta = body && typeof body === 'object' && 'meta' in body ? (body as { meta?: PageMeta }).meta : undefined;
@@ -37,10 +70,10 @@ function readPage<T>(body: unknown): { rows: T[]; meta: PageMeta | undefined } {
 }
 
 /** Paged (the contract gives `?status&page`). */
-export function useTenantInvoices(tenantId: string, filter: { status?: string; page?: number }) {
+export function useTenantInvoices(tenantId: string, filter: { status?: string; page?: number; tenancyId?: string }) {
   return useQuery({
     queryKey: [...keys.account(tenantId), 'invoices', filter],
-    queryFn: () => api.get<unknown>(`${base(tenantId)}/invoices`, { status: filter.status, page: filter.page && filter.page > 1 ? filter.page : undefined })
+    queryFn: () => api.get<unknown>(`${base(tenantId)}/invoices`, { status: filter.status, tenancyId: filter.tenancyId, page: filter.page && filter.page > 1 ? filter.page : undefined })
       .then((body) => readPage<Invoice>(body)),
     placeholderData: keepPreviousData,
   });

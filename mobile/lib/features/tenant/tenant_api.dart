@@ -8,6 +8,7 @@ import '../../core/auth/session_controller.dart';
 import '../../core/money.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/stk_sheet.dart';
+import 'home_scope.dart';
 
 export '../../core/auth/session_controller.dart' show sessionProvider;
 
@@ -86,6 +87,39 @@ class TenantOverview {
   }
 }
 
+/// `GET /tenant/accounts/overview`: every home across every landlord account.
+class ConsolidatedOverview {
+  ConsolidatedOverview({
+    required this.owed,
+    required this.credit,
+    required this.depositHeld,
+    required this.homes,
+    required this.accounts,
+  });
+  final int owed;
+  final int credit;
+  final int depositHeld;
+  final List<Home> homes;
+  final List<TenantOverview> accounts;
+
+  factory ConsolidatedOverview.fromJson(Map<String, dynamic> j) {
+    final balance = centsFrom(j['balance']);
+    return ConsolidatedOverview(
+      owed: balance > 0 ? balance : 0,
+      credit: centsFrom(j['credit']),
+      depositHeld: centsFrom(j['depositHeld']),
+      homes: [
+        for (final h in j['tenancies'] as List? ?? const [])
+          Home.fromJson(h as Map<String, dynamic>),
+      ],
+      accounts: [
+        for (final a in j['accounts'] as List? ?? const [])
+          TenantOverview.fromJson(a as Map<String, dynamic>),
+      ],
+    );
+  }
+}
+
 class Home {
   Home({
     this.id = '',
@@ -100,6 +134,11 @@ class Home {
     required this.startDate,
     this.endDate,
     this.hasSignedLease = false,
+    this.due = 0,
+    this.overdue = 0,
+    this.daysLate = 0,
+    this.nextDueDate,
+    this.leaseEndDate,
   });
   final String id;
   final String tenantId;
@@ -113,6 +152,13 @@ class Home {
   final String startDate;
   final String? endDate;
   final bool hasSignedLease;
+
+  /// Tenant portal redesign: what this home owes, the overdue part, days late, next due.
+  final int due;
+  final int overdue;
+  final int daysLate;
+  final String? nextDueDate;
+  final String? leaseEndDate;
 
   String get key => id.isNotEmpty ? id : '$tenantId:$unit:$property';
 
@@ -133,6 +179,11 @@ class Home {
     startDate: j['startDate'] as String,
     endDate: j['endDate'] as String?,
     hasSignedLease: j['hasSignedLease'] == true,
+    due: centsFrom(j['due']),
+    overdue: centsFrom(j['overdue']),
+    daysLate: (j['daysLate'] as num?)?.toInt() ?? 0,
+    nextDueDate: j['nextDueDate'] as String?,
+    leaseEndDate: j['leaseEndDate'] as String?,
   );
 }
 
@@ -376,6 +427,95 @@ class TenantMaintenanceRequest {
 }
 
 /// A page of a list plus whether there's more.
+
+/// Billed vs paid for one month (`/tenant/accounts/overview/monthly`).
+class MonthlyPoint {
+  const MonthlyPoint(this.period, this.invoiced, this.paid);
+  final String period;
+  final int invoiced;
+  final int paid;
+  factory MonthlyPoint.fromJson(Map<String, dynamic> j) => MonthlyPoint(
+    j['period'] as String,
+    centsFrom(j['invoiced']),
+    centsFrom(j['paid']),
+  );
+}
+
+/// One event in the activity feed (`/tenant/accounts/overview/activity`).
+class ActivityItem {
+  const ActivityItem({
+    required this.kind,
+    required this.at,
+    required this.title,
+    required this.amount,
+    required this.orgName,
+    required this.link,
+  });
+  final String kind;
+  final String at;
+  final String title;
+  final int? amount;
+  final String orgName;
+  final String link;
+  factory ActivityItem.fromJson(Map<String, dynamic> j) => ActivityItem(
+    kind: j['kind'] as String,
+    at: j['at'] as String,
+    title: j['title'] as String,
+    amount: j['amount'] == null ? null : centsFrom(j['amount']),
+    orgName: j['orgName'] as String? ?? '',
+    link: j['link'] as String? ?? '/tenant',
+  );
+}
+
+/// A tenant notice (`/tenant/notices`).
+class TenantNotice {
+  const TenantNotice({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    this.orgName,
+    this.actionUrl,
+    this.read = false,
+    required this.tenantId,
+  });
+  final String id;
+  final String title;
+  final String body;
+  final String createdAt;
+  final String? orgName;
+  final String? actionUrl;
+  final bool read;
+  final String tenantId;
+  factory TenantNotice.fromJson(Map<String, dynamic> j) => TenantNotice(
+    id: j['id'] as String,
+    title: j['title'] as String? ?? '',
+    body: j['body'] as String? ?? '',
+    createdAt: j['createdAt'] as String? ?? '',
+    orgName: j['orgName'] as String?,
+    actionUrl: j['actionUrl'] as String?,
+    read: j['readAt'] != null,
+    tenantId: j['tenantId'] as String? ?? '',
+  );
+}
+
+/// A move-in / move-out inspection as the tenant sees it.
+class TenantInspection {
+  const TenantInspection({
+    required this.kind,
+    required this.inspectedOn,
+    required this.acknowledged,
+  });
+  final String kind;
+  final String inspectedOn;
+  final bool acknowledged;
+  factory TenantInspection.fromJson(Map<String, dynamic> j) => TenantInspection(
+    kind: j['kind'] as String,
+    inspectedOn: j['inspectedOn'] as String? ?? '',
+    acknowledged: j['tenantAcknowledgedAt'] != null,
+  );
+}
+
 class Page<T> {
   Page(this.rows, {required this.page, required this.pages});
   final List<T> rows;
@@ -394,6 +534,12 @@ class TenantApi {
   Future<TenantOverview> overview(String id) async => TenantOverview.fromJson(
     (await _api.get(_base(id)))['data'] as Map<String, dynamic>,
   );
+
+  Future<ConsolidatedOverview> allHomes() async =>
+      ConsolidatedOverview.fromJson(
+        (await _api.get('/tenant/accounts/overview'))['data']
+            as Map<String, dynamic>,
+      );
 
   Future<TenantOverview> consolidatedOverview(List<String> ids) async {
     if (ids.length == 1) return overview(ids.first);
@@ -419,6 +565,60 @@ class TenantApi {
     );
   }
 
+  Future<List<MonthlyPoint>> monthly({
+    int months = 6,
+    String? tenancyId,
+  }) async {
+    final res = await _api.get(
+      '/tenant/accounts/overview/monthly',
+      query: {'months': months, 'tenancyId': ?tenancyId},
+    );
+    return [
+      for (final r in res['data'] as List)
+        MonthlyPoint.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  Future<List<ActivityItem>> activity({
+    int limit = 8,
+    String? tenancyId,
+  }) async {
+    final res = await _api.get(
+      '/tenant/accounts/overview/activity',
+      query: {'limit': limit, 'tenancyId': ?tenancyId},
+    );
+    return [
+      for (final r in res['data'] as List)
+        ActivityItem.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  Future<Page<TenantNotice>> notices({int page = 1, String? tenantId}) => _page(
+    '/tenant/notices',
+    {'page': page, 'tenantId': ?tenantId},
+    TenantNotice.fromJson,
+  );
+
+  String inspectionsPath(String id, String tenancyId) =>
+      '${_base(id)}/tenancies/${Uri.encodeComponent(tenancyId)}/inspections';
+
+  Future<List<TenantInspection>> inspections(
+    String id,
+    String tenancyId,
+  ) async {
+    final res = await _api.get(inspectionsPath(id, tenancyId));
+    return [
+      for (final r in res['data'] as List)
+        TenantInspection.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  Future<void> acknowledgeInspection(
+    String id,
+    String tenancyId,
+    String kind,
+  ) => _api.post('${inspectionsPath(id, tenancyId)}/$kind/acknowledge');
+
   Future<Page<T>> _page<T>(
     String path,
     Map<String, Object?> query,
@@ -433,11 +633,15 @@ class TenantApi {
     );
   }
 
-  Future<Page<InvoiceRow>> invoices(String id, {int page = 1}) => _page(
-    '${_base(id)}/invoices',
-    {'page': page, 'pageSize': 25},
-    InvoiceRow.fromJson,
-  );
+  Future<Page<InvoiceRow>> invoices(
+    String id, {
+    int page = 1,
+    String? tenancyId,
+  }) => _page('${_base(id)}/invoices', {
+    'page': page,
+    'pageSize': 25,
+    'tenancyId': ?tenancyId,
+  }, InvoiceRow.fromJson);
 
   Future<InvoiceDetail> invoice(String id, String invoiceId) async =>
       InvoiceDetail.fromJson(
@@ -523,9 +727,25 @@ final chosenTenantProvider = StateProvider<String?>((ref) => null);
 /// Selected unit/tenancy key on Tenant Home; null = Consolidated across all units.
 final selectedTenantHomeKeyProvider = StateProvider<String?>((ref) => null);
 
+/// Every home across every landlord account (tenant portal redesign).
+final allHomesProvider = FutureProvider.autoDispose<ConsolidatedOverview>(
+  (ref) => ref.watch(tenantApiProvider).allHomes(),
+);
+
+/// The home switcher's choice, checked against the homes there are now.
+final homeScopeProvider = Provider<HomeScope>((ref) {
+  final all = ref.watch(allHomesProvider).valueOrNull;
+  if (all == null) return const AllHomes();
+  return resolveScope(ref.watch(homeScopeRawProvider), homeOptions(all.homes));
+});
+
 final currentTenantIdProvider = Provider<String?>((ref) {
   final session = ref.watch(sessionProvider).valueOrNull;
   final accounts = session?.tenantOf ?? const [];
+  final scope = ref.watch(homeScopeProvider);
+  if (scope is OneHome && accounts.any((a) => a.tenantId == scope.tenantId)) {
+    return scope.tenantId;
+  }
   final chosen = ref.watch(chosenTenantProvider) ?? session?.activeTenantId;
   if (accounts.isEmpty) return null;
   return accounts.any((a) => a.tenantId == chosen)

@@ -6,7 +6,43 @@ import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
 import '../../core/widgets/side_drawer.dart';
+import 'home_scope_widgets.dart';
 import 'tenant_api.dart';
+
+/// The tenant tabs (tenant portal redesign), in the design's order.
+const tenantTabs =
+    <({String label, String path, IconData icon, IconData selected})>[
+      (
+        label: 'Home',
+        path: '/tenant',
+        icon: Icons.home_outlined,
+        selected: Icons.home,
+      ),
+      (
+        label: 'Bills',
+        path: '/tenant/invoices',
+        icon: Icons.receipt_long_outlined,
+        selected: Icons.receipt_long,
+      ),
+      (
+        label: 'Payments',
+        path: '/tenant/payments',
+        icon: Icons.payments_outlined,
+        selected: Icons.payments,
+      ),
+      (
+        label: 'Repairs',
+        path: '/tenant/requests',
+        icon: Icons.handyman_outlined,
+        selected: Icons.handyman,
+      ),
+      (
+        label: 'More',
+        path: '/tenant/more',
+        icon: Icons.menu,
+        selected: Icons.menu_open,
+      ),
+    ];
 
 /// Tenant mode: bottom tabs, the organisation's name on top, account switch when they rent
 /// from more than one place.
@@ -25,67 +61,52 @@ class TenantShell extends ConsumerWidget {
       appBar: KodiHubAppBar(
         loading: session.isLoading,
         subtitle: current?.name,
-        title: accounts.length > 1
-            ? PopupMenuButton<String>(
-                tooltip: 'Switch account',
-                onSelected: (id) {
-                  final next = id.isEmpty ? null : id;
-                  ref.read(chosenTenantProvider.notifier).state = next;
-                  ref.read(selectedTenantHomeKeyProvider.notifier).state = null;
-                  ref
-                      .read(sessionProvider.notifier)
-                      .switchContext(tenantId: next);
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: '',
-                    child: Text('All units (Consolidated)'),
-                  ),
-                  for (final a in accounts)
-                    PopupMenuItem(
-                      value: a.tenantId,
-                      child: Text('${a.orgName} · ${a.name}'),
-                    ),
-                ],
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        current?.orgName ?? 'KodiHub',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Icon(Icons.arrow_drop_down),
-                  ],
-                ),
-              )
-            : Text(current?.orgName ?? 'KodiHub'),
+        title: const _ShellTitle(),
         actions: const [NotificationButton(), AccountButton()],
       ),
-      body: shell,
+      body: Column(
+        children: [
+          const HomeScopeStrip(),
+          Expanded(child: shell),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) =>
             shell.goBranch(i, initialLocation: i == shell.currentIndex),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long_outlined),
-            selectedIcon: Icon(Icons.receipt_long),
-            label: 'Statements',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.handyman_outlined),
-            selectedIcon: Icon(Icons.handyman),
-            label: 'Repairs',
-          ),
+        destinations: [
+          for (final t in tenantTabs)
+            NavigationDestination(
+              icon: Icon(t.icon),
+              selectedIcon: Icon(t.selected),
+              label: t.label,
+            ),
         ],
       ),
     );
+  }
+}
+
+/// The landlord's name with one home, the home switcher with several.
+class _ShellTitle extends ConsumerWidget {
+  const _ShellTitle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final homes = ref.watch(allHomesProvider).valueOrNull?.homes ?? const [];
+    final lived = homes
+        .where((h) => h.status == 'ACTIVE' || h.status == 'NOTICE')
+        .length;
+    if (lived > 1) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: HomeSwitcherChip(),
+      );
+    }
+    final session = ref.watch(sessionProvider);
+    final accounts = session.valueOrNull?.tenantOf ?? const [];
+    final currentId = ref.watch(currentTenantIdProvider);
+    final current = accounts.where((a) => a.tenantId == currentId).firstOrNull;
+    return Text(current?.orgName ?? 'KodiHub');
   }
 }

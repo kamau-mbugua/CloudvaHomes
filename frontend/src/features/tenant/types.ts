@@ -35,6 +35,11 @@ export interface PortalTenancy {
   startDate: string;
   endDate: string | null;
   hasSignedLease?: boolean;
+  /** Tenant portal redesign: what this home owes now, overdue part, days late, next due. */
+  due?: number;
+  overdue?: number;
+  daysLate?: number;
+  nextDueDate?: string | null;
 }
 
 /**
@@ -64,6 +69,8 @@ export interface PortalOpenInvoice {
   creditedAmount?: number;
   balance: number;
   overdue?: boolean;
+  /** The home (tenancy) it bills. */
+  tenancyId?: string;
 }
 
 /** `GET /tenant/accounts/:id`. */
@@ -79,4 +86,55 @@ export interface TenantOverview {
   howToPay: HowToPay[];
   /** The organisation has an M-Pesa channel covering their home: "Pay now" sends a prompt. */
   canPayInApp: boolean;
+}
+
+/** A tenancy in the consolidated overview: also says which landlord account it belongs to. */
+export interface ConsolidatedTenancy extends PortalTenancy {
+  tenantId: string;
+  tenantCode: string;
+  orgName: string;
+}
+
+/** `GET /tenant/accounts/overview` — every home across every landlord/agency. */
+export interface ConsolidatedOverview {
+  balance: number;
+  credit: number;
+  depositHeld: number;
+  /** Homes still lived in (ACTIVE or NOTICE). */
+  homes: number;
+  tenancies: ConsolidatedTenancy[];
+  openInvoices: (PortalOpenInvoice & { tenantId: string; orgName: string })[];
+  /** One full overview per landlord account. */
+  accounts: TenantOverview[];
+}
+
+/** `GET /tenant/accounts/overview/monthly`. */
+export interface MonthlyPoint {
+  period: string;
+  invoiced: number;
+  paid: number;
+}
+
+/** `GET /tenant/accounts/overview/activity`. */
+export interface ActivityItem {
+  kind: 'PAYMENT' | 'INVOICE' | 'RENT_CHANGE' | 'NOTICE';
+  at: string;
+  title: string;
+  amount: number | null;
+  orgName: string;
+  tenantId: string;
+  link: string;
+}
+
+/** `GET /tenant/notices`. */
+export interface TenantNotice {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  actionUrl: string | null;
+  readAt: string | null;
+  createdAt: string;
+  tenantId: string;
+  orgName: string | null;
 }

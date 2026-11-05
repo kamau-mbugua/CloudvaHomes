@@ -88,3 +88,18 @@ export function SwitchIcon() {
 export function ShieldIcon() {
   return <Icon><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /></Icon>;
 }
+
+/** A wrench — repairs and maintenance. */
+export function WrenchIcon() {
+  return <Icon><path d="M7 10h3v-3l-3.5 -3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1 -3 3l-6 -6a6 6 0 0 1 -8 -8l3.5 3.5" /></Icon>;
+}
+
+/** A folder — documents. */
+export function FolderIcon() {
+  return <Icon><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" /></Icon>;
+}
+
+/** A bell — notices. */
+export function BellIcon() {
+  return <Icon><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6" /><path d="M9 17v1a3 3 0 0 0 6 0v-1" /></Icon>;
+}

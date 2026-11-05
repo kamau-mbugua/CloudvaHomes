@@ -117,3 +117,15 @@ describe('tenantMessagingError (staff)', () => {
     expect(tenantMessagingError(err(409, 'NOTHING_DUE'))).toMatch(/owes nothing/);
   });
 });
+
+describe('noticeLink', () => {
+  it('opens tenant pages from a notice, never staff ones', async () => {
+    const { noticeLink } = await import('./rules');
+    expect(noticeLink('/tenant/requests')).toBe('/tenant/requests');
+    expect(noticeLink('/tenant/invoices/abc')).toBe('/tenant/invoices/abc');
+    expect(noticeLink('/tenant')).toBe('/tenant');
+    expect(noticeLink(null)).toBeNull();
+    expect(noticeLink('/app/tenants/1')).toBeNull();
+    expect(noticeLink('https://evil.example/tenant')).toBeNull();
+  });
+});

@@ -16,6 +16,7 @@ import {
   TenantPortalController,
 } from './tenant-portal.controller.js';
 import { TenantPortalService } from './tenant-portal.service.js';
+import { TenantNoticesController } from './tenant-notices.controller.js';
 
 /** Tenant portal & reminders (phase 7). */
 @Module({
@@ -30,6 +31,7 @@ import { TenantPortalService } from './tenant-portal.service.js';
   controllers: [
     TenantAccessController,
     TenantPortalController,
+    TenantNoticesController,
     ReminderJobsController,
     BroadcastsController,
   ],

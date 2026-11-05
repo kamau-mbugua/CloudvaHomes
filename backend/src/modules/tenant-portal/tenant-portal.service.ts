@@ -6,7 +6,14 @@ import {
   emptyContext,
   runWithContext,
 } from '../../common/context/request-context.js';
-import { formatDateOnly, formatDateOnlyOrNull } from '../../common/dates/date-only.js';
+import {
+  formatDateOnly,
+  formatDateOnlyOrNull,
+  parseDateOnly,
+} from '../../common/dates/date-only.js';
+import { todayInNairobi } from '../billing/billing-math.js';
+import { homeStatus } from './home-status.js';
+import { lastMonths, mergeActivity, monthlySeries } from './tenant-insights.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -22,7 +29,8 @@ import { TenanciesService } from '../portfolio/tenancies/tenancies.service.js';
 import { TenantsService } from '../portfolio/tenants/tenants.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
 import type { TenantInvoicesQueryDto, TenantPayDto } from './tenant-portal.dto.js';
-import type { PaginationQueryDto } from '../../common/http/pagination.js';
+import { toSkipTake, type PaginationQueryDto } from '../../common/http/pagination.js';
+import { paginated } from '../../common/http/response.js';
 
 /**
  * The tenant portal (design §6.3). A signed-in user linked to a tenant record sees that
@@ -117,6 +125,8 @@ export class TenantPortalService {
         },
       });
       const current = tenancies.filter((x) => x.status !== 'ENDED');
+      const openInvoices = await this.payments.openInvoices(tenantId);
+      const today = todayInNairobi();
       const propertyIds = [...new Set(current.map((x) => x.unit.property.id))];
       const channels = await this.tenantAccounts.channelsFor(propertyIds);
       const org = await this.db.organization.findUniqueOrThrow({
@@ -148,8 +158,9 @@ export class TenantPortalService {
           leaseEndDate: formatDateOnlyOrNull(x.leaseEndDate),
           upcomingRentChanges: x.rentChanges,
           hasSignedLease: Boolean(x.leaseUploadId),
+          ...homeStatus(openInvoices, x.id, today),
         })),
-        openInvoices: await this.payments.openInvoices(tenantId),
+        openInvoices,
         howToPay: this.tenantAccounts.howToPay(channels, tenant.code),
         canPayInApp: !!this.tenantAccounts.stkChannel(channels),
       };
@@ -186,15 +197,214 @@ export class TenantPortalService {
       balance,
       credit,
       depositHeld,
+      homes: tenancies.filter((t) => t.status === 'ACTIVE' || t.status === 'NOTICE').length,
       tenancies,
       openInvoices,
       accounts: overviews,
     };
   }
 
+  /**
+   * My tenant accounts, or — with `tenancyId` — only the account that home belongs to.
+   * 404 when the home isn't one of mine. Every query below filters by these tenant ids.
+   */
+  private async inScope(tenancyId?: string) {
+    const accounts = await this.mine();
+    if (!tenancyId) return accounts;
+    const t = await this.prisma.tenancy.findFirst({
+      where: { id: tenancyId, tenantId: { in: accounts.map((a) => a.tenantId) } },
+      select: { tenantId: true },
+    });
+    if (!t) throw AppError.notFound('Home');
+    return accounts.filter((a) => a.tenantId === t.tenantId);
+  }
+
+  /** Billed vs paid per month for my homes (or one), oldest first. */
+  async monthly(q: { months: number; tenancyId?: string }) {
+    const ids = (await this.inScope(q.tenancyId)).map((a) => a.tenantId);
+    const months = lastMonths(todayInNairobi(), q.months);
+    const home = q.tenancyId ? { tenancyId: q.tenancyId } : {};
+    const [invoices, allocations] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: { tenantId: { in: ids }, status: { not: 'VOID' }, period: { in: months }, ...home },
+        select: { period: true, total: true, creditedAmount: true },
+      }),
+      this.prisma.paymentAllocation.findMany({
+        where: {
+          invoice: { tenantId: { in: ids }, ...home },
+          payment: { receivedAt: { gte: parseDateOnly(`${months[0]}-01`) } },
+        },
+        select: { amount: true, payment: { select: { receivedAt: true } } },
+      }),
+    ]);
+    return monthlySeries(
+      months,
+      invoices.map((i) => ({ period: i.period, amount: i.total - i.creditedAmount })),
+      allocations.map((a) => ({
+        month: formatDateOnly(a.payment.receivedAt).slice(0, 7),
+        amount: a.amount,
+      })),
+    );
+  }
+
+  /** The latest payments, invoices, rent changes and notices across my homes (or one). */
+  async activity(q: { limit: number; tenancyId?: string }) {
+    const accounts = await this.inScope(q.tenancyId);
+    const ids = accounts.map((a) => a.tenantId);
+    const orgOf = new Map(accounts.map((a) => [a.tenantId, a.organization.name]));
+    const take = q.limit;
+    const home = q.tenancyId;
+    const [payments, invoices, changes, notices] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: {
+          tenantId: { in: ids },
+          ...(home ? { allocations: { some: { invoice: { tenancyId: home } } } } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+        select: {
+          id: true,
+          tenantId: true,
+          amount: true,
+          method: true,
+          reference: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.invoice.findMany({
+        where: {
+          tenantId: { in: ids },
+          status: { not: 'VOID' },
+          ...(home ? { tenancyId: home } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+        select: { id: true, tenantId: true, number: true, total: true, createdAt: true },
+      }),
+      this.prisma.rentChange.findMany({
+        where: {
+          appliedAt: null,
+          tenancy: { tenantId: { in: ids }, ...(home ? { id: home } : {}) },
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+        select: {
+          effectivePeriod: true,
+          newRent: true,
+          createdAt: true,
+          tenancy: { select: { tenantId: true } },
+        },
+      }),
+      this.prisma.userNotification.findMany({
+        where: { userId: authContext().userId, tenantId: { in: ids } },
+        orderBy: { createdAt: 'desc' },
+        take,
+        select: { title: true, tenantId: true, createdAt: true },
+      }),
+    ]);
+    type Item = {
+      kind: 'PAYMENT' | 'INVOICE' | 'RENT_CHANGE' | 'NOTICE';
+      at: string;
+      title: string;
+      amount: bigint | null;
+      orgName: string;
+      tenantId: string;
+      link: string;
+    };
+    const org = (tenantId: string) => orgOf.get(tenantId) ?? '';
+    return mergeActivity<Item>(
+      [
+        payments.map((p) => ({
+          kind: 'PAYMENT' as const,
+          at: p.createdAt.toISOString(),
+          title:
+            p.amount < 0n
+              ? 'Payment reversed'
+              : `Payment received${p.reference ? ` · ${p.reference}` : ''}`,
+          amount: p.amount,
+          orgName: org(p.tenantId),
+          tenantId: p.tenantId,
+          link: '/tenant/payments',
+        })),
+        invoices.map((i) => ({
+          kind: 'INVOICE' as const,
+          at: i.createdAt.toISOString(),
+          title: `Invoice ${i.number}`,
+          amount: i.total,
+          orgName: org(i.tenantId),
+          tenantId: i.tenantId,
+          link: `/tenant/invoices/${i.id}`,
+        })),
+        changes.map((c) => ({
+          kind: 'RENT_CHANGE' as const,
+          at: c.createdAt.toISOString(),
+          title: `Rent change from ${c.effectivePeriod}`,
+          amount: c.newRent,
+          orgName: org(c.tenancy.tenantId),
+          tenantId: c.tenancy.tenantId,
+          link: '/tenant',
+        })),
+        notices.map((n) => ({
+          kind: 'NOTICE' as const,
+          at: n.createdAt.toISOString(),
+          title: n.title,
+          amount: null,
+          orgName: org(n.tenantId!),
+          tenantId: n.tenantId!,
+          link: '/tenant/notices',
+        })),
+      ],
+      q.limit,
+    );
+  }
+
+  /**
+   * The tenant's notices: their notifications that belong to one of their tenant accounts
+   * (`tenantId` set). Staff alerts for a person who is also staff somewhere never show here.
+   */
+  async notices(q: { page: number; pageSize: number; tenantId?: string }) {
+    const accounts = await this.mine();
+    const ids = accounts.map((a) => a.tenantId);
+    if (q.tenantId && !ids.includes(q.tenantId)) throw AppError.notFound('Account');
+    const where = {
+      userId: authContext().userId,
+      tenantId: { in: q.tenantId ? [q.tenantId] : ids },
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.userNotification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...toSkipTake(q),
+      }),
+      this.prisma.userNotification.count({ where }),
+    ]);
+    const orgOf = new Map(accounts.map((a) => [a.tenantId, a.organization.name]));
+    return paginated(
+      rows.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        title: n.title,
+        body: n.body,
+        actionUrl: n.actionUrl,
+        readAt: n.readAt,
+        createdAt: n.createdAt,
+        tenantId: n.tenantId!,
+        orgName: orgOf.get(n.tenantId!) ?? null,
+      })),
+      total,
+      q,
+    );
+  }
+
   invoicesList(tenantId: string, q: TenantInvoicesQueryDto) {
     return this.as(tenantId, () =>
-      this.invoices.list({ page: q.page, pageSize: q.pageSize, status: q.status, tenantId }),
+      this.invoices.list({
+        page: q.page,
+        pageSize: q.pageSize,
+        status: q.status,
+        tenantId,
+        tenancyId: q.tenancyId,
+      }),
     );
   }
 

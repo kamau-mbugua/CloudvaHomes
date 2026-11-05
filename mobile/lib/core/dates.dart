@@ -23,3 +23,13 @@ String formatPeriod(String? period) {
 
 /// DateTime → "2026-10-28".
 String toDay(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+
+/// "2026-10" → "Oct" (chart axis labels).
+String formatPeriodShort(String? period) {
+  final d = period == null ? null : DateTime.tryParse('$period-01');
+  return d == null ? '—' : DateFormat('MMM').format(d);
+}
+
+/// Today in Nairobi (UTC+3, no daylight saving) as "YYYY-MM-DD".
+String todayIso([DateTime? now]) =>
+    toDay((now ?? DateTime.now()).toUtc().add(const Duration(hours: 3)));

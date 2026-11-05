@@ -16,6 +16,7 @@
   color: var(--foreground);
 }
 .hb__banner--alert { border-left-color: var(--destructive); background: var(--destructive-soft); }
+.hb__banner--scope { border-left-color: var(--primary); background: var(--secondary); }
 .hb__banner--off { border-left-color: var(--text-muted); background: var(--muted); }
 .hb__bannertext { margin: 0; font-size: 13.5px; line-height: 1.45; max-width: 90ch; }
 .hb__banner--warn .hb__bannertext strong { color: var(--warning); }
