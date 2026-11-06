@@ -113,4 +113,33 @@ void main() {
       '/tenant/more',
     ]);
   });
+
+  test(
+    'pay button: prompt with in-app M-Pesa, details without, chooser for several',
+    () {
+      LandlordToPay row(int owed, bool inApp, [String id = 'a1']) =>
+          LandlordToPay(id, id, owed, 0, inApp);
+      expect(payButton([row(1600000, true)]), (
+        label: 'Pay now',
+        opens: 'prompt',
+      ));
+      expect(payButton([row(0, true)]), (
+        label: 'Pay in advance',
+        opens: 'prompt',
+      ));
+      expect(payButton([row(1600000, false)]), (
+        label: 'Pay now',
+        opens: 'details',
+      ));
+      expect(payButton([row(0, false)]), (
+        label: 'How to pay',
+        opens: 'details',
+      ));
+      expect(payButton([row(1, true), row(2, false, 'a2')]), (
+        label: 'Pay now',
+        opens: 'chooser',
+      ));
+      expect(payButton(const []), isNull);
+    },
+  );
 }

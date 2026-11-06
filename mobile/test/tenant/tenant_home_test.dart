@@ -214,4 +214,23 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'owing without in-app M-Pesa: Pay now opens the paybill details',
+    (tester) async {
+      final o = overview(balance: 1600000, canPay: false);
+      final adapter = FakeAdapter((c) => dashboardCall(c, o) ?? (404, null));
+      await pumpWithApi(
+        tester,
+        const TenantDashboardScreen(),
+        adapter: adapter,
+        session: sessionJson(staff: false, tenant: true),
+      );
+      expect(find.text('Pay now'), findsOneWidget);
+      await tester.tap(find.text('Pay now'));
+      await tester.pumpAndSettle();
+      expect(find.text('600111'), findsOneWidget);
+      expect(find.text('T00001'), findsOneWidget);
+    },
+  );
 }

@@ -56,3 +56,11 @@ export function mergeActivity<T extends { at: string }>(
     .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
     .slice(0, limit);
 }
+
+/** Notification kinds the activity feed already shows as their own event. */
+const REPEATS_A_FEED_EVENT = new Set(['INVOICE_ISSUED', 'PAYMENT_RECEIVED', 'RENT_CHANGE']);
+
+/** Whether a notification belongs in the activity feed (not a repeat of an invoice etc.). */
+export function feedNotice(kind: string): boolean {
+  return !REPEATS_A_FEED_EVENT.has(kind);
+}

@@ -56,3 +56,25 @@ describe('todoItems', () => {
     expect(todoItems(o, { kind: 'home', tenantId: 'a2', tenancyId: 's2' }, [], TODAY)).toHaveLength(1);
   });
 });
+
+describe('payButton', () => {
+  const row = (owed: number, canPayInApp: boolean, id = 'a1') => ({ tenantId: id, orgName: id, owed, credit: 0, canPayInApp });
+  it('one landlord with in-app M-Pesa: straight to the prompt', async () => {
+    const { payButton } = await import('./dashboard');
+    expect(payButton([row(1600000, true)])).toEqual({ label: 'Pay now', opens: 'prompt' });
+    expect(payButton([row(0, true)])).toEqual({ label: 'Pay in advance', opens: 'prompt' });
+  });
+  it('without in-app M-Pesa it still shows, and opens the paybill / bank details', async () => {
+    const { payButton } = await import('./dashboard');
+    expect(payButton([row(1600000, false)])).toEqual({ label: 'Pay now', opens: 'details' });
+    expect(payButton([row(0, false)])).toEqual({ label: 'How to pay', opens: 'details' });
+  });
+  it('several landlords: the chooser', async () => {
+    const { payButton } = await import('./dashboard');
+    expect(payButton([row(1, true), row(2, false, 'a2')])).toEqual({ label: 'Pay now', opens: 'chooser' });
+  });
+  it('no landlord account: no button', async () => {
+    const { payButton } = await import('./dashboard');
+    expect(payButton([])).toBeNull();
+  });
+});

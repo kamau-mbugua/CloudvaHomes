@@ -19,9 +19,10 @@ export function PayChooser({ rows, overview, onPay, onClose }: {
   const [details, setDetails] = useState<string | null>(null);
   const owing = rows.filter((r) => r.owed > 0);
   const list = owing.length > 0 ? owing : rows;
+  const one = list.length === 1;
   return (
-    <Sheet title="Who do you want to pay?" onClose={onClose}>
-      <p className="ad__muted">Each landlord or agency is paid separately.</p>
+    <Sheet title={one ? `Pay ${list[0]!.orgName}` : 'Who do you want to pay?'} onClose={onClose}>
+      {one ? null : <p className="ad__muted">Each landlord or agency is paid separately.</p>}
       <ul className="tp__rows">
         {list.map((r) => {
           const account = overview.accounts.find((a) => a.tenant.id === r.tenantId);
@@ -38,15 +39,18 @@ export function PayChooser({ rows, overview, onPay, onClose }: {
                   </button>
                 ) : null}
               </div>
-              <button
-                type="button"
-                className="tdp__more"
-                aria-expanded={details === r.tenantId}
-                onClick={() => setDetails(details === r.tenantId ? null : r.tenantId)}
-              >
-                {details === r.tenantId ? 'Hide other ways to pay' : 'Other ways to pay'}
-              </button>
-              {details === r.tenantId && account ? <HowToPayCard ways={account.howToPay} orgName={r.orgName} /> : null}
+              {r.canPayInApp ? (
+                <button
+                  type="button"
+                  className="tdp__more"
+                  aria-expanded={details === r.tenantId}
+                  onClick={() => setDetails(details === r.tenantId ? null : r.tenantId)}
+                >
+                  {details === r.tenantId ? 'Hide other ways to pay' : 'Other ways to pay'}
+                </button>
+              ) : null}
+              {/* No M-Pesa prompt for this landlord: the paybill / bank details are the way to pay. */}
+              {(!r.canPayInApp || details === r.tenantId) && account ? <HowToPayCard ways={account.howToPay} orgName={r.orgName} /> : null}
             </li>
           );
         })}

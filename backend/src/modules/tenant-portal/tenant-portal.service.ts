@@ -13,7 +13,7 @@ import {
 } from '../../common/dates/date-only.js';
 import { todayInNairobi } from '../billing/billing-math.js';
 import { homeStatus } from './home-status.js';
-import { lastMonths, mergeActivity, monthlySeries } from './tenant-insights.js';
+import { feedNotice, lastMonths, mergeActivity, monthlySeries } from './tenant-insights.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -298,8 +298,8 @@ export class TenantPortalService {
       this.prisma.userNotification.findMany({
         where: { userId: authContext().userId, tenantId: { in: ids } },
         orderBy: { createdAt: 'desc' },
-        take,
-        select: { title: true, tenantId: true, createdAt: true },
+        take: take * 2,
+        select: { kind: true, title: true, tenantId: true, createdAt: true },
       }),
     ]);
     type Item = {
@@ -344,15 +344,17 @@ export class TenantPortalService {
           tenantId: c.tenancy.tenantId,
           link: '/tenant',
         })),
-        notices.map((n) => ({
-          kind: 'NOTICE' as const,
-          at: n.createdAt.toISOString(),
-          title: n.title,
-          amount: null,
-          orgName: org(n.tenantId!),
-          tenantId: n.tenantId!,
-          link: '/tenant/notices',
-        })),
+        notices
+          .filter((n) => feedNotice(n.kind))
+          .map((n) => ({
+            kind: 'NOTICE' as const,
+            at: n.createdAt.toISOString(),
+            title: n.title,
+            amount: null,
+            orgName: org(n.tenantId!),
+            tenantId: n.tenantId!,
+            link: '/tenant/notices',
+          })),
       ],
       q.limit,
     );

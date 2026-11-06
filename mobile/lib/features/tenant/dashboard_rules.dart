@@ -102,3 +102,18 @@ List<TodoItem> todoItems(
   }
   return out;
 }
+
+/// The hero's pay button (mirrors frontend `payButton`): always there when the person
+/// rents from someone. `opens`: prompt = M-Pesa prompt for the one landlord; details =
+/// paybill / bank details (no in-app M-Pesa); chooser = pick a landlord.
+({String label, String opens})? payButton(List<LandlordToPay> rows) {
+  if (rows.isEmpty) return null;
+  final owed = heroTotal(rows) > 0;
+  if (rows.length > 1) {
+    return (label: owed ? 'Pay now' : 'Pay in advance', opens: 'chooser');
+  }
+  if (rows.first.canPayInApp) {
+    return (label: owed ? 'Pay now' : 'Pay in advance', opens: 'prompt');
+  }
+  return (label: owed ? 'Pay now' : 'How to pay', opens: 'details');
+}

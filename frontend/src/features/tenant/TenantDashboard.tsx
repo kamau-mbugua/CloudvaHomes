@@ -11,8 +11,8 @@ import type { MaintenanceRequestItem } from '../maintenance/types';
 import { MAINTENANCE_STATUSES } from '../maintenance/types';
 import { TrendChart } from '../reports/TrendChart';
 import { pendingChangeText } from '../tenants/leaseTerms';
-import { keys, useTenantActivity, useTenantMonthly } from './api';
-import { heroTotal, toPayByLandlord, todoItems } from './dashboard';
+import { inspectionTodoKey, keys, useTenantActivity, useTenantMonthly } from './api';
+import { heroTotal, payButton, toPayByLandlord, todoItems } from './dashboard';
 import { PayChooser } from './PayChooser';
 import { PaySheet } from './PaySheet';
 import { homeText } from './rules';
@@ -52,7 +52,7 @@ export function TenantDashboard() {
   });
   const inspections = useQueries({
     queries: homes.map((t) => ({
-      queryKey: ['tenant', t.tenantId, 'inspections', t.id],
+      queryKey: inspectionTodoKey(t.tenantId, t.id),
       queryFn: () => api
         .get<unknown>(`/tenant/accounts/${encodeURIComponent(t.tenantId)}/tenancies/${encodeURIComponent(t.id)}/inspections`)
         .then((b) => unwrap<{ kind: string; tenantAcknowledgedAt: string | null }[]>(b).map((i) => ({ ...i, tenancyId: t.id }))),
@@ -70,11 +70,11 @@ export function TenantDashboard() {
     .filter((r) => !tenancyId || r.unit.id === unitIdOf(homes[0]))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const todo = todoItems(o, scope, inspections.flatMap((q) => q.data ?? []), todayInNairobi());
-  const single = rows.length === 1 ? rows[0] : null;
+  const button = payButton(rows);
 
   const payNow = () => {
-    if (single) {
-      setPaying(single.tenantId);
+    if (button?.opens === 'prompt') {
+      setPaying(rows[0]!.tenantId);
       return;
     }
     setChooser(true);
@@ -98,11 +98,11 @@ export function TenantDashboard() {
         {credits.map((r) => (
           <span key={r.tenantId} className="tp__duenote">{formatKES(r.credit)} in credit with {r.orgName} — used on your next invoice</span>
         ))}
-        {rows.some((r) => r.canPayInApp) || rows.length > 1 ? (
+        {button ? (
           <button type="button" className="nx-btn nx-btn--lg nx-btn--money tp__paybtn" onClick={payNow}>
-            {total > 0 ? 'Pay now' : 'Pay in advance'}
+            {button.label}
           </button>
-        ) : <Link className="tp__duenote" to="/tenant/statement">How to pay</Link>}
+        ) : null}
       </section>
 
       {scope.kind === 'all' && homes.length > 0 ? (

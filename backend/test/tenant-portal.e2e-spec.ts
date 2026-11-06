@@ -285,6 +285,14 @@ describe('Tenant portal & reminders (e2e)', () => {
     const times = activity.map((a: { at: string }) => a.at);
     expect(times).toEqual([...times].sort((a: string, b: string) => b.localeCompare(a)));
     expect(activity.some((a: { kind: string }) => a.kind === 'INVOICE')).toBe(true);
+    // The payment and invoice notifications repeat events already listed: shown once.
+    expect(activity[0].kind).toBe('PAYMENT');
+    expect(
+      activity.filter(
+        (a: { kind: string; title: string }) =>
+          a.kind === 'NOTICE' && /invoice|payment/i.test(a.title),
+      ),
+    ).toEqual([]);
     // Someone else's home is not mine.
     await get(tom, `/tenant/accounts/overview/activity?tenancyId=${x.ann.id}`, 404);
     await get(tom, `/tenant/accounts/overview/monthly?tenancyId=${x.ann.id}`, 404);

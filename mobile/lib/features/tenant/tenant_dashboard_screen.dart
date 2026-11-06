@@ -201,6 +201,7 @@ class _Hero extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final total = heroTotal(rows);
+    final button = payButton(rows);
     final owing = rows.where((r) => r.owed > 0).toList();
     final next = ([for (final h in homes) ?h.nextDueDate]..sort()).firstOrNull;
     final where = homes.length > 1
@@ -242,24 +243,24 @@ class _Hero extends ConsumerWidget {
             style: light,
           ),
         const SizedBox(height: 12),
-        if (rows.any((r) => r.canPayInApp))
+        if (button != null)
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: HodiColors.lime,
               foregroundColor: HodiColors.navy,
               minimumSize: const Size.fromHeight(48),
             ),
-            onPressed: () => _payNow(context, ref),
-            child: Text(total > 0 ? 'Pay now' : 'Pay in advance'),
+            onPressed: () => _payNow(context, ref, button.opens),
+            child: Text(button.label),
           ),
       ],
     );
   }
 
-  void _payNow(BuildContext context, WidgetRef ref) {
+  void _payNow(BuildContext context, WidgetRef ref, String opens) {
     TenantOverview? accountOf(String id) =>
         o.accounts.where((a) => a.tenantId == id).firstOrNull;
-    if (rows.length == 1) {
+    if (opens == 'prompt') {
       final a = accountOf(rows.first.tenantId);
       if (a != null) {
         showTenantPaySheet(
@@ -284,12 +285,17 @@ class _Hero extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
             Text(
-              'Who do you want to pay?',
+              list.length == 1
+                  ? 'Pay ${list.first.orgName}'
+                  : 'Who do you want to pay?',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const Text('Each landlord or agency is paid separately.'),
+            if (list.length > 1)
+              const Text('Each landlord or agency is paid separately.'),
             for (final r in list)
               ExpansionTile(
+                // No M-Pesa prompt for this landlord: the details are the way to pay.
+                initiallyExpanded: !r.canPayInApp,
                 tilePadding: EdgeInsets.zero,
                 title: Text(r.orgName),
                 subtitle: Text(

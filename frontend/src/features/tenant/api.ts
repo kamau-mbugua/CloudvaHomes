@@ -21,6 +21,15 @@ export const keys = {
   account: (tenantId: string) => ['tenant-portal', tenantId] as const,
 };
 
+/** One home's inspections as the Documents page lists them. */
+export const tenantInspectionsKey = (tenantId: string, tenancyId: string) =>
+  ['tenant', tenantId, 'inspections', tenancyId] as const;
+
+/** The dashboard's to-do view of the same inspections (another shape, so its own key —
+ * nested under the list's key so refreshing the list refreshes it too). */
+export const inspectionTodoKey = (tenantId: string, tenancyId: string) =>
+  [...tenantInspectionsKey(tenantId, tenancyId), 'todo'] as const;
+
 const base = (tenantId: string) => `/tenant/accounts/${encodeURIComponent(tenantId)}`;
 
 export function useTenantOverview(tenantId: string) {

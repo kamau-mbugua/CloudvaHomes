@@ -129,3 +129,14 @@ describe('noticeLink', () => {
     expect(noticeLink('https://evil.example/tenant')).toBeNull();
   });
 });
+
+describe('inspection cache keys', () => {
+  it('keeps the dashboard’s to-do shape apart from the Documents list, but refreshes with it', async () => {
+    const { tenantInspectionsKey, inspectionTodoKey } = await import('./api');
+    const list = tenantInspectionsKey('acc1', 'ty1');
+    const todo = inspectionTodoKey('acc1', 'ty1');
+    expect(todo).not.toEqual(list);
+    // Invalidating the list (after "I've checked this") also matches the to-do query.
+    expect(todo.slice(0, list.length)).toEqual(list);
+  });
+});

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { tenantInspectionsKey } from './api';
 import { api } from '../../lib/api/client';
 import { formatDay } from '../../lib/dates';
 import { saveBlob } from '../../lib/files';
@@ -16,7 +17,7 @@ const path = (tenantId: string, tenancyId: string) =>
 export function TenantInspections({ tenantId, tenancyId }: { tenantId: string; tenancyId: string }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const key = ['tenant', tenantId, 'inspections', tenancyId];
+  const key = tenantInspectionsKey(tenantId, tenancyId);
   const list = useQuery({
     queryKey: key,
     queryFn: () => api.get<unknown>(path(tenantId, tenancyId)).then((b) => unwrap<Inspection[]>(b)),

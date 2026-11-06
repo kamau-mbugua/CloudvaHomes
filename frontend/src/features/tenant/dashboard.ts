@@ -80,3 +80,22 @@ export function todoItems(
   }
   return out;
 }
+
+export interface PayButton {
+  label: 'Pay now' | 'Pay in advance' | 'How to pay';
+  /** prompt = M-Pesa prompt for the one landlord; details = paybill / bank details; chooser = pick a landlord. */
+  opens: 'prompt' | 'details' | 'chooser';
+}
+
+/**
+ * The hero's pay button. Always there when the person rents from someone: without in-app
+ * M-Pesa it opens the landlord's paybill / bank details instead of a prompt.
+ */
+export function payButton(rows: readonly LandlordToPay[]): PayButton | null {
+  if (rows.length === 0) return null;
+  const owed = heroTotal(rows) > 0;
+  if (rows.length > 1) return { label: owed ? 'Pay now' : 'Pay in advance', opens: 'chooser' };
+  const [only] = rows;
+  if (only!.canPayInApp) return { label: owed ? 'Pay now' : 'Pay in advance', opens: 'prompt' };
+  return { label: owed ? 'Pay now' : 'How to pay', opens: 'details' };
+}

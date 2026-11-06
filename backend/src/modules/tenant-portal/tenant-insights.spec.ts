@@ -43,3 +43,14 @@ describe('mergeActivity', () => {
     expect(out.map((i) => i.kind)).toEqual(['INVOICE', 'NOTICE', 'PAYMENT']);
   });
 });
+
+describe('feedNotice', () => {
+  it('leaves out notices that repeat an invoice, payment or rent change already in the feed', async () => {
+    const { feedNotice } = await import('./tenant-insights.js');
+    expect(feedNotice('INVOICE_ISSUED')).toBe(false);
+    expect(feedNotice('PAYMENT_RECEIVED')).toBe(false);
+    expect(feedNotice('RENT_CHANGE')).toBe(false);
+    expect(feedNotice('BROADCAST')).toBe(true);
+    expect(feedNotice('UNIT_ASSIGNED')).toBe(true);
+  });
+});
