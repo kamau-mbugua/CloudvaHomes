@@ -92,7 +92,7 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
       <div className="adm__head">
         <div>
           <h1 className="adm__h1">{org.name}</h1>
-          <span className="ad__muted"><span className="num">{org.billingRef}</span> · {org.kind === 'AGENCY' ? 'Agency' : 'Landlord'}</span>
+          <span className="ad__muted"><span className="num">{org.billingRef}</span> · {org.kind === 'AGENCY' ? 'Agency' : org.kind === 'HOST' ? 'Host' : 'Landlord'}</span>
         </div>
         <OrgStatusBadge status={org.status} />
         {superAdmin ? (

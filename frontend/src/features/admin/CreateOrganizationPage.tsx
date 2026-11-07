@@ -148,7 +148,7 @@ export function CreateOrganizationPage() {
         {tab === 'org' ? (
           <>
             <h2>Organisation details</h2>
-            <p>Create a Landlord or Property Agency account on KodiHub. Its billing reference (e.g. H00001) and built-in roles are set up automatically.</p>
+            <p>Create a Landlord, Property Agency or short-stay Host account on KodiHub. Its billing reference (e.g. H00001) and built-in roles are set up automatically.</p>
 
             <div className="fm__grid">
               <Field id="co-name" label="Organisation name" error={errors.name}>
@@ -160,6 +160,7 @@ export function CreateOrganizationPage() {
                 <select id="co-kind" value={kind} onChange={(e) => setKind(e.target.value as OrgKind)}>
                   <option value="LANDLORD">Landlord (manages own properties)</option>
                   <option value="AGENCY">Agency (manages properties for landlords)</option>
+                  <option value="HOST">Host (short stays / BNB, own booking site)</option>
                 </select>
               </Field>
 

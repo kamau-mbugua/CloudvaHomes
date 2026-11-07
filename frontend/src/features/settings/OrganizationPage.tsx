@@ -47,6 +47,7 @@ type Field =
 const KIND_LABEL: Record<string, string> = {
   LANDLORD: 'Landlord — manages its own properties',
   AGENCY: 'Agency — manages properties for landlords',
+  HOST: 'Host — short stays with its own booking site',
 };
 
 export function OrganizationPage() {

@@ -340,7 +340,7 @@ export const ADMIN_NAV: NavGroup[] = [
       { label: 'Active', to: '/admin/organizations?status=ACTIVE', phase: '8', hint: 'Organisations in good standing' },
       { label: 'Trial', to: '/admin/organizations?status=TRIAL', phase: '8', hint: 'Organisations currently in their free trial' },
       { label: 'Suspended', to: '/admin/organizations?status=SUSPENDED', phase: '8', hint: 'Organisations in read-only mode for unpaid KodiHub bills' },
-      { label: 'Add an organisation', to: '/admin/organizations/new', phase: '11', hint: 'Onboard a landlord or agency and invite its owner' },
+      { label: 'Add an organisation', to: '/admin/organizations/new', phase: '11', hint: 'Onboard a landlord, agency or host and invite its owner' },
     ],
   },
   {
