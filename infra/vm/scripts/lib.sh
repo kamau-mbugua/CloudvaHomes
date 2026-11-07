@@ -32,6 +32,17 @@ wait_healthy() {
   return 1
 }
 
+# The API runs as `node`; the uploaded-files volume must be writable by it. Volumes created
+# before the image made /var/lib/hodi/files node's (or by Docker as root) are fixed here, once,
+# cheaply: only entries not already owned by node are touched. A failure only warns.
+files_owner_ok() {
+  stack run --rm --no-deps --user root --entrypoint sh api -c \
+    'chown node:node /var/lib/hodi/files && find /var/lib/hodi/files ! -user node -exec chown node:node {} +' \
+    >/dev/null 2>&1 \
+    && log "Uploaded files folder is writable by the API" \
+    || warn "Could not fix the owner of /var/lib/hodi/files: uploads may fail (EACCES)."
+}
+
 # Points the edge proxy at the current infra bundle and reloads it (no dropped connections).
 edge_up() {
   if [ -f "$ROOT/edge/edge.env" ]; then

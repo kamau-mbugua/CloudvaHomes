@@ -38,6 +38,10 @@ WORKDIR /app
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./
+# Uploaded files live on a volume here (infra/vm/stack/compose.yml, STORAGE_DIR). A new named
+# volume takes this folder's owner; without it Docker makes it root's and every upload fails
+# with EACCES (the API runs as node).
+RUN mkdir -p /var/lib/hodi/files && chown node:node /var/lib/hodi/files
 USER node
 EXPOSE 8080
 # Cloud Run sends SIGTERM before stopping an instance; Nest's shutdown hooks drain and close.

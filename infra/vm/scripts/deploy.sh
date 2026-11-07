@@ -52,6 +52,7 @@ stack --profile tools pull --quiet
 
 # ── 4. Edge proxy (TLS, routing, maintenance page) ────────────────────────────
 edge_up
+files_owner_ok
 
 # ── 5. Back up the database before anything changes ───────────────────────────
 mkdir -p "$ROOT/backups/$ENV"
