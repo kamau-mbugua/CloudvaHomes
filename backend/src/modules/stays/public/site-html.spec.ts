@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { injectMeta, siteSlugFromHost } from './site-html.js';
+import { createHash } from 'node:crypto';
+import { injectMeta, siteCsp, siteSlugFromHost } from './site-html.js';
 
 describe('site-html — injectMeta and siteSlugFromHost', () => {
   it('escapes HTML characters in title, description, image, and url, and omits og:image when image is null', () => {
@@ -44,5 +45,19 @@ describe('site-html — injectMeta and siteSlugFromHost', () => {
     expect(siteSlugFromHost('evil.com', 'kodihub.co.ke')).toBeNull();
     expect(siteSlugFromHost('kodihub.co.ke', 'kodihub.co.ke')).toBeNull();
     expect(siteSlugFromHost('sub.cozy.kodihub.co.ke', 'kodihub.co.ke')).toBeNull();
+  });
+
+  it('siteCsp keeps the strict policy but allows exactly the inline scripts in the page', () => {
+    const body =
+      "\n      (function () { document.documentElement.setAttribute('data-theme', 'light'); })();\n    ";
+    const html = `<!doctype html><html><head><script>${body}</script><script type="module" src="/assets/app.js"></script></head></html>`;
+    const hash = createHash('sha256').update(body, 'utf8').digest('base64');
+    const csp = siteCsp(html);
+    expect(csp).toContain(`script-src 'self' 'sha256-${hash}'`);
+    expect(csp).not.toContain("unsafe-inline'; script");
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(siteCsp('<html><head></head></html>')).toContain("script-src 'self';");
   });
 });

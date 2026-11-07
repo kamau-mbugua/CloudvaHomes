@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { RESERVED_SLUGS, slugProblem } from '../rules/slug.js';
 
 export interface SiteMeta {
@@ -49,4 +50,34 @@ export function siteSlugFromHost(host: string, siteDomain: string): string | nul
   if (RESERVED_SLUGS.has(sub)) return null;
   if (slugProblem(sub) !== null) return null;
   return sub;
+}
+
+/**
+ * Content-Security-Policy for a host booking-site page. Same as the API's helmet default, plus
+ * the sha256 of each inline <script> in this exact page (the web app's theme stamp), so it runs
+ * without opening `script-src` to 'unsafe-inline'. Hashes come from the HTML being served, so
+ * an edit to that script can't silently break the page.
+ */
+export function siteCsp(html: string): string {
+  const hashes: string[] = [];
+  for (const m of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
+    const body = m[1] ?? '';
+    if (body.trim())
+      hashes.push(`'sha256-${createHash('sha256').update(body, 'utf8').digest('base64')}'`);
+  }
+  return (
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "font-src 'self' https: data:",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
+      "img-src 'self' data:",
+      "object-src 'none'",
+      `script-src 'self'${hashes.length ? ` ${hashes.join(' ')}` : ''}`,
+      "script-src-attr 'none'",
+      "style-src 'self' https: 'unsafe-inline'",
+      'upgrade-insecure-requests',
+    ].join(';') + ';'
+  );
 }

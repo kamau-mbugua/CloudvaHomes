@@ -26,6 +26,7 @@ import {
   PublicVerifyPhoneDto,
 } from './public-site.dto.js';
 import { PublicSiteService } from './public-site.service.js';
+import { siteCsp } from './site-html.js';
 
 function clientIp(req: Request): string {
   return req.ip || req.socket.remoteAddress || '0.0.0.0';
@@ -138,6 +139,7 @@ export class PublicSiteController {
   ) {
     const html = await this.publicSite.renderSiteHtml(host ?? '', path ?? '/');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Content-Security-Policy', siteCsp(html));
     res.status(200).send(html);
   }
 
