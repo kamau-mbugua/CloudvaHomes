@@ -84,15 +84,28 @@ EOF
       || echo "WEB_INDEX_URL=http://hodi-$ENV-web:8080/index.html" >> "$api_env"
   fi
 
-  rm -rf "$ROOT/infra/edge/sites"; mkdir -p "$ROOT/infra/edge/sites"
-  if [ "$ENV" = prod ]; then cp "$ROOT"/infra/edge/sites-prod/*.caddy "$ROOT/infra/edge/sites/"; fi
+  # Caddy reads its config from $ROOT/edge/conf, a folder deploys never rename. (Each deploy
+  # renames infra -> infra.prev and later deletes it; a container mounting ./Caddyfile or ./sites
+  # from there kept the old, then deleted, folder and silently lost the host-sites block.)
+  local conf="$ROOT/edge/conf"
+  mkdir -p "$conf/sites"
+  find "$conf/sites" -mindepth 1 -maxdepth 1 -name '*.caddy' -delete
+  if [ "$ENV" = prod ]; then cp "$ROOT"/infra/edge/sites-prod/*.caddy "$conf/sites/"; fi
   if [ -n "${CF_API_TOKEN:-}" ]; then
-    cp "$ROOT/infra/edge/hosts.caddy" "$ROOT/infra/edge/sites/"
+    cp "$ROOT/infra/edge/hosts.caddy" "$conf/sites/"
   else
     warn "CF_API_TOKEN is not set in $ROOT/edge/edge.env: host booking sites (*.$SITE_DOMAIN) stay off."
   fi
+  cp "$ROOT/infra/edge/Caddyfile" "$conf/Caddyfile.tmp" && mv "$conf/Caddyfile.tmp" "$conf/Caddyfile"
   cp "$ROOT/infra/edge/maintenance.html" "$ROOT/maintenance/index.html"
-  ( cd "$ROOT/infra/edge" && docker compose up -d --quiet-pull >/dev/null \
+
+  # edge.env is read when the container starts, so a changed value (e.g. a new Cloudflare
+  # token) needs a recreate; otherwise a reload keeps connections open.
+  local sum recreate=""
+  sum=$( (sha256sum 2>/dev/null || shasum -a 256) < "$ROOT/edge/edge.env" | cut -d' ' -f1)
+  [ "$(cat "$ROOT/edge/.env.sum" 2>/dev/null)" = "$sum" ] || recreate="--force-recreate"
+  ( cd "$ROOT/infra/edge" && docker compose up -d --quiet-pull $recreate >/dev/null \
       && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 ) \
     || fail "Could not start or reload the edge proxy."
+  echo "$sum" > "$ROOT/edge/.env.sum"
 }

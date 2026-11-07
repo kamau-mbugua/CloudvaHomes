@@ -102,6 +102,7 @@ Running it again for an existing email or phone promotes that user and resets th
 | `/opt/hodi/infra/` (`infra.prev`) | the deployed `infra/vm` bundle (and the previous one) |
 | `/opt/hodi/releases/` | `current`, `previous`, `history` |
 | `/opt/hodi/backups/<env>/` | `pre-deploy-*.sql.gz` (last 7) and, on production, nightly `hodi-*.sql.gz` (14 days) |
+| `/opt/hodi/edge/conf/` | the Caddyfile and `sites/*.caddy` the edge actually loads; refreshed by every deploy (`edge_up`) — never edit by hand |
 | `/opt/hodi/edge/edge.env` | this server's hosts (`APP_HOST`, `APP_STACK`, `LANDING_HOST`, `SITE_DOMAIN`, `CF_API_TOKEN`) |
 
 ## Wildcard HTTPS for host booking sites (`*.kodihub.co.ke` / `*.dev.kodihub.co.ke`)

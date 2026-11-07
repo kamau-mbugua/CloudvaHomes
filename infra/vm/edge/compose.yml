@@ -17,8 +17,8 @@ services:
     # happens to export (an empty token, the prod domain on dev).
     env_file: /opt/hodi/edge/edge.env
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./sites:/etc/caddy/sites:ro
+      # Caddyfile + sites/ copied here by scripts/lib.sh edge_up: a folder deploys never rename.
+      - /opt/hodi/edge/conf:/etc/caddy:ro
       - /opt/hodi/maintenance:/srv/maintenance:ro
       - /opt/hodi/landing-releases:/srv/landing:ro
       - caddy_data:/data
