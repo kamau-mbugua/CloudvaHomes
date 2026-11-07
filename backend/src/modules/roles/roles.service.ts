@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AppError } from '../../common/errors/app-error.js';
 import { DB, type Db, type Tx } from '../../prisma/prisma.module.js';
-import type { Role } from '../../generated/prisma/client.js';
+import type { OrgKind, Role } from '../../generated/prisma/client.js';
 import { AuditService } from '../audit/audit.service.js';
 import { orgContext, requireStepUp } from '../auth/decorators.js';
 import {
   ALL_PERMISSIONS,
   isKnownPermission,
-  SYSTEM_ROLE_DEFAULTS,
+  systemRoleDefaults,
+  type RoleDefault,
   type SystemRole,
 } from './permissions.js';
 import type { CreateRoleDto, UpdateRoleDto } from './roles.dto.js';
@@ -42,12 +43,14 @@ export class RolesService {
   ) {}
 
   /** Creates the four system roles for a new organisation (inside its creation transaction). */
-  static async seedSystemRoles(tx: Tx, orgId: string): Promise<Record<SystemRole, string>> {
+  static async seedSystemRoles(
+    tx: Tx,
+    orgId: string,
+    kind: OrgKind,
+  ): Promise<Record<SystemRole, string>> {
     const ids = {} as Record<SystemRole, string>;
-    for (const [key, def] of Object.entries(SYSTEM_ROLE_DEFAULTS) as [
-      SystemRole,
-      (typeof SYSTEM_ROLE_DEFAULTS)[SystemRole],
-    ][]) {
+    const defaults = systemRoleDefaults(kind);
+    for (const [key, def] of Object.entries(defaults) as [SystemRole, RoleDefault][]) {
       const role = await tx.role.create({
         data: {
           orgId,

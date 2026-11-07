@@ -26,6 +26,7 @@ class KodiHubSideDrawer extends ConsumerWidget {
 
     switch (mode) {
       case AppMode.staff:
+      case AppMode.host:
         final org = session?.activeOrganization;
         final membership = session?.organizations
             .where((o) => o.id == org?.id)
@@ -33,7 +34,7 @@ class KodiHubSideDrawer extends ConsumerWidget {
         workspaceTitle = org?.name ?? 'KodiHub';
         workspaceSubtitle =
             membership?.roleName ?? session?.user.fullName ?? 'Staff';
-        modeBadge = 'Staff';
+        modeBadge = mode == AppMode.host ? 'Host' : 'Staff';
       case AppMode.tenant:
         final accounts = session?.tenantOf ?? const [];
         final currentId = ref.watch(currentTenantIdProvider);
@@ -138,6 +139,50 @@ class KodiHubSideDrawer extends ConsumerWidget {
               icon: Icons.admin_panel_settings_outlined,
               label: 'Plans, Billing & Operators',
               route: '/platform/manage',
+            ),
+          ],
+        ),
+      ],
+      AppMode.host => [
+        _DrawerSection(
+          title: 'SHORT STAYS',
+          items: [
+            const _DrawerItem(
+              icon: Icons.today_outlined,
+              label: 'Today',
+              route: '/host',
+              exactMatch: true,
+            ),
+            if (can('bookings:view'))
+              const _DrawerItem(
+                icon: Icons.calendar_month_outlined,
+                label: 'Calendar',
+                route: '/host/calendar',
+              ),
+            if (can('bookings:create') || can('stay-payments:view'))
+              const _DrawerItem(
+                icon: Icons.book_online_outlined,
+                label: 'Bookings',
+                route: '/host/bookings',
+              ),
+            if (can('listings:create') ||
+                can('listings:update') ||
+                can('stay-payments:view'))
+              const _DrawerItem(
+                icon: Icons.bed_outlined,
+                label: 'Listings',
+                route: '/host/listings',
+              ),
+            if (can('site:view'))
+              const _DrawerItem(
+                icon: Icons.language_outlined,
+                label: 'Booking site',
+                route: '/host/site',
+              ),
+            const _DrawerItem(
+              icon: Icons.grid_view_outlined,
+              label: 'More',
+              route: '/host/more',
             ),
           ],
         ),

@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_error.dart';
+import '../../../core/auth/session_controller.dart';
 import '../../../core/dates.dart';
 import '../../../core/money.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
+import '../../host/host_api.dart';
 import '../staff_api.dart';
 import '../staff_models.dart';
 import '../staff_widgets.dart';
@@ -81,7 +83,18 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               heroTag: 'fab-expenses',
               icon: const Icon(Icons.add),
               label: const Text('Add expense'),
-              onPressed: () => context.push('/staff/more/expenses/new'),
+              onPressed: () {
+                final isHost =
+                    ref
+                        .read(sessionProvider)
+                        .valueOrNull
+                        ?.activeOrganization
+                        ?.kind ==
+                    'HOST';
+                context.push(
+                  isHost ? '/host/expenses/new' : '/staff/more/expenses/new',
+                );
+              },
             )
           : null,
       body: !can(ref, 'expenses:view')
@@ -144,6 +157,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
   final _reference = TextEditingController();
   final _amount = TextEditingController();
   String? _propertyId;
+  String? _unitId;
   String? _category;
   late DateTime _incurredOn = nairobiToday();
   Uint8List? _photo;
@@ -194,6 +208,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       }
       await api.createExpense({
         'propertyId': propertyId,
+        if (_unitId != null && _unitId!.isNotEmpty) 'unitId': _unitId,
         'category': _category,
         'name': _name.text.trim(),
         if (_payee.text.trim().isNotEmpty) 'payee': _payee.text.trim(),
@@ -237,6 +252,12 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
   @override
   Widget build(BuildContext context) {
     final properties = ref.watch(propertiesProvider);
+    final isHost =
+        ref.watch(sessionProvider).valueOrNull?.activeOrganization?.kind ==
+        'HOST';
+    final hostListings = isHost
+        ? ref.watch(hostListingsProvider).valueOrNull ?? const []
+        : const [];
     return Scaffold(
       appBar: const KodiHubAppBar(title: Text('Add expense')),
       body: !can(ref, 'expenses:create')
@@ -244,136 +265,173 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
           : AsyncBody(
               value: properties,
               onRetry: () => ref.invalidate(propertiesProvider),
-              data: (list) => ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue:
-                        _propertyId ??
-                        (list.length == 1 ? list.first.id : null),
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: 'Property',
-                      errorText: _errors['propertyId'],
-                    ),
-                    items: [
-                      for (final p in list)
-                        DropdownMenuItem(value: p.id, child: Text(p.name)),
-                    ],
-                    onChanged: (v) => setState(() => _propertyId = v),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: _category,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: 'Category',
-                      errorText: _errors['category'],
-                    ),
-                    items: [
-                      for (final e in expenseCategoryLabel.entries)
-                        DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    ],
-                    onChanged: (v) => setState(() => _category = v),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _name,
-                    maxLength: 120,
-                    decoration: InputDecoration(
-                      labelText: 'What for',
-                      hintText: 'e.g. Plumbing repair, block A',
-                      errorText: _errors['name'],
-                      counterText: '',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _amount,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Amount (KES)',
-                      errorText: _errors['amount'],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () async {
-                      final d = await showDatePicker(
-                        context: context,
-                        initialDate: _incurredOn,
-                        firstDate: DateTime(2000),
-                        lastDate: nairobiToday(),
-                        helpText: 'Date',
-                      );
-                      if (d != null) setState(() => _incurredOn = d);
-                    },
-                    child: InputDecorator(
+              data: (list) {
+                final selectedPropId =
+                    _propertyId ?? (list.length == 1 ? list.first.id : null);
+                final propListings = [
+                  for (final l in hostListings)
+                    if (selectedPropId == null ||
+                        l.propertyId == selectedPropId)
+                      l,
+                ];
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedPropId,
+                      isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: 'Date',
-                        errorText: _errors['incurredOn'],
-                        suffixIcon: const Icon(Icons.calendar_today_outlined),
+                        labelText: 'Property',
+                        errorText: _errors['propertyId'],
                       ),
-                      child: Text(formatDay(toDay(_incurredOn))),
+                      items: [
+                        for (final p in list)
+                          DropdownMenuItem(value: p.id, child: Text(p.name)),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _propertyId = v;
+                        _unitId = null;
+                      }),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _payee,
-                    maxLength: 120,
-                    decoration: InputDecoration(
-                      labelText: 'Paid to (optional)',
-                      errorText: _errors['payee'],
-                      counterText: '',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _reference,
-                    maxLength: 60,
-                    decoration: InputDecoration(
-                      labelText: 'Supplier’s invoice or receipt no. (optional)',
-                      errorText: _errors['reference'],
-                      counterText: '',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  PhotoField(
-                    label: 'Add a receipt photo',
-                    photo: _photo,
-                    error: _errors['receiptUploadId'],
-                    onPick: () async {
-                      final p = await pickPhoto(context);
-                      if (p != null) {
-                        setState(() {
-                          _photo = p;
-                          _uploadId = null;
-                        });
-                      }
-                    },
-                    onRemove: () => setState(() {
-                      _photo = null;
-                      _uploadId = null;
-                    }),
-                  ),
-                  if (_general != null) ...[
+                    if (isHost) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _unitId ?? '',
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText:
+                              'Unit (optional — leave blank for shared property expense)',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: '',
+                            child: Text('Shared across all units'),
+                          ),
+                          for (final l in propListings)
+                            DropdownMenuItem(
+                              value: l.unitId,
+                              child: Text('${l.title} (${l.unitNumber})'),
+                            ),
+                        ],
+                        onChanged: (v) => setState(
+                          () => _unitId = (v == null || v.isEmpty) ? null : v,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
-                    ErrorBox(_general!),
-                  ],
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: _saving ? null : () => _save(list),
-                    child: KodiHubButtonChild(
-                      loading: _saving,
-                      label: 'Save expense',
-                      loadingLabel: 'Saving…',
-                      tone: SpinnerTone.navy,
+                    DropdownButtonFormField<String>(
+                      initialValue: _category,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Category',
+                        errorText: _errors['category'],
+                      ),
+                      items: [
+                        for (final e in expenseCategoryLabel.entries)
+                          DropdownMenuItem(value: e.key, child: Text(e.value)),
+                      ],
+                      onChanged: (v) => setState(() => _category = v),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _name,
+                      maxLength: 120,
+                      decoration: InputDecoration(
+                        labelText: 'What for',
+                        hintText: 'e.g. Plumbing repair, block A',
+                        errorText: _errors['name'],
+                        counterText: '',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _amount,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Amount (KES)',
+                        errorText: _errors['amount'],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final d = await showDatePicker(
+                          context: context,
+                          initialDate: _incurredOn,
+                          firstDate: DateTime(2000),
+                          lastDate: nairobiToday(),
+                          helpText: 'Date',
+                        );
+                        if (d != null) setState(() => _incurredOn = d);
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Date',
+                          errorText: _errors['incurredOn'],
+                          suffixIcon: const Icon(Icons.calendar_today_outlined),
+                        ),
+                        child: Text(formatDay(toDay(_incurredOn))),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _payee,
+                      maxLength: 120,
+                      decoration: InputDecoration(
+                        labelText: 'Paid to (optional)',
+                        errorText: _errors['payee'],
+                        counterText: '',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _reference,
+                      maxLength: 60,
+                      decoration: InputDecoration(
+                        labelText:
+                            'Supplier’s invoice or receipt no. (optional)',
+                        errorText: _errors['reference'],
+                        counterText: '',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    PhotoField(
+                      label: 'Add a receipt photo',
+                      photo: _photo,
+                      error: _errors['receiptUploadId'],
+                      onPick: () async {
+                        final p = await pickPhoto(context);
+                        if (p != null) {
+                          setState(() {
+                            _photo = p;
+                            _uploadId = null;
+                          });
+                        }
+                      },
+                      onRemove: () => setState(() {
+                        _photo = null;
+                        _uploadId = null;
+                      }),
+                    ),
+                    if (_general != null) ...[
+                      const SizedBox(height: 12),
+                      ErrorBox(_general!),
+                    ],
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _saving ? null : () => _save(list),
+                      child: KodiHubButtonChild(
+                        loading: _saving,
+                        label: 'Save expense',
+                        loadingLabel: 'Saving…',
+                        tone: SpinnerTone.navy,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
     );
   }

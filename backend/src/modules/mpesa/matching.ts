@@ -2,6 +2,7 @@ import { normalizeAccountRef } from './daraja.js';
 
 /** What an account reference could mean, in the order KodiHub tries them (pure, no I/O). */
 export type RefGuess =
+  | { kind: 'booking'; code: string }
   | { kind: 'tenant'; code: string }
   | { kind: 'invoice'; number: string }
   | { kind: 'unit'; ref: string };
@@ -10,6 +11,7 @@ export function guessesFor(raw: string | null | undefined): RefGuess[] {
   const ref = normalizeAccountRef(raw);
   if (!ref) return [];
   const out: RefGuess[] = [];
+  if (/^B\d{5,}$/.test(ref)) out.push({ kind: 'booking', code: ref });
   if (/^T\d{3,}$/.test(ref)) out.push({ kind: 'tenant', code: ref });
   const inv = /^INV(\d{4})(\d{6,})$/.exec(ref);
   if (inv) out.push({ kind: 'invoice', number: `INV-${inv[1]}-${inv[2]}` });

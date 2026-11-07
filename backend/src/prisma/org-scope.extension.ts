@@ -47,6 +47,14 @@ export const ORG_SCOPED_MODELS = new Set<string>([
   'RentChange',
   'Broadcast',
   'Inspection',
+  'HostSite',
+  'Listing',
+  'ListingPhoto',
+  'SpecialPrice',
+  'Guest',
+  'Booking',
+  'StayPayment',
+  'CleaningTask',
 ]);
 
 const WHERE_AND = new Set([

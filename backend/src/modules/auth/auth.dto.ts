@@ -46,10 +46,10 @@ export class RegisterOrganizationDto extends ClientDto {
   @MaxLength(120)
   organizationName!: string;
 
-  @ApiPropertyOptional({ enum: ['LANDLORD', 'AGENCY'], default: 'LANDLORD' })
+  @ApiPropertyOptional({ enum: ['LANDLORD', 'AGENCY', 'HOST'], default: 'LANDLORD' })
   @IsOptional()
-  @IsIn(['LANDLORD', 'AGENCY'])
-  organizationKind?: 'LANDLORD' | 'AGENCY';
+  @IsIn(['LANDLORD', 'AGENCY', 'HOST'])
+  organizationKind?: 'LANDLORD' | 'AGENCY' | 'HOST';
 
   @ApiProperty({ example: '0712345678' })
   @IsString()

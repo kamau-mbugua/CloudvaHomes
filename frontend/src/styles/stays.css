@@ -1,0 +1,291 @@
+/* Short-stay host calendar & compact helper layouts — uses design tokens from tokens.css */
+
+.st__cal {
+  overflow-x: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.st__cal__grid {
+  min-width: 900px;
+}
+
+.st__cal__head {
+  display: grid;
+  border-bottom: 1px solid var(--border);
+  background: var(--secondary);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.st__cal__unithead {
+  padding: 10px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.st__cal__dayhead {
+  padding: 8px 4px;
+  text-align: center;
+  border-right: 1px solid var(--border-soft);
+}
+
+.st__cal__row {
+  position: relative;
+  display: grid;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.st__cal__row:last-child {
+  border-bottom: 0;
+}
+
+.st__cal__unit {
+  padding: 10px 12px;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.st__cal__unit strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st__cal__cell {
+  height: 56px;
+  border: 0;
+  border-right: 1px solid var(--border-soft);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.st__cal__cell:hover:not(:disabled) {
+  background: var(--secondary);
+}
+
+.st__cal__cell:disabled {
+  cursor: default;
+}
+
+.st__cal__bars {
+  pointer-events: none;
+  grid-column: 2 / -1;
+  grid-row: 1;
+  display: grid;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.st__cal__bar {
+  pointer-events: auto;
+  margin: 0 2px;
+  padding: 4px 8px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.st__cal__bar--requested {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.st__cal__bar--held {
+  background: var(--part-paid-soft);
+  color: var(--part-paid);
+  border-color: var(--part-paid);
+}
+
+.st__cal__bar--confirmed {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.st__cal__bar--checked-in {
+  background: var(--info-soft);
+  color: var(--info-text);
+  border-color: var(--info);
+}
+
+.st__cal__bar--completed {
+  background: var(--secondary);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+.st__cal__bar--cancelled {
+  background: var(--destructive-soft);
+  color: var(--destructive-text);
+  border-color: var(--destructive);
+}
+
+.st__cal__bar--block {
+  background: var(--muted);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.st__quote {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.st__quote__row,
+.st__quote__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.st__quote__total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.st__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.st__sp__list {
+  display: grid;
+  gap: 12px;
+}
+
+.st__sp__card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
+  padding: 12px;
+  background: var(--secondary);
+}
+
+.st__sp__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.st__cellactions {
+  display: grid;
+  gap: 10px;
+}
+
+.st__thumb {
+  width: 48px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--secondary);
+  flex-shrink: 0;
+}
+
+.st__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.st__rowtitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.st__photogrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.st__photocard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-dialog);
+  overflow: hidden;
+  background: var(--card);
+  position: relative;
+}
+
+.st__photocard__img {
+  aspect-ratio: 4 / 3;
+  background: var(--secondary);
+  position: relative;
+}
+
+.st__photocard__img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.st__photocard__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.st__photocard__cover {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.st__photocard__bar {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  gap: 4px;
+}
+
+.st__photocard__moves {
+  display: flex;
+  gap: 4px;
+}
+
+.st__logo {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-input);
+  overflow: hidden;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.st__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

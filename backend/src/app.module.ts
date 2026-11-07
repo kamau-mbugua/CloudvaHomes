@@ -16,6 +16,7 @@ import { ReportsModule } from './modules/reports/reports.module.js';
 import { TenantPortalModule } from './modules/tenant-portal/tenant-portal.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { PortfolioModule } from './modules/portfolio/portfolio.module.js';
+import { StaysModule } from './modules/stays/stays.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -25,6 +26,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     PrismaModule,
     IdentityModule,
     PortfolioModule,
+    StaysModule,
     BillingModule,
     PaymentsModule,
     MpesaModule,

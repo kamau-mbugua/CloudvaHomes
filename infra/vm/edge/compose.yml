@@ -5,12 +5,16 @@ name: hodi-edge
 
 services:
   caddy:
-    image: caddy:2-alpine
+    build: .
+    image: kodihub-edge:latest
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+    # Everything Caddy reads ({$APP_HOST}, {$SITE_DOMAIN}, {env.CF_API_TOKEN}, …) comes from here.
+    # No `environment:` block: it would override these values with whatever the deploy shell
+    # happens to export (an empty token, the prod domain on dev).
     env_file: /opt/hodi/edge/edge.env
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

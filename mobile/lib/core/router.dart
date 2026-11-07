@@ -6,6 +6,7 @@ import '../features/auth/code_sign_in_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/sign_in_screen.dart';
+import '../features/host/host_routes.dart';
 import '../features/owner/owner_screens.dart';
 import '../features/platform/platform_screens.dart';
 import '../features/staff/staff_routes.dart';
@@ -40,6 +41,7 @@ String? redirectFor({
   }
   final home = switch (mode) {
     AppMode.staff => '/staff',
+    AppMode.host => '/host',
     AppMode.tenant => '/tenant',
     AppMode.owner => '/owner',
     AppMode.platform => '/platform',
@@ -52,6 +54,7 @@ String? redirectFor({
     return home;
   }
   if (location.startsWith('/staff') && mode != AppMode.staff) return home;
+  if (location.startsWith('/host') && mode != AppMode.host) return home;
   if (location.startsWith('/tenant') && mode != AppMode.tenant) return home;
   if (location.startsWith('/owner') && mode != AppMode.owner) return home;
   if (location.startsWith('/platform') && mode != AppMode.platform) return home;
@@ -95,6 +98,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/forgot', builder: (_, _) => const ForgotPasswordScreen()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
       ...tenantRoutes(),
+      ...hostRoutes(),
       ownerRoutes(),
       staffRoutes(),
       platformRoutes(),

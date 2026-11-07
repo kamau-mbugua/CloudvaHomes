@@ -62,6 +62,18 @@ export class PlatformBillingService {
     return rows[0]?.n ?? 0;
   }
 
+  /** Billable units for an organisation: published listings for HOST, occupied units otherwise. */
+  async billableUnits(client: Tx | Db, orgId: string, date: Date): Promise<number> {
+    const org = await client.organization.findUnique({
+      where: { id: orgId },
+      select: { kind: true },
+    });
+    if (org?.kind === 'HOST') {
+      return client.listing.count({ where: { orgId, published: true } });
+    }
+    return this.occupiedUnits(client, orgId, date);
+  }
+
   // ── Monthly run ──
 
   /** Bills `period` for every open organisation (or one). Idempotent. */
@@ -101,7 +113,7 @@ export class PlatformBillingService {
         return null;
       const plan = org.planId ? await tx.plan.findUnique({ where: { id: org.planId } }) : null;
       const price = this.price(org, plan);
-      const units = await this.occupiedUnits(tx, orgId, end);
+      const units = await this.billableUnits(tx, orgId, end);
       const total = platformTotal(units, price.pricePerUnit, price.minimumMonthly);
       if (total === 0n) return null;
       const today = parseDateOnly(todayInNairobi());
@@ -617,7 +629,7 @@ export class PlatformBillingService {
     ]);
     let units = 0;
     for (const o of orgs)
-      units += await this.occupiedUnits(this.prisma, o.id, parseDateOnly(today));
+      units += await this.billableUnits(this.prisma, o.id, parseDateOnly(today));
     const counts = Object.fromEntries(
       ['TRIAL', 'ACTIVE', 'GRACE', 'SUSPENDED', 'CLOSED'].map((s) => [
         s,

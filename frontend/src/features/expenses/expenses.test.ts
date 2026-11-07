@@ -47,6 +47,20 @@ describe('checkExpense', () => {
     const result = checkExpense(expense({ amount: '12.345' }), TODAY);
     expect(result).toEqual({ ok: false, errors: { amount: 'Use at most two decimal places.' } });
   });
+
+  it('includes unitId in the body only when chosen and supports RENT category', () => {
+    const withoutUnit = checkExpense(expense({ category: 'RENT' }), TODAY);
+    expect(withoutUnit.ok).toBe(true);
+    if (withoutUnit.ok) {
+      expect(withoutUnit.body).not.toHaveProperty('unitId');
+    }
+
+    const withUnit = checkExpense({ ...expense({ category: 'RENT' }), unitId: 'u-123' }, TODAY);
+    expect(withUnit.ok).toBe(true);
+    if (withUnit.ok) {
+      expect(withUnit.body.unitId).toBe('u-123');
+    }
+  });
 });
 
 describe('receiptChange', () => {

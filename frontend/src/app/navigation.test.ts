@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ORG_NAV, availableTo, badgeCount, countText, groupBadgeCount, bestEntry, destinations, filterNav, matchScore, searchDestinations, segments,
+  ORG_NAV, availableTo, badgeCount, hintFor, countText, groupBadgeCount, bestEntry, destinations, filterNav, matchScore, searchDestinations, segments,
 } from './navigation';
 import type { NavGroup } from './navigation';
 
@@ -96,13 +96,13 @@ describe('the model', () => {
 
   it('lists the groups in the agreed order', () => {
     expect(ORG_NAV.map((g) => g.label)).toEqual([
-      'Dashboard', 'Landlords', 'Properties', 'Tenants', 'Billing', 'Money', 'Expenses', 'Reports', 'Settings',
+      'Dashboard', 'Short stays', 'Landlords', 'Properties', 'Tenants', 'Billing', 'Money', 'Expenses', 'Reports', 'Settings',
     ]);
   });
 
   it('searches by label, group and hint', () => {
     expect(searchDestinations(all, 'remit').map((d) => d.label)).toContain('Remittances');
-    expect(searchDestinations(all, 'SETTINGS').length).toBe(6);
+    expect(searchDestinations(all, 'SETTINGS').length).toBe(7);
     expect(searchDestinations(all, 'm-pesa').map((d) => d.label)).toEqual(['Reconciliation', 'Payouts']);
     expect(searchDestinations(all, '   ')).toHaveLength(all.length);
   });
@@ -116,7 +116,7 @@ describe('filterNav', () => {
   });
 
   it('keeps entries whose permission is held and drops emptied groups', () => {
-    const groups = filterNav(ORG_NAV, ['units:view', 'users:view', 'audit:view']);
+    const groups = filterNav(ORG_NAV, ['units:view', 'users:view', 'audit:view'], 'LANDLORD');
     expect(labels(groups)).toEqual([
       'Dashboard:',
       'Properties:Units',
@@ -125,7 +125,7 @@ describe('filterNav', () => {
   });
 
   it('labels the catalogue page "Unit setup"', () => {
-    const properties = filterNav(ORG_NAV, ['unit-categories:view']).find((g) => g.id === 'properties');
+    const properties = filterNav(ORG_NAV, ['unit-categories:view'], 'LANDLORD').find((g) => g.id === 'properties');
     expect(properties?.children.map((c) => c.label)).toEqual(['Unit setup']);
   });
 
@@ -135,18 +135,19 @@ describe('filterNav', () => {
   });
 
   it('shows both invoice pages for invoices:view', () => {
-    const billing = filterNav(ORG_NAV, ['invoices:view']).find((g) => g.id === 'billing');
+    const billing = filterNav(ORG_NAV, ['invoices:view'], 'LANDLORD').find((g) => g.id === 'billing');
     expect(billing?.children.map((c) => c.label)).toEqual(['Invoices', 'Invoice run']);
   });
 
-  it('keeps everything when every permission is held', () => {
+  it('keeps everything allowed for an agency when every permission is held', () => {
     const every = destinations(ORG_NAV).flatMap((d) => (d.permission ? [d.permission] : []));
-    expect(destinations(filterNav(ORG_NAV, every, 'AGENCY'))).toHaveLength(destinations(ORG_NAV).length);
+    const agencyOnly = destinations(ORG_NAV).filter((d) => !d.orgKinds || d.orgKinds.includes('AGENCY'));
+    expect(destinations(filterNav(ORG_NAV, every, 'AGENCY'))).toHaveLength(agencyOnly.length);
   });
 
   it('does not mutate the model', () => {
     filterNav(ORG_NAV, []);
-    expect(ORG_NAV.find((g) => g.id === 'settings')?.children.length).toBe(6);
+    expect(ORG_NAV.find((g) => g.id === 'settings')?.children.length).toBe(7);
   });
 
   it('gives every page except the dashboard a resource:action permission', () => {
@@ -168,9 +169,29 @@ describe('organisation kinds', () => {
   it('hides the whole landlords group from a landlord organisation, whatever its permissions', () => {
     const groups = filterNav(ORG_NAV, every, 'LANDLORD');
     expect(ids(groups)).not.toContain('landlords');
+    expect(ids(groups)).not.toContain('stays');
     expect(destinations(groups).some((d) => d.to.startsWith('/app/landlords') || d.to === '/app/remittances')).toBe(false);
+    expect(destinations(groups).some((d) => d.to === '/app/settings/site')).toBe(false);
     // Everything else is still there.
-    expect(ids(groups)).toEqual(ids(ORG_NAV).filter((id) => id !== 'landlords'));
+    expect(ids(groups)).toEqual(ids(ORG_NAV).filter((id) => id !== 'landlords' && id !== 'stays'));
+  });
+
+  it('shows Short stays and Booking site to a HOST owner, and hides Tenants, Billing, Units and Payments', () => {
+    const groups = filterNav(ORG_NAV, every, 'HOST');
+    expect(ids(groups)).toContain('stays');
+    expect(ids(groups)).not.toContain('tenants');
+    expect(ids(groups)).not.toContain('billing');
+    expect(ids(groups)).not.toContain('landlords');
+    const paths = destinations(groups).map((d) => d.to);
+    expect(paths).toContain('/app/calendar');
+    expect(paths).toContain('/app/bookings');
+    expect(paths).toContain('/app/listings');
+    expect(paths).toContain('/app/guests');
+    expect(paths).toContain('/app/cleaning');
+    expect(paths).toContain('/app/settings/site');
+    expect(paths).not.toContain('/app/units');
+    expect(paths).not.toContain('/app/unit-categories');
+    expect(paths).not.toContain('/app/payments');
   });
 
   it('hides restricted groups when the kind is unknown, and keeps the rest', () => {
@@ -186,10 +207,12 @@ describe('organisation kinds', () => {
     expect(availableTo({ orgKinds: ['AGENCY'] }, undefined)).toBe(false);
   });
 
-  it('carries the group restriction onto each destination', () => {
+  it('carries the group or entry restriction onto each destination', () => {
     const landlords = destinations(ORG_NAV).find((d) => d.to === '/app/landlords');
     expect(landlords?.orgKinds).toEqual(['AGENCY']);
-    expect(destinations(ORG_NAV).find((d) => d.to === '/app/units')?.orgKinds).toBeUndefined();
+    expect(destinations(ORG_NAV).find((d) => d.to === '/app/units')?.orgKinds).toEqual(['LANDLORD', 'AGENCY']);
+    expect(destinations(ORG_NAV).find((d) => d.to === '/app/settings/site')?.orgKinds).toEqual(['HOST']);
+    expect(destinations(ORG_NAV).find((d) => d.to === '/app/properties')?.orgKinds).toBeUndefined();
   });
 });
 
@@ -219,5 +242,16 @@ describe('menu counts', () => {
     expect(countText(0)).toBeNull();
     expect(countText(12)).toBe('12');
     expect(countText(150)).toBe('99+');
+  });
+});
+
+describe('hintFor', () => {
+  it('gives hosts their own subtitle on shared pages, and everyone else the usual one', () => {
+    const dashboard = bestEntry(ORG_NAV, '/app')!.entry;
+    const reports = bestEntry(ORG_NAV, '/app/reports')!.entry;
+    expect(hintFor(dashboard, 'HOST')).toBe('Arrivals, departures and what needs doing today');
+    expect(hintFor(reports, 'HOST')).toBe('Income, occupancy, expenses and profit per unit');
+    expect(hintFor(dashboard, 'LANDLORD')).toBe('Collections, arrears and occupancy at a glance');
+    expect(hintFor(reports, undefined)).toBe('Property P&L, arrears, aging and occupancy');
   });
 });

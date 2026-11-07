@@ -16,10 +16,12 @@ if [ "$ENV" = prod ]; then
   APP_HOST="${2:-app.kodihub.co.ke}"
   API_HOST="${3:-api.kodihub.co.ke}"
   LANDING_HOST="${4:-kodihub.co.ke}"
+  SITE_DOMAIN="${5:-kodihub.co.ke}"
 else
   APP_HOST="${2:-dev.kodihub.co.ke}"
   API_HOST="${3:-dapi.kodihub.co.ke}"
   LANDING_HOST="${4:-landing.kodihub.co.ke}"
+  SITE_DOMAIN="${5:-dev.kodihub.co.ke}"
 fi
 
 PUBKEY="$(cat)"
@@ -64,6 +66,7 @@ cat > "$ROOT/edge/edge.env" <<EDGE
 APP_HOST=$APP_HOST
 API_HOST=$API_HOST
 LANDING_HOST=$LANDING_HOST
+SITE_DOMAIN=$SITE_DOMAIN
 APP_STACK=hodi-$ENV
 EDGE
 
@@ -86,6 +89,8 @@ NODE_ENV=$([ "$ENV" = prod ] && echo production || echo development)
 LOG_FORMAT=json
 APP_URL=https://$APP_HOST
 PUBLIC_API_URL=https://$API_HOST
+SITE_DOMAIN=$SITE_DOMAIN
+WEB_INDEX_URL=http://hodi-$ENV-web:8080/index.html
 CORS_ORIGINS=https://$APP_HOST,https://$LANDING_HOST
 JWT_SECRET=$(rand 64)
 FIELD_ENCRYPTION_KEYS=k1:$(key32)

@@ -2,10 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import { applyTheme, storedTheme } from './lib/theme';
-import { restoreSession } from './lib/auth/session';
 import { reloadOnce } from './lib/chunkReload';
 import { installTableLabels } from './lib/tableLabels';
-import App from './App.tsx';
+import { siteSlugFromHost } from './site/siteHost';
 
 // index.html already stamped the theme before first paint; this keeps the attribute
 // right if that inline script was blocked (e.g. by a strict CSP).
@@ -17,15 +16,29 @@ window.addEventListener('vite:preloadError', (event) => {
   if (reloadOnce(window.sessionStorage, () => window.location.reload())) event.preventDefault();
 });
 
-// Restore the session from the refresh cookie before React mounts, so it happens exactly
-// once (StrictMode runs effects twice; a second refresh would reuse a rotated token).
-void restoreSession();
-
 // Column names on table cells for the phone card layout (styles/admin.css).
 installTableLabels(document.body);
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+const siteSlug = siteSlugFromHost(window.location.hostname);
+const root = createRoot(document.getElementById('root')!);
+
+if (siteSlug) {
+  void import('./site/GuestSiteApp.tsx').then(({ default: GuestSiteApp }) => {
+    root.render(
+      <StrictMode>
+        <GuestSiteApp slug={siteSlug} />
+      </StrictMode>,
+    );
+  });
+} else {
+  void Promise.all([import('./lib/auth/session'), import('./App.tsx')]).then(
+    async ([{ restoreSession }, { default: App }]) => {
+      await restoreSession();
+      root.render(
+        <StrictMode>
+          <App />
+        </StrictMode>,
+      );
+    },
+  );
+}

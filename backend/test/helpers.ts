@@ -116,7 +116,12 @@ export const auth = (s: Session | string) => ({
 export async function onboardOrg(
   t: TestApp,
   admin: Session,
-  p: { name: string; ownerEmail: string; ownerPhone: string; kind?: 'LANDLORD' | 'AGENCY' },
+  p: {
+    name: string;
+    ownerEmail: string;
+    ownerPhone: string;
+    kind?: 'LANDLORD' | 'AGENCY' | 'HOST';
+  },
 ) {
   const res = await t
     .http()

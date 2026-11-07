@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      allowedHosts: ['.localhost'],
       // Proxy rather than CORS: the browser makes same-origin requests, which is also
       // what production looks like (Firebase Hosting rewrites /api/** to Cloud Run).
       proxy: {

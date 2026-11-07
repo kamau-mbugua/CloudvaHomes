@@ -119,6 +119,7 @@ export function RegisterPage() {
             >
               <option value="LANDLORD">Landlord (managing our own properties)</option>
               <option value="AGENCY">Letting agency (managing for property owners)</option>
+              <option value="HOST">Short-stay host (BNB)</option>
             </select>
           </div>
 

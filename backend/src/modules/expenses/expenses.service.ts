@@ -27,11 +27,19 @@ import { dueDates, firstDue } from './schedule.js';
 import { UploadsService } from '../files/uploads.service.js';
 
 const PROPERTY = { property: { select: { id: true, code: true, name: true } } } as const;
-type ExpenseRow = Expense & { property: { id: string; code: string; name: string } };
+const EXPENSE_INCLUDE = {
+  property: { select: { id: true, code: true, name: true } },
+  unit: { select: { id: true, number: true } },
+} as const;
+type ExpenseRow = Expense & {
+  property: { id: string; code: string; name: string };
+  unit?: { id: string; number: string } | null;
+};
 
 function snapshot(e: Expense) {
   return {
     propertyId: e.propertyId,
+    unitId: e.unitId,
     category: e.category,
     name: e.name,
     payee: e.payee,
@@ -100,6 +108,8 @@ export class ExpensesService {
       return {
         id: e.id,
         property: e.property,
+        unit: e.unit ?? null,
+        unitId: e.unitId ?? null,
         category: e.category,
         name: e.name,
         payee: e.payee,
@@ -126,6 +136,7 @@ export class ExpensesService {
         { property: propertyScope() },
         q.voided ? { voidedAt: { not: null } } : { voidedAt: null },
         q.propertyId ? { propertyId: q.propertyId } : {},
+        q.unitId ? { unitId: q.unitId } : {},
         q.category ? { category: q.category } : {},
         q.from ? { incurredOn: { gte: parseDateOnly(q.from) } } : {},
         q.to ? { incurredOn: { lte: parseDateOnly(q.to) } } : {},
@@ -147,7 +158,7 @@ export class ExpensesService {
     const [rows, total, sum] = await Promise.all([
       this.db.expense.findMany({
         where,
-        include: PROPERTY,
+        include: EXPENSE_INCLUDE,
         orderBy: [{ incurredOn: 'desc' }, { createdAt: 'desc' }],
         ...toSkipTake(q),
       }),
@@ -201,9 +212,22 @@ export class ExpensesService {
     return e.receiptUploadId;
   }
 
+  private async checkUnitProperty(propertyId: string, unitId: string) {
+    const unit = await this.db.unit.findFirst({
+      where: { id: unitId, propertyId },
+      select: { id: true },
+    });
+    if (!unit) {
+      throw AppError.fieldInvalid('unitId', 'Unit does not belong to that property');
+    }
+  }
+
   async create(dto: CreateExpenseDto) {
     const ctx = orgContext();
     await this.properties.find(dto.propertyId);
+    if (dto.unitId) {
+      await this.checkUnitProperty(dto.propertyId, dto.unitId);
+    }
     notInFuture(dto.incurredOn, 'incurredOn');
     const row = await this.db.$transaction(async (tx) => {
       if (dto.receiptUploadId)
@@ -212,6 +236,7 @@ export class ExpensesService {
         data: {
           orgId: ctx.orgId,
           propertyId: dto.propertyId,
+          unitId: dto.unitId ?? null,
           category: dto.category,
           name: dto.name.trim(),
           payee: optionalText(dto.payee) ?? null,
@@ -221,7 +246,7 @@ export class ExpensesService {
           receiptUploadId: dto.receiptUploadId ?? null,
           createdById: ctx.userId,
         },
-        include: PROPERTY,
+        include: EXPENSE_INCLUDE,
       });
       await this.audit.record(
         {
@@ -243,6 +268,9 @@ export class ExpensesService {
     if (before.voidedAt)
       throw AppError.conflict('This expense was voided and can’t change', 'EXPENSE_VOID');
     if (dto.incurredOn) notInFuture(dto.incurredOn, 'incurredOn');
+    if (dto.unitId) {
+      await this.checkUnitProperty(before.propertyId, dto.unitId);
+    }
     const row = await this.db.$transaction(async (tx) => {
       const replacing =
         dto.receiptUploadId !== undefined && dto.receiptUploadId !== before.receiptUploadId;
@@ -252,6 +280,7 @@ export class ExpensesService {
       const updated = await tx.expense.update({
         where: { id },
         data: {
+          ...(dto.unitId !== undefined ? { unitId: dto.unitId } : {}),
           ...(dto.category !== undefined ? { category: dto.category } : {}),
           ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
           ...(dto.payee !== undefined ? { payee: optionalText(dto.payee) } : {}),
@@ -260,7 +289,7 @@ export class ExpensesService {
           ...(dto.incurredOn !== undefined ? { incurredOn: parseDateOnly(dto.incurredOn) } : {}),
           ...(replacing ? { receiptUploadId: dto.receiptUploadId } : {}),
         },
-        include: PROPERTY,
+        include: EXPENSE_INCLUDE,
       });
       // A replaced receipt is detached so the clean-up job removes the file.
       if (replacing && before.receiptUploadId) {
@@ -311,7 +340,7 @@ export class ExpensesService {
   private async find(id: string): Promise<ExpenseRow> {
     const e = await this.db.expense.findFirst({
       where: { id, property: propertyScope() },
-      include: PROPERTY,
+      include: EXPENSE_INCLUDE,
     });
     if (!e) throw AppError.notFound('Expense');
     return e;

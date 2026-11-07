@@ -51,6 +51,6 @@ import { UsersService } from './users/users.service.js';
     RolesService,
     OrganizationsService,
   ],
-  exports: [AuditService, RateLimitService],
+  exports: [AuditService, RateLimitService, OtpService],
 })
 export class IdentityModule {}

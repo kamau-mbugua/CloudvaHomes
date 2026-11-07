@@ -212,7 +212,7 @@ export class PlatformAdminService {
           })
         : Promise.resolve(null),
       this.billing.balance(o.id),
-      this.billing.occupiedUnits(this.db, o.id, today),
+      this.billing.billableUnits(this.db, o.id, today),
     ]);
     return {
       id: o.id,

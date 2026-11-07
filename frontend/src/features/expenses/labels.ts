@@ -11,6 +11,7 @@ export const EXPENSE_CATEGORY: Record<ExpenseCategory, Label> = {
   TAXES: { label: 'Taxes & levies', tone: 'ad__badge--off' },
   INSURANCE: { label: 'Insurance', tone: 'ad__badge--off' },
   MANAGEMENT: { label: 'Management fees', tone: 'ad__badge--off' },
+  RENT: { label: 'Rent paid to landlord', tone: 'ad__badge--off' },
   OTHER: { label: 'Other', tone: 'ad__badge--off' },
 };
 

@@ -1,3 +1,5 @@
+import type { OrgKind } from '../../generated/prisma/client.js';
+
 /**
  * Every permission in the system (design §4.5): `resource:action`. The role editor renders
  * this catalogue; guards check against it. Adding a feature = add its permissions here (and to
@@ -20,6 +22,19 @@ const crud = (resource: string, noun: string, actions = ['view', 'create', 'upda
         delete: `Delete ${noun}`,
       }[a] ?? a,
   }));
+
+const STAYS_PERMISSIONS = [
+  ...crud('listings', 'listings'),
+  ...crud('bookings', 'bookings', ['view', 'create', 'update']),
+  { key: 'bookings:cancel', label: 'Cancel bookings' },
+  ...crud('stay-payments', 'stay payments', ['view', 'create']),
+  { key: 'stay-payments:refund', label: 'Refund or void stay payments' },
+  ...crud('guests', 'guests', ['view', 'update']),
+  ...crud('cleaning', 'cleaning tasks', ['view', 'update']),
+  ...crud('site', 'booking site settings', ['view', 'update']),
+];
+
+const STAYS_KEY_SET = new Set(STAYS_PERMISSIONS.map((p) => p.key));
 
 export const PERMISSION_CATALOGUE: PermissionGroup[] = [
   {
@@ -73,6 +88,11 @@ export const PERMISSION_CATALOGUE: PermissionGroup[] = [
     ],
   },
   {
+    group: 'stays',
+    label: 'Short stays',
+    permissions: STAYS_PERMISSIONS,
+  },
+  {
     group: 'expenses',
     label: 'Expenses',
     permissions: crud('expenses', 'expenses'),
@@ -110,71 +130,131 @@ export function isKnownPermission(key: string): boolean {
 }
 
 const VIEW_ALL = ALL_PERMISSIONS.filter((p) => p.endsWith(':view'));
+const RENT_PERMISSIONS = ALL_PERMISSIONS.filter((p) => !STAYS_KEY_SET.has(p));
+const RENT_VIEW_ALL = RENT_PERMISSIONS.filter((p) => p.endsWith(':view'));
 
-/** Default permissions for the four roles every organisation starts with. Owner = everything. */
-export const SYSTEM_ROLE_DEFAULTS = {
-  OWNER: {
-    name: 'Owner',
-    description: 'Full access, including users, roles and payment channels.',
-    permissions: [...ALL_PERMISSIONS],
-  },
-  MANAGER: {
-    name: 'Manager',
-    description:
-      'Runs day-to-day operations. Cannot change roles, payment channels or approve payouts.',
-    permissions: ALL_PERMISSIONS.filter(
-      (p) =>
-        !p.startsWith('roles:') &&
-        ![
-          'channels:manage',
-          'remittances:approve',
-          'remittances:pay',
-          'payments:refund',
-          'users:delete',
-          'settings:update',
-        ].includes(p),
-    ),
-  },
-  ACCOUNTANT: {
-    name: 'Accountant',
-    description: 'Invoices, payments, reconciliation, expenses and remittances.',
-    permissions: [
-      ...VIEW_ALL.filter((p) => !['users:view', 'roles:view', 'audit:view'].includes(p)),
-      'invoices:create',
-      'invoices:update',
-      'invoices:void',
-      'payments:create',
-      'payments:refund',
-      'reconciliation:update',
-      'expenses:create',
-      'expenses:update',
-      'remittances:create',
-      'remittances:pay',
-    ],
-  },
-  CARETAKER: {
-    name: 'Caretaker',
-    description: 'Meter readings, unit status and tenant move-in/out on site. No money settings.',
-    permissions: [
-      'properties:view',
-      'units:view',
-      'units:update',
-      'tenants:view',
-      'tenants:create',
-      'tenancies:view',
-      'tenancies:create',
-      'tenancies:update',
-      'meters:view',
-      'meters:create',
-      'meters:update',
-      'maintenance:view',
-      'maintenance:create',
-      'maintenance:update',
-    ],
-  },
-} as const satisfies Record<
-  string,
-  { name: string; description: string; permissions: readonly string[] }
->;
+export type SystemRole = 'OWNER' | 'MANAGER' | 'ACCOUNTANT' | 'CARETAKER';
 
-export type SystemRole = keyof typeof SYSTEM_ROLE_DEFAULTS;
+export interface RoleDefault {
+  name: string;
+  description: string;
+  permissions: readonly string[];
+}
+
+export function systemRoleDefaults(kind: OrgKind): Record<SystemRole, RoleDefault> {
+  if (kind === 'HOST') {
+    return {
+      OWNER: {
+        name: 'Owner',
+        description: 'Full access, including users, roles and payment channels.',
+        permissions: [...ALL_PERMISSIONS],
+      },
+      MANAGER: {
+        name: 'Manager',
+        description:
+          'Runs day-to-day operations. Cannot change roles, payment channels or refund stay payments.',
+        permissions: ALL_PERMISSIONS.filter(
+          (p) =>
+            !p.startsWith('roles:') &&
+            ![
+              'channels:manage',
+              'stay-payments:refund',
+              'settings:update',
+              'users:delete',
+            ].includes(p),
+        ),
+      },
+      ACCOUNTANT: {
+        name: 'Accountant',
+        description: 'Stay payments, refunds, expenses and reports.',
+        permissions: [
+          ...VIEW_ALL.filter((p) => !['users:view', 'roles:view', 'audit:view'].includes(p)),
+          'stay-payments:create',
+          'stay-payments:refund',
+          'expenses:create',
+          'expenses:update',
+        ],
+      },
+      CARETAKER: {
+        name: 'Caretaker',
+        description: 'Arrivals, departures, check-in/out and cleaning on site. No money settings.',
+        permissions: [
+          'properties:view',
+          'listings:view',
+          'bookings:view',
+          'bookings:update',
+          'cleaning:view',
+          'cleaning:update',
+          'maintenance:view',
+          'maintenance:create',
+          'maintenance:update',
+        ],
+      },
+    };
+  }
+
+  return {
+    OWNER: {
+      name: 'Owner',
+      description: 'Full access, including users, roles and payment channels.',
+      permissions: [...ALL_PERMISSIONS],
+    },
+    MANAGER: {
+      name: 'Manager',
+      description:
+        'Runs day-to-day operations. Cannot change roles, payment channels or approve payouts.',
+      permissions: RENT_PERMISSIONS.filter(
+        (p) =>
+          !p.startsWith('roles:') &&
+          ![
+            'channels:manage',
+            'remittances:approve',
+            'remittances:pay',
+            'payments:refund',
+            'users:delete',
+            'settings:update',
+          ].includes(p),
+      ),
+    },
+    ACCOUNTANT: {
+      name: 'Accountant',
+      description: 'Invoices, payments, reconciliation, expenses and remittances.',
+      permissions: [
+        ...RENT_VIEW_ALL.filter((p) => !['users:view', 'roles:view', 'audit:view'].includes(p)),
+        'invoices:create',
+        'invoices:update',
+        'invoices:void',
+        'payments:create',
+        'payments:refund',
+        'reconciliation:update',
+        'expenses:create',
+        'expenses:update',
+        'remittances:create',
+        'remittances:pay',
+      ],
+    },
+    CARETAKER: {
+      name: 'Caretaker',
+      description: 'Meter readings, unit status and tenant move-in/out on site. No money settings.',
+      permissions: [
+        'properties:view',
+        'units:view',
+        'units:update',
+        'tenants:view',
+        'tenants:create',
+        'tenancies:view',
+        'tenancies:create',
+        'tenancies:update',
+        'meters:view',
+        'meters:create',
+        'meters:update',
+        'maintenance:view',
+        'maintenance:create',
+        'maintenance:update',
+      ],
+    },
+  };
+}
+
+/** Default permissions for the four roles in landlord/agency organisations. */
+export const SYSTEM_ROLE_DEFAULTS = systemRoleDefaults('LANDLORD');

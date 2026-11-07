@@ -28,6 +28,7 @@ class Session {
 
   bool can(String permission) => permissions.contains(permission);
   bool get isStaff => activeOrganization != null;
+  bool get isHost => activeOrganization?.kind == 'HOST';
   bool get isTenant => tenantOf.isNotEmpty;
   bool get isOwner => ownerOf.isNotEmpty;
   bool get isPlatformAdmin => user.isPlatformAdmin;
@@ -159,14 +160,21 @@ class SessionUser {
 }
 
 class OrgMembership {
-  OrgMembership({required this.id, required this.name, required this.roleName});
+  OrgMembership({
+    required this.id,
+    required this.name,
+    required this.roleName,
+    this.kind = 'LANDLORD',
+  });
   final String id;
   final String name;
   final String roleName;
+  final String kind;
   factory OrgMembership.fromJson(Map<String, dynamic> j) => OrgMembership(
     id: j['id'] as String,
     name: j['name'] as String,
     roleName: j['roleName'] as String? ?? '',
+    kind: j['kind'] as String? ?? 'LANDLORD',
   );
 }
 

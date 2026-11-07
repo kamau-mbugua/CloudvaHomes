@@ -58,6 +58,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     try {
       await ref.read(sessionProvider.notifier).registerOrganization({
         'organizationName': _orgName.text.trim(),
+        'organizationKind': _kind,
         'kind': _kind,
         'firstName': _firstName.text.trim(),
         'lastName': _lastName.text.trim(),
@@ -99,6 +100,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           segments: const [
             ButtonSegment(value: 'LANDLORD', label: Text('Landlord')),
             ButtonSegment(value: 'AGENCY', label: Text('Managing agency')),
+            ButtonSegment(value: 'HOST', label: Text('Short-stay host')),
           ],
           selected: {_kind},
           onSelectionChanged: (s) => setState(() => _kind = s.first),

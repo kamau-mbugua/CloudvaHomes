@@ -26,6 +26,7 @@ const ICONS: Record<GroupId, ReactNode> = {
   dashboard: <HomeIcon />,
   landlords: <KeyIcon />,
   properties: <BuildingIcon />,
+  stays: <KeyIcon />,
   tenants: <PeopleIcon />,
   billing: <InvoiceIcon />,
   money: <CashIcon />,

@@ -193,23 +193,29 @@ export class NotificationsService {
 
   async sendCode(
     to: Recipient,
-    purpose: 'login' | 'reset' | 'step-up' | 'admin-2fa',
+    purpose: 'login' | 'reset' | 'step-up' | 'admin-2fa' | 'booking',
     code: string,
     minutes: number,
+    bizName?: string,
   ): Promise<void> {
     const what = {
       login: 'sign-in code',
       reset: 'password reset code',
       'step-up': 'confirmation code',
       'admin-2fa': 'admin sign-in code',
+      booking: 'booking code',
     }[purpose];
     const kind = {
       login: 'login_otp',
       reset: 'password_reset',
       'step-up': 'step_up',
       'admin-2fa': 'admin_2fa',
+      booking: 'booking_otp',
     }[purpose];
-    const smsText = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
+    const smsText =
+      purpose === 'booking'
+        ? `Your ${bizName ?? 'KodiHub'} booking code is ${code}. It expires in ${minutes} minutes.`
+        : `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
     const tasks: Promise<void>[] = [];
     if (to.phone) {
       tasks.push(this.dispatchSms(to.phone, smsText));

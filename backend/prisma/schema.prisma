@@ -83,6 +83,7 @@ model Organization {
   landlords   Landlord[]
   properties  Property[]
   tenants     Tenant[]
+  hostSite    HostSite?
 
   @@index([onboardedById])
   @@map("organizations")
@@ -91,6 +92,7 @@ model Organization {
 enum OrgKind {
   LANDLORD
   AGENCY
+  HOST
 }
 
 enum OrgStatus {
@@ -218,6 +220,7 @@ enum OtpPurpose {
   PASSWORD_RESET
   STEP_UP
   ADMIN_2FA
+  GUEST_BOOKING
 }
 
 // ───────────────────────────── Portfolio ─────────────────────────────
@@ -303,6 +306,8 @@ model Property {
   organization        Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
   landlord            Landlord?            @relation(fields: [landlordId], references: [id], onDelete: Restrict)
   units               Unit[]
+  listings            Listing[]
+  bookings            Booking[]
   chargeTypes         ChargeType[]
   moveInCharges       MoveInCharge[]
   expenses            Expense[]
@@ -384,6 +389,10 @@ model Unit {
   unitType            UnitType?            @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
   category            UnitCategory?        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   tenancies           Tenancy[]
+  listing             Listing?
+  bookings            Booking[]
+  cleaningTasks       CleaningTask[]
+  expenses            Expense[]
   meters              Meter[]
   maintenanceRequests MaintenanceRequest[]
 
@@ -773,10 +782,11 @@ model PaymentChannel {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  payments Payment[]
-  inbound  InboundTransaction[]
-  stk      StkRequest[]
-  imports  StatementImport[]
+  payments     Payment[]
+  stayPayments StayPayment[]
+  inbound      InboundTransaction[]
+  stk          StkRequest[]
+  imports      StatementImport[]
 
   @@unique([orgId, name])
   @@map("payment_channels")
@@ -905,6 +915,8 @@ model InboundTransaction {
   matchedBy     MatchMethod?
   tenantId      String?       @db.Uuid
   paymentId     String?       @db.Uuid
+  bookingId     String?       @db.Uuid
+  stayPaymentId String?       @db.Uuid
   ignoredReason String?
   resolvedById  String?       @db.Uuid
   resolvedAt    DateTime?
@@ -943,7 +955,8 @@ model StkRequest {
   id                String    @id @default(uuid(7)) @db.Uuid
   orgId             String    @db.Uuid
   channelId         String    @db.Uuid
-  tenantId          String    @db.Uuid
+  tenantId          String?   @db.Uuid
+  bookingId         String?   @db.Uuid
   invoiceIds        String[]  @db.Uuid
   phone             String
   amount            BigInt
@@ -966,6 +979,7 @@ model StkRequest {
   @@unique([orgId, idempotencyKey])
   @@index([state, createdAt])
   @@index([tenantId, createdAt])
+  @@index([bookingId, createdAt])
   @@map("stk_requests")
 }
 
@@ -1002,6 +1016,8 @@ enum UploadPurpose {
   MAINTENANCE_PHOTO
   LEASE_DOCUMENT
   INSPECTION_PHOTO
+  LISTING_PHOTO
+  SITE_LOGO
 }
 
 enum ExpenseCategory {
@@ -1013,6 +1029,7 @@ enum ExpenseCategory {
   TAXES
   INSURANCE
   MANAGEMENT
+  RENT
   OTHER
 }
 
@@ -1044,6 +1061,7 @@ model Expense {
   id                 String          @id @default(uuid(7)) @db.Uuid
   orgId              String          @db.Uuid
   propertyId         String          @db.Uuid
+  unitId             String?         @db.Uuid
   recurringExpenseId String?         @db.Uuid
   category           ExpenseCategory
   name               String
@@ -1059,11 +1077,13 @@ model Expense {
   updatedAt          DateTime        @updatedAt
 
   property           Property            @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  unit               Unit?               @relation(fields: [unitId], references: [id], onDelete: SetNull)
   recurring          RecurringExpense?   @relation(fields: [recurringExpenseId], references: [id], onDelete: Restrict)
   maintenanceRequest MaintenanceRequest?
 
   @@unique([recurringExpenseId, incurredOn])
   @@index([orgId, propertyId, incurredOn])
+  @@index([orgId, unitId, incurredOn])
   @@map("expenses")
 }
 
@@ -1642,4 +1662,237 @@ model DeviceToken {
 
   @@index([userId])
   @@map("device_tokens")
+}
+
+// ───────────────────────────── Hosts & short stays ─────────────────────────────
+
+enum BookingKind {
+  STAY
+  BLOCK
+}
+
+enum BookingStatus {
+  HELD
+  REQUESTED
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  EXPIRED
+  DECLINED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingSource {
+  SITE
+  HOST
+}
+
+enum StayPaymentKind {
+  PAYMENT
+  REFUND
+}
+
+enum CleaningStatus {
+  OPEN
+  DONE
+}
+
+model HostSite {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  orgId             String    @unique @db.Uuid
+  slug              String?   @unique
+  previousSlug      String?   @unique
+  previousSlugUntil DateTime?
+  published         Boolean   @default(false)
+  businessName      String
+  about             String?
+  logoUploadId      String?   @unique @db.Uuid
+  contactPhone      String?
+  whatsappPhone     String?
+  rules             Json
+  houseRules        String?
+  checkInTime       String    @default("14:00")
+  checkOutTime      String    @default("10:00")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("host_sites")
+}
+
+model Listing {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  orgId               String   @db.Uuid
+  unitId              String   @unique @db.Uuid
+  propertyId          String   @db.Uuid
+  title               String
+  description         String?
+  amenities           String[]
+  maxGuests           Int
+  bedrooms            Int      @default(1)
+  bathrooms           Int      @default(1)
+  nightlyPrice        BigInt
+  weekendPrice        BigInt?
+  weeklyDiscountBps   Int?
+  cleaningFee         BigInt   @default(0)
+  minNights           Int      @default(1)
+  checkInInstructions String?
+  area                String?
+  rulesOverride       Json?
+  published           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  unit          Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  photos        ListingPhoto[]
+  specialPrices SpecialPrice[]
+  bookings      Booking[]
+
+  @@index([orgId, propertyId])
+  @@map("listings")
+}
+
+model ListingPhoto {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  orgId     String  @db.Uuid
+  listingId String  @db.Uuid
+  uploadId  String  @unique @db.Uuid
+  position  Int
+  caption   String?
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, position])
+  @@map("listing_photos")
+}
+
+model SpecialPrice {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  orgId        String   @db.Uuid
+  listingId    String   @db.Uuid
+  fromDate     DateTime @db.Date
+  toDate       DateTime @db.Date
+  nightlyPrice BigInt
+  label        String?
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, fromDate])
+  @@map("special_prices")
+}
+
+model Guest {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  orgId        String   @db.Uuid
+  name         String
+  phone        String
+  email        String?
+  idNumberEnc  Bytes?
+  idNumberHint String?
+  notes        String?
+  doNotAccept  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  bookings Booking[]
+
+  @@unique([orgId, phone])
+  @@map("guests")
+}
+
+model Booking {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  orgId            String        @db.Uuid
+  code             String
+  kind             BookingKind   @default(STAY)
+  unitId           String        @db.Uuid
+  propertyId       String        @db.Uuid
+  listingId        String        @db.Uuid
+  guestId          String?       @db.Uuid
+  checkIn          DateTime      @db.Date
+  checkOut         DateTime      @db.Date
+  guests           Int           @default(1)
+  status           BookingStatus
+  source           BookingSource
+  holdExpiresAt    DateTime?
+  requestExpiresAt DateTime?
+  total            BigInt        @default(0)
+  dueNow           BigInt        @default(0)
+  balanceDueOn     DateTime?     @db.Date
+  amountPaid       BigInt        @default(0)
+  amountRefunded   BigInt        @default(0)
+  lines            Json
+  rules            Json
+  guestNote        String?
+  hostNote         String?
+  accessTokenHash  String?       @unique
+  cancelledAt      DateTime?
+  cancelledBy      String?
+  cancelReason     String?
+  checkedInAt      DateTime?
+  checkedOutAt     DateTime?
+  infoSentAt       DateTime?
+  createdById      String?       @db.Uuid
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  unit         Unit          @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  listing      Listing       @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  guest        Guest?        @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  payments     StayPayment[]
+  cleaningTask CleaningTask?
+
+  @@unique([orgId, code])
+  @@index([orgId, status])
+  @@index([unitId, checkIn])
+  @@index([guestId])
+  @@map("bookings")
+}
+
+model StayPayment {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  orgId        String          @db.Uuid
+  bookingId    String          @db.Uuid
+  number       String
+  kind         StayPaymentKind
+  method       PaymentMethod
+  channelId    String?         @db.Uuid
+  amount       BigInt
+  reference    String?
+  receivedAt   DateTime
+  inboundId    String?         @unique @db.Uuid
+  recordedById String?         @db.Uuid
+  voidedAt     DateTime?
+  voidReason   String?
+  createdAt    DateTime        @default(now())
+
+  booking Booking         @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  channel PaymentChannel? @relation(fields: [channelId], references: [id], onDelete: Restrict)
+
+  @@unique([orgId, number])
+  @@index([bookingId])
+  @@index([orgId, receivedAt])
+  @@map("stay_payments")
+}
+
+model CleaningTask {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  orgId     String         @db.Uuid
+  unitId    String         @db.Uuid
+  bookingId String?        @unique @db.Uuid
+  status    CleaningStatus @default(OPEN)
+  doneAt    DateTime?
+  doneById  String?        @db.Uuid
+  note      String?
+  createdAt DateTime       @default(now())
+
+  unit    Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status])
+  @@map("cleaning_tasks")
 }

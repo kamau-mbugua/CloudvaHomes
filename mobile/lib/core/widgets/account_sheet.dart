@@ -32,11 +32,14 @@ class AccountSheet extends ConsumerWidget {
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     final themeMode = ref.watch(themeModeProvider);
 
-    Future<void> switchOrg(String id) async {
+    Future<void> switchOrg(String id, String kind) async {
       final nav = Navigator.of(context);
+      final targetMode = kind == 'HOST' ? AppMode.host : AppMode.staff;
       try {
-        await ref.read(sessionProvider.notifier).switchOrganization(id);
-        ref.read(appModeProvider.notifier).state = AppMode.staff;
+        if (session.activeOrganization?.id != id) {
+          await ref.read(sessionProvider.notifier).switchOrganization(id);
+        }
+        ref.read(appModeProvider.notifier).state = targetMode;
         nav.pop();
       } on ApiError catch (e) {
         if (context.mounted) showMessage(context, e.message);
@@ -75,6 +78,7 @@ class AccountSheet extends ConsumerWidget {
               ),
             ),
             StatusChip(switch (mode) {
+              AppMode.host => 'Host',
               AppMode.tenant => 'Tenant',
               AppMode.owner => 'Owner',
               AppMode.platform => 'Platform',
@@ -137,9 +141,9 @@ class AccountSheet extends ConsumerWidget {
                 subtitle: o.roleName,
                 pill: StatusChip(o.roleName, tone: Tone.good),
                 selected:
-                    mode == AppMode.staff &&
+                    (mode == AppMode.staff || mode == AppMode.host) &&
                     session.activeOrganization?.id == o.id,
-                onTap: () => switchOrg(o.id),
+                onTap: () => switchOrg(o.id, o.kind),
               ),
             ),
         ],

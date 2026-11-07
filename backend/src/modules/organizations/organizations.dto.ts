@@ -181,9 +181,9 @@ export class CreateOrganizationDto {
   @MaxLength(120)
   name!: string;
 
-  @ApiProperty({ enum: ['LANDLORD', 'AGENCY'] })
-  @IsIn(['LANDLORD', 'AGENCY'])
-  kind!: 'LANDLORD' | 'AGENCY';
+  @ApiProperty({ enum: ['LANDLORD', 'AGENCY', 'HOST'] })
+  @IsIn(['LANDLORD', 'AGENCY', 'HOST'])
+  kind!: 'LANDLORD' | 'AGENCY' | 'HOST';
 
   @ApiProperty()
   @IsString()

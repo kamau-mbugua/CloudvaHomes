@@ -11,12 +11,15 @@ import type { ExpenseCategory } from './types';
 
 // ---------------------------------------------------------------- expense form
 
-export const EXPENSE_FIELDS = ['propertyId', 'category', 'name', 'amount', 'incurredOn', 'payee', 'reference', 'receiptUploadId'] as const;
+export const EXPENSE_FIELDS = ['propertyId', 'unitId', 'category', 'name', 'amount', 'incurredOn', 'payee', 'reference', 'receiptUploadId'] as const;
 export type ExpenseField = (typeof EXPENSE_FIELDS)[number];
-export type ExpenseValues = Record<Exclude<ExpenseField, 'receiptUploadId'>, string>;
+export type ExpenseValues = Record<Exclude<ExpenseField, 'receiptUploadId' | 'unitId'>, string> & {
+  unitId?: string;
+};
 
 export interface ExpenseBody {
   propertyId: string;
+  unitId?: string;
   category: ExpenseCategory;
   name: string;
   amount: number;
@@ -59,10 +62,12 @@ export function checkExpense(
   else if (values.incurredOn > today) errors.incurredOn = 'The date can’t be in the future.';
 
   if (Object.keys(errors).length > 0 || !amount.ok || !isCategory(values.category)) return { ok: false, errors };
+  const unitId = values.unitId?.trim();
   return {
     ok: true,
     body: {
       propertyId: values.propertyId,
+      ...(unitId ? { unitId } : {}),
       category: values.category,
       name,
       amount: amount.minor,

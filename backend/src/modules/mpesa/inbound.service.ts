@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { currentContext } from '../../common/context/request-context.js';
 import { parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
@@ -8,6 +8,7 @@ import type {
   InboundSource,
   MatchMethod,
   PaymentChannel,
+  PaymentMethod,
   Prisma,
 } from '../../generated/prisma/client.js';
 import { violatesUnique } from '../../prisma/errors.js';
@@ -17,9 +18,11 @@ import { orgContext } from '../auth/decorators.js';
 import { PaymentsService } from '../payments/payments.service.js';
 import { tenantScope } from '../portfolio/property-scope.js';
 import { TenantsService } from '../portfolio/tenants/tenants.service.js';
+import { StayPaymentsService } from '../stays/payments/stay-payments.service.js';
 import { normalizeAccountRef } from './daraja.js';
 import { guessesFor, unitSplits } from './matching.js';
 import type { AssignInboundDto, IgnoreInboundDto, ListInboundQueryDto } from './mpesa.dto.js';
+import type { WrapperType } from '../../common/di/wrapper-type.js';
 
 export interface InboundInput {
   source: InboundSource;
@@ -46,29 +49,65 @@ export class InboundService {
     private readonly audit: AuditService,
     private readonly payments: PaymentsService,
     private readonly tenants: TenantsService,
+    @Inject(forwardRef(() => StayPaymentsService))
+    private readonly stayPayments: WrapperType<StayPaymentsService>,
   ) {}
 
   /**
    * Stores and processes one transaction. Idempotent: a replay of a receipt already stored
-   * returns the stored one untouched. `stk` = the request it answers (tenant already known).
+   * returns the stored one untouched. `target` = the STK request it answers (tenant or booking).
    */
   async receive(
     channel: PaymentChannel,
     input: InboundInput,
-    stk?: { tenantId: string; invoiceIds: string[] },
+    target?: { tenantId: string; invoiceIds: string[] } | { bookingId: string },
   ): Promise<{ inboundId: string; paymentId: string | null; replay: boolean }> {
     const existing = await this.db.inboundTransaction.findUnique({
       where: { channelId_providerRef: { channelId: channel.id, providerRef: input.providerRef } },
     });
-    if (existing) return { inboundId: existing.id, paymentId: existing.paymentId, replay: true };
+    if (existing) {
+      return {
+        inboundId: existing.id,
+        paymentId: existing.paymentId ?? existing.stayPaymentId,
+        replay: true,
+      };
+    }
 
-    let result: { inboundId: string; paymentId: string | null };
+    let result: { inboundId: string; paymentId: string | null; isStay?: boolean };
     try {
       result = await this.db.$transaction(async (tx) => {
         const inbound = await tx.inboundTransaction.create({
           data: { orgId: channel.orgId, channelId: channel.id, ...input },
         });
-        // Entered by hand already? Link to it instead of paying twice.
+        // Entered by hand already for a stay? Link to it instead of paying twice.
+        const manualStay = await tx.stayPayment.findFirst({
+          where: {
+            channelId: channel.id,
+            reference: input.providerRef.toUpperCase(),
+            kind: 'PAYMENT',
+            voidedAt: null,
+          },
+        });
+        if (manualStay) {
+          await tx.inboundTransaction.update({
+            where: { id: inbound.id },
+            data: {
+              matchStatus: 'MATCHED',
+              matchedBy: 'EXISTING',
+              bookingId: manualStay.bookingId,
+              stayPaymentId: manualStay.id,
+              resolvedAt: new Date(),
+            },
+          });
+          if (!manualStay.inboundId) {
+            await tx.stayPayment.update({
+              where: { id: manualStay.id },
+              data: { inboundId: inbound.id },
+            });
+          }
+          return { inboundId: inbound.id, paymentId: null, isStay: true };
+        }
+        // Entered by hand already for a tenant? Link to it instead of paying twice.
         const manual = await tx.payment.findFirst({
           where: {
             channelId: channel.id,
@@ -87,10 +126,42 @@ export class InboundService {
           }
           return { inboundId: inbound.id, paymentId: null };
         }
-        const match = stk
-          ? { tenantId: stk.tenantId, by: 'AUTO_STK' as const, invoiceIds: stk.invoiceIds }
-          : await this.match(tx, input);
+        const match = target
+          ? 'bookingId' in target
+            ? { kind: 'booking' as const, bookingId: target.bookingId, by: 'AUTO_STK' as const }
+            : {
+                kind: 'tenant' as const,
+                tenantId: target.tenantId,
+                by: 'AUTO_STK' as const,
+                invoiceIds: target.invoiceIds,
+              }
+          : await this.match(tx, channel.orgId, input);
         if (!match) return { inboundId: inbound.id, paymentId: null };
+
+        if (match.kind === 'booking') {
+          const stayPaymentId = await this.stayPayments.record(tx, {
+            bookingId: match.bookingId,
+            kind: 'PAYMENT',
+            method: channel.kind as PaymentMethod,
+            channelId: channel.id,
+            amount: input.amount,
+            reference: input.providerRef,
+            receivedAt: input.occurredAt,
+            inboundId: inbound.id,
+          });
+          await tx.inboundTransaction.update({
+            where: { id: inbound.id },
+            data: {
+              matchStatus: 'MATCHED',
+              matchedBy: match.by,
+              bookingId: match.bookingId,
+              stayPaymentId,
+              resolvedAt: new Date(),
+            },
+          });
+          return { inboundId: inbound.id, paymentId: stayPaymentId, isStay: true };
+        }
+
         const paymentId = await this.payments.recordAutomatic(tx, {
           orgId: channel.orgId,
           tenantId: match.tenantId,
@@ -117,29 +188,52 @@ export class InboundService {
             channelId_providerRef: { channelId: channel.id, providerRef: input.providerRef },
           },
         });
-        return { inboundId: row.id, paymentId: row.paymentId, replay: true };
+        return {
+          inboundId: row.id,
+          paymentId: row.paymentId ?? row.stayPaymentId,
+          replay: true,
+        };
       }
       throw e;
     }
-    if (result.paymentId) await this.payments.notifyReceipt(result.paymentId);
-    return { ...result, replay: false };
+    if (result.paymentId && !result.isStay) await this.payments.notifyReceipt(result.paymentId);
+    if (result.paymentId && result.isStay) await this.stayPayments.notifyPayment(result.paymentId);
+    return { inboundId: result.inboundId, paymentId: result.paymentId, replay: false };
   }
 
-  /** Tenant for an unmatched transaction: account reference first, then phone. */
+  /** Match for an unmatched transaction: booking code (HOST orgs), tenant/invoice/unit, then phone. */
   private async match(
     tx: Tx,
+    orgId: string,
     input: InboundInput,
-  ): Promise<{ tenantId: string; by: MatchMethod; invoiceIds?: string[] } | null> {
+  ): Promise<
+    | { kind: 'booking'; bookingId: string; by: MatchMethod }
+    | { kind: 'tenant'; tenantId: string; by: MatchMethod; invoiceIds?: string[] }
+    | null
+  > {
     for (const g of guessesFor(input.accountRef)) {
-      if (g.kind === 'tenant') {
+      if (g.kind === 'booking') {
+        const org = await tx.organization.findUnique({
+          where: { id: orgId },
+          select: { kind: true },
+        });
+        if (org?.kind === 'HOST') {
+          const b = await tx.booking.findFirst({
+            where: { orgId, code: g.code, kind: 'STAY' },
+            select: { id: true },
+          });
+          if (b) return { kind: 'booking', bookingId: b.id, by: 'AUTO_ACCOUNT' };
+        }
+      } else if (g.kind === 'tenant') {
         const t = await tx.tenant.findFirst({ where: { code: g.code }, select: { id: true } });
-        if (t) return { tenantId: t.id, by: 'AUTO_ACCOUNT' };
+        if (t) return { kind: 'tenant', tenantId: t.id, by: 'AUTO_ACCOUNT' };
       } else if (g.kind === 'invoice') {
         const i = await tx.invoice.findFirst({
           where: { number: g.number, status: { not: 'VOID' } },
           select: { id: true, tenantId: true },
         });
-        if (i) return { tenantId: i.tenantId, by: 'AUTO_ACCOUNT', invoiceIds: [i.id] };
+        if (i)
+          return { kind: 'tenant', tenantId: i.tenantId, by: 'AUTO_ACCOUNT', invoiceIds: [i.id] };
       } else {
         const props = await tx.property.findMany({ select: { id: true, code: true } });
         for (const split of unitSplits(
@@ -159,7 +253,7 @@ export class InboundService {
           });
           const unit = units.find((u) => normalizeAccountRef(u.number) === split.number);
           const tenantId = unit?.tenancies[0]?.tenantId;
-          if (tenantId) return { tenantId, by: 'AUTO_ACCOUNT' };
+          if (tenantId) return { kind: 'tenant', tenantId, by: 'AUTO_ACCOUNT' };
         }
       }
     }
@@ -169,7 +263,8 @@ export class InboundService {
         select: { id: true },
         take: 2,
       });
-      if (byPhone.length === 1) return { tenantId: byPhone[0]!.id, by: 'AUTO_PHONE' };
+      if (byPhone.length === 1)
+        return { kind: 'tenant', tenantId: byPhone[0]!.id, by: 'AUTO_PHONE' };
     }
     return null;
   }

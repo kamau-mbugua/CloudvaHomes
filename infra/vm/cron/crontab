@@ -10,4 +10,6 @@
 0     2  1   *   *    /usr/local/bin/job.sh platform-invoices
 0     3  *   *   *    /usr/local/bin/job.sh platform-status
 0     9  *   *   *    /usr/local/bin/job.sh reminders
+*/5   *  *   *   *    /usr/local/bin/job.sh stays-expiry
+0     7  *   *   *    /usr/local/bin/job.sh stays-daily
 45    2  *   *   *    /usr/local/bin/backup.sh

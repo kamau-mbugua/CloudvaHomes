@@ -1,7 +1,11 @@
 import { guessesFor, unitSplits } from './matching.js';
 
 describe('account reference matching', () => {
-  it('guesses tenant codes, invoice numbers and unit references', () => {
+  it('guesses booking codes, tenant codes, invoice numbers and unit references', () => {
+    expect(guessesFor('b00012')[0]).toEqual({
+      kind: 'booking',
+      code: 'B00012',
+    });
     expect(guessesFor(' t00042 ')).toEqual([
       { kind: 'tenant', code: 'T00042' },
       { kind: 'unit', ref: 'T00042' },

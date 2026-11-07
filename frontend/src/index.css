@@ -17,6 +17,7 @@
 @import './styles/tenant.css';
 @import './styles/platform.css';
 @import './styles/banks.css';
+@import './styles/stays.css';
 
 *, *::before, *::after { box-sizing: border-box; }
 

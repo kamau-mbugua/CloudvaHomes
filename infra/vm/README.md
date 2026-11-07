@@ -102,7 +102,31 @@ Running it again for an existing email or phone promotes that user and resets th
 | `/opt/hodi/infra/` (`infra.prev`) | the deployed `infra/vm` bundle (and the previous one) |
 | `/opt/hodi/releases/` | `current`, `previous`, `history` |
 | `/opt/hodi/backups/<env>/` | `pre-deploy-*.sql.gz` (last 7) and, on production, nightly `hodi-*.sql.gz` (14 days) |
-| `/opt/hodi/edge/edge.env` | this server's hosts (`APP_HOST`, `APP_STACK`, `LANDING_HOST`) |
+| `/opt/hodi/edge/edge.env` | this server's hosts (`APP_HOST`, `APP_STACK`, `LANDING_HOST`, `SITE_DOMAIN`, `CF_API_TOKEN`) |
+
+## Wildcard HTTPS for host booking sites (`*.kodihub.co.ke` / `*.dev.kodihub.co.ke`)
+
+Host short-stay booking sites are served on wildcard subdomains (`{slug}.kodihub.co.ke` on
+production, `{slug}.dev.kodihub.co.ke` on dev) using a custom Caddy build with the Cloudflare
+DNS-01 ACME provider (`infra/vm/edge/Dockerfile`).
+
+Deploy order (owner step):
+1. In Cloudflare, create an API token with **Zone → DNS → Edit** permission scoped to zone
+   `kodihub.co.ke`, and add wildcard DNS A records `*.kodihub.co.ke` (prod IP) and
+   `*.dev.kodihub.co.ke` (dev IP).
+2. In GitHub → Settings → Secrets and variables → Actions, add the repository secret
+   `CF_API_TOKEN` (used by prod, and by dev unless `DEV_CF_API_TOKEN` is also set). Each deploy
+   sends it to `/opt/hodi/edge/edge.env` over SSH stdin (`scripts/set-edge-env.sh`); no server
+   login needed. (Adding `CF_API_TOKEN=<token>` to that file by hand also works; deploys keep
+   it, along with `SITE_DOMAIN`, and keep the file at mode 600.) Nothing else to set: deploys add `SITE_DOMAIN` and
+   `WEB_INDEX_URL=http://hodi-<env>-web:8080/index.html` to `/opt/hodi/envs/<env>/api.env` when
+   missing, and the web app recognises host addresses at runtime (no build setting).
+3. Deploy (or rebuild the edge: `docker compose -f /opt/hodi/infra/edge/compose.yml up -d --build`
+   after copying `infra/edge/hosts.caddy` into `infra/edge/sites/`). The wildcard block lives in
+   `edge/hosts.caddy` and is switched on only when `CF_API_TOKEN` is set: without a token the
+   deploy warns and leaves host sites off, so the app and API keep working.
+4. Verify wildcard TLS and OpenGraph routing:
+   `curl -I https://test.dev.kodihub.co.ke` returns HTTP 200 over HTTPS.
 
 ## Setting up a server (once)
 

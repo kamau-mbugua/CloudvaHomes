@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FieldCipher, maskHint, normalizeIdNumber } from '../../common/crypto/field-cipher.js';
 
-export type IdOwner = 'tenant' | 'landlord';
+export type IdOwner = 'tenant' | 'landlord' | 'guest';
 
 export interface SealedIdNumber {
   idNumberEnc: Uint8Array<ArrayBuffer> | null;

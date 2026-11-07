@@ -1,5 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { emptyContext, runWithContext } from '../../common/context/request-context.js';
+import {
+  currentContext,
+  emptyContext,
+  runWithContext,
+} from '../../common/context/request-context.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
@@ -48,10 +52,12 @@ export class StkService {
   ) {}
 
   private async view(r: StkRequest & { channel: { id: string; name: string } }) {
-    const t = await this.db.tenant.findUnique({
-      where: { id: r.tenantId },
-      select: { id: true, code: true, firstName: true, lastName: true },
-    });
+    const t = r.tenantId
+      ? await this.db.tenant.findUnique({
+          where: { id: r.tenantId },
+          select: { id: true, code: true, firstName: true, lastName: true },
+        })
+      : null;
     return {
       id: r.id,
       state: r.state,
@@ -61,12 +67,112 @@ export class StkService {
       resultDesc: r.resultDesc,
       mpesaReceipt: r.mpesaReceipt,
       tenant: t,
+      bookingId: r.bookingId,
       channel: r.channel,
       invoiceIds: r.invoiceIds,
       paymentId: r.paymentId,
       createdAt: r.createdAt,
       completedAt: r.completedAt,
     };
+  }
+
+  async pushForBooking(p: { bookingId: string; amount: bigint; phone: string }) {
+    const booking = await this.db.booking.findUnique({
+      where: { id: p.bookingId },
+    });
+    if (!booking) throw AppError.notFound('Booking');
+
+    const channels = await this.db.paymentChannel.findMany({
+      where: {
+        orgId: booking.orgId,
+        kind: { in: ['MPESA_PAYBILL', 'MPESA_TILL'] },
+        status: 'ACTIVE',
+        darajaEnv: { not: null },
+        secretsEnc: { not: null },
+      },
+      orderBy: { name: 'asc' },
+    });
+    const channel = channels.find((c) => {
+      const creds = this.config.credentials(c);
+      return !!creds?.passkey && !!c.shortcode && !!c.callbackToken;
+    });
+    if (!channel) {
+      throw AppError.conflict(
+        'No M-Pesa channel with payment prompts configured',
+        'NO_MPESA_PROMPT',
+      );
+    }
+
+    const target = this.config.target(channel);
+    const amount = p.amount;
+    if (amount <= 0n || amount % 100n !== 0n) {
+      throw AppError.fieldInvalid('amount', 'M-Pesa takes whole shillings only');
+    }
+    const phone = requiredPhone('phone', p.phone);
+    if (!/^\+254[17]\d{8}$/.test(phone)) {
+      throw AppError.fieldInvalid('phone', 'Enter a Safaricom number');
+    }
+
+    const auth = this.config.stkAuth(channel, target.credentials);
+    const urls = this.config.urls(channel);
+    const ctx = currentContext();
+
+    let request = await this.db.stkRequest.create({
+      data: {
+        orgId: booking.orgId,
+        channelId: channel.id,
+        bookingId: booking.id,
+        tenantId: null,
+        invoiceIds: [],
+        phone,
+        amount,
+        accountRef: booking.code,
+        requestedById: ctx?.userId ?? null,
+      },
+    });
+
+    try {
+      const res = await this.daraja.stkPush(target, {
+        ...auth,
+        amountKes: Number(amount / 100n),
+        phone: toMsisdn(phone),
+        callbackUrl: urls.stk,
+        accountReference: booking.code.slice(0, 12),
+        description: 'Stay',
+      });
+      request = await this.db.stkRequest.update({
+        where: { id: request.id },
+        data: {
+          merchantRequestId: res.merchantRequestId,
+          checkoutRequestId: res.checkoutRequestId,
+        },
+      });
+    } catch (e) {
+      await this.db.stkRequest.update({
+        where: { id: request.id },
+        data: {
+          state: 'FAILED',
+          resultDesc: e instanceof AppError ? e.message : 'Could not reach M-Pesa',
+          completedAt: new Date(),
+        },
+      });
+      throw e;
+    }
+
+    if (ctx?.userId) {
+      await this.audit.record({
+        action: 'stk.push',
+        entity: 'stk_request',
+        entityId: request.id,
+        after: { bookingId: booking.id, channelId: channel.id, amount, phone },
+      });
+    }
+
+    const full = await this.db.stkRequest.findUniqueOrThrow({
+      where: { id: request.id },
+      include: INCLUDE,
+    });
+    return this.view(full);
   }
 
   async push(dto: StkPushDto, idempotencyKey?: string) {
@@ -260,7 +366,11 @@ export class StkService {
         occurredAt: cb.occurredAt ?? new Date(),
         raw: body as Prisma.InputJsonValue,
       },
-      { tenantId: req.tenantId, invoiceIds: req.invoiceIds },
+      req.bookingId
+        ? { bookingId: req.bookingId }
+        : req.tenantId
+          ? { tenantId: req.tenantId, invoiceIds: req.invoiceIds }
+          : undefined,
     );
     await this.finish(req.id, {
       state: 'SUCCESS',

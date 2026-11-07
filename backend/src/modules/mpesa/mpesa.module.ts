@@ -1,4 +1,4 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { forwardRef, Module, type OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { emptyContext, runWithContext } from '../../common/context/request-context.js';
 import { ENV } from '../../config/config.module.js';
@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { JobsGuard, JobTokenVerifier } from '../jobs/job-auth.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { PortfolioModule } from '../portfolio/portfolio.module.js';
+import { StaysModule } from '../stays/stays.module.js';
 import { DarajaConfigService } from './daraja-config.service.js';
 import { DarajaClient, HttpDarajaClient, SimulatedDarajaClient } from './daraja.client.js';
 import { HooksController } from './hooks.controller.js';
@@ -16,7 +17,7 @@ import { StkService } from './stk.service.js';
 
 /** M-Pesa (phase 5): Daraja set-up, STK push, C2B, matching and reconciliation. */
 @Module({
-  imports: [PortfolioModule, PaymentsModule],
+  imports: [PortfolioModule, PaymentsModule, forwardRef(() => StaysModule)],
   controllers: [MpesaController, HooksController, MpesaJobsController],
   providers: [
     {

@@ -15,11 +15,14 @@ export type ExpenseCategory =
   | 'TAXES'
   | 'INSURANCE'
   | 'MANAGEMENT'
+  | 'RENT'
   | 'OTHER';
 
 export interface Expense {
   id: string;
   property: CodedRef;
+  unit?: { id: string; number: string } | null;
+  unitId?: string | null;
   category: ExpenseCategory;
   name: string;
   payee: string | null;

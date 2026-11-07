@@ -48,12 +48,20 @@ edge_up() {
     [[ -z "${API_HOST:-}" || "${API_HOST:-}" == *.sslip.io ]] && API_HOST="dapi.kodihub.co.ke"
     [[ -z "${LANDING_HOST:-}" || "${LANDING_HOST:-}" == *.sslip.io ]] && LANDING_HOST="landing.kodihub.co.ke"
   fi
-  cat > "$ROOT/edge/edge.env" <<EDGE
+  # Host booking sites: keep the owner's SITE_DOMAIN and Cloudflare token across deploys.
+  if [ -z "${SITE_DOMAIN:-}" ]; then
+    if [ "$ENV" = prod ]; then SITE_DOMAIN="kodihub.co.ke"; else SITE_DOMAIN="dev.kodihub.co.ke"; fi
+  fi
+  ( umask 077
+    cat > "$ROOT/edge/edge.env" <<EDGE
 APP_HOST=$APP_HOST
 API_HOST=$API_HOST
 LANDING_HOST=$LANDING_HOST
+SITE_DOMAIN=$SITE_DOMAIN
 APP_STACK=hodi-$ENV
 EDGE
+    if [ -n "${CF_API_TOKEN:-}" ]; then echo "CF_API_TOKEN=$CF_API_TOKEN" >> "$ROOT/edge/edge.env"; fi )
+  chmod 600 "$ROOT/edge/edge.env"
 
   # Initialize APP_URL, PUBLIC_API_URL, and CORS_ORIGINS in api.env only if missing or still
   # pointing at a legacy sslip.io placeholder, so manual server edits are never overwritten.
@@ -69,10 +77,20 @@ EOF
       chmod 600 "$api_env.tmp"
       mv "$api_env.tmp" "$api_env"
     fi
+    # Host booking sites: the API builds guest links ({slug}.$SITE_DOMAIN) and link previews
+    # (from the web container's index.html). Added only when missing; manual values win.
+    grep -q '^SITE_DOMAIN=' "$api_env" || echo "SITE_DOMAIN=$SITE_DOMAIN" >> "$api_env"
+    grep -q '^WEB_INDEX_URL=' "$api_env" \
+      || echo "WEB_INDEX_URL=http://hodi-$ENV-web:8080/index.html" >> "$api_env"
   fi
 
   rm -rf "$ROOT/infra/edge/sites"; mkdir -p "$ROOT/infra/edge/sites"
   if [ "$ENV" = prod ]; then cp "$ROOT"/infra/edge/sites-prod/*.caddy "$ROOT/infra/edge/sites/"; fi
+  if [ -n "${CF_API_TOKEN:-}" ]; then
+    cp "$ROOT/infra/edge/hosts.caddy" "$ROOT/infra/edge/sites/"
+  else
+    warn "CF_API_TOKEN is not set in $ROOT/edge/edge.env: host booking sites (*.$SITE_DOMAIN) stay off."
+  fi
   cp "$ROOT/infra/edge/maintenance.html" "$ROOT/maintenance/index.html"
   ( cd "$ROOT/infra/edge" && docker compose up -d --quiet-pull >/dev/null \
       && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 ) \

@@ -3,6 +3,7 @@ import {
   isKnownPermission,
   PERMISSION_CATALOGUE,
   SYSTEM_ROLE_DEFAULTS,
+  systemRoleDefaults,
 } from './permissions.js';
 
 describe('permission catalogue', () => {
@@ -15,6 +16,11 @@ describe('permission catalogue', () => {
   it('system role defaults only use known permissions', () => {
     for (const role of Object.values(SYSTEM_ROLE_DEFAULTS)) {
       expect(role.permissions.filter((p) => !isKnownPermission(p))).toEqual([]);
+    }
+    for (const kind of ['LANDLORD', 'AGENCY', 'HOST'] as const) {
+      for (const role of Object.values(systemRoleDefaults(kind))) {
+        expect(role.permissions.filter((p) => !isKnownPermission(p))).toEqual([]);
+      }
     }
   });
 
@@ -41,5 +47,14 @@ describe('permission catalogue', () => {
 
   it('Owner defaults to every permission', () => {
     expect([...SYSTEM_ROLE_DEFAULTS.OWNER.permissions].sort()).toEqual([...ALL_PERMISSIONS].sort());
+  });
+
+  it('separates short-stay role defaults for HOST vs LANDLORD/AGENCY', () => {
+    const hostCaretaker = new Set<string>(systemRoleDefaults('HOST').CARETAKER.permissions);
+    expect(hostCaretaker.has('bookings:update')).toBe(true);
+    expect(hostCaretaker.has('stay-payments:view')).toBe(false);
+
+    const landlordCaretaker = new Set<string>(systemRoleDefaults('LANDLORD').CARETAKER.permissions);
+    expect([...landlordCaretaker].some((p) => p.startsWith('bookings:'))).toBe(false);
   });
 });

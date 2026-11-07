@@ -23,7 +23,7 @@ export interface AdminTwoFactorChallenge {
   destinationMasked: string;
 }
 
-export type OrgKind = 'LANDLORD' | 'AGENCY';
+export type OrgKind = 'LANDLORD' | 'AGENCY' | 'HOST';
 
 export interface OrganizationMembership {
   id: string;

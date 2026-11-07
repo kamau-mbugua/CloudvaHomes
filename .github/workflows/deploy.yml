@@ -189,6 +189,23 @@ jobs:
           rsync -az --no-owner --no-group --omit-dir-times --delete --exclude='README.md' --exclude='check.mjs' \
             "$LANDING_DIR/" "hodi:/opt/hodi/landing-releases/$GITHUB_SHA/"
 
+      # Host booking sites need a Cloudflare token on the server (wildcard HTTPS). It goes from
+      # GitHub secrets to /opt/hodi/edge/edge.env over SSH stdin, never on a command line. dev
+      # uses DEV_CF_API_TOKEN when set, else CF_API_TOKEN; prod uses CF_API_TOKEN. No secret =
+      # the server's current value is left alone.
+      - name: Send the Cloudflare token
+        env:
+          CF_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_TOKEN_DEV: ${{ secrets.DEV_CF_API_TOKEN }}
+        run: |
+          token="$CF_TOKEN"
+          if [ "$DEPLOY_ENV" = dev ] && [ -n "$CF_TOKEN_DEV" ]; then token="$CF_TOKEN_DEV"; fi
+          if [ -z "$token" ]; then
+            echo "::notice::No CF_API_TOKEN secret: host booking sites stay as configured on the server."
+            exit 0
+          fi
+          printf '%s' "$token" | ssh hodi "bash /opt/hodi/infra.new/scripts/set-edge-env.sh CF_API_TOKEN"
+
       # The server pulls the images with THIS run's short-lived token, then logs out. The
       # commit goes along so the server runs exactly what was built.
       - name: Deploy

@@ -16,6 +16,7 @@ import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { AcceptInvitationPage } from './features/auth/AcceptInvitationPage';
 import { StepUpProvider } from './features/auth/StepUpProvider';
 import { DashboardPage } from './features/reports/DashboardPage';
+import { useSession } from './lib/auth/useAuth';
 
 const MessagesPage = lazy(() => import('./features/messages/MessagesPage').then((m) => ({ default: m.MessagesPage })));
 const AccountPage = lazy(() => import('./features/account/AccountPage').then((m) => ({ default: m.AccountPage })));
@@ -54,6 +55,17 @@ const RemittancesPage = lazy(() => import('./features/agency/RemittancesPage').t
 const RemittanceDetailPage = lazy(() => import('./features/agency/RemittanceDetailPage').then((m) => ({ default: m.RemittanceDetailPage })));
 const PlanBillingPage = lazy(() => import('./features/platform/PlanBillingPage').then((m) => ({ default: m.PlanBillingPage })));
 const PayoutsPage = lazy(() => import('./features/banks/PayoutsPage').then((m) => ({ default: m.PayoutsPage })));
+const ListingsPage = lazy(() => import('./features/stays/ListingsPage').then((m) => ({ default: m.ListingsPage })));
+const ListingEditorPage = lazy(() => import('./features/stays/ListingEditorPage').then((m) => ({ default: m.ListingEditorPage })));
+const SiteSettingsPage = lazy(() => import('./features/stays/SiteSettingsPage').then((m) => ({ default: m.SiteSettingsPage })));
+const TodayPage = lazy(() => import('./features/stays/TodayPage').then((m) => ({ default: m.TodayPage })));
+const CalendarPage = lazy(() => import('./features/stays/CalendarPage').then((m) => ({ default: m.CalendarPage })));
+const BookingsPage = lazy(() => import('./features/stays/BookingsPage').then((m) => ({ default: m.BookingsPage })));
+const BookingDetailPage = lazy(() => import('./features/stays/BookingDetailPage').then((m) => ({ default: m.BookingDetailPage })));
+const HostReportsPage = lazy(() => import('./features/stays/HostReportsPage').then((m) => ({ default: m.HostReportsPage })));
+const GuestsPage = lazy(() => import('./features/stays/GuestsPage').then((m) => ({ default: m.GuestsPage })));
+const GuestDetailPage = lazy(() => import('./features/stays/GuestDetailPage').then((m) => ({ default: m.GuestDetailPage })));
+const CleaningPage = lazy(() => import('./features/stays/CleaningPage').then((m) => ({ default: m.CleaningPage })));
 
 const AdminShell = lazy(() => import('./features/admin/AdminShell').then((m) => ({ default: m.AdminShell })));
 const AdminOverviewPage = lazy(() => import('./features/admin/OverviewPage').then((m) => ({ default: m.OverviewPage })));
@@ -100,6 +112,7 @@ const PAGES = destinations(ORG_NAV);
 /** Path (relative to /app) → the screen that replaces its placeholder. */
 const BUILT: Record<string, { element: ReactNode; children?: { path: string; title: string; element: ReactNode }[] }> = {
   'settings/organization': { element: <OrganizationPage /> },
+  'settings/site': { element: <SiteSettingsPage /> },
   'settings/users': { element: <UsersPage /> },
   'settings/roles': {
     element: <RolesPage />,
@@ -111,6 +124,23 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; tit
   'settings/audit': { element: <AuditLogPage /> },
   'settings/plan': { element: <PlanBillingPage /> },
   'settings/payouts': { element: <PayoutsPage /> },
+  listings: {
+    element: <ListingsPage />,
+    children: [
+      { path: 'new', title: 'New listing', element: <ListingEditorPage /> },
+      { path: ':listingId', title: 'Listing details', element: <ListingEditorPage /> },
+    ],
+  },
+  calendar: { element: <CalendarPage /> },
+  bookings: {
+    element: <BookingsPage />,
+    children: [{ path: ':bookingId', title: 'Booking details', element: <BookingDetailPage /> }],
+  },
+  guests: {
+    element: <GuestsPage />,
+    children: [{ path: ':guestId', title: 'Guest details', element: <GuestDetailPage /> }],
+  },
+  cleaning: { element: <CleaningPage /> },
   landlords: { element: <LandlordsPage />, children: [{ path: ':landlordId', title: 'Landlord details', element: <LandlordDetailPage /> }] },
   properties: { element: <PropertiesPage />, children: [{ path: ':propertyId', title: 'Property details', element: <PropertyDetailPage /> }] },
   units: { element: <UnitsPage />, children: [{ path: ':unitId', title: 'Unit details', element: <UnitDetailPage /> }] },
@@ -130,11 +160,27 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; tit
   'payment-channels': { element: <PaymentChannelsPage /> },
   reconciliation: { element: <ReconciliationPage />, children: [{ path: ':inboundId', title: 'Transaction details', element: <InboundDetailPage /> }] },
   expenses: { element: <ExpensesPage /> },
-  reports: { element: <ReportsPage /> },
+  reports: { element: <ReportsOrHostReportsPage /> },
   agreements: { element: <AgreementsPage /> },
   'owner-statements': { element: <OwnerStatementsPage /> },
   remittances: { element: <RemittancesPage />, children: [{ path: ':remittanceId', title: 'Remittance details', element: <RemittanceDetailPage /> }] },
 };
+
+function ReportsOrHostReportsPage() {
+  const session = useSession();
+  if (session?.activeOrganization?.kind === 'HOST') {
+    return <HostReportsPage />;
+  }
+  return <ReportsPage />;
+}
+
+function HomeOrTodayPage() {
+  const session = useSession();
+  if (session?.activeOrganization?.kind === 'HOST') {
+    return <TodayPage />;
+  }
+  return <DashboardPage />;
+}
 
 export default function App() {
   return (
@@ -153,7 +199,7 @@ export default function App() {
               <Route path="/invite/:token" element={<AcceptInvitationPage />} />
 
               <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
-                <Route index element={<DashboardPage />} />
+                <Route index element={<HomeOrTodayPage />} />
                 <Route path="account" element={<AccountPage />} />
                 {PAGES.filter((page) => page.to !== '/app').map((page) => {
                   const path = page.to.slice('/app/'.length);

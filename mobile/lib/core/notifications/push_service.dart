@@ -75,6 +75,23 @@ final pushTokenSourceProvider = Provider<PushTokenSource>(
   if (raw.startsWith('/owner')) {
     return (route: '/owner', mode: AppMode.owner);
   }
+  if (raw.startsWith('/app/bookings/')) {
+    final id = raw.substring('/app/bookings/'.length);
+    return (
+      route: id.isEmpty ? '/host/bookings' : '/host/bookings/$id',
+      mode: AppMode.host,
+    );
+  }
+  if (raw == '/app/bookings' || raw.startsWith('/host/bookings')) {
+    final suffix = raw.startsWith('/host') ? raw : '/host/bookings';
+    return (route: suffix, mode: AppMode.host);
+  }
+  if (raw == '/app/cleaning' || raw.startsWith('/host/cleaning')) {
+    return (route: '/host/cleaning', mode: AppMode.host);
+  }
+  if (raw == '/app/guests' || raw.startsWith('/host/guests')) {
+    return (route: '/host/guests', mode: AppMode.host);
+  }
   if (raw == '/maintenance' || raw.startsWith('/app/maintenance')) {
     return (route: '/staff/more/maintenance', mode: AppMode.staff);
   }

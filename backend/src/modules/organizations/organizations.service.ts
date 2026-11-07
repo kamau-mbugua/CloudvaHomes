@@ -12,6 +12,7 @@ import { readOrgDocumentInstructions } from '../../common/pdf/pdf.js';
 import { RolesService } from '../roles/roles.service.js';
 import { readReminders } from '../tenant-portal/reminders.js';
 import { readLateFees, storeLateFees } from '../billing/late-fees/late-fees.js';
+import { DEFAULT_RULES } from '../stays/rules/terms.js';
 import { InvitationsService } from '../users/invitations.service.js';
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './organizations.dto.js';
 
@@ -202,7 +203,18 @@ export class OrganizationsService {
             onboardedById,
           },
         });
-        const roles = await RolesService.seedSystemRoles(tx, org.id);
+        const roles = await RolesService.seedSystemRoles(tx, org.id, org.kind);
+        if (org.kind === 'HOST') {
+          await tx.hostSite.create({
+            data: {
+              orgId: org.id,
+              businessName: org.name,
+              rules: DEFAULT_RULES as unknown as Prisma.InputJsonValue,
+              slug: null,
+              published: false,
+            },
+          });
+        }
         const invite = await this.invitations.createInTx(tx, {
           orgId: org.id,
           roleId: roles.OWNER,

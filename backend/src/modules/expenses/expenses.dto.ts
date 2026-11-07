@@ -25,6 +25,7 @@ export const CATEGORIES = [
   'TAXES',
   'INSURANCE',
   'MANAGEMENT',
+  'RENT',
   'OTHER',
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
@@ -47,6 +48,11 @@ export class ListExpensesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   propertyId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  unitId?: string;
 
   @ApiPropertyOptional({ enum: CATEGORIES })
   @IsOptional()
@@ -77,6 +83,11 @@ export class ListExpensesQueryDto extends PaginationQueryDto {
 }
 
 class ExpenseFieldsDto {
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsUUID()
+  unitId?: string | null;
+
   @ApiPropertyOptional({ enum: CATEGORIES })
   @IsOptional()
   @IsIn(CATEGORIES)
@@ -122,6 +133,11 @@ export class CreateExpenseDto {
   @ApiProperty()
   @IsUUID()
   propertyId!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  unitId?: string;
 
   @ApiProperty({ enum: CATEGORIES })
   @IsIn(CATEGORIES)
@@ -172,6 +188,11 @@ export class ListRecurringQueryDto {
   @IsOptional()
   @IsUUID()
   propertyId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  unitId?: string;
 
   @ApiPropertyOptional({ enum: ['ACTIVE', 'INACTIVE'] })
   @IsOptional()

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { withoutOrgScope } from '../../common/context/request-context.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { ObjectStorage, sniffType } from '../../common/storage/object-storage.js';
 import type { Upload, UploadPurpose } from '../../generated/prisma/client.js';
@@ -9,6 +10,8 @@ import { orgContext } from '../auth/decorators.js';
 import { propertyScope, unitScope } from '../portfolio/property-scope.js';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const MAX_PHOTO_UPLOAD_BYTES = 5 * 1024 * 1024;
+const IMAGE_ONLY_PURPOSES = new Set<UploadPurpose>(['LISTING_PHOTO', 'SITE_LOGO']);
 
 /** Who may upload / read each kind of file (any one of the permissions). */
 const UPLOAD_PERMS: Record<UploadPurpose, string[]> = {
@@ -17,6 +20,8 @@ const UPLOAD_PERMS: Record<UploadPurpose, string[]> = {
   MAINTENANCE_PHOTO: ['maintenance:create', 'maintenance:update'],
   LEASE_DOCUMENT: ['tenancies:create', 'tenancies:update', 'tenants:create', 'tenants:update'],
   INSPECTION_PHOTO: ['tenancies:update'],
+  LISTING_PHOTO: ['listings:create', 'listings:update'],
+  SITE_LOGO: ['site:update'],
 };
 
 export function toUpload(u: Upload) {
@@ -44,9 +49,15 @@ export class UploadsService {
     const ctx = orgContext();
     if (!UPLOAD_PERMS[purpose].some((p) => ctx.permissions.has(p))) throw AppError.forbidden();
     if (!file?.size) throw AppError.fieldInvalid('file', 'Choose a file');
+    if (IMAGE_ONLY_PURPOSES.has(purpose) && file.size > MAX_PHOTO_UPLOAD_BYTES) {
+      throw AppError.fieldInvalid('file', 'Photos must be 5 MB or smaller');
+    }
     const contentType = sniffType(file.buffer);
     if (!contentType) {
       throw new AppError(415, 'UNSUPPORTED_FILE', 'Upload a photo (JPEG, PNG or WebP) or a PDF');
+    }
+    if (IMAGE_ONLY_PURPOSES.has(purpose) && contentType === 'application/pdf') {
+      throw new AppError(415, 'UNSUPPORTED_FILE', 'Upload a photo (JPEG, PNG or WebP)');
     }
     const id = randomUUID();
     const key = `org/${ctx.orgId}/${purpose.toLowerCase()}/${id}`;
@@ -93,6 +104,28 @@ export class UploadsService {
     return { upload: u, data: await this.storage.get(u.key) };
   }
 
+  /** Public site photo: only LISTING_PHOTO of a published listing or SITE_LOGO of a published site. */
+  async publicPhotoContent(id: string) {
+    return withoutOrgScope(async () => {
+      const u = await this.prisma.upload.findUnique({ where: { id } });
+      if (!u || !u.attachedAt) throw AppError.notFound('Photo');
+      if (u.purpose === 'LISTING_PHOTO') {
+        const count = await this.prisma.listingPhoto.count({
+          where: { uploadId: u.id, listing: { published: true } },
+        });
+        if (!count) throw AppError.notFound('Photo');
+      } else if (u.purpose === 'SITE_LOGO') {
+        const count = await this.prisma.hostSite.count({
+          where: { logoUploadId: u.id, published: true },
+        });
+        if (!count) throw AppError.notFound('Photo');
+      } else {
+        throw AppError.notFound('Photo');
+      }
+      return { upload: u, data: await this.storage.get(u.key) };
+    });
+  }
+
   private async canRead(u: Upload, userId: string, perms: ReadonlySet<string>): Promise<boolean> {
     if (!u.attachedAt) return u.uploadedById === userId;
     if (u.purpose === 'EXPENSE_RECEIPT') {
@@ -117,6 +150,18 @@ export class UploadsService {
       if (!perms.has('tenancies:view') && !perms.has('tenants:view')) return false;
       return !!(await this.db.tenancy.count({
         where: { leaseUploadId: u.id, unit: unitScope() },
+      }));
+    }
+    if (u.purpose === 'LISTING_PHOTO') {
+      if (!perms.has('listings:view')) return false;
+      return !!(await this.db.listingPhoto.count({
+        where: { uploadId: u.id, listing: { property: propertyScope() } },
+      }));
+    }
+    if (u.purpose === 'SITE_LOGO') {
+      if (!perms.has('site:view')) return false;
+      return !!(await this.db.hostSite.count({
+        where: { logoUploadId: u.id },
       }));
     }
     if (!perms.has('meters:view')) return false;

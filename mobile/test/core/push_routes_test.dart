@@ -21,4 +21,13 @@ void main() {
       expect(r?.mode, AppMode.tenant, reason: e.key);
     }
   });
+
+  test(
+    'push link /app/bookings/abc in host mode routes to /host/bookings/abc',
+    () {
+      final r = mobileRouteForActionUrl('/app/bookings/abc');
+      expect(r?.route, '/host/bookings/abc');
+      expect(r?.mode, AppMode.host);
+    },
+  );
 }

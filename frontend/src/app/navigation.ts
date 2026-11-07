@@ -16,6 +16,7 @@ import type { OrgKind } from '../lib/auth/types';
 
 export type GroupId =
   | 'dashboard'
+  | 'stays'
   | 'landlords'
   | 'properties'
   | 'tenants'
@@ -44,11 +45,15 @@ export interface NavEntry {
   phase: string;
   /** One line shown under the title and in the command palette. */
   hint: string;
+  /** The same line for host organisations, when the shared page means something else to them. */
+  hostHint?: string;
   /**
    * The permission needed to see this page (`resource:action`). Absent = anyone signed in
    * to an organisation (the dashboard). Hiding is a courtesy; the API enforces it.
    */
   permission?: string;
+  /** Present when only these kinds of organisation have this entry. Absent = inherits group. */
+  orgKinds?: OrgKind[];
   /**
    * Match only this exact path, never its children. For `/app`, which is a prefix of
    * every other page and would otherwise light up for any unknown address.
@@ -70,12 +75,29 @@ export interface NavGroup {
 
 export const APP_ROOT = '/app';
 
+/** The subtitle for a page, in the words that fit this kind of organisation. */
+export function hintFor(entry: NavEntry, kind: OrgKind | undefined): string {
+  return kind === 'HOST' && entry.hostHint ? entry.hostHint : entry.hint;
+}
+
 export const ORG_NAV: NavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    entry: { label: 'Dashboard', to: '/app', phase: '6', hint: 'Collections, arrears and occupancy at a glance', exact: true },
+    entry: { label: 'Dashboard', to: '/app', phase: '6', hint: 'Collections, arrears and occupancy at a glance', hostHint: 'Arrivals, departures and what needs doing today', exact: true },
     children: [],
+  },
+  {
+    id: 'stays',
+    label: 'Short stays',
+    orgKinds: ['HOST'],
+    children: [
+      { label: 'Calendar', to: '/app/calendar', permission: 'bookings:view', phase: 'stays', hint: 'Nightly availability, stays and blocked dates across units' },
+      { label: 'Bookings', to: '/app/bookings', permission: 'bookings:view', phase: 'stays', hint: 'Upcoming, current and past guest stays and requests' },
+      { label: 'Listings', to: '/app/listings', permission: 'listings:view', phase: 'stays', hint: 'Nightly units, photos, pricing and house rules' },
+      { label: 'Guests', to: '/app/guests', permission: 'guests:view', phase: 'stays', hint: 'People who have booked or stayed at your properties' },
+      { label: 'Cleaning', to: '/app/cleaning', permission: 'cleaning:view', phase: 'stays', hint: 'Turnover cleaning tasks after guests check out' },
+    ],
   },
   {
     id: 'landlords',
@@ -93,14 +115,15 @@ export const ORG_NAV: NavGroup[] = [
     label: 'Properties',
     children: [
       { label: 'Properties', to: '/app/properties', permission: 'properties:view', phase: '2', hint: 'Buildings and compounds' },
-      { label: 'Units', to: '/app/units', permission: 'units:view', phase: '2', hint: 'Rentable spaces in each property' },
-      { label: 'Unit setup', to: '/app/unit-categories', permission: 'unit-categories:view', phase: '2', hint: 'Categories, types and features, e.g. Executive · 2 Bedroom · Balcony' },
+      { label: 'Units', to: '/app/units', permission: 'units:view', orgKinds: ['LANDLORD', 'AGENCY'], phase: '2', hint: 'Rentable spaces in each property' },
+      { label: 'Unit setup', to: '/app/unit-categories', permission: 'unit-categories:view', orgKinds: ['LANDLORD', 'AGENCY'], phase: '2', hint: 'Categories, types and features, e.g. Executive · 2 Bedroom · Balcony' },
       { label: 'Maintenance', to: '/app/maintenance', permission: 'maintenance:view', phase: '12', hint: 'Tenant repair requests and unit maintenance' },
     ],
   },
   {
     id: 'tenants',
     label: 'Tenants',
+    orgKinds: ['LANDLORD', 'AGENCY'],
     children: [
       { label: 'Tenants', to: '/app/tenants', permission: 'tenants:view', phase: '2', hint: 'People renting your units' },
       { label: 'Tenancies', to: '/app/tenancies', permission: 'tenancies:view', phase: '2', hint: 'Move-ins, move-outs and occupancy history' },
@@ -110,6 +133,7 @@ export const ORG_NAV: NavGroup[] = [
   {
     id: 'billing',
     label: 'Billing',
+    orgKinds: ['LANDLORD', 'AGENCY'],
     children: [
       { label: 'Invoices', to: '/app/invoices', permission: 'invoices:view', phase: '3', hint: 'Rent and charges billed to tenants' },
       { label: 'Invoice run', to: '/app/invoices/run', permission: 'invoices:view', phase: '3', hint: 'Generate this period’s invoices' },
@@ -121,7 +145,7 @@ export const ORG_NAV: NavGroup[] = [
     id: 'money',
     label: 'Money',
     children: [
-      { label: 'Payments', to: '/app/payments', permission: 'payments:view', phase: '4', hint: 'Money received and how it was allocated' },
+      { label: 'Payments', to: '/app/payments', permission: 'payments:view', orgKinds: ['LANDLORD', 'AGENCY'], phase: '4', hint: 'Money received and how it was allocated' },
       { label: 'Reconciliation', to: '/app/reconciliation', permission: 'reconciliation:view', phase: '5', hint: 'Match M-Pesa and bank transactions to tenants', badge: 'unmatchedInbound' },
       { label: 'Payment channels', to: '/app/payment-channels', permission: 'channels:view', phase: '4', hint: 'Paybills, tills, bank accounts and cash' },
     ],
@@ -135,7 +159,7 @@ export const ORG_NAV: NavGroup[] = [
   {
     id: 'reports',
     label: 'Reports',
-    entry: { label: 'Reports', to: '/app/reports', permission: 'reports:view', phase: '6', hint: 'Property P&L, arrears, aging and occupancy' },
+    entry: { label: 'Reports', to: '/app/reports', permission: 'reports:view', phase: '6', hint: 'Property P&L, arrears, aging and occupancy', hostHint: 'Income, occupancy, expenses and profit per unit' },
     children: [],
   },
   {
@@ -143,6 +167,7 @@ export const ORG_NAV: NavGroup[] = [
     label: 'Settings',
     children: [
       { label: 'Organisation', to: '/app/settings/organization', permission: 'settings:view', phase: '1', hint: 'Name, contacts and defaults' },
+      { label: 'Booking site', to: '/app/settings/site', permission: 'site:view', orgKinds: ['HOST'], phase: 'stays', hint: 'Your guest booking web address, rules and branding' },
       { label: 'Users', to: '/app/settings/users', permission: 'users:view', phase: '1', hint: 'Who can sign in to this organisation' },
       { label: 'Roles', to: '/app/settings/roles', permission: 'roles:view', phase: '1', hint: 'Named sets of permissions' },
       { label: 'Audit log', to: '/app/settings/audit', permission: 'audit:view', phase: '1', hint: 'Who changed what, and when' },
@@ -233,7 +258,11 @@ export interface Destination extends NavEntry {
 /** Every page, flattened in menu order — for routes and the command palette. */
 export function destinations(groups: NavGroup[]): Destination[] {
   return groups.flatMap((group) =>
-    entriesOf(group).map((entry) => ({ ...entry, groupLabel: group.label, orgKinds: group.orgKinds })),
+    entriesOf(group).map((entry) => ({
+      ...entry,
+      groupLabel: group.label,
+      orgKinds: entry.orgKinds ?? group.orgKinds,
+    })),
   );
 }
 
@@ -248,20 +277,21 @@ export function searchDestinations(all: Destination[], term: string): Destinatio
     || d.hint.toLowerCase().includes(needle));
 }
 
-/** Whether an organisation of `kind` has this group at all. Unknown kind = only unrestricted groups. */
-export function availableTo(group: Pick<NavGroup, 'orgKinds'>, kind: OrgKind | null | undefined): boolean {
-  if (!group.orgKinds) return true;
-  return Boolean(kind && group.orgKinds.includes(kind));
+/** Whether an organisation of `kind` has this group or entry at all. Unknown kind = only unrestricted ones. */
+export function availableTo(item: Pick<NavGroup | NavEntry, 'orgKinds'>, kind: OrgKind | null | undefined): boolean {
+  if (!item.orgKinds) return true;
+  return Boolean(kind && item.orgKinds.includes(kind));
 }
 
 /**
  * The navigation a person may see: groups their kind of organisation has, entries whose
- * permission they hold, and only the groups left with something in them. A group that is
- * itself a page keeps its children only if its own page is visible too.
+ * permission and orgKind they hold, and only the groups left with something in them. A group
+ * that is itself a page keeps its children only if its own page is visible too.
  */
 export function filterNav(groups: NavGroup[], permissions: Iterable<string>, orgKind?: OrgKind | null): NavGroup[] {
   const held = new Set(permissions);
-  const allowed = (entry: NavEntry) => !entry.permission || held.has(entry.permission);
+  const allowed = (entry: NavEntry) =>
+    availableTo(entry, orgKind) && (!entry.permission || held.has(entry.permission));
 
   return groups.flatMap((group) => {
     if (!availableTo(group, orgKind)) return [];

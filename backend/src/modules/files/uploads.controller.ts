@@ -26,9 +26,17 @@ class UploadBodyDto {
     'MAINTENANCE_PHOTO',
     'LEASE_DOCUMENT',
     'INSPECTION_PHOTO',
+    'LISTING_PHOTO',
+    'SITE_LOGO',
   ])
   purpose!:
-    'EXPENSE_RECEIPT' | 'METER_PHOTO' | 'MAINTENANCE_PHOTO' | 'LEASE_DOCUMENT' | 'INSPECTION_PHOTO';
+    | 'EXPENSE_RECEIPT'
+    | 'METER_PHOTO'
+    | 'MAINTENANCE_PHOTO'
+    | 'LEASE_DOCUMENT'
+    | 'INSPECTION_PHOTO'
+    | 'LISTING_PHOTO'
+    | 'SITE_LOGO';
 }
 
 /** Streams a stored file inline, never cached by shared caches. */
@@ -62,6 +70,8 @@ export class UploadsController {
             'MAINTENANCE_PHOTO',
             'LEASE_DOCUMENT',
             'INSPECTION_PHOTO',
+            'LISTING_PHOTO',
+            'SITE_LOGO',
           ],
         },
       },

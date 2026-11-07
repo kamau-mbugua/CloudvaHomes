@@ -184,6 +184,13 @@ export class TenanciesService {
 
   async moveIn(dto: CreateTenancyDto) {
     const ctx = orgContext();
+    const org = await this.db.organization.findUnique({
+      where: { id: ctx.orgId },
+      select: { kind: true },
+    });
+    if (org?.kind === 'HOST') {
+      throw AppError.conflict("Short-stay hosts don't have tenancies", 'HOST_ORG_NO_TENANCIES');
+    }
     if (!!dto.tenantId === !!dto.tenant) {
       throw AppError.fieldInvalid('tenantId', 'Choose an existing tenant or add a new one');
     }

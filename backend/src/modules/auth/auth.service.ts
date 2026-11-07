@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { addDays, todayInNairobi } from '../billing/billing-math.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { RolesService } from '../roles/roles.service.js';
+import { DEFAULT_RULES } from '../stays/rules/terms.js';
 import type { RegisterOrganizationDto } from './auth.dto.js';
 import { hashPassword, verifyPassword } from './crypto.js';
 import { authContext } from './decorators.js';
@@ -196,7 +197,19 @@ export class AuthService {
           },
         });
 
-        const roles = await RolesService.seedSystemRoles(tx, org.id);
+        const roles = await RolesService.seedSystemRoles(tx, org.id, org.kind);
+
+        if (org.kind === 'HOST') {
+          await tx.hostSite.create({
+            data: {
+              orgId: org.id,
+              businessName: org.name,
+              rules: DEFAULT_RULES as unknown as object,
+              slug: null,
+              published: false,
+            },
+          });
+        }
 
         const user = await tx.user.create({
           data: {

@@ -46,6 +46,10 @@ const envSchema = z
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     // Public URL of the web app, used in invitation links.
     APP_URL: z.url().default('http://localhost:5173'),
+    // Base domain for short-stay host booking sites ({slug}.{SITE_DOMAIN}).
+    SITE_DOMAIN: z.string().min(1).default('localhost'),
+    // Optional internal URL for the web SPA index.html (used by /public/site-html for OpenGraph tags).
+    WEB_INDEX_URL: z.string().optional(),
 
     // ── Personal data at rest (design §8) ──
     // Field-encryption key ring "keyId:base64(32 bytes),…"; the first key encrypts new values.

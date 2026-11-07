@@ -51,6 +51,7 @@ const expenseCategoryLabel = {
   'TAXES': 'Taxes & levies',
   'INSURANCE': 'Insurance',
   'MANAGEMENT': 'Management fees',
+  'RENT': 'Rent paid to landlord',
   'OTHER': 'Other',
 };
 

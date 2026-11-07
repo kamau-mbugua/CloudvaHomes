@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
-import { useCan } from '../../lib/auth/useAuth';
+import type { PageEnvelope } from '../../lib/api/types';
+import { useCan, useSession } from '../../lib/auth/useAuth';
 import { todayInNairobi } from '../../lib/dates';
 import { minorToInput } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
@@ -27,10 +28,13 @@ import type { Expense } from './types';
 export function ExpenseSheet({ expense, onClose }: { expense?: Expense; onClose: () => void }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const session = useSession();
+  const isHost = session?.activeOrganization?.kind === 'HOST';
   const canSeeProperties = useCan('properties:view');
   const today = todayInNairobi();
   const form = useForm<Exclude<ExpenseField, 'receiptUploadId'>>({
     propertyId: expense?.property.id ?? '',
+    unitId: expense?.unitId ?? expense?.unit?.id ?? '',
     category: expense?.category ?? '',
     name: expense?.name ?? '',
     amount: expense ? minorToInput(expense.amount) : '',
@@ -39,6 +43,16 @@ export function ExpenseSheet({ expense, onClose }: { expense?: Expense; onClose:
     reference: expense?.reference ?? '',
   });
   const { values, errors, set } = form;
+
+  const hostListings = useQuery({
+    queryKey: ['host', 'listings', { propertyId: values.propertyId }],
+    queryFn: () =>
+      api.get<PageEnvelope<{ id: string; unitId: string; title: string; unit: { number: string } }>>(
+        '/host/listings',
+        { propertyId: values.propertyId, pageSize: 100 },
+      ),
+    enabled: isHost && Boolean(values.propertyId),
+  });
   const [receipt, setReceipt] = useState<AttachmentDraft>({ kind: 'keep' });
   const [receiptError, setReceiptError] = useState<string | undefined>();
   const [uploading, setUploading] = useState(false);
@@ -103,11 +117,23 @@ export function ExpenseSheet({ expense, onClose }: { expense?: Expense; onClose:
         <Field id="ex-property" label="Property" error={errors.propertyId}
           hint={!canSeeProperties ? 'Your role can’t list properties.' : undefined}>
           {canSeeProperties ? (
-            <PropertySelect id="ex-property" className="" value={values.propertyId} onChange={(id) => set('propertyId', id)} />
+            <PropertySelect id="ex-property" className="" value={values.propertyId} onChange={(id) => { set('propertyId', id); set('unitId', ''); }} />
           ) : (
             <input id="ex-property" value={expense ? `${expense.property.name} (${expense.property.code})` : ''} disabled />
           )}
         </Field>
+        {isHost ? (
+          <Field id="ex-unit" label="Unit" optional error={errors.unitId} hint="Leave blank to split across the property.">
+            <select id="ex-unit" value={values.unitId} onChange={(e) => set('unitId', e.target.value)} disabled={!values.propertyId}>
+              <option value="">Shared across property</option>
+              {(hostListings.data?.data ?? []).map((l) => (
+                <option key={l.unitId} value={l.unitId}>
+                  {l.title} ({l.unit.number})
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
         <Field id="ex-category" label="Category" error={errors.category}>
           <select id="ex-category" value={values.category} onChange={(e) => set('category', e.target.value)} aria-invalid={Boolean(errors.category)}>
             <option value="">Choose a category…</option>

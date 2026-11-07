@@ -9,7 +9,7 @@ import { CommandPalette } from './CommandPalette';
 import { NotificationBell } from './NotificationBell';
 import { TopRouteProgress } from '../components/Loading';
 import { MenuIcon, MoonIcon, SunIcon } from './icons';
-import { ACCOUNT_ENTRY, ORG_NAV, bestEntry, destinations, filterNav, matchScore } from './navigation';
+import { ACCOUNT_ENTRY, ORG_NAV, bestEntry, destinations, filterNav, hintFor, matchScore } from './navigation';
 import { readStored, writeStored } from '../lib/storage';
 import { useTheme } from '../lib/theme';
 import { ApiError, ORG_SUSPENDED, errorMessage } from '../lib/api/client';
@@ -64,7 +64,9 @@ export function AppShell() {
   const onAccount = matchScore(ACCOUNT_ENTRY, location.pathname) >= 0;
   const title = here?.entry.label ?? (onAccount ? ACCOUNT_ENTRY.label : 'Page not found');
   const subtitle = here
-    ? (here.group.children.length > 0 ? `${here.group.label} · ${here.entry.hint}` : here.entry.hint)
+    ? (here.group.children.length > 0
+      ? `${here.group.label} · ${hintFor(here.entry, session.activeOrganization?.kind)}`
+      : hintFor(here.entry, session.activeOrganization?.kind))
     : onAccount ? ACCOUNT_ENTRY.hint : 'There is nothing at this address.';
 
   const pageTitle = usePageTitleOverride();

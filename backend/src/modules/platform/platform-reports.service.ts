@@ -244,7 +244,7 @@ export class PlatformReportsService {
           const [unitsCount, occupiedUnits, lastRentPay, lastPlatformPay, lastMember] =
             await Promise.all([
               this.db.unit.count({ where: { orgId: o.id } }),
-              this.billing.occupiedUnits(this.db, o.id, todayDate),
+              this.billing.billableUnits(this.db, o.id, todayDate),
               this.db.payment.findFirst({
                 where: { orgId: o.id, amount: { gt: 0n } },
                 orderBy: { receivedAt: 'desc' },
@@ -543,7 +543,7 @@ export class PlatformReportsService {
       }
       const unitsByOrg = new Map<string, number>();
       for (const o of orgs) {
-        unitsByOrg.set(o.id, await this.billing.occupiedUnits(this.db, o.id, todayDate));
+        unitsByOrg.set(o.id, await this.billing.billableUnits(this.db, o.id, todayDate));
       }
 
       const buildRow = (plan: Plan | null, planOrgs: Organization[]) => {
@@ -697,7 +697,7 @@ export class PlatformReportsService {
       const rows = await Promise.all(
         orgs.map(async (o) => {
           const plan = o.planId ? (planMap.get(o.planId) ?? null) : null;
-          const occupiedUnits = await this.billing.occupiedUnits(this.db, o.id, todayDate);
+          const occupiedUnits = await this.billing.billableUnits(this.db, o.id, todayDate);
           const planRate = plan?.pricePerUnit ?? 0n;
           const planMinimum = plan?.minimumMonthly ?? 0n;
           const effective = this.billing.price(o, plan);
@@ -782,7 +782,7 @@ export class PlatformReportsService {
       }
       const unitsByOrg = new Map<string, number>();
       for (const o of orgs) {
-        unitsByOrg.set(o.id, await this.billing.occupiedUnits(this.db, o.id, todayDate));
+        unitsByOrg.set(o.id, await this.billing.billableUnits(this.db, o.id, todayDate));
       }
 
       const summarizeBook = (bookOrgs: Organization[]) => {
