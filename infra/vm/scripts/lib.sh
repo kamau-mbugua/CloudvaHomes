@@ -104,8 +104,19 @@ EOF
   local sum recreate=""
   sum=$( (sha256sum 2>/dev/null || shasum -a 256) < "$ROOT/edge/edge.env" | cut -d' ' -f1)
   [ "$(cat "$ROOT/edge/.env.sum" 2>/dev/null)" = "$sum" ] || recreate="--force-recreate"
-  ( cd "$ROOT/infra/edge" && docker compose up -d --quiet-pull $recreate >/dev/null \
-      && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 ) \
-    || fail "Could not start or reload the edge proxy."
+  ( cd "$ROOT/infra/edge" && docker compose up -d --quiet-pull $recreate >/dev/null ) \
+    || fail "Could not start the edge proxy."
+  # A container that was just (re)started needs a moment before its admin API takes a reload.
+  local tries=0 out=""
+  until out=$( cd "$ROOT/infra/edge" \
+      && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>&1 ); do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 20 ]; then
+      warn "Last reload error: ${out:-none}"
+      ( cd "$ROOT/infra/edge" && docker compose ps caddy && docker compose logs --tail 30 caddy ) || true
+      fail "Could not reload the edge proxy (Caddy did not accept its config)."
+    fi
+    sleep 1
+  done
   echo "$sum" > "$ROOT/edge/.env.sum"
 }
