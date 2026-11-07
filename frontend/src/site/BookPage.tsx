@@ -6,7 +6,7 @@ import {
   type PublicSiteData,
   publicSiteApi,
 } from './api';
-import { bookingErrorMessage, bookingSteps, formatMinorKES, payLabel } from './booking';
+import { STEP_LABELS, bookingErrorMessage, bookingSteps, formatMinorKES, payLabel } from './booking';
 
 interface BookPageProps {
   site: PublicSiteData;
@@ -139,9 +139,12 @@ export function BookPage({ site }: BookPageProps) {
         {stepInfo.order.map((s) => (
           <span
             key={s}
-            className={`site-step ${stepInfo.next === s ? 'is-active' : ''}`}
+            className={`site-step${stepInfo.next === s ? ' is-active' : ''}${
+              stepInfo.order.indexOf(s) < stepInfo.order.indexOf(stepInfo.next) ? ' is-done' : ''
+            }`}
+            aria-current={stepInfo.next === s ? 'step' : undefined}
           >
-            {s}
+            {STEP_LABELS[s]}
           </span>
         ))}
       </div>
@@ -291,10 +294,17 @@ export function BookPage({ site }: BookPageProps) {
                 </div>
                 <p className="site-terms-note">{quote.payWhenText}</p>
                 <p className="site-terms-note">{quote.cancellationText}</p>
+                {!quote.available && quote.problems.length > 0 ? (
+                  <div className="site-alert site-alert--error" role="alert">
+                    {quote.problems.join('. ')}. Please change your dates or guests.
+                  </div>
+                ) : null}
                 <button
                   type="submit"
                   className="site-btn site-btn--primary site-btn--full"
-                  disabled={!hasDates || !hasDetails || !hasVerifiedCode || submitting}
+                  disabled={
+                    !hasDates || !hasDetails || !hasVerifiedCode || !quote.available || submitting
+                  }
                 >
                   {submitting
                     ? 'Submitting…'

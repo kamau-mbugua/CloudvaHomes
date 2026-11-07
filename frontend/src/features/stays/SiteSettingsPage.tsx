@@ -3,10 +3,18 @@ import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
+import { Link } from 'react-router-dom';
 import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { useAuthedBlobUrl } from '../uploads/api';
-import { DEFAULT_STAY_RULES, staysErrorMessage, staysKeys, validateStayRules } from './api';
+import {
+  fromApiRules,
+  guestPaymentWarning,
+  staysErrorMessage,
+  staysKeys,
+  toApiRules,
+  validateStayRules,
+} from './api';
 import { resizeImage } from './resizeImage';
 import { RulesFields } from './RulesFields';
 import type { HostSite, SlugCheckResult, StayRules } from './types';
@@ -15,6 +23,7 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const canUpdate = useCan('site:update');
+  const canManageChannels = useCan('channels:view');
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   const [slug, setSlug] = useState(site.slug ?? '');
@@ -26,7 +35,7 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
   const [checkInTime, setCheckInTime] = useState(site.checkInTime);
   const [checkOutTime, setCheckOutTime] = useState(site.checkOutTime);
   const [houseRules, setHouseRules] = useState(site.houseRules ?? '');
-  const [rules, setRules] = useState<StayRules>(site.rules ?? DEFAULT_STAY_RULES);
+  const [rules, setRules] = useState<StayRules>(() => fromApiRules(site.rules));
   const [localError, setLocalError] = useState<string | null>(null);
 
   const trimmedSlug = slug.trim().toLowerCase();
@@ -91,14 +100,26 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
       checkInTime,
       checkOutTime,
       houseRules: houseRules.trim() || null,
-      rules,
+      rules: toApiRules(rules),
     });
   };
 
   const errMsg = localError ?? (save.isError ? staysErrorMessage(save.error) : null);
 
+  const paymentWarning = guestPaymentWarning(site.guestPayments, rules);
+
   return (
     <div className="pg" style={{ maxWidth: '48rem' }}>
+      {paymentWarning ? (
+        <div className="ad__callout ad__callout--warn" role="alert">
+          <p>{paymentWarning}</p>
+          {canManageChannels ? (
+            <Link className="nx-btn nx-btn--sm" to="/app/payment-channels">
+              Add a paybill or till
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
       <form onSubmit={submit} style={{ display: 'grid', gap: '1.5rem' }}>
         <section
           style={{

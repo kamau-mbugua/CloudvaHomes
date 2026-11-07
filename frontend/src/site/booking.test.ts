@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   bookingErrorMessage,
+  STEP_LABELS,
+  holdTimeLeft,
   bookingSteps,
+  guestStatusLabel,
   isNightDisabled,
   payLabel,
 } from './booking';
@@ -88,5 +91,29 @@ describe('site/booking — steps, labels, date availability, and DATES_TAKEN err
       'Those dates were just taken — pick other dates',
     );
     expect(bookingErrorMessage(new Error('Network down'))).toBe('Network down');
+  });
+
+  it('names every booking step and status in plain English for guests', () => {
+    expect(STEP_LABELS).toEqual({
+      dates: 'Dates',
+      details: 'Your details',
+      code: 'Confirm phone',
+      review: 'Review',
+      pay: 'Pay',
+      sent: 'Request sent',
+    });
+    expect(guestStatusLabel('HELD')).toBe('Waiting for payment');
+    expect(guestStatusLabel('REQUESTED')).toBe('Waiting for the host');
+    expect(guestStatusLabel('CHECKED_IN')).toBe('Checked in');
+    expect(guestStatusLabel('NO_SHOW')).toBe('No-show');
+    expect(guestStatusLabel('SOMETHING_NEW')).toBe('Something new');
+  });
+
+  it('writes the hold time left the way people say it', () => {
+    expect(holdTimeLeft(7197)).toBe('1 h 59 min');
+    expect(holdTimeLeft(3600)).toBe('1 h 0 min');
+    expect(holdTimeLeft(899)).toBe('14:59');
+    expect(holdTimeLeft(5)).toBe('0:05');
+    expect(holdTimeLeft(0)).toBe('0:00');
   });
 });

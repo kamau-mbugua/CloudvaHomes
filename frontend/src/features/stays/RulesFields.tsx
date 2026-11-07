@@ -31,7 +31,7 @@ export function RulesFields({
         cancellation: {
           kind: 'CUSTOM',
           fullRefundDays: 7,
-          partialRefundDays: 2,
+          partialRefundDays: 0,
           partialPercent: 50,
         },
       });
@@ -159,7 +159,7 @@ export function RulesFields({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
           <div className="au__field">
             <div className="au__labelrow">
-              <label htmlFor="rules-full-days">Full refund (days before)</label>
+              <label htmlFor="rules-full-days">Full refund if cancelled at least (days before)</label>
             </div>
             <input
               id="rules-full-days"
@@ -182,30 +182,7 @@ export function RulesFields({
           </div>
           <div className="au__field">
             <div className="au__labelrow">
-              <label htmlFor="rules-partial-days">Partial refund (days before)</label>
-            </div>
-            <input
-              id="rules-partial-days"
-              className="au__input"
-              type="number"
-              min={0}
-              max={90}
-              disabled={disabled}
-              value={value.cancellation.partialRefundDays}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  cancellation: {
-                    ...(value.cancellation as Extract<CancellationRules, { kind: 'CUSTOM' }>),
-                    partialRefundDays: Number(e.target.value),
-                  },
-                })
-              }
-            />
-          </div>
-          <div className="au__field">
-            <div className="au__labelrow">
-              <label htmlFor="rules-partial-pct">Partial refund (%)</label>
+              <label htmlFor="rules-partial-pct">Refund after that (%)</label>
             </div>
             <input
               id="rules-partial-pct"

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_error.dart';
+import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import '../staff/staff_widgets.dart';
 import 'host_api.dart';
@@ -29,6 +30,8 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
   String _paymentKind = 'FULL_UPFRONT';
   String _cancelKind = 'MODERATE';
   String? _address;
+  bool? _guestCanPay;
+  StayRules _loadedRules = const StayRules();
   String? _slugStatus;
   bool _loading = true;
   bool _saving = false;
@@ -69,6 +72,8 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
       _paymentKind = site.rules.payment.kind;
       _cancelKind = site.rules.cancellation.kind;
       _address = site.address;
+      _guestCanPay = site.guestCanPay;
+      _loadedRules = site.rules;
     } on ApiError catch (e) {
       _error = e.message;
     } finally {
@@ -128,8 +133,14 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
             : _houseRules.text.trim(),
         'rules': StayRules(
           bookingMode: _bookingMode,
-          payment: StayPaymentRule(kind: _paymentKind),
-          cancellation: StayCancelRule(kind: _cancelKind),
+          // Keep deposit / custom-policy details set elsewhere (e.g. on the web) when only
+          // the kind is shown here and it didn't change.
+          payment: _loadedRules.payment.kind == _paymentKind
+              ? _loadedRules.payment
+              : StayPaymentRule(kind: _paymentKind),
+          cancellation: _loadedRules.cancellation.kind == _cancelKind
+              ? _loadedRules.cancellation
+              : StayCancelRule(kind: _cancelKind),
         ).toJson(),
       });
       _address = updated.address;
@@ -155,6 +166,11 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
               children: [
                 if (_error != null) ...[
                   ErrorBox(_error!),
+                  const SizedBox(height: 12),
+                ],
+                if (guestPaymentWarning(_guestCanPay, _paymentKind)
+                    case final warning?) ...[
+                  _PaymentWarning(warning),
                   const SizedBox(height: 12),
                 ],
                 TextField(
@@ -322,6 +338,39 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// Guests can't pay this host yet (no paybill/till, no M-Pesa prompt) and money is due upfront.
+class _PaymentWarning extends StatelessWidget {
+  const _PaymentWarning(this.message);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: HodiColors.warningSoft,
+        borderRadius: BorderRadius.circular(10),
+        border: const Border(
+          left: BorderSide(color: HodiColors.warning, width: 3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: HodiColors.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$message Add one on the web under Money → Payment channels.',
+              style: const TextStyle(color: HodiColors.warning, height: 1.4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

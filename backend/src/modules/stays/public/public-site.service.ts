@@ -333,12 +333,29 @@ export class PublicSiteService {
       throw AppError.notFound('Listing');
     }
 
+    const canPayInApp = (await this.findDarajaChannel(site.orgId)) !== null;
     return runWithContext(emptyContext({ orgId: site.orgId }), async () => {
-      const q = await this.bookings.quoteForApi(listing.id, dto.checkIn, dto.checkOut, dto.guests);
+      const q = await this.bookings.quoteForApi(
+        listing.id,
+        dto.checkIn,
+        dto.checkOut,
+        dto.guests,
+        site.orgId,
+      );
+      // The flat shape the guest site reads (frontend/src/site/api.ts PublicQuoteResponse).
       return {
-        ...q,
+        nights: q.quote.nights,
+        lines: q.quote.lines,
+        total: q.quote.total,
+        dueNow: q.dueNow,
+        balanceDueOn: q.balanceDueOn,
+        payWhen: q.rules.payWhen,
         payWhenText: describePayWhen(q.rules),
         cancellationText: describeCancellation(q.rules),
+        bookingMode: q.rules.bookingMode,
+        canPayInApp,
+        available: q.available,
+        problems: q.problems,
       };
     });
   }

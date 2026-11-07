@@ -113,21 +113,58 @@ class StayRules {
   final StayPaymentRule payment;
   final StayCancelRule cancellation;
 
-  factory StayRules.fromJson(Map<String, dynamic> j) => StayRules(
-    bookingMode: (j['bookingMode'] as String?) ?? 'INSTANT',
-    payment: j['payment'] is Map<String, dynamic>
-        ? StayPaymentRule.fromJson(j['payment'] as Map<String, dynamic>)
-        : const StayPaymentRule(kind: 'FULL_UPFRONT'),
-    cancellation: j['cancellation'] is Map<String, dynamic>
-        ? StayCancelRule.fromJson(j['cancellation'] as Map<String, dynamic>)
-        : const StayCancelRule(kind: 'MODERATE'),
-  );
+  /// Reads the API's rules (backend rules/terms.ts StayRules: flat `payWhen`, `cancellation`
+  /// strings), or a partial listing override; gaps fall back to the defaults.
+  factory StayRules.fromJson(Map<String, dynamic> j) {
+    final payWhen = j['payWhen'] as String?;
+    final balanceBefore = j['balanceDue'] == 'BEFORE_CHECKIN';
+    final cancel = (j['cancellation'] as String?) ?? 'MODERATE';
+    return StayRules(
+      bookingMode: (j['bookingMode'] as String?) ?? 'INSTANT',
+      payment: switch (payWhen) {
+        'DEPOSIT' => StayPaymentRule(
+          kind: 'DEPOSIT',
+          depositPercent: (j['depositPercent'] as num?)?.toInt() ?? 50,
+          balanceDueDaysBefore: balanceBefore
+              ? (j['balanceDaysBefore'] as num?)?.toInt() ?? 0
+              : 0,
+        ),
+        'ON_ARRIVAL' => const StayPaymentRule(kind: 'ON_ARRIVAL'),
+        _ => const StayPaymentRule(kind: 'FULL_UPFRONT'),
+      },
+      cancellation: cancel == 'CUSTOM'
+          ? StayCancelRule(
+              kind: 'CUSTOM',
+              fullRefundDays: (j['customFullRefundDays'] as num?)?.toInt() ?? 5,
+              partialPercent: (j['customLatePercent'] as num?)?.toInt() ?? 50,
+            )
+          : StayCancelRule(kind: cancel),
+    );
+  }
 
-  Map<String, Object?> toJson() => {
-    'bookingMode': bookingMode,
-    'payment': payment.toJson(),
-    'cancellation': cancellation.toJson(),
-  };
+  /// The API's rules shape. A custom policy is "full refund if cancelled at least
+  /// [StayCancelRule.fullRefundDays] days before, otherwise [StayCancelRule.partialPercent]%".
+  Map<String, Object?> toJson() {
+    final isDeposit = payment.kind == 'DEPOSIT';
+    final isCustom = cancellation.kind == 'CUSTOM';
+    return {
+      'bookingMode': bookingMode,
+      'payWhen': switch (payment.kind) {
+        'DEPOSIT' => 'DEPOSIT',
+        'ON_ARRIVAL' => 'ON_ARRIVAL',
+        _ => 'FULL',
+      },
+      'depositPercent': isDeposit ? payment.depositPercent : null,
+      'depositFixed': null,
+      'balanceDue': isDeposit && payment.balanceDueDaysBefore > 0
+          ? 'BEFORE_CHECKIN'
+          : 'ON_ARRIVAL',
+      'balanceDaysBefore': isDeposit ? payment.balanceDueDaysBefore : 0,
+      'cancellation': cancellation.kind,
+      'customFullRefundDays': isCustom ? cancellation.fullRefundDays : null,
+      'customLatePercent': isCustom ? cancellation.partialPercent : null,
+    };
+  }
 }
 
 class HostSite {
@@ -145,6 +182,7 @@ class HostSite {
     required this.checkInTime,
     required this.checkOutTime,
     required this.address,
+    this.guestCanPay,
   });
 
   final String? slug;
@@ -160,6 +198,9 @@ class HostSite {
   final String checkInTime;
   final String checkOutTime;
   final String? address;
+
+  /// Whether guests have a way to pay (paybill/till or M-Pesa prompt); null when unknown.
+  final bool? guestCanPay;
 
   factory HostSite.fromJson(Map<String, dynamic> j) => HostSite(
     slug: j['slug'] as String?,
@@ -177,7 +218,20 @@ class HostSite {
     checkInTime: (j['checkInTime'] as String?) ?? '14:00',
     checkOutTime: (j['checkOutTime'] as String?) ?? '11:00',
     address: j['address'] as String?,
+    guestCanPay: j['guestPayments'] is Map<String, dynamic>
+        ? (j['guestPayments']['paybill'] == true ||
+              j['guestPayments']['mpesaPrompt'] == true)
+        : null,
   );
+}
+
+/// Warning for site settings when guests have nothing to pay with but the host asks for money
+/// upfront (those bookings are held for 2 hours, then released). Null = nothing to warn about.
+String? guestPaymentWarning(bool? guestCanPay, String paymentKind) {
+  if (guestCanPay != false || paymentKind == 'ON_ARRIVAL') return null;
+  return "Guests can't pay you yet. Add an M-Pesa paybill or till so guests can pay "
+      'when they book. Until then, bookings that need payment upfront are held for '
+      '2 hours and then released.';
 }
 
 class ListingPhoto {

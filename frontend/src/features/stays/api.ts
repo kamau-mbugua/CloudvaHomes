@@ -1,5 +1,5 @@
 import { ApiError } from '../../lib/api/client';
-import type { StayRules } from './types';
+import type { ApiStayRules, GuestPayments, StayRules } from './types';
 
 export const DEFAULT_STAY_RULES: StayRules = {
   bookingMode: 'INSTANT',
@@ -83,3 +83,58 @@ export const COMMON_AMENITIES = [
   '24-hour security',
   'Elevator',
 ] as const;
+
+/** Form rules → the API's rules (backend StayRules). */
+export function toApiRules(r: StayRules): ApiStayRules {
+  const p = r.payment;
+  const c = r.cancellation;
+  return {
+    bookingMode: r.bookingMode,
+    payWhen: p.kind === 'FULL_UPFRONT' ? 'FULL' : p.kind,
+    depositPercent: p.kind === 'DEPOSIT' ? p.depositPercent : null,
+    depositFixed: null,
+    balanceDue: p.kind === 'DEPOSIT' && p.balanceDueDaysBefore > 0 ? 'BEFORE_CHECKIN' : 'ON_ARRIVAL',
+    balanceDaysBefore: p.kind === 'DEPOSIT' ? p.balanceDueDaysBefore : 0,
+    cancellation: c.kind,
+    customFullRefundDays: c.kind === 'CUSTOM' ? c.fullRefundDays : null,
+    customLatePercent: c.kind === 'CUSTOM' ? c.partialPercent : null,
+  };
+}
+
+/** The API's rules (or a partial listing override) → form rules, filling gaps with defaults. */
+export function fromApiRules(a: Partial<ApiStayRules> | null | undefined): StayRules {
+  if (!a) return DEFAULT_STAY_RULES;
+  const payment: StayRules['payment'] =
+    a.payWhen === 'DEPOSIT'
+      ? {
+          kind: 'DEPOSIT',
+          depositPercent: a.depositPercent ?? 50,
+          balanceDueDaysBefore: a.balanceDue === 'BEFORE_CHECKIN' ? (a.balanceDaysBefore ?? 0) : 0,
+        }
+      : a.payWhen === 'ON_ARRIVAL'
+        ? { kind: 'ON_ARRIVAL' }
+        : { kind: 'FULL_UPFRONT' };
+  const cancellation: StayRules['cancellation'] =
+    a.cancellation === 'CUSTOM'
+      ? {
+          kind: 'CUSTOM',
+          fullRefundDays: a.customFullRefundDays ?? 7,
+          partialRefundDays: 0,
+          partialPercent: a.customLatePercent ?? 0,
+        }
+      : { kind: a.cancellation ?? DEFAULT_STAY_RULES.cancellation.kind } as StayRules['cancellation'];
+  return { bookingMode: a.bookingMode ?? DEFAULT_STAY_RULES.bookingMode, payment, cancellation };
+}
+
+/**
+ * Warning for Site settings when guests have nothing to pay with but the host asks for money
+ * upfront: those bookings are held for 2 hours, then released. Paying on arrival needs no warning.
+ */
+export function guestPaymentWarning(
+  payments: GuestPayments | undefined,
+  rules: StayRules,
+): string | null {
+  if (!payments || payments.paybill || payments.mpesaPrompt) return null;
+  if (rules.payment.kind === 'ON_ARRIVAL') return null;
+  return "Guests can't pay you yet. Add an M-Pesa paybill or till so guests can pay when they book. Until then, bookings that need payment upfront are held for 2 hours and then released.";
+}

@@ -572,4 +572,31 @@ describe('Stays — Public booking site API (e2e)', () => {
     expect(row.status).toBe('CONFIRMED');
     expect(row.infoSentAt).not.toBeNull();
   });
+
+  it('quotes a stay for a guest who is not signed in', async () => {
+    const { listing } = await setUpPublishedSite({ withMpesa: false });
+    const res = check(
+      await t
+        .http()
+        .post(`/api/v1/public/sites/cozy-homes/listings/${listing.id}/quote`)
+        .send({ checkIn: '2027-04-01', checkOut: '2027-04-03', guests: 2 }),
+      200,
+    ).data;
+    // The flat shape the guest site reads (site/api.ts PublicQuoteResponse).
+    // 2 nights x 3,000 + 500 cleaning
+    expect(res).toMatchObject({
+      nights: 2,
+      total: String(KES(6500)),
+      dueNow: String(KES(6500)),
+      payWhen: 'FULL',
+      bookingMode: 'INSTANT',
+      canPayInApp: false,
+      available: true,
+      problems: [],
+    });
+    expect(res.lines.map((l: { kind: string }) => l.kind)).toEqual(['NIGHT', 'NIGHT', 'CLEANING']);
+    expect(res.payWhenText).toBeTruthy();
+    expect(res.cancellationText).toBeTruthy();
+    expect(res.rules).toBeUndefined();
+  });
 });

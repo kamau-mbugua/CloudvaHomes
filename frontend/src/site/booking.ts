@@ -6,6 +6,44 @@ export function formatMinorKES(minor: string | number): string {
 
 export type BookingStepId = 'dates' | 'details' | 'code' | 'review' | 'pay' | 'sent';
 
+export const STEP_LABELS: Record<BookingStepId, string> = {
+  dates: 'Dates',
+  details: 'Your details',
+  code: 'Confirm phone',
+  review: 'Review',
+  pay: 'Pay',
+  sent: 'Request sent',
+};
+
+const GUEST_STATUS: Record<string, string> = {
+  HELD: 'Waiting for payment',
+  REQUESTED: 'Waiting for the host',
+  CONFIRMED: 'Confirmed',
+  CHECKED_IN: 'Checked in',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+  EXPIRED: 'Expired',
+  DECLINED: 'Declined',
+  NO_SHOW: 'No-show',
+};
+
+/** What a guest sees for a booking status: plain words, never the raw code. */
+export function guestStatusLabel(status: string): string {
+  const known = GUEST_STATUS[status];
+  if (known) return known;
+  const words = status.toLowerCase().replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Hold countdown: "1 h 59 min" for an hour or more, "14:59" under an hour. */
+export function holdTimeLeft(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h} h ${m} min`;
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
 export interface BookingStepState {
   hasDates: boolean;
   hasDetails: boolean;

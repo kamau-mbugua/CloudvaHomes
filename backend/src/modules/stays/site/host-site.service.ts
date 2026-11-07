@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { withoutOrgScope } from '../../../common/context/request-context.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { ENV } from '../../../config/config.module.js';
@@ -13,7 +13,17 @@ import { UploadsService } from '../../files/uploads.service.js';
 import { assertHostOrg } from '../host-org.js';
 import { slugProblem } from '../rules/slug.js';
 import { DEFAULT_RULES, rulesProblem, type StayRules } from '../rules/terms.js';
+import type { WrapperType } from '../../../common/di/wrapper-type.js';
+import { DarajaConfigService } from '../../mpesa/daraja-config.service.js';
 import type { UpdateHostSiteDto } from './host-site.dto.js';
+
+/** What guests can use to pay this host. Neither = bookings needing money upfront expire. */
+export interface GuestPayments {
+  /** An active M-Pesa paybill or till with a number guests can pay to. */
+  paybill: boolean;
+  /** The in-app M-Pesa prompt is set up (Daraja credentials, passkey, callback). */
+  mpesaPrompt: boolean;
+}
 
 const REDIRECT_RETENTION_MS = 30 * 86_400_000;
 
@@ -24,7 +34,26 @@ export class HostSiteService {
     @Inject(ENV) private readonly env: Env,
     private readonly audit: AuditService,
     private readonly uploads: UploadsService,
+    @Inject(forwardRef(() => DarajaConfigService))
+    private readonly darajaConfig: WrapperType<DarajaConfigService>,
   ) {}
+
+  private async guestPayments(orgId: string): Promise<GuestPayments> {
+    const channels = await this.db.paymentChannel.findMany({
+      where: { orgId, kind: { in: ['MPESA_PAYBILL', 'MPESA_TILL'] }, status: 'ACTIVE' },
+    });
+    return {
+      paybill: channels.some((c) => !!c.shortcode),
+      mpesaPrompt: channels.some((c) => {
+        if (!c.shortcode || !c.callbackToken || !c.darajaEnv || !c.secretsEnc) return false;
+        return !!this.darajaConfig.credentials(c)?.passkey;
+      }),
+    };
+  }
+
+  private async viewWithPayments(s: HostSite) {
+    return { ...this.toView(s), guestPayments: await this.guestPayments(s.orgId) };
+  }
 
   private toView(s: HostSite) {
     return {
@@ -88,7 +117,7 @@ export class HostSiteService {
     const { orgId } = orgContext();
     await assertHostOrg(this.db, orgId);
     const site = await this.ensureSite(orgId);
-    return this.toView(site);
+    return this.viewWithPayments(site);
   }
 
   async checkSlug(rawSlug: string) {
@@ -210,7 +239,7 @@ export class HostSiteService {
         );
         return row;
       });
-      return this.toView(updated);
+      return this.viewWithPayments(updated);
     } catch (e) {
       if (violatesUnique(e, 'slug')) {
         throw AppError.conflict('That web address is already taken', 'SLUG_TAKEN');
@@ -249,6 +278,6 @@ export class HostSiteService {
       );
       return row;
     });
-    return this.toView(updated);
+    return this.viewWithPayments(updated);
   }
 }

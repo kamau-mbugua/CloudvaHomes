@@ -140,6 +140,13 @@
   max-width: 64ch;
 }
 
+/* Something the person should fix soon (e.g. guests can't pay a host yet): warning colours,
+   with the fixing button beside the words. */
+.ad__callout--warn {
+  border-left-color: var(--warning);
+  background: var(--warning-soft);
+}
+
 /* The same block used to EXPLAIN rather than offer — no button beside the words, so it
    reads as a paragraph and is warned rather than branded. */
 .ad__callout--note {

@@ -267,4 +267,33 @@ describe('Host site settings & listings API (e2e)', () => {
     const res = await t.http().get('/api/v1/host/listings').set(auth(landlord)).expect(409);
     expect(res.body.error.code).toBe('HOST_ONLY');
   });
+
+  it('tells the host whether guests can pay: no channel, then a paybill', async () => {
+    const { owner } = await onboardOrg(t, admin, {
+      name: 'Pay Ready Stays',
+      ownerEmail: 'host-payready@example.invalid',
+      ownerPhone: '+254700000405',
+      kind: 'HOST',
+    });
+    const before = await t.http().get('/api/v1/host/site').set(auth(owner)).expect(200);
+    expect(before.body.data.guestPayments).toEqual({ paybill: false, mpesaPrompt: false });
+
+    await t
+      .http()
+      .post('/api/v1/payment-channels')
+      .set(auth(owner))
+      .send({ kind: 'MPESA_PAYBILL', name: 'Stays Paybill', shortcode: '600333' })
+      .expect(201);
+
+    const after = await t.http().get('/api/v1/host/site').set(auth(owner)).expect(200);
+    expect(after.body.data.guestPayments).toEqual({ paybill: true, mpesaPrompt: false });
+
+    const patched = await t
+      .http()
+      .patch('/api/v1/host/site')
+      .set(auth(owner))
+      .send({ businessName: 'Pay Ready Stays' })
+      .expect(200);
+    expect(patched.body.data.guestPayments).toEqual({ paybill: true, mpesaPrompt: false });
+  });
 });

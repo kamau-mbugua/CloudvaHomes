@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { type PublicBookingDetail, publicSiteApi } from './api';
-import { bookingErrorMessage, digitsOnly, formatMinorKES } from './booking';
+import {
+  bookingErrorMessage,
+  digitsOnly,
+  formatMinorKES,
+  guestStatusLabel,
+  holdTimeLeft,
+} from './booking';
 
 export function BookingPage() {
   const { token = '' } = useParams<{ token: string }>();
@@ -126,8 +132,6 @@ export function BookingPage() {
   const holdRemainingSec = booking.holdExpiresAt
     ? Math.max(0, Math.floor((new Date(booking.holdExpiresAt).getTime() - nowMs) / 1000))
     : 0;
-  const holdMins = Math.floor(holdRemainingSec / 60);
-  const holdSecs = holdRemainingSec % 60;
   const owedBig = BigInt(booking.owed || '0');
   const canCancel = ['REQUESTED', 'HELD', 'CONFIRMED'].includes(booking.status);
   const waDigits = digitsOnly(booking.contact.whatsappPhone);
@@ -144,7 +148,7 @@ export function BookingPage() {
           </p>
         </div>
         <span className={`site-status-pill site-status-pill--${booking.status.toLowerCase()}`}>
-          {booking.status.replace('_', ' ')}
+          {guestStatusLabel(booking.status)}
         </span>
       </div>
 
@@ -164,7 +168,7 @@ export function BookingPage() {
         <div className="site-hold-banner">
           <strong>Hold active:</strong> Complete payment of {formatMinorKES(booking.dueNow)} within{' '}
           <span className="site-countdown">
-            {holdMins}:{String(holdSecs).padStart(2, '0')}
+            {holdTimeLeft(holdRemainingSec)}
           </span>{' '}
           to confirm your dates.
         </div>

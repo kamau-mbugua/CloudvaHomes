@@ -240,6 +240,11 @@ export function UnitPage({ site }: UnitPageProps) {
                 </div>
               </div>
             )}
+            {quote && !quote.available && quote.problems.length > 0 ? (
+              <p className="site-alert site-alert--error" role="alert">
+                {quote.problems.join('. ')}.
+              </p>
+            ) : null}
 
             <button
               type="button"

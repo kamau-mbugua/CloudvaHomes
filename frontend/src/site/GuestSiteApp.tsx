@@ -54,22 +54,47 @@ export default function GuestSiteApp({ slug }: GuestSiteAppProps) {
   if (loading) {
     return (
       <div className="site-shell">
-        <div className="site-loading">Loading…</div>
+        <div className="site-loading" role="status">
+          <span className="site-spinner" aria-hidden="true" />
+          Loading…
+        </div>
       </div>
     );
   }
 
   if (notFound || !site) {
     return (
-      <div className="site-shell site-not-found">
-        <div className="site-not-found__card">
-          <h1>Site not found</h1>
-          <p>
-            No published booking site is available at <strong>{window.location.hostname}</strong>.
-          </p>
-        </div>
+      <div className="site-shell">
+        <main className="site-not-found">
+          <div className="site-not-found__card">
+            <div className="site-not-found__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 10.5 12 3l9 7.5" />
+                <path d="M5 9.5V20h14V9.5" />
+                <path d="M10 20v-5h4v5" />
+              </svg>
+            </div>
+            <h1>We couldn't find this booking site</h1>
+            <p className="site-not-found__address">{window.location.hostname}</p>
+            <p>
+              The address may be mistyped, or the host may have paused or renamed their site.
+            </p>
+            <ul className="site-not-found__tips">
+              <li>Check the spelling of the link you were sent.</li>
+              <li>Ask the host to send you their booking link again.</li>
+            </ul>
+            <p className="site-not-found__host">
+              Run short stays?{' '}
+              <a href="https://kodihub.co.ke" rel="noreferrer">
+                Get your own booking site with KodiHub
+              </a>
+            </p>
+          </div>
+        </main>
         <footer className="site-footer">
-          <span>Powered by KodiHub</span>
+          <div className="site-footer__inner">
+            <span className="site-footer__powered">Powered by KodiHub</span>
+          </div>
         </footer>
       </div>
     );

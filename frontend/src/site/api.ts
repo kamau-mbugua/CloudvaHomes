@@ -94,6 +94,9 @@ export interface PublicQuoteResponse {
   cancellationText: string;
   bookingMode: 'INSTANT' | 'REQUEST';
   canPayInApp: boolean;
+  /** False when the dates can't be booked as chosen; `problems` says why, in plain words. */
+  available: boolean;
+  problems: string[];
 }
 
 export interface PublicBookingDetail {

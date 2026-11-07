@@ -217,11 +217,16 @@ export class BookingsService {
     return effectiveRules(DEFAULT_RULES, site.rules as unknown as Partial<StayRules>);
   }
 
+  /**
+   * Price and availability for a stay. `orgId` defaults to the signed-in staff member's
+   * organisation; the public booking site passes the host's (guests are never signed in).
+   */
   async quote(
     listingId: string,
     checkIn: string,
     checkOut: string,
     guests: number,
+    orgId: string = orgContext().orgId,
   ): Promise<{
     quote: Quote;
     rules: StayRules;
@@ -230,7 +235,6 @@ export class BookingsService {
     available: boolean;
     problems: string[];
   }> {
-    const { orgId } = orgContext();
     await assertHostOrg(this.db, orgId);
 
     const checkInDate = parseDateOnly(checkIn);
@@ -300,8 +304,14 @@ export class BookingsService {
     };
   }
 
-  async quoteForApi(listingId: string, checkIn: string, checkOut: string, guests: number) {
-    const res = await this.quote(listingId, checkIn, checkOut, guests);
+  async quoteForApi(
+    listingId: string,
+    checkIn: string,
+    checkOut: string,
+    guests: number,
+    orgId: string = orgContext().orgId,
+  ) {
+    const res = await this.quote(listingId, checkIn, checkOut, guests, orgId);
     return {
       quote: {
         nights: res.quote.nights,

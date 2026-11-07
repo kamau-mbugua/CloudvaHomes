@@ -10,9 +10,10 @@ import { ConfirmDialog } from '../../components/ConfirmDelete';
 import { usePropertyOptions } from '../portfolio/api';
 import {
   COMMON_AMENITIES,
-  DEFAULT_STAY_RULES,
+  fromApiRules,
   staysErrorMessage,
   staysKeys,
+  toApiRules,
   validateStayRules,
 } from './api';
 import { formatKES } from '../../lib/money';
@@ -69,8 +70,8 @@ function ListingEditorForm({
   const [useDefaultRules, setUseDefaultRules] = useState(
     existing ? existing.rulesOverride === null : true,
   );
-  const [rulesOverride, setRulesOverride] = useState<StayRules>(
-    existing?.rulesOverride ?? DEFAULT_STAY_RULES,
+  const [rulesOverride, setRulesOverride] = useState<StayRules>(() =>
+    fromApiRules(existing?.rulesOverride),
   );
   const [published, setPublished] = useState(existing?.published ?? false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -159,7 +160,7 @@ function ListingEditorForm({
       cleaningFee: cleaningMinor,
       weeklyDiscountBps: weeklyDiscountPct > 0 ? weeklyDiscountPct * 100 : null,
       checkInInstructions: checkInInstructions.trim() || null,
-      rulesOverride: useDefaultRules ? null : rulesOverride,
+      rulesOverride: useDefaultRules ? null : toApiRules(rulesOverride),
       published,
     };
     save.mutate(payload);

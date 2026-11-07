@@ -20,6 +20,28 @@ export interface StayRules {
   cancellation: CancellationRules;
 }
 
+/**
+ * Rules as the API stores and returns them (backend rules/terms.ts StayRules). The forms use
+ * the nested StayRules above; convert with toApiRules / fromApiRules in ./api.
+ */
+export interface ApiStayRules {
+  bookingMode: 'INSTANT' | 'REQUEST';
+  payWhen: 'FULL' | 'DEPOSIT' | 'ON_ARRIVAL';
+  depositPercent?: number | null;
+  depositFixed?: string | null;
+  balanceDue?: 'BEFORE_CHECKIN' | 'ON_ARRIVAL';
+  balanceDaysBefore?: number;
+  cancellation: 'FLEXIBLE' | 'MODERATE' | 'STRICT' | 'CUSTOM';
+  customFullRefundDays?: number | null;
+  customLatePercent?: number | null;
+}
+
+/** What guests can use to pay this host (from GET /host/site). */
+export interface GuestPayments {
+  paybill: boolean;
+  mpesaPrompt: boolean;
+}
+
 export interface HostSite {
   slug: string | null;
   published: boolean;
@@ -29,11 +51,12 @@ export interface HostSite {
   logoUrl: string | null;
   contactPhone: string | null;
   whatsappPhone: string | null;
-  rules: StayRules;
+  rules: ApiStayRules;
   houseRules: string | null;
   checkInTime: string;
   checkOutTime: string;
   address: string | null;
+  guestPayments?: GuestPayments;
 }
 
 export interface SlugCheckResult {
@@ -82,7 +105,7 @@ export interface Listing {
   weeklyDiscountBps: number | null;
   minNights: number;
   checkInInstructions: string | null;
-  rulesOverride: StayRules | null;
+  rulesOverride: Partial<ApiStayRules> | null;
   published: boolean;
   coverPhotoId: string | null;
   coverUploadId: string | null;
@@ -122,7 +145,7 @@ export interface BookingQuoteResponse {
     lines: QuoteLine[];
     total: string;
   };
-  rules: StayRules;
+  rules: ApiStayRules;
   dueNow: string;
   balanceDueOn: string | null;
   available: boolean;
@@ -161,7 +184,7 @@ export interface Booking {
   holdExpiresAt: string | null;
   requestExpiresAt: string | null;
   balanceDueOn: string | null;
-  rules: StayRules;
+  rules: ApiStayRules;
   guestNote: string | null;
   hostNote: string | null;
   cancelledAt: string | null;

@@ -613,3 +613,358 @@
   justify-content: space-between;
   gap: 0.75rem;
 }
+
+/* ── States: loading, empty, site not found ─────────────────────────────── */
+.site-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 40vh;
+  color: #78716c;
+  font-size: 0.95rem;
+}
+
+.site-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #d6d3d1;
+  border-top-color: #1f4d3a;
+  animation: site-spin 0.8s linear infinite;
+}
+
+@keyframes site-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-spinner { animation: none; }
+}
+
+.site-empty {
+  max-width: 480px;
+  margin: 3rem auto;
+  padding: 2rem 1.5rem;
+  background: #ffffff;
+  border: 1px solid #e7e2da;
+  border-radius: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.site-empty p {
+  margin: 0;
+  font-size: 1rem;
+  color: #44403c;
+}
+
+.site-not-found {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.site-not-found__card {
+  width: 100%;
+  max-width: 460px;
+  background: #ffffff;
+  border: 1px solid #e7e2da;
+  border-radius: 20px;
+  padding: 2.25rem 1.75rem;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(28, 25, 23, 0.06);
+}
+
+.site-not-found__icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 1.1rem;
+  border-radius: 16px;
+  background: #ecfdf5;
+  color: #1f4d3a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-not-found__card h1 {
+  font-size: 1.35rem;
+  line-height: 1.3;
+  margin: 0 0 0.5rem;
+}
+
+.site-not-found__address {
+  display: inline-block;
+  margin: 0 0 1rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  background: #f5f5f4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: #44403c;
+  word-break: break-all;
+}
+
+.site-not-found__card > p {
+  color: #57534e;
+  line-height: 1.55;
+  margin: 0 0 1rem;
+}
+
+.site-not-found__tips {
+  text-align: left;
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem 0.9rem 2rem;
+  background: #faf8f5;
+  border-radius: 12px;
+  color: #44403c;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.site-not-found__host {
+  font-size: 0.85rem;
+  color: #78716c;
+  border-top: 1px solid #f0ece6;
+  padding-top: 1rem;
+  margin: 0 !important;
+}
+
+.site-not-found__host a {
+  color: #1f4d3a;
+  font-weight: 600;
+}
+
+/* ── Text and links ──────────────────────────────────────────────────────── */
+.site-muted {
+  color: #78716c;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.site-terms-note {
+  color: #57534e;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0.4rem 0 0;
+}
+
+.site-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #57534e;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+  margin-bottom: 0.75rem;
+}
+
+.site-back-link:hover {
+  color: #1f4d3a;
+  text-decoration: underline;
+}
+
+/* ── Header / footer bits ────────────────────────────────────────────────── */
+.site-brand__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.site-btn--sm {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
+}
+
+.site-footer__powered {
+  color: #a8a29e;
+}
+
+/* ── Unit page ───────────────────────────────────────────────────────────── */
+.site-unit__top {
+  margin-bottom: 1.25rem;
+}
+
+.site-unit__title,
+.site-book__title,
+.site-booking-title {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  line-height: 1.2;
+  margin: 0.25rem 0 0.4rem;
+}
+
+.site-unit__subtitle {
+  color: #57534e;
+  margin: 0;
+}
+
+.site-gallery__main {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 16px;
+  display: block;
+}
+
+.site-gallery__thumb {
+  width: 84px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.site-quote-card__price {
+  font-size: 1.05rem;
+  margin: 0 0 0.6rem;
+}
+
+.site-sticky-bar__price {
+  font-weight: 700;
+}
+
+.site-sticky-bar__sub {
+  font-size: 0.8rem;
+  color: #78716c;
+}
+
+/* ── Booking flow ────────────────────────────────────────────────────────── */
+.site-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 1.25rem;
+  padding: 0;
+  counter-reset: site-step;
+}
+
+.site-step {
+  counter-increment: site-step;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem 0.35rem 0.4rem;
+  border-radius: 999px;
+  background: #f5f5f4;
+  color: #78716c;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.site-step::before {
+  content: counter(site-step);
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e7e5e4;
+  color: #57534e;
+  font-size: 0.75rem;
+}
+
+.site-step.is-done {
+  background: #ecfdf5;
+  color: #1f4d3a;
+}
+
+.site-step.is-done::before {
+  content: '✓';
+  background: #1f4d3a;
+  color: #ffffff;
+}
+
+.site-step.is-active {
+  background: #1f4d3a;
+  color: #ffffff;
+}
+
+.site-step.is-active::before {
+  background: #ffffff;
+  color: #1f4d3a;
+}
+
+.site-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.site-countdown {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.site-mpesa-box,
+.site-paybill-box,
+.site-cancel-box {
+  background: #faf8f5;
+  border: 1px solid #e7e2da;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-top: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.site-paybill-box h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.site-paybill-box p {
+  margin: 0;
+}
+
+.site-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.site-status-pill--completed {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.site-status-pill--cancelled,
+.site-status-pill--declined,
+.site-status-pill--expired,
+.site-status-pill--no_show {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ── Home ────────────────────────────────────────────────────────────────── */
+.site-rules-box {
+  background: #ffffff;
+  border: 1px solid #e7e2da;
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-top: 2rem;
+  color: #44403c;
+  line-height: 1.55;
+}
+
+.site-datepicker__empty {
+  aspect-ratio: 1;
+}
