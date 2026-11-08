@@ -14,7 +14,12 @@ import 'calendar_rules.dart';
 import 'host_models.dart';
 
 /// Picks a photo via `image_picker` with `maxWidth: 1600, imageQuality: 80`.
-Future<Uint8List?> pickHostPhoto(BuildContext context) async {
+/// Lets the host pick listing photos: one from the camera, or several from the gallery
+/// (at most [limit]). Each is resized to 1600 px. Empty when cancelled.
+Future<List<Uint8List>> pickHostPhotos(
+  BuildContext context, {
+  int limit = 20,
+}) async {
   final source = await showModalBottomSheet<ImageSource>(
     context: context,
     showDragHandle: true,
@@ -36,16 +41,27 @@ Future<Uint8List?> pickHostPhoto(BuildContext context) async {
       ),
     ),
   );
-  if (source == null) return null;
+  if (source == null || limit <= 0) return const [];
   try {
-    final file = await ImagePicker().pickImage(
-      source: source,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 80,
-    );
-    if (file == null) return null;
-    return await file.readAsBytes();
+    final picker = ImagePicker();
+    final List<XFile> files;
+    if (source == ImageSource.camera || limit == 1) {
+      final one = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+      files = one == null ? const [] : [one];
+    } else {
+      files = await picker.pickMultiImage(
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+        limit: limit,
+      );
+    }
+    return [for (final f in files.take(limit)) await f.readAsBytes()];
   } catch (_) {
     if (context.mounted) {
       showMessage(
@@ -53,7 +69,7 @@ Future<Uint8List?> pickHostPhoto(BuildContext context) async {
         'Couldn’t open the ${source == ImageSource.camera ? 'camera' : 'gallery'}. Check the app’s permissions in Settings.',
       );
     }
-    return null;
+    return const [];
   }
 }
 

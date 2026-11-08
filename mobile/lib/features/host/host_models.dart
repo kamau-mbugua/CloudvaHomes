@@ -848,3 +848,27 @@ class HostReportSummary {
     );
   }
 }
+
+/// A listing holds at most this many photos (the API enforces it too).
+const maxListingPhotos = 20;
+
+/// How many more photos fit on a listing that already has [existing].
+int photosRoomLeft(int existing) =>
+    existing >= maxListingPhotos ? 0 : maxListingPhotos - existing;
+
+/// One message after uploading a batch of listing photos.
+String photoUploadMessage({
+  required int added,
+  required int failed,
+  required int skipped,
+}) {
+  final parts = <String>[
+    added == 0
+        ? 'No photos added.'
+        : '$added ${added == 1 ? 'photo' : 'photos'} added.',
+    if (failed > 0) '$failed could not be uploaded.',
+    if (skipped > 0)
+      '$skipped not added: a listing holds up to $maxListingPhotos photos.',
+  ];
+  return parts.join(' ');
+}

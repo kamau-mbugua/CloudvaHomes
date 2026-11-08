@@ -5,6 +5,7 @@ import type { DataEnvelope } from '../../lib/api/types';
 import { useToast } from '../../lib/useToast';
 import { useAuthedBlobUrl } from '../uploads/api';
 import { staysErrorMessage, staysKeys } from './api';
+import { MAX_LISTING_PHOTOS, photoUploadSummary, planPhotoUpload } from './photoUploads';
 import { resizeImage } from './resizeImage';
 import type { Listing, ListingPhoto } from './types';
 
@@ -136,21 +137,38 @@ export function PhotoManager({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
-  const upload = useMutation({
-    mutationFn: async (file: File) => {
-      const resized = await resizeImage(file, 1600, 0.8);
-      return api.upload<DataEnvelope<ListingPhoto>>(`/host/listings/${listing.id}/photos`, {
-        file: resized,
-        filename: file.name.replace(/\.[^.]+$/, '.jpg'),
-      });
-    },
-    onSuccess: async () => {
-      toast.saved('Photo added.');
-      await queryClient.invalidateQueries({ queryKey: staysKeys.listing(listing.id) });
-      await queryClient.invalidateQueries({ queryKey: staysKeys.listings });
-    },
-    onError: (err) => toast.failed(staysErrorMessage(err)),
-  });
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const uploadOne = async (file: File) => {
+    const resized = await resizeImage(file, 1600, 0.8);
+    return api.upload<DataEnvelope<ListingPhoto>>(`/host/listings/${listing.id}/photos`, {
+      file: resized,
+      filename: file.name.replace(/\.[^.]+$/, '.jpg'),
+    });
+  };
+
+  /** Uploads the picked photos one after another; one failure doesn't stop the rest. */
+  const uploadMany = async (picked: File[]) => {
+    const { accepted, skipped } = planPhotoUpload(picked, listing.photos.length);
+    const failed: { name: string; reason: string }[] = [];
+    let added = 0;
+    setProgress({ done: 0, total: accepted.length });
+    for (const [i, file] of accepted.entries()) {
+      try {
+        await uploadOne(file);
+        added += 1;
+      } catch (err) {
+        failed.push({ name: file.name, reason: staysErrorMessage(err) });
+      }
+      setProgress({ done: i + 1, total: accepted.length });
+    }
+    setProgress(null);
+    await queryClient.invalidateQueries({ queryKey: staysKeys.listing(listing.id) });
+    await queryClient.invalidateQueries({ queryKey: staysKeys.listings });
+    const summary = photoUploadSummary({ added, failed, skipped });
+    if (summary.ok) toast.saved(summary.text);
+    else toast.failed(summary.text);
+  };
 
   const reorder = useMutation({
     mutationFn: (photoIds: string[]) =>
@@ -186,32 +204,35 @@ export function PhotoManager({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '0.95rem' }}>
-            Photos ({listing.photos.length}/20)
+            Photos ({listing.photos.length}/{MAX_LISTING_PHOTOS})
           </h3>
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Drag or use arrows to reorder. The first photo is the cover on your booking site.
+            Pick several at once. Drag or use arrows to reorder; the first photo is the cover on your booking site.
           </p>
         </div>
-        {canEdit && listing.photos.length < 20 ? (
+        {canEdit && listing.photos.length < MAX_LISTING_PHOTOS ? (
           <>
             <input
               ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
+              multiple
               style={{ display: 'none' }}
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) upload.mutate(f);
+                const files = Array.from(e.target.files ?? []);
                 e.target.value = '';
+                if (files.length > 0) void uploadMany(files);
               }}
             />
             <button
               type="button"
               className="nx-btn nx-btn--sm"
-              disabled={upload.isPending}
+              disabled={progress !== null}
               onClick={() => fileRef.current?.click()}
             >
-              {upload.isPending ? 'Uploading…' : '+ Add photo'}
+              {progress
+                ? `Uploading ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
+                : '+ Add photos'}
             </button>
           </>
         ) : null}

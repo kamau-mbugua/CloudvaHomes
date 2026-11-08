@@ -1,5 +1,10 @@
 /* Guest Booking Site — Host-First Identity */
 .site-shell {
+  /* Content column for header, page and footer. Wide enough for large screens, narrow
+     enough that text lines stay readable. */
+  --site-max: 1320px;
+  /* The home hero bleeds to the screen edges; never let that add a sideways scrollbar. */
+  overflow-x: clip;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -18,7 +23,7 @@
 }
 
 .site-header__inner {
-  max-width: 1120px;
+  max-width: var(--site-max);
   margin: 0 auto;
   padding: 0.85rem 1.25rem;
   display: flex;
@@ -59,7 +64,7 @@
 
 .site-main {
   flex: 1;
-  max-width: 1120px;
+  max-width: var(--site-max);
   width: 100%;
   margin: 0 auto;
   padding: 1.5rem 1.25rem 5.5rem;
@@ -606,7 +611,7 @@
 }
 
 .site-footer__inner {
-  max-width: 1120px;
+  max-width: var(--site-max);
   margin: 0 auto;
   display: flex;
   flex-wrap: wrap;
@@ -1008,4 +1013,17 @@
 
 .site-footer__inner {
   padding: 0 1.25rem;
+}
+
+/* ── Home hero: full-width band, text aligned to the content column ──────── */
+.site-home > .site-hero {
+  margin: -1.5rem calc(50% - 50vw) 2.5rem;
+  border-radius: 0;
+  padding: 3rem max(1.25rem, calc(50vw - var(--site-max) / 2 + 1.25rem));
+}
+
+@media (max-width: 820px) {
+  .site-home > .site-hero {
+    padding: 2rem 1.25rem;
+  }
 }

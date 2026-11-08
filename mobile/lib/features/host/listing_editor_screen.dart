@@ -254,11 +254,24 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
 
   Future<void> _addPhoto() async {
     if (_loaded == null) return;
-    final bytes = await pickHostPhoto(context);
-    if (bytes == null) return;
+    final room = photosRoomLeft(_photos.length);
+    final picked = await pickHostPhotos(context, limit: room);
+    if (picked.isEmpty) return;
     setState(() => _uploadingPhoto = true);
+    var added = 0;
+    var failed = 0;
     try {
-      await ref.read(hostApiProvider).uploadListingPhoto(_loaded!.id, bytes);
+      // One after another; a failed photo doesn't stop the rest.
+      for (final bytes in picked) {
+        try {
+          await ref
+              .read(hostApiProvider)
+              .uploadListingPhoto(_loaded!.id, bytes);
+          added += 1;
+        } on ApiError {
+          failed += 1;
+        }
+      }
       final refreshed = await ref.read(hostApiProvider).listing(_loaded!.id);
       if (mounted) {
         setState(() {
@@ -271,6 +284,12 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
       if (mounted) showMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
+    }
+    if (mounted) {
+      showMessage(
+        context,
+        photoUploadMessage(added: added, failed: failed, skipped: 0),
+      );
     }
   }
 
@@ -577,7 +596,7 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
                             size: 18,
                           ),
                           label: Text(
-                            _uploadingPhoto ? 'Uploading…' : 'Add photo',
+                            _uploadingPhoto ? 'Uploading…' : 'Add photos',
                           ),
                         ),
                     ],
