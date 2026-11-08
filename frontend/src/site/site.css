@@ -1249,7 +1249,6 @@
 }
 
 .site-legal__text {
-  white-space: pre-wrap;
   line-height: 1.7;
   color: #44403c;
   background: var(--site-surface);
@@ -1257,6 +1256,33 @@
   border-radius: 16px;
   padding: 1.5rem;
   margin-top: 1rem;
+}
+
+.site-legal__text h2,
+.site-legal__text h3 {
+  color: var(--site-text);
+}
+.site-legal__text h2:not(:first-child),
+.site-legal__text h3:not(:first-child) {
+  border-top: 1px solid var(--site-border);
+  padding-top: 1.25rem;
+}
+.site-legal__text a {
+  color: var(--site-accent);
+}
+.site-legal__text blockquote {
+  border-left-color: var(--site-accent);
+  background: var(--site-accent-soft);
+  color: inherit;
+  border-radius: 0 8px 8px 0;
+}
+.site-legal__text hr {
+  border-top-color: var(--site-border);
+}
+@media (max-width: 640px) {
+  .site-legal__text {
+    padding: 1.1rem;
+  }
 }
 
 .site-terms-note a {

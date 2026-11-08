@@ -1,3 +1,4 @@
+import { MarkdownEditor } from '../../lib/MarkdownEditor';
 import { THEME_PRESETS, themeVars } from '../../site/theme';
 import type { HostLegalPage } from './types';
 
@@ -177,15 +178,12 @@ export function LegalFields({
                 ) : null}
               </span>
             </div>
-            <textarea
+            <MarkdownEditor
               id={`site-legal-${f.key}`}
-              className="au__input"
-              rows={10}
               maxLength={20000}
               disabled={disabled}
               value={values[f.key]}
-              onChange={(e) => onChange(f.key, e.target.value)}
-              style={{ fontFamily: 'inherit', lineHeight: 1.5 }}
+              onChange={(text) => onChange(f.key, text)}
             />
           </div>
         );

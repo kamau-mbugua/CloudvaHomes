@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Markdown } from '../lib/markdown';
 import { type PublicLegalPage, publicSiteApi } from './api';
 
-/** /terms, /terms-of-use, /privacy on a host's booking site. Text is shown as written (no HTML). */
+/** /terms, /terms-of-use, /privacy on a host's booking site. Host text is Markdown, rendered as safe elements (no raw HTML). */
 export function LegalPage({ slug, docKey }: { slug: string; docKey: string }) {
   const [page, setPage] = useState<PublicLegalPage | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export function LegalPage({ slug, docKey }: { slug: string; docKey: string }) {
       {page.updatedAt ? (
         <p className="site-muted">Last updated {new Date(page.updatedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       ) : null}
-      <div className="site-legal__text">{page.text}</div>
+      <Markdown text={page.text} className="site-legal__text md" />
     </article>
   );
 }

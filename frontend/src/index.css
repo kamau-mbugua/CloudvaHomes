@@ -18,6 +18,7 @@
 @import './styles/platform.css';
 @import './styles/banks.css';
 @import './styles/stays.css';
+@import './styles/markdown.css';
 
 *, *::before, *::after { box-sizing: border-box; }
 

@@ -42,4 +42,14 @@ describe('stays/rules/legal — starter legal pages for host sites', () => {
   it('offers six theme presets', () => {
     expect(THEME_PRESETS).toEqual(['forest', 'ocean', 'sunset', 'terracotta', 'plum', 'charcoal']);
   });
+
+  it('is written in Markdown: numbered section headings and bullet lists', () => {
+    const terms = legalTemplate('terms', ctx);
+    expect(terms).toMatch(/^## 1\. Your booking$/m);
+    expect(terms).toMatch(/^## 7\. Contact$/m);
+    expect(terms).not.toMatch(/^\d+\. [A-Z]/m);
+    const privacy = legalTemplate('privacy', ctx);
+    expect(privacy).toMatch(/^## 5\. Your rights$/m);
+    expect(privacy).toMatch(/^- Your name, phone number/m);
+  });
 });

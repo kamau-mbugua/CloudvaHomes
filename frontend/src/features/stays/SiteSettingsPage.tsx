@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { useAuthedBlobUrl } from '../uploads/api';
@@ -21,7 +21,22 @@ import { RulesFields } from './RulesFields';
 import { LegalFields, type LegalKey, ThemeFields } from './SiteLookAndLegal';
 import type { HostSite, SlugCheckResult, StayRules } from './types';
 
+const SITE_TABS = [
+  { key: 'address', label: 'Web address' },
+  { key: 'business', label: 'Business & contact' },
+  { key: 'rules', label: 'Booking rules' },
+  { key: 'look', label: 'Look' },
+  { key: 'legal', label: 'Legal pages' },
+] as const;
+type SiteTab = (typeof SITE_TABS)[number]['key'];
+
 function SiteSettingsForm({ site }: { site: HostSite }) {
+  // All tabs stay mounted (hidden), so edits on every tab are kept and saved together.
+  const [params, setParams] = useSearchParams();
+  const tab: SiteTab = SITE_TABS.some((t) => t.key === params.get('tab'))
+    ? (params.get('tab') as SiteTab)
+    : 'address';
+  const setTab = (next: SiteTab) => setParams(next === 'address' ? {} : { tab: next }, { replace: true });
   const queryClient = useQueryClient();
   const toast = useToast();
   const canUpdate = useCan('site:update');
@@ -140,7 +155,24 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
           ) : null}
         </div>
       ) : null}
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="Booking site settings">
+          {SITE_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              className="pf__tab"
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <form onSubmit={submit} style={{ display: 'grid', gap: '1.5rem' }}>
+        <div hidden={tab !== 'address'}>
         <section
           style={{
             background: 'var(--card)',
@@ -208,7 +240,9 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
             Publish my booking site (guests can browse and book online)
           </label>
         </section>
+        </div>
 
+        <div hidden={tab !== 'business'}>
         <section
           style={{
             background: 'var(--card)',
@@ -360,7 +394,9 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
             </div>
           </div>
         </section>
+        </div>
 
+        <div hidden={tab !== 'rules'}>
         <section
           style={{
             background: 'var(--card)',
@@ -391,14 +427,18 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
             />
           </div>
         </section>
+        </div>
 
+        <div hidden={tab !== 'look'}>
         <ThemeFields
           preset={theme.preset}
           brandColor={theme.brandColor}
           disabled={!canUpdate}
           onChange={setTheme}
         />
+        </div>
 
+        <div hidden={tab !== 'legal'}>
         {site.legal ? (
           <LegalFields
             pages={site.legal}
@@ -408,6 +448,7 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
             onChange={(key, text) => setLegal((l) => ({ ...l, [key]: text }))}
           />
         ) : null}
+        </div>
 
         {errMsg ? (
           <p className="au__error" role="alert">

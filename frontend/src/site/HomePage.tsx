@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { type PublicListingSummary, type PublicSiteData, photoSrc, publicSiteApi } from './api';
-import { digitsOnly, formatMinorKES } from './booking';
+import {
+  checkOutAfter,
+  dateRangeProblem,
+  digitsOnly,
+  formatMinorKES,
+  nairobiToday,
+  nextDay,
+} from './booking';
 import {
   EMPTY_FILTERS,
   type ListingFilters,
@@ -26,6 +33,7 @@ export function HomePage({ site }: HomePageProps) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ListingFilters>(EMPTY_FILTERS);
 
+  const today = nairobiToday();
   const waDigits = digitsOnly(site.whatsappPhone);
   const hasListings = site.listings.length > 0;
   const areas = useMemo(() => areasOf(site.listings), [site.listings]);
@@ -45,8 +53,13 @@ export function HomePage({ site }: HomePageProps) {
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (!checkIn || !checkOut) {
+    if (!checkIn && !checkOut) {
       setAvailable(null);
+      return;
+    }
+    const problem = dateRangeProblem(checkIn, checkOut, today);
+    if (problem) {
+      setSearchError(problem);
       return;
     }
     setSearching(true);
@@ -86,14 +99,23 @@ export function HomePage({ site }: HomePageProps) {
           <form className="site-search-bar" onSubmit={(e) => void handleSearch(e)}>
             <label className="site-search-field">
               <span>Check-in</span>
-              <input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+              <input
+                type="date"
+                value={checkIn}
+                min={today}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setCheckIn(v);
+                  setCheckOut((o) => checkOutAfter(v, o));
+                }}
+              />
             </label>
             <label className="site-search-field">
               <span>Check-out</span>
               <input
                 type="date"
                 value={checkOut}
-                min={checkIn || undefined}
+                min={nextDay(checkIn || today)}
                 onChange={(e) => setCheckOut(e.target.value)}
               />
             </label>

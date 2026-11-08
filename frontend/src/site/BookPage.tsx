@@ -6,7 +6,17 @@ import {
   type PublicSiteData,
   publicSiteApi,
 } from './api';
-import { STEP_LABELS, bookingErrorMessage, bookingSteps, formatMinorKES, payLabel } from './booking';
+import {
+  STEP_LABELS,
+  bookingErrorMessage,
+  bookingSteps,
+  checkOutAfter,
+  dateRangeProblem,
+  formatMinorKES,
+  nairobiToday,
+  nextDay,
+  payLabel,
+} from './booking';
 
 interface BookPageProps {
   site: PublicSiteData;
@@ -41,7 +51,7 @@ export function BookPage({ site }: BookPageProps) {
 
     Promise.all([
       publicSiteApi.getListing(site.slug, listingId),
-      checkIn && checkOut
+      checkIn && checkOut && !dateRangeProblem(checkIn, checkOut)
         ? publicSiteApi.quote(site.slug, listingId, { checkIn, checkOut, guests })
         : Promise.resolve(null),
     ])
@@ -165,7 +175,12 @@ export function BookPage({ site }: BookPageProps) {
                 <input
                   type="date"
                   value={checkIn}
-                  onChange={(e) => setCheckIn(e.target.value)}
+                  min={nairobiToday()}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCheckIn(v);
+                    setCheckOut((o) => checkOutAfter(v, o));
+                  }}
                   required
                 />
               </label>
@@ -174,7 +189,7 @@ export function BookPage({ site }: BookPageProps) {
                 <input
                   type="date"
                   value={checkOut}
-                  min={checkIn || undefined}
+                  min={nextDay(checkIn || nairobiToday())}
                   onChange={(e) => setCheckOut(e.target.value)}
                   required
                 />
@@ -330,7 +345,11 @@ export function BookPage({ site }: BookPageProps) {
                 </button>
               </>
             ) : (
-              <p className="site-muted">Select valid check-in and check-out dates to see pricing.</p>
+              <p className="site-muted">
+                {(checkIn || checkOut) && dateRangeProblem(checkIn, checkOut)
+                  ? dateRangeProblem(checkIn, checkOut)
+                  : 'Choose your check-in and check-out dates to see the price.'}
+              </p>
             )}
           </div>
         </aside>

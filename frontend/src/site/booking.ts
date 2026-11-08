@@ -126,3 +126,27 @@ export function digitsOnly(phone: string | null | undefined): string {
   if (!phone) return '';
   return phone.replace(/\D+/g, '');
 }
+
+/** Today's date (YYYY-MM-DD) in Nairobi (UTC+3, no daylight saving). */
+export function nairobiToday(now: Date = new Date()): string {
+  return new Date(now.getTime() + 3 * 3600_000).toISOString().slice(0, 10);
+}
+
+export function nextDay(iso: string): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+/** After check-in changes: keep check-out if it is still later, else move it to the next day. */
+export function checkOutAfter(checkIn: string, checkOut: string): string {
+  if (!checkIn || !checkOut) return checkOut;
+  return checkOut > checkIn ? checkOut : nextDay(checkIn);
+}
+
+/** A plain reason the dates can't be searched or booked, or null when they are fine. */
+export function dateRangeProblem(checkIn: string, checkOut: string, today: string = nairobiToday()): string | null {
+  if (!checkIn) return 'Choose a check-in date.';
+  if (!checkOut) return 'Choose a check-out date.';
+  if (checkIn < today) return 'Check-in can’t be in the past.';
+  if (checkOut <= checkIn) return 'Check-out must be at least one night after check-in.';
+  return null;
+}

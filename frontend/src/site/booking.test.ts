@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   bookingErrorMessage,
   STEP_LABELS,
+  checkOutAfter,
+  dateRangeProblem,
+  nairobiToday,
+  nextDay,
   holdTimeLeft,
   bookingSteps,
   guestStatusLabel,
@@ -115,5 +119,22 @@ describe('site/booking — steps, labels, date availability, and DATES_TAKEN err
     expect(holdTimeLeft(899)).toBe('14:59');
     expect(holdTimeLeft(5)).toBe('0:05');
     expect(holdTimeLeft(0)).toBe('0:00');
+  });
+
+  it('keeps stays at least one night and never in the past', () => {
+    expect(nextDay('2026-11-08')).toBe('2026-11-09');
+    expect(nextDay('2026-12-31')).toBe('2027-01-01');
+    expect(nairobiToday(new Date('2026-11-07T22:30:00Z'))).toBe('2026-11-08');
+    // Moving check-in on/after check-out pushes check-out to the next day; otherwise it stays.
+    expect(checkOutAfter('2026-11-08', '2026-11-08')).toBe('2026-11-09');
+    expect(checkOutAfter('2026-11-10', '2026-11-09')).toBe('2026-11-11');
+    expect(checkOutAfter('2026-11-08', '2026-11-12')).toBe('2026-11-12');
+    expect(checkOutAfter('2026-11-08', '')).toBe('');
+    const today = '2026-11-08';
+    expect(dateRangeProblem('2026-11-08', '2026-11-08', today)).toBe('Check-out must be at least one night after check-in.');
+    expect(dateRangeProblem('2026-11-07', '2026-11-09', today)).toBe('Check-in can’t be in the past.');
+    expect(dateRangeProblem('2026-11-08', '', today)).toBe('Choose a check-out date.');
+    expect(dateRangeProblem('', '2026-11-09', today)).toBe('Choose a check-in date.');
+    expect(dateRangeProblem('2026-11-08', '2026-11-10', today)).toBeNull();
   });
 });
