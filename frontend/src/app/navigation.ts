@@ -146,7 +146,7 @@ export const ORG_NAV: NavGroup[] = [
     label: 'Money',
     children: [
       { label: 'Payments', to: '/app/payments', permission: 'payments:view', orgKinds: ['LANDLORD', 'AGENCY'], phase: '4', hint: 'Money received and how it was allocated' },
-      { label: 'Reconciliation', to: '/app/reconciliation', permission: 'reconciliation:view', phase: '5', hint: 'Match M-Pesa and bank transactions to tenants', badge: 'unmatchedInbound' },
+      { label: 'Reconciliation', to: '/app/reconciliation', permission: 'reconciliation:view', phase: '5', hint: 'Match M-Pesa and bank transactions to tenants', hostHint: 'M-Pesa and bank payments not yet matched to a booking', badge: 'unmatchedInbound' },
       { label: 'Payment channels', to: '/app/payment-channels', permission: 'channels:view', phase: '4', hint: 'Paybills, tills, bank accounts and cash' },
     ],
   },

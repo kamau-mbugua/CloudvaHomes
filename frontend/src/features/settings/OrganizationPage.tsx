@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent, InputHTMLAttributes } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
@@ -8,29 +8,18 @@ import { updateSessionDetails } from '../../lib/auth/session';
 import type { Organization, SessionPayload } from '../../lib/auth/types';
 import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
-import { ConfirmDelete } from '../../components/ConfirmDelete';
-import { EmptyState } from '../../components/EmptyState';
 import { CardSkeleton } from '../../components/Loading';
 import { checkDueDays } from '../billing/rules';
-import { isMpesaKind } from '../mpesa/rules';
-import { keys as paymentKeys, paymentsErrorMessage, useChannels } from '../payments/api';
-import { CHANNEL_KIND } from '../payments/labels';
-import { ChannelSheet } from '../payments/PaymentChannelsPage';
-import { channelDetails } from '../payments/rules';
-import type { PaymentChannel } from '../payments/types';
-import { usePropertyOptions } from '../portfolio/api';
-import { RECORD_STATUS } from '../portfolio/labels';
-import { Badge } from '../portfolio/ui';
+import { type OrgSettingsTab, orgSettingsTabs } from '../payments/audience';
 import { keys, settingsErrorMessage } from './api';
 import { checkReminders, describeReminders, overdueDaysText, readReminders } from './reminders';
 import { LateFeesPanel } from './LateFeesPanel';
 
 /**
- * Settings → Organisation: the active organisation's name and contacts, billing
- * defaults (how many days after issue an invoice falls due), payment methods (how the
- * organisation receives payments from tenants — M-Pesa Paybill, Till, Bank Account,
- * Cash, Cheque) and SMS rent reminders. Everyone with `settings:view` sees them;
- * `settings:update` / `channels:manage` can edit.
+ * Settings → Organisation: the active organisation's name and contacts, plus — for landlords
+ * and agencies — billing defaults (how many days after issue an invoice falls due), SMS rent
+ * reminders and late fees. Hosts see only the details. Payment methods live in Money → Payment
+ * channels. Everyone with `settings:view` sees this page; `settings:update` can edit.
  */
 
 type Field =
@@ -51,10 +40,14 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export function OrganizationPage() {
+  const [params] = useSearchParams();
   const query = useQuery({
     queryKey: keys.organization,
     queryFn: () => api.get<DataEnvelope<Organization>>('/organization').then((r) => r.data),
   });
+
+  // Payment methods used to be a tab here; they live in Money → Payment channels now.
+  if (params.get('tab') === 'payments') return <Navigate to="/app/payment-channels" replace />;
 
   if (query.isPending) return <CardSkeleton count={3} />;
   if (query.isError) return <p className="ad__error" role="alert">{settingsErrorMessage(query.error)}</p>;
@@ -63,18 +56,17 @@ export function OrganizationPage() {
   return <OrganizationForm key={query.data.id} org={query.data} />;
 }
 
-type OrgTab = 'details' | 'payments' | 'billing' | 'reminders' | 'late-fees';
-
 function OrganizationForm({ org }: { org: Organization }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const canEdit = useCan('settings:update');
+  const canSeeChannels = useCan('channels:view');
   const [params, setParams] = useSearchParams();
+  const tabs = orgSettingsTabs(org.kind);
   const rawTab = params.get('tab');
-  const tab: OrgTab =
-    rawTab === 'payments' || rawTab === 'billing' || rawTab === 'reminders' || rawTab === 'late-fees' ? rawTab : 'details';
+  const tab: OrgSettingsTab = tabs.find((t) => t.key === rawTab)?.key ?? 'details';
 
-  const setTab = (next: OrgTab) => {
+  const setTab = (next: OrgSettingsTab) => {
     setParams(
       (prev) => {
         const p = new URLSearchParams(prev);
@@ -198,66 +190,44 @@ function OrganizationForm({ org }: { org: Organization }) {
   );
 
   const showServerError = save.isError && !(save.error instanceof ApiError && save.error.code === 'VALIDATION_FAILED');
-  const [editingChannel, setEditingChannel] = useState<PaymentChannel | 'new' | null>(null);
 
   return (
     <>
       <form className="fm fm--single pg-narrow" onSubmit={submit} noValidate>
         <div className="fm__main">
+          {tabs.length > 1 ? (
           <div className="pf__tabsrow">
             <div className="pf__tabs" role="tablist" aria-label="Organisation settings sections">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'details'}
-                className="pf__tab"
-                onClick={() => setTab('details')}
-              >
-                Organisation details
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'payments'}
-                className="pf__tab"
-                onClick={() => setTab('payments')}
-              >
-                Payment methods
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'billing'}
-                className="pf__tab"
-                onClick={() => setTab('billing')}
-              >
-                Billing
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'reminders'}
-                className="pf__tab"
-                onClick={() => setTab('reminders')}
-              >
-                Rent reminders
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === 'late-fees'}
-                className="pf__tab"
-                onClick={() => setTab('late-fees')}
-              >
-                Late fees
-              </button>
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  className="pf__tab"
+                  onClick={() => setTab(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
           </div>
+          ) : null}
 
           {tab === 'details' ? (
             <section className="fm__section">
               <h2>Organisation details</h2>
-              <p>Shown on invoices, receipts and messages to tenants.</p>
+              <p>
+                {org.kind === 'HOST'
+                  ? 'Your organisation’s name and contacts on KodiHub.'
+                  : 'Shown on invoices, receipts and messages to tenants.'}
+              </p>
+              {canSeeChannels ? (
+                <p className="ad__muted">
+                  Paybills, tills, bank accounts and cash are set up in{' '}
+                  <Link to="/app/payment-channels" className="ad__link">Money → Payment channels</Link>.
+                </p>
+              ) : null}
 
               <div className="fm__grid">
                 <div className="fm__wide">{field('name', 'Name', { autoComplete: 'organization', required: true })}</div>
@@ -271,10 +241,6 @@ function OrganizationForm({ org }: { org: Organization }) {
                 </div>
               </div>
             </section>
-          ) : null}
-
-          {tab === 'payments' ? (
-            <OrganizationPaymentMethodsSection onEdit={setEditingChannel} />
           ) : null}
 
           {tab === 'billing' ? (
@@ -360,7 +326,7 @@ function OrganizationForm({ org }: { org: Organization }) {
 
           {showServerError ? <p className="ad__error" role="alert">{settingsErrorMessage(save.error)}</p> : null}
 
-          {tab !== 'payments' && tab !== 'late-fees' ? (
+          {tab !== 'late-fees' ? (
             canEdit ? (
               <div className="pg-actions">
                 <button type="button" className="nx-btn" disabled={!dirty || save.isPending}
@@ -377,135 +343,6 @@ function OrganizationForm({ org }: { org: Organization }) {
           ) : null}
         </div>
       </form>
-
-      {editingChannel ? (
-        <ChannelSheet
-          channel={editingChannel === 'new' ? undefined : editingChannel}
-          onClose={() => setEditingChannel(null)}
-        />
-      ) : null}
     </>
-  );
-}
-
-function OrganizationPaymentMethodsSection({
-  onEdit,
-}: {
-  onEdit: (channel: PaymentChannel | 'new') => void;
-}) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const canManage = useCan('channels:manage');
-  const channels = useChannels({});
-  const properties = usePropertyOptions(useCan('properties:view'));
-
-  const remove = useMutation({
-    mutationFn: (channel: PaymentChannel) => api.delete(`/payment-channels/${channel.id}`),
-    onSuccess: async (_r, channel) => {
-      toast.saved(`${channel.name} was deleted.`);
-      await queryClient.invalidateQueries({ queryKey: paymentKeys.channels });
-    },
-    onError: (error) => toast.failed(paymentsErrorMessage(error)),
-  });
-
-  const rows = [...(channels.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-  const propertyName = (id: string) => properties.data?.data.find((p) => p.id === id)?.name;
-  const scope = (c: PaymentChannel) => {
-    if (c.propertyIds.length === 0) return 'All properties';
-    const names = c.propertyIds.map(propertyName).filter(Boolean) as string[];
-    if (names.length === c.propertyIds.length && names.length <= 2) return names.join(', ');
-    return `${c.propertyIds.length} ${c.propertyIds.length === 1 ? 'property' : 'properties'}`;
-  };
-
-  return (
-    <section className="fm__section">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
-        <div>
-          <h2>How your organisation receives payments</h2>
-          <p>
-            Configure the M-Pesa Paybills, Buy Goods Tills, bank accounts, cash or cheque channels
-            your tenants pay into. Active M-Pesa and bank channels are automatically printed on
-            tenant invoices (and PDFs), welcome emails, SMS reminders and the Tenant Portal.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <Link to="/app/payment-channels" className="nx-btn nx-btn--sm">
-            M-Pesa &amp; bank connections
-          </Link>
-          {canManage ? (
-            <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => onEdit('new')}>
-              Add payment method
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {channels.isError ? (
-        <p className="ad__error" role="alert">{paymentsErrorMessage(channels.error)}</p>
-      ) : channels.isPending ? (
-        <p className="ad__muted" role="status">Loading payment methods…</p>
-      ) : rows.length === 0 ? (
-        <div className="ad__tablewrap">
-          <EmptyState
-            title="No payment methods configured yet"
-            detail="Add each way tenants pay you — an M-Pesa paybill or till, a bank account, cash or cheque. You can apply a payment method to all properties or specific properties."
-            action={
-              canManage ? (
-                <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => onEdit('new')}>
-                  Add payment method
-                </button>
-              ) : undefined
-            }
-          />
-        </div>
-      ) : (
-        <div className="ad__tablewrap">
-          <table className="ad__table">
-            <thead>
-              <tr>
-                <th>Method</th>
-                <th>Kind</th>
-                <th>Account / Shortcode</th>
-                <th>Properties</th>
-                <th>Status</th>
-                {canManage ? <th className="ad__rowactions"><span className="nx-sr">Actions</span></th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <strong>{c.name}</strong>
-                    {c.accountName && c.kind !== 'CHEQUE' ? <span className="ad__sub">{c.accountName}</span> : null}
-                  </td>
-                  <td>
-                    <Badge table={CHANNEL_KIND} value={c.kind} />
-                    {isMpesaKind(c.kind) ? (
-                      <span className="ad__sub">{c.daraja?.configured ? 'Connected to M-Pesa' : 'Manual / instructions'}</span>
-                    ) : null}
-                  </td>
-                  <td className="num">{channelDetails(c) || <span className="nx-muted">—</span>}</td>
-                  <td>{scope(c)}</td>
-                  <td><Badge table={RECORD_STATUS} value={c.status} /></td>
-                  {canManage ? (
-                    <td className="ad__rowactions">
-                      <div>
-                        <button type="button" className="nx-btn nx-btn--sm" onClick={() => onEdit(c)}>Edit</button>
-                        <ConfirmDelete
-                          what={c.name}
-                          consequence="A payment method with payments recorded on it can’t be deleted — mark it inactive instead."
-                          busy={remove.isPending && remove.variables?.id === c.id}
-                          onConfirm={() => remove.mutate(c)}
-                        />
-                      </div>
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
   );
 }

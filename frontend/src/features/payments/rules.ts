@@ -240,7 +240,7 @@ export function checkSettlement(draft: SettlementDraft, held: number): CheckedSe
 export const CHANNEL_FIELDS: Record<ChannelKind, { field: 'shortcode' | 'bankName' | 'accountNumber' | 'accountName'; label: string; required: boolean; hint?: string }[]> = {
   MPESA_PAYBILL: [
     { field: 'shortcode', label: 'Paybill number', required: true, hint: '5 to 7 digits, e.g. 522522.' },
-    { field: 'accountName', label: 'Account name', required: false, hint: 'Shown to tenants, e.g. the business name.' },
+    { field: 'accountName', label: 'Account name', required: false, hint: 'Shown with the paybill number, e.g. your business name.' },
   ],
   MPESA_TILL: [
     { field: 'shortcode', label: 'Till number', required: true, hint: '5 to 7 digits.' },

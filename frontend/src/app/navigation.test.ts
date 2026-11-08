@@ -253,5 +253,8 @@ describe('hintFor', () => {
     expect(hintFor(reports, 'HOST')).toBe('Income, occupancy, expenses and profit per unit');
     expect(hintFor(dashboard, 'LANDLORD')).toBe('Collections, arrears and occupancy at a glance');
     expect(hintFor(reports, undefined)).toBe('Property P&L, arrears, aging and occupancy');
+    const reconciliation = bestEntry(ORG_NAV, '/app/reconciliation')!.entry;
+    expect(hintFor(reconciliation, 'HOST')).toBe('M-Pesa and bank payments not yet matched to a booking');
+    expect(hintFor(reconciliation, 'AGENCY')).toBe('Match M-Pesa and bank transactions to tenants');
   });
 });

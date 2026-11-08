@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
-import { useCan } from '../../lib/auth/useAuth';
+import { useCan, useSession } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
@@ -15,6 +15,7 @@ import { useForm, useListFilters } from '../portfolio/hooks';
 import { RECORD_STATUS } from '../portfolio/labels';
 import { Badge, CheckList, Field } from '../portfolio/ui';
 import { keys, paymentsErrorMessage, useChannels } from './api';
+import { paymentCopy } from './audience';
 import { DarajaPanel } from '../mpesa/DarajaPanel';
 import { BankPanel } from '../banks/BankPanel';
 import { isMpesaKind } from '../mpesa/rules';
@@ -35,6 +36,7 @@ export function PaymentChannelsPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const canManage = useCan('channels:manage');
+  const copy = paymentCopy(useSession().activeOrganization?.kind);
   const filters = useListFilters();
   const status = filters.get('status');
   const channels = useChannels(status ? { status } : {});
@@ -129,7 +131,7 @@ export function PaymentChannelsPage() {
                     <EmptyState title="No channels match" onClear={() => filters.clear()} />
                   ) : (
                     <EmptyState title="No payment channels yet"
-                      detail="Add each way tenants pay you — an M-Pesa paybill or till, a bank account, cash or cheque. Payments are recorded against a channel."
+                      detail={copy.emptyChannels}
                       action={canManage ? <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" onClick={() => setEditing('new')}>Add channel</button> : undefined} />
                   )}
                 </div>

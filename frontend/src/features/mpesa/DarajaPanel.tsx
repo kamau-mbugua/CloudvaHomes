@@ -3,11 +3,13 @@ import type { FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import { copyText } from '../../lib/clipboard';
+import { useSession } from '../../lib/auth/useAuth';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { Sheet } from '../../components/Sheet';
 import { keys as paymentKeys } from '../payments/api';
+import { paymentCopy } from '../payments/audience';
 import { channelDetails } from '../payments/rules';
 import type { DarajaEnvironment, PaymentChannel } from '../payments/types';
 import { Badge, Field } from '../portfolio/ui';
@@ -27,13 +29,14 @@ import type { DarajaBody, DarajaDraft } from './rules';
  */
 export function DarajaPanel({ channels, canManage }: { channels: PaymentChannel[]; canManage: boolean }) {
   const [settingUp, setSettingUp] = useState<PaymentChannel | null>(null);
+  const copy = paymentCopy(useSession().activeOrganization?.kind);
 
   return (
     <section className="fm__section mp__daraja" aria-labelledby="daraja-title">
       <div className="pf__sectionhead"><h2 id="daraja-title">M-Pesa connection</h2></div>
       <p className="ad__muted mp__lead">
         Connect a paybill or till to your own Safaricom Daraja app and M-Pesa payments are recorded and receipted
-        automatically — and you can send payment prompts to tenants’ phones. The money goes straight to your
+        automatically — and you can send payment prompts to {copy.mpesaPrompts}. The money goes straight to your
         paybill or till, never through KodiHub.
       </p>
       <div className="mp__cards">

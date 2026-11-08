@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
-import { useCan } from '../../lib/auth/useAuth';
+import { useCan, useSession } from '../../lib/auth/useAuth';
+import { paymentCopy } from '../payments/audience';
 import { copyText } from '../../lib/clipboard';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
@@ -27,14 +28,14 @@ import type { BankWebhookSecret, StatementImport } from './types';
 export function BankPanel({ channels, canManage }: { channels: PaymentChannel[]; canManage: boolean }) {
   const [importing, setImporting] = useState<PaymentChannel | null>(null);
   const [revealed, setRevealed] = useState<{ channel: PaymentChannel; secret: BankWebhookSecret } | null>(null);
+  const copy = paymentCopy(useSession().activeOrganization?.kind);
 
   return (
     <section className="fm__section mp__daraja" aria-labelledby="banks-title">
       <div className="pf__sectionhead"><h2 id="banks-title">Bank accounts</h2></div>
       <p className="ad__muted mp__lead">
         Bring money paid into your bank accounts into KodiHub: import the statement your bank lets you download, or have the
-        bank (or your integration partner) notify KodiHub of each deposit. Tenants found in the narrative — a tenant code like
-        T00001 or an invoice number — are recorded as paid; the rest wait on Reconciliation.
+        bank (or your integration partner) notify KodiHub of each deposit. {copy.bankMatching}
       </p>
       <div className="mp__cards">
         {channels.map((c) => (
