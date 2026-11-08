@@ -74,6 +74,21 @@ export class TextSmsSender implements ProviderSender {
 }
 
 /**
+ * HostPinnacle error codes (their api_error_codes list) an owner can act on, in plain words.
+ * Other codes keep HostPinnacle's own reason.
+ */
+const HOSTPINNACLE_REASONS: Record<string, string> = {
+  '216': 'HostPinnacle rejected the user ID, password or API key.',
+  '217': 'The HostPinnacle account is not active.',
+  '218': 'The HostPinnacle account has expired.',
+  '159': 'Your HostPinnacle account is out of SMS credit.',
+  '190': 'Your HostPinnacle account is out of SMS credit.',
+  '267': 'Your HostPinnacle account is out of SMS credit.',
+  '162': 'The sender ID is missing.',
+  '183': 'This HostPinnacle demo account can only send to approved numbers.',
+};
+
+/**
  * HostPinnacle, from their Postman collection. Errors come back as HTTP 200 with
  * {"status":"error","statusCode":"216","reason":"…"}, so only `status: success` counts as sent.
  * The request carries the account password: never log it.
@@ -101,11 +116,15 @@ export class HostPinnacleSmsSender implements ProviderSender {
       headers: { apiKey: this.apiKey, Accept: 'application/json' },
       body: form,
     });
-    const body = res.ok ? await readJson(res) : null;
+    // Errors may come back as HTTP 200 or as 4xx, always with {status, statusCode, reason}.
+    const body = await readJson(res);
     if (!body) throw new ProviderError(`HostPinnacle refused the message (HTTP ${res.status})`);
-    if (scalar(body.status)?.toLowerCase() !== 'success') {
+    if (!res.ok || scalar(body.status)?.toLowerCase() !== 'success') {
       throw new ProviderError(
-        scalar(body.reason) ?? scalar(body.message) ?? 'HostPinnacle refused the message',
+        HOSTPINNACLE_REASONS[scalar(body.statusCode) ?? ''] ??
+          scalar(body.reason) ??
+          scalar(body.message) ??
+          `HostPinnacle refused the message (HTTP ${res.status})`,
       );
     }
     return {

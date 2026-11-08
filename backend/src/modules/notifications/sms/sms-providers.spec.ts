@@ -97,11 +97,50 @@ describe('HostPinnacle', () => {
     );
     await expect(
       new HostPinnacleSmsSender('u', 'p', 'k', 'X').send('+254712345678', 'Hi'),
-    ).rejects.toThrow(new ProviderError('Invalid credentials'));
+    ).rejects.toThrow(new ProviderError('HostPinnacle rejected the user ID, password or API key.'));
     fetchMock.mockResolvedValue(new Response('Unauthorized', { status: 401 }));
     await expect(
       new HostPinnacleSmsSender('u', 'p', 'k', 'X').send('+254712345678', 'Hi'),
     ).rejects.toThrow('HostPinnacle refused the message (HTTP 401)');
+  });
+});
+
+describe('HostPinnacle error codes (their api_error_codes list)', () => {
+  const send = () => new HostPinnacleSmsSender('u', 'p', 'k', 'X').send('+254712345678', 'Hi');
+
+  it('reads the reason even when the reply is not HTTP 200', async () => {
+    fetchMock.mockResolvedValue(
+      json(
+        { status: 'error', statusCode: '159', reason: 'Insufficient Balance to send message.' },
+        402,
+      ),
+    );
+    await expect(send()).rejects.toThrow(
+      new ProviderError('Your HostPinnacle account is out of SMS credit.'),
+    );
+  });
+
+  it('puts the codes an owner can act on in plain words', async () => {
+    const cases: [string, string][] = [
+      ['216', 'HostPinnacle rejected the user ID, password or API key.'],
+      ['217', 'The HostPinnacle account is not active.'],
+      ['218', 'The HostPinnacle account has expired.'],
+      ['190', 'Your HostPinnacle account is out of SMS credit.'],
+      ['267', 'Your HostPinnacle account is out of SMS credit.'],
+      ['162', 'The sender ID is missing.'],
+      ['183', 'This HostPinnacle demo account can only send to approved numbers.'],
+    ];
+    for (const [code, reason] of cases) {
+      fetchMock.mockResolvedValue(json({ status: 'error', statusCode: code, reason: 'raw' }));
+      await expect(send()).rejects.toThrow(new ProviderError(reason));
+    }
+  });
+
+  it('keeps HostPinnacle’s own words for other codes', async () => {
+    fetchMock.mockResolvedValue(
+      json({ status: 'error', statusCode: '177', reason: 'duplicate message' }),
+    );
+    await expect(send()).rejects.toThrow(new ProviderError('duplicate message'));
   });
 });
 

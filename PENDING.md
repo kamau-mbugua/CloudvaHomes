@@ -5,9 +5,11 @@ Small changes agreed but not done yet. Newest first.
 ## SMS (platform vs organisation)
 
 - Mobile app: SMS balance and Buy SMS in settings (web has both; API ready). Spec §6, call 6.
-- HostPinnacle: confirm the success reply against a real account with its API key (errors
-  come back as HTTP 200 `{status:"error",statusCode,reason}`; a test-mode call without the API
-  key returned "Invalid credentials"). Use Admin → Organisation → SMS → Send test SMS.
+- HostPinnacle: do one real "Send test SMS" (Admin → Organisation → SMS) with an account that has
+  its API key, before switching anyone over. Their error-code list confirms success is
+  `status: "success"`; a demo account only sends to whitelisted numbers (code 183).
+- HostPinnacle delivery reports (later): their delivery_error_codes list maps DLR codes to
+  DELIVERED / FAILED / NOTSENT / SUBMITTED, e.g. 59 "Balance Over", 15 "Invalid SenderId".
 - TextSMS: confirm the balance endpoint with TextSMS before showing a provider balance.
 - Delivery reports (non-goal for now).
 
