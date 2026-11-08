@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsIn,
   IsObject,
   IsOptional,
   IsString,
@@ -10,6 +11,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import { THEME_PRESETS, type ThemePreset } from '../rules/legal.js';
 import type { StayRules } from '../rules/terms.js';
 
 export class UpdateHostSiteDto {
@@ -80,6 +82,41 @@ export class UpdateHostSiteDto {
   @ValidateIf((_, v) => v !== null)
   @IsUUID()
   logoUploadId?: string | null;
+
+  @ApiPropertyOptional({ enum: THEME_PRESETS, example: 'ocean' })
+  @IsOptional()
+  @IsIn(THEME_PRESETS, { message: 'Choose one of the themes' })
+  themePreset?: ThemePreset;
+
+  @ApiPropertyOptional({ nullable: true, example: '#0E7490' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'Use a colour like #1F4D3A' })
+  brandColor?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Null = use the starter Terms and Conditions',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(20000)
+  termsText?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Null = use the starter Terms of Use' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(20000)
+  termsOfUseText?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Null = use the starter Privacy Policy' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(20000)
+  privacyText?: string | null;
 }
 
 export class SlugCheckQueryDto {

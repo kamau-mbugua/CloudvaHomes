@@ -4,6 +4,11 @@ Small changes agreed but not done yet. Newest first.
 
 ## Hosts and short stays
 
+- Mobile app: host Site settings don't have the new "Look of your booking site" (theme) and
+  "Legal pages" sections yet (web has both; the API is ready).
+- Legal: have KodiHub Legal review the starter Terms and Conditions, Terms of Use and Privacy
+  Policy texts once (`backend/src/modules/stays/rules/legal.ts`).
+
 - **Unused host addresses should go to the main app.** Today `anything.dev.kodihub.co.ke` (no
   published site) shows "We couldn't find this booking site". Wanted: a temporary (302) redirect
   to `https://dev.kodihub.co.ke` on dev and to the main app on prod (`APP_URL`).

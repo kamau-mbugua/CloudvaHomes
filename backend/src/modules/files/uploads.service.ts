@@ -8,6 +8,7 @@ import { DB, type Db, type Tx } from '../../prisma/prisma.module.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { orgContext } from '../auth/decorators.js';
 import { propertyScope, unitScope } from '../portfolio/property-scope.js';
+import { makePhotoVariant, type PhotoWidth, photoVariantKey } from './photo-variants.js';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const MAX_PHOTO_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -124,6 +125,27 @@ export class UploadsService {
       }
       return { upload: u, data: await this.storage.get(u.key) };
     });
+  }
+
+  /**
+   * A smaller WebP copy of a public photo (same access rules as publicPhotoContent). Made from
+   * the original on first request and stored next to it; later requests read the stored copy.
+   */
+  async publicPhotoVariant(id: string, width: PhotoWidth) {
+    const { upload, data } = await this.publicPhotoContent(id);
+    const key = photoVariantKey(upload.key, width);
+    try {
+      return { data: await this.storage.get(key), contentType: 'image/webp', resized: true };
+    } catch {
+      // Not made yet: make and store it. A photo sharp can't read is served as the original.
+    }
+    try {
+      const variant = await makePhotoVariant(data, width);
+      await this.storage.put(key, variant, 'image/webp');
+      return { data: variant, contentType: 'image/webp', resized: true };
+    } catch {
+      return { data, contentType: upload.contentType, resized: false };
+    }
   }
 
   private async canRead(u: Upload, userId: string, perms: ReadonlySet<string>): Promise<boolean> {

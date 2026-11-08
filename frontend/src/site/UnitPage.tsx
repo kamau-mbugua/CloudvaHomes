@@ -5,6 +5,7 @@ import {
   type PublicQuoteResponse,
   type PublicSiteData,
   publicSiteApi,
+  photoSrc,
 } from './api';
 import { formatMinorKES, payLabel } from './booking';
 import { DatePicker } from './DatePicker';
@@ -135,8 +136,10 @@ export function UnitPage({ site }: UnitPageProps) {
           {listing.photoUrls.map((url, idx) => (
             <img
               key={url}
-              src={url}
+              src={photoSrc(url, idx === 0 ? 1024 : 480)!}
               alt={`${listing.title} photo ${idx + 1}`}
+              loading={idx === 0 ? 'eager' : 'lazy'}
+              decoding="async"
               className={idx === 0 ? 'site-gallery__main' : 'site-gallery__thumb'}
             />
           ))}

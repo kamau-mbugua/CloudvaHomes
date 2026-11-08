@@ -10,6 +10,7 @@ import { useAuthedBlobUrl } from '../uploads/api';
 import {
   fromApiRules,
   guestPaymentWarning,
+  legalPayload,
   staysErrorMessage,
   staysKeys,
   toApiRules,
@@ -17,6 +18,7 @@ import {
 } from './api';
 import { resizeImage } from './resizeImage';
 import { RulesFields } from './RulesFields';
+import { LegalFields, type LegalKey, ThemeFields } from './SiteLookAndLegal';
 import type { HostSite, SlugCheckResult, StayRules } from './types';
 
 function SiteSettingsForm({ site }: { site: HostSite }) {
@@ -36,6 +38,15 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
   const [checkOutTime, setCheckOutTime] = useState(site.checkOutTime);
   const [houseRules, setHouseRules] = useState(site.houseRules ?? '');
   const [rules, setRules] = useState<StayRules>(() => fromApiRules(site.rules));
+  const [theme, setTheme] = useState({
+    preset: site.theme?.preset ?? 'forest',
+    brandColor: site.theme?.brandColor ?? '',
+  });
+  const [legal, setLegal] = useState<Record<LegalKey, string>>({
+    terms: site.legal?.terms.text ?? '',
+    termsOfUse: site.legal?.termsOfUse.text ?? '',
+    privacy: site.legal?.privacy.text ?? '',
+  });
   const [localError, setLocalError] = useState<string | null>(null);
 
   const trimmedSlug = slug.trim().toLowerCase();
@@ -101,6 +112,15 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
       checkOutTime,
       houseRules: houseRules.trim() || null,
       rules: toApiRules(rules),
+      themePreset: theme.preset,
+      brandColor: theme.brandColor || null,
+      ...(site.legal
+        ? {
+            termsText: legalPayload(legal.terms, site.legal.terms.starter),
+            termsOfUseText: legalPayload(legal.termsOfUse, site.legal.termsOfUse.starter),
+            privacyText: legalPayload(legal.privacy, site.legal.privacy.starter),
+          }
+        : {}),
     });
   };
 
@@ -371,6 +391,23 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
             />
           </div>
         </section>
+
+        <ThemeFields
+          preset={theme.preset}
+          brandColor={theme.brandColor}
+          disabled={!canUpdate}
+          onChange={setTheme}
+        />
+
+        {site.legal ? (
+          <LegalFields
+            pages={site.legal}
+            values={legal}
+            siteAddress={site.address}
+            disabled={!canUpdate}
+            onChange={(key, text) => setLegal((l) => ({ ...l, [key]: text }))}
+          />
+        ) : null}
 
         {errMsg ? (
           <p className="au__error" role="alert">

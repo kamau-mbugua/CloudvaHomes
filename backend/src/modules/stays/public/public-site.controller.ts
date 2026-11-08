@@ -25,6 +25,7 @@ import {
   PublicQuoteDto,
   PublicVerifyPhoneDto,
 } from './public-site.dto.js';
+import { photoWidth } from '../../files/photo-variants.js';
 import { PublicSiteService } from './public-site.service.js';
 import { siteCsp } from './site-html.js';
 
@@ -68,6 +69,11 @@ export class PublicSiteController {
     @Req() req: Request,
   ) {
     return ok(await this.publicSite.getAvailableListings(slug, q, clientIp(req)));
+  }
+
+  @Get('sites/:slug/legal/:doc')
+  async getLegalPage(@Param('slug') slug: string, @Param('doc') doc: string, @Req() req: Request) {
+    return ok(await this.publicSite.getLegalPage(slug, doc, clientIp(req)));
   }
 
   @Post('sites/:slug/listings/:id/quote')
@@ -146,8 +152,23 @@ export class PublicSiteController {
   @Get('photos/:uploadId')
   async getPhoto(
     @Param('uploadId', ParseUUIDPipe) uploadId: string,
+    @Query('w') w: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
+    // ?w=160|480|1024 → a smaller WebP copy. Its URL never changes content (a new photo is a
+    // new upload id), so browsers may keep it for a year.
+    const width = photoWidth(w);
+    if (width) {
+      const variant = await this.uploads.publicPhotoVariant(uploadId, width);
+      res.setHeader('Content-Type', variant.contentType);
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader(
+        'Cache-Control',
+        variant.resized ? 'public, max-age=31536000, immutable' : 'public, max-age=86400',
+      );
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      return new StreamableFile(variant.data);
+    }
     const { upload, data } = await this.uploads.publicPhotoContent(uploadId);
     res.setHeader('Content-Type', upload.contentType);
     res.setHeader('Content-Disposition', 'inline');

@@ -138,3 +138,9 @@ export function guestPaymentWarning(
   if (rules.payment.kind === 'ON_ARRIVAL') return null;
   return "Guests can't pay you yet. Add an M-Pesa paybill or till so guests can pay when they book. Until then, bookings that need payment upfront are held for 2 hours and then released.";
 }
+
+/** A legal page left as the starter text is saved as null, so the template keeps tracking the host's details. */
+export function legalPayload(text: string, starter: string): string | null {
+  const t = text.trim();
+  return t === '' || t === starter.trim() ? null : t;
+}

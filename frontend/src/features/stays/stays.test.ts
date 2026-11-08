@@ -3,6 +3,7 @@ import {
   DEFAULT_STAY_RULES,
   fromApiRules,
   guestPaymentWarning,
+  legalPayload,
   toApiRules,
   validateStayRules,
 } from './api';
@@ -120,5 +121,16 @@ describe('rules sent to and read from the API', () => {
       ...DEFAULT_STAY_RULES,
       payment: { kind: 'ON_ARRIVAL' },
     });
+  });
+});
+
+describe('legal page text sent on save', () => {
+  it('sends nothing (keep the starter text) when the host left it as the starter text', () => {
+    expect(legalPayload('Starter text.', 'Starter text.')).toBeNull();
+    expect(legalPayload('  Starter text.  ', 'Starter text.')).toBeNull();
+    expect(legalPayload('', 'Starter text.')).toBeNull();
+  });
+  it('sends the own text of the host when it differs', () => {
+    expect(legalPayload('Our terms.', 'Starter text.')).toBe('Our terms.');
   });
 });

@@ -1714,6 +1714,13 @@ model HostSite {
   houseRules        String?
   checkInTime       String    @default("14:00")
   checkOutTime      String    @default("10:00")
+  /// Booking-site look: one of rules/legal.ts THEME_PRESETS, optionally a brand colour (#RRGGBB).
+  themePreset       String    @default("forest")
+  brandColor        String?
+  /// The host's own legal pages; null = the starter template (rules/legal.ts).
+  termsText         String?
+  termsOfUseText    String?
+  privacyText       String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { DarajaClient, type StkQueryResult } from '../src/modules/mpesa/daraja.client.js';
 import { outbox } from '../src/modules/notifications/senders.js';
 import {
@@ -598,5 +599,95 @@ describe('Stays — Public booking site API (e2e)', () => {
     expect(res.payWhenText).toBeTruthy();
     expect(res.cancellationText).toBeTruthy();
     expect(res.rules).toBeUndefined();
+  });
+
+  it('host theme and legal pages reach the public site (own text, else the starter text)', async () => {
+    await setUpPublishedSite({ withMpesa: false });
+
+    // Bad values are refused.
+    await patch(host, '/host/site', { themePreset: 'neon' }, 422);
+    await patch(host, '/host/site', { brandColor: 'green' }, 422);
+
+    const saved = (
+      await patch(host, '/host/site', {
+        themePreset: 'ocean',
+        brandColor: '#0E7490',
+        termsText: 'Our own booking terms.',
+      })
+    ).data;
+    expect(saved.theme).toEqual({ preset: 'ocean', brandColor: '#0E7490' });
+    expect(saved.legal.terms).toMatchObject({ text: 'Our own booking terms.', isDefault: false });
+    expect(saved.legal.terms.starter).toContain('Cozy Homes');
+    expect(saved.legal.privacy.isDefault).toBe(true);
+    expect(saved.legal.privacy.text).toContain('Cozy Homes');
+
+    const site = check(await t.http().get('/api/v1/public/sites/cozy-homes'), 200).data;
+    expect(site.theme).toEqual({ preset: 'ocean', brandColor: '#0E7490' });
+    expect(site.legalPages).toEqual([
+      { key: 'terms', title: 'Terms and Conditions' },
+      { key: 'terms-of-use', title: 'Terms of Use' },
+      { key: 'privacy', title: 'Privacy Policy' },
+    ]);
+
+    const terms = check(
+      await t.http().get('/api/v1/public/sites/cozy-homes/legal/terms'),
+      200,
+    ).data;
+    expect(terms).toMatchObject({
+      key: 'terms',
+      title: 'Terms and Conditions',
+      text: 'Our own booking terms.',
+    });
+    const privacy = check(
+      await t.http().get('/api/v1/public/sites/cozy-homes/legal/privacy'),
+      200,
+    ).data;
+    expect(privacy.text).toContain('Data Protection Act, 2019');
+    expect(privacy.text).toContain('Cozy Homes');
+    await t.http().get('/api/v1/public/sites/cozy-homes/legal/cookies').expect(404);
+
+    // Clearing the host's text goes back to the starter text.
+    const cleared = (await patch(host, '/host/site', { termsText: null })).data;
+    expect(cleared.legal.terms.isDefault).toBe(true);
+  });
+
+  it('serves smaller WebP sizes of public photos, made once and cached', async () => {
+    const { listing, uploadId: stubId } = await setUpPublishedSite({ withMpesa: false });
+    const realJpeg = await sharp({
+      create: { width: 1600, height: 900, channels: 3, background: '#336699' },
+    })
+      .jpeg()
+      .toBuffer();
+    const uploadId = check(
+      await t
+        .http()
+        .post(`/api/v1/host/listings/${listing.id}/photos`)
+        .set(auth(host))
+        .attach('file', realJpeg, { filename: 'room.jpg', contentType: 'image/jpeg' }),
+      201,
+    ).data.uploadId as string;
+
+    const first = await t.http().get(`/api/v1/public/photos/${uploadId}?w=480`).buffer(true);
+    expect(first.status).toBe(200);
+    expect(first.headers['content-type']).toBe('image/webp');
+    expect(first.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    const again = await t.http().get(`/api/v1/public/photos/${uploadId}?w=480`).buffer(true);
+    expect(Buffer.compare(first.body as Buffer, again.body as Buffer)).toBe(0);
+
+    expect((await sharp(first.body as Buffer).metadata()).width).toBe(480);
+
+    // A photo that can't be resized is served as the original instead of failing.
+    const stub = await t.http().get(`/api/v1/public/photos/${stubId}?w=480`);
+    expect(stub.status).toBe(200);
+    expect(stub.headers['content-type']).toBe('image/jpeg');
+
+    // An unknown width gets the original.
+    const original = await t.http().get(`/api/v1/public/photos/${uploadId}?w=333`);
+    expect(original.status).toBe(200);
+    expect(original.headers['content-type']).toBe('image/jpeg');
+
+    // Unpublished listings keep their photos private at every size.
+    await patch(host, `/host/listings/${listing.id}`, { published: false });
+    await t.http().get(`/api/v1/public/photos/${uploadId}?w=480`).expect(404);
   });
 });

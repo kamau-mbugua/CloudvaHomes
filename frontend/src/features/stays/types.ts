@@ -57,6 +57,15 @@ export interface HostSite {
   checkOutTime: string;
   address: string | null;
   guestPayments?: GuestPayments;
+  theme?: { preset: string; brandColor: string | null };
+  legal?: Record<'terms' | 'termsOfUse' | 'privacy', HostLegalPage>;
+}
+
+export interface HostLegalPage {
+  text: string;
+  /** True when the site shows the starter template (the host has not written their own). */
+  isDefault: boolean;
+  starter: string;
 }
 
 export interface SlugCheckResult {

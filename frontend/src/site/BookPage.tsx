@@ -294,6 +294,19 @@ export function BookPage({ site }: BookPageProps) {
                 </div>
                 <p className="site-terms-note">{quote.payWhenText}</p>
                 <p className="site-terms-note">{quote.cancellationText}</p>
+                {site.legalPages?.some((p) => p.key === 'terms') ? (
+                  <p className="site-terms-note">
+                    By booking you agree to the{' '}
+                    <Link to="/terms" target="_blank">
+                      Terms and Conditions
+                    </Link>
+                    {site.houseRules ? ' and house rules' : ''}, and confirm you have read the{' '}
+                    <Link to="/privacy" target="_blank">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </p>
+                ) : null}
                 {!quote.available && quote.problems.length > 0 ? (
                   <div className="site-alert site-alert--error" role="alert">
                     {quote.problems.join('. ')}. Please change your dates or guests.

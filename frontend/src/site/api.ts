@@ -53,7 +53,16 @@ export interface PublicSiteData {
   houseRules: string | null;
   checkInTime: string;
   checkOutTime: string;
+  theme?: { preset: string; brandColor: string | null };
+  legalPages?: { key: string; title: string }[];
   listings: PublicListingSummary[];
+}
+
+export interface PublicLegalPage {
+  key: string;
+  title: string;
+  text: string;
+  updatedAt: string | null;
 }
 
 export interface PublicListingDetail {
@@ -139,6 +148,9 @@ export interface PublicBookingDetail {
 export const publicSiteApi = {
   getSite: (slug: string) => req<PublicSiteData>(`/sites/${encodeURIComponent(slug)}`),
 
+  legal: (slug: string, doc: string) =>
+    req<PublicLegalPage>(`/sites/${encodeURIComponent(slug)}/legal/${encodeURIComponent(doc)}`),
+
   getAvailable: (slug: string, checkIn: string, checkOut: string, guests: number) =>
     req<{ listings: PublicListingSummary[] }>(
       `/sites/${encodeURIComponent(slug)}/available?checkIn=${encodeURIComponent(checkIn)}&checkOut=${encodeURIComponent(checkOut)}&guests=${guests}`,
@@ -210,3 +222,8 @@ export const publicSiteApi = {
       body: JSON.stringify({ code }),
     }),
 };
+
+/** A smaller WebP size of a public photo (the API makes 160, 480 and 1024 px). */
+export function photoSrc(url: string | null, width: 160 | 480 | 1024): string | null {
+  return url ? `${url}?w=${width}` : null;
+}

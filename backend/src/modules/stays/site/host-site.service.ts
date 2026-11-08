@@ -15,6 +15,7 @@ import { slugProblem } from '../rules/slug.js';
 import { DEFAULT_RULES, rulesProblem, type StayRules } from '../rules/terms.js';
 import type { WrapperType } from '../../../common/di/wrapper-type.js';
 import { DarajaConfigService } from '../../mpesa/daraja-config.service.js';
+import { type LegalDocKey, legalTemplate } from '../rules/legal.js';
 import type { UpdateHostSiteDto } from './host-site.dto.js';
 
 /** What guests can use to pay this host. Neither = bookings needing money upfront expire. */
@@ -70,6 +71,41 @@ export class HostSiteService {
       checkInTime: s.checkInTime,
       checkOutTime: s.checkOutTime,
       address: s.slug ? `https://${s.slug}.${this.env.SITE_DOMAIN}` : null,
+      theme: { preset: s.themePreset, brandColor: s.brandColor },
+      legal: this.legalView(s),
+    };
+  }
+
+  /** For the audit log: the site view without the long legal texts (just whether each is custom). */
+  private auditView(s: HostSite) {
+    const { legal: _legal, ...rest } = this.toView(s);
+    return {
+      ...rest,
+      legalCustom: {
+        terms: !!s.termsText,
+        termsOfUse: !!s.termsOfUseText,
+        privacy: !!s.privacyText,
+      },
+    };
+  }
+
+  /** Each legal page: the host's own text, or the starter template (isDefault) to edit. */
+  private legalView(s: HostSite) {
+    const ctx = {
+      businessName: s.businessName,
+      contactPhone: s.whatsappPhone ?? s.contactPhone,
+      siteAddress: s.slug ? `https://${s.slug}.${this.env.SITE_DOMAIN}` : null,
+    };
+    const page = (own: string | null, key: LegalDocKey) => {
+      const starter = legalTemplate(key, ctx);
+      return own
+        ? { text: own, isDefault: false, starter }
+        : { text: starter, isDefault: true, starter };
+    };
+    return {
+      terms: page(s.termsText, 'terms'),
+      termsOfUse: page(s.termsOfUseText, 'terms-of-use'),
+      privacy: page(s.privacyText, 'privacy'),
     };
   }
 
@@ -224,6 +260,17 @@ export class HostSiteService {
             ...(dto.checkInTime !== undefined ? { checkInTime: dto.checkInTime } : {}),
             ...(dto.checkOutTime !== undefined ? { checkOutTime: dto.checkOutTime } : {}),
             ...(dto.logoUploadId !== undefined ? { logoUploadId: dto.logoUploadId } : {}),
+            ...(dto.themePreset !== undefined ? { themePreset: dto.themePreset } : {}),
+            ...(dto.brandColor !== undefined
+              ? { brandColor: dto.brandColor ? dto.brandColor.toUpperCase() : null }
+              : {}),
+            ...(dto.termsText !== undefined ? { termsText: dto.termsText?.trim() || null } : {}),
+            ...(dto.termsOfUseText !== undefined
+              ? { termsOfUseText: dto.termsOfUseText?.trim() || null }
+              : {}),
+            ...(dto.privacyText !== undefined
+              ? { privacyText: dto.privacyText?.trim() || null }
+              : {}),
           },
         });
 
@@ -232,8 +279,8 @@ export class HostSiteService {
             action: 'host_site.update',
             entity: 'host_site',
             entityId: row.id,
-            before: this.toView(before),
-            after: this.toView(row),
+            before: this.auditView(before),
+            after: this.auditView(row),
           },
           tx,
         );

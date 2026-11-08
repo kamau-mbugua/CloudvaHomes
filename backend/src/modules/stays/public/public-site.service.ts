@@ -44,6 +44,7 @@ import type {
   PublicQuoteDto,
   PublicVerifyPhoneDto,
 } from './public-site.dto.js';
+import { LEGAL_DOCS, legalTemplate } from '../rules/legal.js';
 import { injectMeta, siteSlugFromHost } from './site-html.js';
 import type { WrapperType } from '../../../common/di/wrapper-type.js';
 
@@ -162,6 +163,8 @@ export class PublicSiteService {
         houseRules: site.houseRules,
         checkInTime: site.checkInTime,
         checkOutTime: site.checkOutTime,
+        theme: { preset: site.themePreset, brandColor: site.brandColor },
+        legalPages: LEGAL_DOCS.map((d) => ({ key: d.key, title: d.title })),
         listings: listings.map((l) => ({
           id: l.id,
           title: l.title,
@@ -358,6 +361,28 @@ export class PublicSiteService {
         problems: q.problems,
       };
     });
+  }
+
+  /** One legal page of a published site: the host's own text, else the starter template. */
+  async getLegalPage(slug: string, key: string, ip: string) {
+    await this.rateLimit.hit({ key: `pub:avail:ip:${ip}`, limit: 120, windowSeconds: 60 });
+    const doc = LEGAL_DOCS.find((d) => d.key === key);
+    if (!doc) throw AppError.notFound('Page');
+    const site = await this.requireSite(slug);
+    const own = site[doc.field];
+    const text =
+      own ||
+      legalTemplate(doc.key, {
+        businessName: site.businessName || site.organization.name,
+        contactPhone: site.whatsappPhone ?? site.contactPhone,
+        siteAddress: site.slug ? `https://${site.slug}.${this.env.SITE_DOMAIN}` : null,
+      });
+    return {
+      key: doc.key,
+      title: doc.title,
+      text,
+      updatedAt: own ? site.updatedAt.toISOString() : null,
+    };
   }
 
   async verifyPhone(slug: string, dto: PublicVerifyPhoneDto, ip: string) {
@@ -943,7 +968,9 @@ export class PublicSiteService {
           return injectMeta(indexHtml, {
             title: `${listing.title} · ${biz}`,
             description: desc,
-            image: coverId ? `${scheme}://${cleanHost}/api/v1/public/photos/${coverId}` : null,
+            image: coverId
+              ? `${scheme}://${cleanHost}/api/v1/public/photos/${coverId}?w=1024`
+              : null,
             url: fullUrl,
           });
         }
@@ -969,7 +996,7 @@ export class PublicSiteService {
       return injectMeta(indexHtml, {
         title: biz,
         description: site.about?.trim() || `Book directly with ${biz}`,
-        image: coverId ? `${scheme}://${cleanHost}/api/v1/public/photos/${coverId}` : null,
+        image: coverId ? `${scheme}://${cleanHost}/api/v1/public/photos/${coverId}?w=1024` : null,
         url: fullUrl,
       });
     } catch {
