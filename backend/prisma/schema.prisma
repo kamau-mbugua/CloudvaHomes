@@ -1538,6 +1538,7 @@ model PlatformStkRequest {
   requestedById     String?   @db.Uuid
   createdAt         DateTime  @default(now())
   completedAt       DateTime?
+  purpose           String    @default("INVOICE") // "INVOICE" | "SMS" (SMS bundles never touch invoices)
 
   @@index([state, createdAt])
   @@map("platform_stk_requests")
@@ -1545,42 +1546,55 @@ model PlatformStkRequest {
 
 /// The single row of KodiHub's own billing and platform settings (id = 1).
 model PlatformSettings {
-  id                    Int            @id @default(1)
-  dueDays               Int            @default(10)
-  suspendAfterDays      Int            @default(21)
-  defaultPlanId         String?        @db.Uuid
-  paybill               String?
-  darajaEnv             DarajaEnv?
-  secretsEnc            Bytes?
-  callbackToken         String?        @unique
+  id                      Int            @id @default(1)
+  dueDays                 Int            @default(10)
+  suspendAfterDays        Int            @default(21)
+  defaultPlanId           String?        @db.Uuid
+  paybill                 String?
+  darajaEnv               DarajaEnv?
+  secretsEnc              Bytes?
+  callbackToken           String?        @unique
   // ── Security & Admin 2FA (phase 11) ──
-  requireAdminTwoFactor Boolean        @default(false)
-  adminTwoFactorChannel MessageChannel @default(EMAIL)
+  requireAdminTwoFactor   Boolean        @default(false)
+  adminTwoFactorChannel   MessageChannel @default(EMAIL)
   // ── Email SMTP (phase 11) ──
-  smtpHost              String?
-  smtpPort              Int?           @default(587)
-  smtpUser              String?
-  smtpEncryption        String?        @default("tls")
-  smtpPassEnc           Bytes?
-  smtpFromEmail         String?
-  smtpFromName          String?
-  smtpAllowlist         String?
-  emailTemplates        Json           @default("{}")
+  smtpHost                String?
+  smtpPort                Int?           @default(587)
+  smtpUser                String?
+  smtpEncryption          String?        @default("tls")
+  smtpPassEnc             Bytes?
+  smtpFromEmail           String?
+  smtpFromName            String?
+  smtpAllowlist           String?
+  emailTemplates          Json           @default("{}")
   // ── SMS Africa's Talking (phase 11) ──
-  atUsername            String?
-  atSenderId            String?
-  atApiKeyEnc           Bytes?
+  atUsername              String?
+  atSenderId              String?
+  atApiKeyEnc             Bytes?
+  // ── SMS providers, units and pricing (2026-11 SMS plan) ──
+  smsProvider             SmsProvider    @default(AFRICASTALKING)
+  textsmsPartnerId        String?
+  textsmsKeyEnc           Bytes?
+  textsmsSenderId         String?
+  hostpinnacleUserId      String?
+  hostpinnacleKeyEnc      Bytes?
+  hostpinnaclePasswordEnc Bytes?
+  hostpinnacleSenderId    String?
+  smsUnitPrice            BigInt         @default(80) // cents per unit (KES 0.80)
+  smsBundles              Int[]          @default([500, 1000, 5000])
+  smsMinUnits             Int            @default(100)
+  smsFreeUnits            Int            @default(100) // given to every new organisation
   // ── Signup, Mobile App & Maintenance (phase 11) ──
-  allowPublicSignup     Boolean        @default(false)
-  minAppVersionCode     Int            @default(1)
-  minAppVersionName     String?        @default("1.0.0")
-  appUpdateMessage      String?
-  appStoreUrl           String?
-  maintenanceMode       Boolean        @default(false)
-  maintenanceMessage    String?
+  allowPublicSignup       Boolean        @default(false)
+  minAppVersionCode       Int            @default(1)
+  minAppVersionName       String?        @default("1.0.0")
+  appUpdateMessage        String?
+  appStoreUrl             String?
+  maintenanceMode         Boolean        @default(false)
+  maintenanceMessage      String?
   /// Monthly rental income tax rate for the MRI report, basis points (750 = 7.5%). Phase 13.
-  mriRateBps            Int            @default(750)
-  updatedAt             DateTime       @updatedAt
+  mriRateBps              Int            @default(750)
+  updatedAt               DateTime       @updatedAt
 
   @@map("platform_settings")
 }
@@ -1902,4 +1916,130 @@ model CleaningTask {
 
   @@index([orgId, status])
   @@map("cleaning_tasks")
+}
+
+// ───────────────────────────── SMS: platform vs organisation (2026-11 SMS plan) ─────────────────────────────
+// Not org-scoped by the extension (like platform billing): SmsService runs in public and job contexts
+// and always filters by an explicit orgId; organisation-facing endpoints filter by the caller's orgId.
+
+enum SmsMode {
+  PLATFORM
+  OWN
+}
+
+enum SmsProvider {
+  AFRICASTALKING
+  TEXTSMS
+  HOSTPINNACLE
+}
+
+enum SmsKind {
+  PLATFORM
+  ORG
+}
+
+enum SmsRoute {
+  PLATFORM
+  ORG_PROVIDER
+  PLATFORM_FALLBACK
+  PLATFORM_FREE
+}
+
+enum SmsLogStatus {
+  SENT
+  FAILED
+  NO_UNITS
+}
+
+enum SmsLedgerKind {
+  PURCHASE
+  ADJUSTMENT
+  CHARGE
+  REFUND
+}
+
+enum SmsPurchaseState {
+  PENDING
+  PAID
+  FAILED
+}
+
+/// One per organisation: how its SMS is sent, its prepaid KodiHub units and warning state.
+model SmsAccount {
+  orgId              String       @id @db.Uuid
+  mode               SmsMode      @default(PLATFORM)
+  provider           SmsProvider?
+  providerUser       String? // AT username, TextSMS partner ID, or HostPinnacle user ID
+  providerKeyEnc     Bytes? // API key (all providers)
+  providerSecretEnc  Bytes? // HostPinnacle password
+  senderId           String?
+  sandbox            Boolean      @default(false)
+  unitPrice          BigInt? // cents; null = platform price
+  lowBalanceLevel    Int          @default(50)
+  fallbackToPlatform Boolean      @default(false)
+  balance            Int          @default(0)
+  lowWarnedOn        DateTime?    @db.Date
+  emptyWarnedOn      DateTime?    @db.Date
+  failWarnedOn       DateTime?    @db.Date
+  failingSince       DateTime?
+  lastFailReason     String?
+  updatedAt          DateTime     @updatedAt
+
+  @@map("sms_accounts")
+}
+
+/// Every SMS KodiHub tried to send, platform or organisation.
+model SmsLog {
+  id                String       @id @default(uuid(7)) @db.Uuid
+  orgId             String?      @db.Uuid
+  kind              SmsKind
+  type              String
+  to                String
+  units             Int          @default(0)
+  route             SmsRoute?
+  provider          SmsProvider?
+  providerMessageId String?
+  status            SmsLogStatus
+  reason            String?
+  createdAt         DateTime     @default(now())
+
+  @@index([orgId, createdAt])
+  @@map("sms_logs")
+}
+
+/// Unit movements; their sum per organisation is the balance.
+model SmsLedgerEntry {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  orgId        String        @db.Uuid
+  kind         SmsLedgerKind
+  units        Int
+  balanceAfter Int
+  smsLogId     String?       @db.Uuid
+  purchaseId   String?       @db.Uuid
+  reason       String?
+  createdById  String?       @db.Uuid
+  createdAt    DateTime      @default(now())
+
+  @@index([orgId, createdAt])
+  @@map("sms_ledger")
+}
+
+/// A bundle of KodiHub SMS units bought by M-Pesa (prompt or paybill).
+model SmsPurchase {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  orgId         String            @db.Uuid
+  units         Int
+  unitPrice     BigInt
+  amount        BigInt
+  state         SmsPurchaseState  @default(PENDING)
+  phone         String?
+  stkRequestId  String?           @unique @db.Uuid
+  mpesaReceipt  String?           @unique
+  source        PlatformPaySource
+  requestedById String?           @db.Uuid
+  createdAt     DateTime          @default(now())
+  paidAt        DateTime?
+
+  @@index([orgId, createdAt])
+  @@map("sms_purchases")
 }

@@ -12,7 +12,8 @@ import {
   MinLength,
 } from 'class-validator';
 
-export class BroadcastPreviewDto {
+/** Which properties' current tenants get the notice. */
+export class BroadcastTargetDto {
   @ApiProperty({ type: [String], description: 'Properties whose current tenants get the notice' })
   @IsArray()
   @ArrayMinSize(1)
@@ -21,7 +22,15 @@ export class BroadcastPreviewDto {
   propertyIds!: string[];
 }
 
-export class CreateBroadcastDto extends BroadcastPreviewDto {
+export class BroadcastPreviewDto extends BroadcastTargetDto {
+  @ApiPropertyOptional({ description: 'The notice text, to work out the SMS units it needs' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(480)
+  text?: string;
+}
+
+export class CreateBroadcastDto extends BroadcastTargetDto {
   @ApiProperty({ minLength: 1, maxLength: 480, example: 'Water off Saturday 9am to noon.' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()

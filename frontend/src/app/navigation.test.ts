@@ -102,7 +102,7 @@ describe('the model', () => {
 
   it('searches by label, group and hint', () => {
     expect(searchDestinations(all, 'remit').map((d) => d.label)).toContain('Remittances');
-    expect(searchDestinations(all, 'SETTINGS').length).toBe(7);
+    expect(searchDestinations(all, 'SETTINGS').length).toBe(8);
     expect(searchDestinations(all, 'm-pesa').map((d) => d.label)).toEqual(['Reconciliation', 'Payouts']);
     expect(searchDestinations(all, '   ')).toHaveLength(all.length);
   });
@@ -147,7 +147,7 @@ describe('filterNav', () => {
 
   it('does not mutate the model', () => {
     filterNav(ORG_NAV, []);
-    expect(ORG_NAV.find((g) => g.id === 'settings')?.children.length).toBe(7);
+    expect(ORG_NAV.find((g) => g.id === 'settings')?.children.length).toBe(8);
   });
 
   it('gives every page except the dashboard a resource:action permission', () => {
@@ -258,3 +258,14 @@ describe('hintFor', () => {
     expect(hintFor(reconciliation, 'AGENCY')).toBe('Match M-Pesa and bank transactions to tenants');
   });
 });
+
+describe('SMS settings entry', () => {
+  it('shows Settings → SMS to anyone who can see SMS, in every kind of organisation', () => {
+    for (const kind of ['LANDLORD', 'AGENCY', 'HOST'] as const) {
+      const settings = filterNav(ORG_NAV, ['sms:view'], kind).find((g) => g.id === 'settings');
+      expect(settings?.children?.map((c) => c.to)).toEqual(['/app/settings/sms']);
+    }
+    expect(filterNav(ORG_NAV, ['settings:view'], 'HOST').find((g) => g.id === 'settings')?.children?.map((c) => c.to)).not.toContain('/app/settings/sms');
+  });
+});
+

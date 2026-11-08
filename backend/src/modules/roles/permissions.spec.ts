@@ -49,6 +49,17 @@ describe('permission catalogue', () => {
     expect([...SYSTEM_ROLE_DEFAULTS.OWNER.permissions].sort()).toEqual([...ALL_PERMISSIONS].sort());
   });
 
+  it('gives owners SMS management and managers/accountants SMS viewing, for every kind', () => {
+    for (const kind of ['LANDLORD', 'AGENCY', 'HOST'] as const) {
+      const r = systemRoleDefaults(kind);
+      expect(r.OWNER.permissions).toEqual(expect.arrayContaining(['sms:view', 'sms:manage']));
+      expect(r.MANAGER.permissions).toContain('sms:view');
+      expect(r.MANAGER.permissions).not.toContain('sms:manage');
+      expect(r.ACCOUNTANT.permissions).toContain('sms:view');
+      expect(r.CARETAKER.permissions).not.toContain('sms:view');
+    }
+  });
+
   it('separates short-stay role defaults for HOST vs LANDLORD/AGENCY', () => {
     const hostCaretaker = new Set<string>(systemRoleDefaults('HOST').CARETAKER.permissions);
     expect(hostCaretaker.has('bookings:update')).toBe(true);

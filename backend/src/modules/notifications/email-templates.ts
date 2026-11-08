@@ -11,6 +11,9 @@ export const EMAIL_TEMPLATE_KEYS = [
   'tenant_invoice',
   'tenant_payment_receipt',
   'tenant_rent_reminder',
+  'sms_low',
+  'sms_empty',
+  'sms_failing',
 ] as const;
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
@@ -651,6 +654,63 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
         key: 'portalLink',
         description: 'URL to the KodiHub Tenant Portal',
         sample: 'https://app.kodihub.co.ke/tenant',
+      },
+    ],
+  },
+  sms_low: {
+    key: 'sms_low',
+    name: 'SMS Units Running Low',
+    category: 'Platform Billing',
+    description:
+      'Sent to organisation owners on KodiHub SMS when their prepaid SMS units drop below their low-balance level.',
+    defaultSubject: 'SMS units running low',
+    defaultBody:
+      '{{organizationName}}: {{balance}} SMS units left. Buy more in KodiHub (Settings → SMS) so messages to your tenants and guests keep going.',
+    variables: [
+      { key: 'organizationName', description: 'Organisation name', sample: 'Makini Homes' },
+      { key: 'balance', description: 'SMS units left', sample: '49' },
+      {
+        key: 'reason',
+        description: 'Why the SMS provider refused the message',
+        sample: 'Invalid credentials',
+      },
+    ],
+  },
+  sms_empty: {
+    key: 'sms_empty',
+    name: 'Out of SMS Units',
+    category: 'Platform Billing',
+    description:
+      'Sent to organisation owners on KodiHub SMS when a message to a tenant or guest was not sent for lack of units.',
+    defaultSubject: 'Out of SMS units',
+    defaultBody:
+      '{{organizationName}}: messages to your tenants and guests are not being sent because you have no SMS units left. Buy SMS units in KodiHub (Settings → SMS) to start again.',
+    variables: [
+      { key: 'organizationName', description: 'Organisation name', sample: 'Makini Homes' },
+      { key: 'balance', description: 'SMS units left', sample: '49' },
+      {
+        key: 'reason',
+        description: 'Why the SMS provider refused the message',
+        sample: 'Invalid credentials',
+      },
+    ],
+  },
+  sms_failing: {
+    key: 'sms_failing',
+    name: 'Own SMS Account Failing',
+    category: 'Platform Billing',
+    description:
+      'Sent to organisation owners using their own SMS provider when it refuses messages.',
+    defaultSubject: 'Your SMS account isn’t sending',
+    defaultBody:
+      '{{organizationName}}: your SMS provider refused a message ({{reason}}). Messages to your tenants and guests are failing. Check your SMS account, or buy KodiHub SMS units (Settings → SMS).',
+    variables: [
+      { key: 'organizationName', description: 'Organisation name', sample: 'Makini Homes' },
+      { key: 'balance', description: 'SMS units left', sample: '49' },
+      {
+        key: 'reason',
+        description: 'Why the SMS provider refused the message',
+        sample: 'Invalid credentials',
       },
     ],
   },

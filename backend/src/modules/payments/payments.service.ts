@@ -201,6 +201,7 @@ export class PaymentsService {
     return {
       payment,
       org: { name: org.name, phone: org.phone, email: org.email, kraPin: org.kraPin },
+      orgId: p.orgId,
       balance,
       instructions: {
         org: orgDocs.receiptInstructions,
@@ -443,11 +444,11 @@ export class PaymentsService {
   private async sendReceipt(id: string, phone: string, number: string): Promise<boolean> {
     try {
       const receiptData = await this.forReceipt(id);
-      const { payment, org, balance } = receiptData;
+      const { payment, org, orgId, balance } = receiptData;
       const standing = balanceText(balance);
       let sentAny = false;
       try {
-        await this.notifications.sendPaymentReceipt(phone, {
+        await this.notifications.sendPaymentReceipt(orgId, phone, {
           amount: money(payment.amount),
           number,
           balance: standing,

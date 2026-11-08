@@ -108,6 +108,14 @@ export const PERMISSION_CATALOGUE: PermissionGroup[] = [
     permissions: [{ key: 'reports:view', label: 'View reports and dashboard figures' }],
   },
   {
+    group: 'sms',
+    label: 'SMS',
+    permissions: [
+      { key: 'sms:view', label: 'See SMS balance and usage' },
+      { key: 'sms:manage', label: 'Buy SMS units and change SMS settings' },
+    ],
+  },
+  {
     group: 'admin',
     label: 'Administration',
     permissions: [
@@ -161,6 +169,7 @@ export function systemRoleDefaults(kind: OrgKind): Record<SystemRole, RoleDefaul
               'stay-payments:refund',
               'settings:update',
               'users:delete',
+              'sms:manage',
             ].includes(p),
         ),
       },
@@ -213,6 +222,7 @@ export function systemRoleDefaults(kind: OrgKind): Record<SystemRole, RoleDefaul
             'payments:refund',
             'users:delete',
             'settings:update',
+            'sms:manage',
           ].includes(p),
       ),
     },

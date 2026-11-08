@@ -18,7 +18,7 @@ export class BroadcastsController {
   @HttpCode(200)
   @RequirePermission('messages:send')
   async preview(@Body() dto: BroadcastPreviewDto) {
-    return ok(await this.broadcasts.preview(dto.propertyIds));
+    return ok(await this.broadcasts.preview(dto.propertyIds, dto.text));
   }
 
   /** Queues the notice; it is sent in the background (one per organisation a minute). */

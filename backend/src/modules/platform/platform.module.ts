@@ -9,6 +9,10 @@ import { PlatformBillingService } from './platform-billing.service.js';
 import { PlatformHooksController } from './platform-hooks.controller.js';
 import { PlatformPayService } from './platform-pay.service.js';
 import { PlatformReportsService } from './platform-reports.service.js';
+import { SmsController } from './sms.controller.js';
+import { SmsAdminController } from './sms-admin.controller.js';
+import { SmsSettingsService } from './sms-settings.service.js';
+import { SmsPurchasesService } from './sms-purchases.service.js';
 import {
   BillingController,
   PlatformController,
@@ -25,8 +29,12 @@ import {
     PlatformJobsController,
     PlatformHooksController,
     PublicLandingController,
+    SmsController,
+    SmsAdminController,
   ],
   providers: [
+    SmsPurchasesService,
+    SmsSettingsService,
     PlatformBillingService,
     PlatformAdminService,
     PlatformPayService,

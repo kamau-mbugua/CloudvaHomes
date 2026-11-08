@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { broadcastSummary, counterLabel, smsSegments } from './rules';
+import { unitsLine } from './rules';
 
 describe('smsSegments', () => {
   it('matches the server: 160/153 for plain text, 70/67 otherwise', () => {
@@ -28,3 +29,16 @@ describe('broadcastSummary', () => {
       .toBe('1 of 1 text sent');
   });
 });
+
+describe('SMS units before a notice goes out', () => {
+  const platform = { mode: 'PLATFORM' as const, balance: 5 };
+  it('says how many units it needs against the balance', () => {
+    expect(unitsLine(2, 3, platform)).toEqual({ text: 'About 6 SMS units · you have 5', short: true });
+    expect(unitsLine(1, 3, platform)).toEqual({ text: 'About 3 SMS units · you have 5', short: false });
+  });
+  it('says nothing about units on the organisation’s own SMS account', () => {
+    expect(unitsLine(2, 3, { mode: 'OWN', balance: 0 })).toEqual({ text: 'Sent from your own SMS account', short: false });
+    expect(unitsLine(2, 3, null)).toBeNull();
+  });
+});
+

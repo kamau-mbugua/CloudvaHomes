@@ -8,8 +8,24 @@ import { violatesUnique } from '../../prisma/errors.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { todayInNairobi } from '../billing/billing-math.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import type { OrgSmsType } from '../notifications/sms/sms-types.js';
 import { tenantScope } from '../portfolio/property-scope.js';
 import type { ListMessagesQueryDto } from './tenant-portal.dto.js';
+
+/** Which kind of organisation SMS a tenant message is (spec §2). */
+export function smsTypeFor(kind: MessageKind): OrgSmsType {
+  switch (kind) {
+    case 'REMINDER_DUE':
+    case 'REMINDER_OVERDUE':
+      return 'rent_reminder';
+    case 'REMINDER_MANUAL':
+      return 'reminder_manual';
+    case 'PORTAL_ACCESS':
+      return 'portal_access';
+    case 'BROADCAST':
+      return 'broadcast';
+  }
+}
 
 /**
  * Sends SMS to tenants and keeps a log of every one. The log row is written first, so an
@@ -54,7 +70,11 @@ export class MessagesService {
       throw e;
     }
     try {
-      await this.notifications.sendSms(p.to, p.text);
+      await this.notifications.sendSms(
+        { kind: 'org', orgId: p.orgId, type: smsTypeFor(p.kind) },
+        p.to,
+        p.text,
+      );
       return row;
     } catch (e) {
       this.log.warn({ err: e, messageId: row.id }, 'SMS to a tenant failed');

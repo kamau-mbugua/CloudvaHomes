@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import nodemailer from 'nodemailer';
 import { currentContext } from '../../common/context/request-context.js';
+import { AppError } from '../../common/errors/app-error.js';
 import { FieldCipher } from '../../common/crypto/field-cipher.js';
 import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
@@ -12,7 +13,6 @@ import {
   resolveEmailTemplate,
 } from './email-templates.js';
 import {
-  AfricasTalkingSmsSender,
   createEmailSender,
   createPushSender,
   createSmsSender,
@@ -21,9 +21,17 @@ import {
   type PushSender,
   type SmsSender,
 } from './senders.js';
+import { AT_KEY_CONTEXT, SmsService } from './sms/sms.service.js';
+import { smsWarningCopy } from './sms/sms-copy.js';
+import {
+  type OrgSmsSpec,
+  SmsNotSentError,
+  type SmsSpec,
+  type SmsWarning,
+} from './sms/sms-types.js';
 
 export const SMTP_PASS_CONTEXT = 'platform.smtp.password';
-export const AT_API_KEY_CONTEXT = 'platform.sms.africastalking';
+export const AT_API_KEY_CONTEXT = AT_KEY_CONTEXT;
 
 export interface Recipient {
   email?: string | null;
@@ -185,6 +193,7 @@ export class NotificationsService {
     @Inject(ENV) private readonly env: Env,
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly cipher?: FieldCipher,
+    @Optional() private readonly smsRouter?: SmsService,
   ) {
     this.sms = createSmsSender(env);
     this.email = createEmailSender(env);
@@ -193,32 +202,34 @@ export class NotificationsService {
 
   async sendCode(
     to: Recipient,
-    purpose: 'login' | 'reset' | 'step-up' | 'admin-2fa' | 'booking',
+    purpose: 'login' | 'reset' | 'step-up' | 'admin-2fa',
     code: string,
     minutes: number,
-    bizName?: string,
   ): Promise<void> {
     const what = {
       login: 'sign-in code',
       reset: 'password reset code',
       'step-up': 'confirmation code',
       'admin-2fa': 'admin sign-in code',
-      booking: 'booking code',
     }[purpose];
     const kind = {
       login: 'login_otp',
       reset: 'password_reset',
       'step-up': 'step_up',
       'admin-2fa': 'admin_2fa',
-      booking: 'booking_otp',
     }[purpose];
-    const smsText =
-      purpose === 'booking'
-        ? `Your ${bizName ?? 'KodiHub'} booking code is ${code}. It expires in ${minutes} minutes.`
-        : `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
+    const smsType = (
+      {
+        login: 'login_otp',
+        reset: 'password_reset',
+        'step-up': 'step_up',
+        'admin-2fa': 'admin_2fa',
+      } as const
+    )[purpose];
+    const smsText = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
     const tasks: Promise<void>[] = [];
     if (to.phone) {
-      tasks.push(this.dispatchSms(to.phone, smsText));
+      tasks.push(this.dispatchSms({ kind: 'platform', type: smsType }, to.phone, smsText));
     }
     if (to.email) {
       const emailAddr = to.email;
@@ -238,6 +249,31 @@ export class NotificationsService {
     const results = await Promise.allSettled(tasks);
     if (tasks.length && results.every((r) => r.status === 'rejected')) {
       throw (results[0] as PromiseRejectedResult).reason;
+    }
+  }
+
+  /** A guest's booking code on a host's booking site: the host's message (spec §2). */
+  async sendBookingCode(
+    orgId: string,
+    phone: string,
+    code: string,
+    minutes: number,
+    bizName: string,
+  ): Promise<void> {
+    try {
+      await this.dispatchSms(
+        { kind: 'org', orgId, type: 'booking_otp' },
+        phone,
+        `Your ${bizName} booking code is ${code}. It expires in ${minutes} minutes.`,
+      );
+    } catch (e) {
+      // A guest sees a plain message, not a server error (e.g. the host's own SMS account is failing).
+      this.logger.warn({ err: e, orgId }, 'Guest booking code not sent');
+      throw new AppError(
+        502,
+        'DELIVERY_FAILED',
+        "We couldn't send the code. Please try again shortly, or contact the host.",
+      );
     }
   }
 
@@ -315,7 +351,11 @@ export class NotificationsService {
     }
     if (to.phone) {
       tasks.push(
-        this.dispatchSms(to.phone, `${by} to ${p.organizationName} on KodiHub. Accept: ${link}`),
+        this.dispatchSms(
+          { kind: 'platform', type: 'invitation' },
+          to.phone,
+          `${by} to ${p.organizationName} on KodiHub. Accept: ${link}`,
+        ),
       );
     }
     // One channel failing shouldn't hide the other's success; report but don't throw if any worked.
@@ -381,10 +421,15 @@ export class NotificationsService {
    * Thank you - Kilimani Agency". Kept to one 160-character SMS where the organisation name allows.
    */
   async sendPaymentReceipt(
+    orgId: string,
     phone: string,
     p: { amount: string; number: string; balance: string; organizationName: string },
   ): Promise<void> {
-    await this.dispatchSms(phone, paymentReceiptText(p));
+    await this.dispatchSms(
+      { kind: 'org', orgId, type: 'payment_receipt' },
+      phone,
+      paymentReceiptText(p),
+    );
   }
 
   /** A landlord was given owner-portal access. */
@@ -394,7 +439,10 @@ export class NotificationsService {
       organizationName: p.organizationName,
       portalLink: link,
     });
-    await this.deliver(to, rendered.subject, rendered.text, 'portal_access');
+    await this.deliver(to, rendered.subject, rendered.text, 'portal_access', {
+      kind: 'platform',
+      type: 'owner_portal_access',
+    });
   }
 
   /** Payout details changed — always tell the landlord (a common fraud route). */
@@ -407,7 +455,10 @@ export class NotificationsService {
       organizationName: p.organizationName,
       changeDescription: what,
     });
-    await this.deliver(to, rendered.subject, rendered.text, 'payout_changed');
+    await this.deliver(to, rendered.subject, rendered.text, 'payout_changed', {
+      kind: 'platform',
+      type: 'payout_changed',
+    });
   }
 
   /**
@@ -588,9 +639,9 @@ export class NotificationsService {
     );
   }
 
-  /** A plain SMS (callers log it). Throws if the provider refuses. */
-  async sendSms(phone: string, text: string): Promise<void> {
-    await this.dispatchSms(phone, text);
+  /** An organisation's SMS to its tenant/guest (callers log it). Throws SmsNotSentError unless sent. */
+  async sendSms(spec: OrgSmsSpec, phone: string, text: string): Promise<void> {
+    await this.dispatchSms(spec, phone, text);
   }
 
   /** Sends a direct platform email (e.g. SMTP test or broadcast) and records it in PlatformEmailLog. */
@@ -638,7 +689,13 @@ export class NotificationsService {
       tasks.push(this.dispatchEmail({ to: to.email, subject, text: emailBody }, 'invitation'));
     }
     if (to.phone) {
-      tasks.push(this.dispatchSms(to.phone, smsText.slice(0, 160)));
+      tasks.push(
+        this.dispatchSms(
+          { kind: 'platform', type: 'operator_welcome' },
+          to.phone,
+          smsText.slice(0, 160),
+        ),
+      );
     }
     if (!tasks.length) return false;
     const results = await Promise.allSettled(tasks);
@@ -664,31 +721,80 @@ export class NotificationsService {
     to: Recipient,
     subject: string,
     text: string,
-    kind = 'other',
+    kind: string,
+    smsSpec: SmsSpec,
   ): Promise<void> {
     const tasks: Promise<void>[] = [];
-    if (to.phone) tasks.push(this.dispatchSms(to.phone, text));
+    if (to.phone) tasks.push(this.dispatchSms(smsSpec, to.phone, text));
     if (to.email) tasks.push(this.dispatchEmail({ to: to.email, subject, text }, kind));
     const results = await Promise.allSettled(tasks);
     if (tasks.length && results.every((r) => r.status === 'rejected'))
       throw new Error('Message could not be delivered');
   }
 
-  private async dispatchSms(phone: string, text: string): Promise<void> {
-    if (this.env.NODE_ENV !== 'test' && this.prisma && this.cipher) {
-      const settings = await this.prisma.platformSettings.findUnique({ where: { id: 1 } });
-      if (settings?.atUsername && settings.atApiKeyEnc) {
-        const apiKey = this.cipher.decrypt(settings.atApiKeyEnc, AT_API_KEY_CONTEXT);
-        const sender = new AfricasTalkingSmsSender(
-          settings.atUsername,
-          apiKey,
-          settings.atSenderId ?? undefined,
-        );
-        await sender.send(phone, text);
-        return;
-      }
+  /** Every SMS goes through SmsService, which picks the route (spec §2–3). */
+  private async dispatchSms(spec: SmsSpec, phone: string, text: string): Promise<void> {
+    if (!this.smsRouter) {
+      await this.sms.send(phone, text); // constructed outside Nest (unit tests)
+      return;
     }
-    await this.sms.send(phone, text);
+    const outcome = await this.smsRouter.send(spec, phone, text);
+    if (outcome.warn && spec.kind === 'org') {
+      await this.warnOwners(spec.orgId, outcome.warn, outcome);
+    }
+    if (outcome.status !== 'SENT') throw new SmsNotSentError(outcome);
+  }
+
+  /** Warns owners about SMS units or a failing SMS account (spec §6). */
+  private async warnOwners(
+    orgId: string,
+    warn: SmsWarning,
+    detail: { balance: number | null; reason: string | null },
+  ): Promise<void> {
+    const copy = smsWarningCopy(warn, detail);
+    await this.notifyOwners(orgId, copy, async (orgName) => {
+      const rendered = await this.renderSystemEmailTemplate(copy.kind as EmailTemplateKey, {
+        organizationName: orgName,
+        balance: String(detail.balance ?? 0),
+        reason: detail.reason ?? '',
+      });
+      return { subject: rendered.subject, text: rendered.text };
+    });
+  }
+
+  /**
+   * In-app notice (+ optional email) to each active owner of an organisation. Best effort: it
+   * never throws, so a notice can't fail the work that triggered it.
+   */
+  async notifyOwners(
+    orgId: string,
+    copy: { kind: string; title: string; body: string },
+    email?:
+      | { subject: string; text: string }
+      | ((organizationName: string) => Promise<{ subject: string; text: string }>),
+  ): Promise<void> {
+    if (!this.prisma) return;
+    try {
+      const owners = await this.prisma.membership.findMany({
+        where: { orgId, status: 'ACTIVE', role: { systemKey: 'OWNER' } },
+        select: {
+          userId: true,
+          user: { select: { email: true } },
+          organization: { select: { name: true } },
+        },
+      });
+      for (const o of owners) {
+        await this.notifyUser({ userId: o.userId, orgId, ...copy, actionUrl: '/app/settings/sms' });
+        if (o.user.email && email) {
+          const m = typeof email === 'function' ? await email(o.organization.name) : email;
+          await this.dispatchEmail({ to: o.user.email, ...m }, copy.kind).catch((err: unknown) =>
+            this.logger.warn({ err, orgId }, 'Owner email failed'),
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn({ err, orgId, kind: copy.kind }, 'Could not notify owners');
+    }
   }
 
   private async dispatchEmail(m: EmailMessage, kind: string): Promise<void> {

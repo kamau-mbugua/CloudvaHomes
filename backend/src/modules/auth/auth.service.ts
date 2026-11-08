@@ -23,6 +23,7 @@ import {
 import { OTP_TTL_MINUTES, OtpService } from './otp.service.js';
 import { type IssuedSession, SessionsService } from './sessions.service.js';
 import { TokensService } from './tokens.service.js';
+import { SmsAccountsService } from '../notifications/sms/sms-accounts.service.js';
 
 export interface AdminTwoFactorChallenge {
   requiresTwoFactor: true;
@@ -198,6 +199,7 @@ export class AuthService {
         });
 
         const roles = await RolesService.seedSystemRoles(tx, org.id, org.kind);
+        await SmsAccountsService.openAccount(tx, org.id);
 
         if (org.kind === 'HOST') {
           await tx.hostSite.create({

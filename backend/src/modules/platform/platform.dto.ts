@@ -220,6 +220,65 @@ export class PlatformSettingsDto {
   atApiKey?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() clearAtApiKey?: boolean;
 
+  // ── SMS providers and units (2026-11 SMS plan) ──
+  @ApiPropertyOptional({ enum: ['AFRICASTALKING', 'TEXTSMS', 'HOSTPINNACLE'] })
+  @IsOptional()
+  @IsIn(['AFRICASTALKING', 'TEXTSMS', 'HOSTPINNACLE'])
+  smsProvider?: 'AFRICASTALKING' | 'TEXTSMS' | 'HOSTPINNACLE';
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(80)
+  textsmsPartnerId?: string | null;
+  @ApiPropertyOptional({ description: 'Write-only TextSMS API key' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  textsmsApiKey?: string;
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(20)
+  textsmsSenderId?: string | null;
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(80)
+  hostpinnacleUserId?: string | null;
+  @ApiPropertyOptional({ description: 'Write-only HostPinnacle API key' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  hostpinnacleApiKey?: string;
+  @ApiPropertyOptional({ description: 'Write-only HostPinnacle password' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  hostpinnaclePassword?: string;
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(20)
+  hostpinnacleSenderId?: string | null;
+  @ApiPropertyOptional({ description: 'Cents per SMS unit' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100_000)
+  smsUnitPrice?: number;
+  @ApiPropertyOptional({ type: [Number] })
+  @IsOptional()
+  @IsInt({ each: true })
+  @ArrayMinSize(1)
+  @ArrayMaxSize(6)
+  smsBundles?: number[];
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(1_000_000) smsMinUnits?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(100_000) smsFreeUnits?: number;
+
   // ── Signup, Mobile App & Maintenance (phase 11) ──
   @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPublicSignup?: boolean;
   @ApiPropertyOptional()
@@ -490,6 +549,11 @@ export class PlatformAuditQueryDto extends PaginationQueryDto {
 
 export class BillingPayDto {
   @IsMinorAmount({ description: 'Whole shillings, in cents' }) amount!: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(20) phone?: string;
+}
+
+export class BuySmsDto {
+  @ApiProperty({ description: 'Number of SMS units to buy' }) @IsInt() units!: number;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(20) phone?: string;
 }
 

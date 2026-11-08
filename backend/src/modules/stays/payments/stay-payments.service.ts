@@ -349,6 +349,7 @@ export class StayPaymentsService {
     if (booking.guest?.phone) {
       await this.notifications
         .sendSms(
+          { kind: 'org', orgId: booking.orgId, type: 'stay_payment' },
           booking.guest.phone,
           guestSms('PAYMENT', {
             biz,

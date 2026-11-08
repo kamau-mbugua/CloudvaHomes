@@ -28,6 +28,7 @@ const check = (res: Res, status: number) => {
 describe('Broadcasts to tenants (e2e)', () => {
   let t: TestApp;
   let owner: Session;
+  let orgId: string;
   const post = async (s: Session, path: string, body: object = {}, status = 201) =>
     check(await t.http().post(`/api/v1${path}`).set(auth(s)).send(body), status);
   const get = async (s: Session, path: string, status = 200) =>
@@ -45,7 +46,7 @@ describe('Broadcasts to tenants (e2e)', () => {
     await resetDb(t.prisma);
     await createPlatformAdmin(t.prisma);
     const admin = await login(t, 'admin@example.invalid');
-    ({ owner } = await onboardOrg(t, admin, {
+    ({ owner, orgId } = await onboardOrg(t, admin, {
       name: 'Notice Org',
       ownerEmail: 'notice-owner@example.invalid',
       ownerPhone: '+254700000061',
@@ -114,9 +115,9 @@ describe('Broadcasts to tenants (e2e)', () => {
 
     const notifications = t.app.get(NotificationsService);
     const realSms = notifications.sendSms.bind(notifications);
-    vi.spyOn(notifications, 'sendSms').mockImplementation(async (phone, text) => {
+    vi.spyOn(notifications, 'sendSms').mockImplementation(async (spec, phone, text) => {
       if (phone === '+254711000702') throw new Error('Network down');
-      return realSms(phone, text);
+      return realSms(spec, phone, text);
     });
     const before = outbox.length;
     const created = (
@@ -208,5 +209,50 @@ describe('Broadcasts to tenants (e2e)', () => {
     await get(managerB, `/broadcasts/${toBoth}`, 404);
     await get(managerB, `/broadcasts/${toB}`);
     expect((await get(owner, '/broadcasts')).data).toHaveLength(3);
+  });
+
+  describe('SMS units', () => {
+    const LONG = 'Water will be off on Saturday from 9am to noon while the tank is cleaned. '
+      .repeat(3)
+      .slice(0, 200);
+    const setBalance = (balance: number, mode: 'PLATFORM' | 'OWN' = 'PLATFORM') =>
+      t.prisma.smsAccount.update({ where: { orgId }, data: { balance, mode } });
+
+    it('previews the units a broadcast needs', async () => {
+      const x = await setUp();
+      await setBalance(5);
+      const preview = (
+        await post(owner, '/broadcasts/preview', { propertyIds: [x.a.id, x.b.id], text: LONG }, 200)
+      ).data;
+      expect(preview).toMatchObject({
+        recipients: 3,
+        unitsPerMessage: 2,
+        unitsNeeded: 6,
+        balance: 5,
+        mode: 'PLATFORM',
+      });
+    });
+
+    it('refuses a broadcast the balance cannot cover', async () => {
+      const x = await setUp();
+      await setBalance(5);
+      const res = await t
+        .http()
+        .post('/api/v1/broadcasts')
+        .set(auth(owner))
+        .send({ propertyIds: [x.a.id, x.b.id], text: LONG });
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatchObject({
+        code: 'SMS_UNITS_LOW',
+        message: 'Not enough SMS units for this notice: it needs 6, you have 5.',
+      });
+      expect(await t.prisma.broadcast.count({ where: { orgId } })).toBe(0);
+    });
+
+    it('lets own-SMS organisations broadcast without units', async () => {
+      const x = await setUp();
+      await setBalance(0, 'OWN');
+      await post(owner, '/broadcasts', { propertyIds: [x.a.id, x.b.id], text: LONG }, 202);
+    });
   });
 });

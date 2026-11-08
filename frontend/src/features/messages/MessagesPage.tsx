@@ -11,7 +11,8 @@ import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
 import { portfolioErrorMessage, usePropertyOptions } from '../portfolio/api';
 import { useListFilters } from '../portfolio/hooks';
-import { MAX_BROADCAST_LENGTH, broadcastSummary, counterLabel, type BroadcastCounts } from './rules';
+import { useSmsAccount } from '../sms/api';
+import { MAX_BROADCAST_LENGTH, broadcastSummary, counterLabel, smsSegments, unitsLine, type BroadcastCounts } from './rules';
 
 interface Broadcast extends BroadcastCounts {
   id: string;
@@ -107,6 +108,8 @@ function BroadcastSheet({ onClose }: { onClose: () => void }) {
     if (picked.length) runPreview(picked);
   }, [picked, runPreview]);
   const counts = picked.length ? preview.data?.data : undefined;
+  const smsAccount = useSmsAccount(useCan('sms:view'));
+  const units = text.trim() && counts ? unitsLine(smsSegments(text.trim()), counts.recipients, smsAccount.data ?? null) : null;
 
   const send = useMutation({
     mutationFn: () => api.post('/broadcasts', { propertyIds: picked, text: text.trim(), alsoEmail }),
@@ -126,6 +129,7 @@ function BroadcastSheet({ onClose }: { onClose: () => void }) {
     if (!text.trim()) return setError('Write the notice.');
     if (text.length > MAX_BROADCAST_LENGTH) return setError(`Keep it to ${MAX_BROADCAST_LENGTH} characters.`);
     if (!counts?.recipients) return setError('There are no current tenants in those properties.');
+    if (units?.short) return setError(`Not enough SMS units for this notice (${units.text}). Buy more under Settings → SMS.`);
     setError(null);
     setConfirming(true);
   };
@@ -182,6 +186,7 @@ function BroadcastSheet({ onClose }: { onClose: () => void }) {
               placeholder="e.g. Water will be off on Saturday from 9am to noon for tank cleaning."
               onChange={(e) => setText(e.target.value)} />
             <span className="hint">{counterLabel(text, counts?.recipients ?? 0)}</span>
+            {units ? <span className={units.short ? 'fld__err' : 'hint'}>{units.text}</span> : null}
           </label>
           <label className="fld__check">
             <input type="checkbox" checked={alsoEmail} onChange={(e) => setAlsoEmail(e.target.checked)} />

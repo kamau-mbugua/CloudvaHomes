@@ -63,3 +63,17 @@
   .adm__tag { display: none; }
   .adm__head .pg-actions { width: 100%; justify-content: flex-start; }
 }
+
+/* ---- Settings → SMS ------------------------------------------------------------ */
+.sms__unit { font-size: 15px; font-weight: 500; color: var(--text-muted); }
+.sms__form { display: grid; gap: 12px; justify-items: start; }
+.sms__check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+.sms__bundles { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.sms__bundles legend { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
+.sms__bundle {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer;
+}
+.sms__bundle:has(input:checked) { border-color: var(--primary); background: var(--secondary); }
+.sms__test { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 16px; }

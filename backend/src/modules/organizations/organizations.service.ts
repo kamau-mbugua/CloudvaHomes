@@ -15,6 +15,7 @@ import { readLateFees, storeLateFees } from '../billing/late-fees/late-fees.js';
 import { DEFAULT_RULES } from '../stays/rules/terms.js';
 import { InvitationsService } from '../users/invitations.service.js';
 import type { CreateOrganizationDto, UpdateOrganizationDto } from './organizations.dto.js';
+import { SmsAccountsService } from '../notifications/sms/sms-accounts.service.js';
 
 function toOrg(o: Organization) {
   const docInstructions = readOrgDocumentInstructions(o.settings);
@@ -204,6 +205,7 @@ export class OrganizationsService {
           },
         });
         const roles = await RolesService.seedSystemRoles(tx, org.id, org.kind);
+        await SmsAccountsService.openAccount(tx, org.id);
         if (org.kind === 'HOST') {
           await tx.hostSite.create({
             data: {

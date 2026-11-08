@@ -13,6 +13,7 @@ import { PAGE_SIZE, keys, platformErrorMessage } from '../platform/api';
 import { formatDayish } from '../platform/rules';
 import type { OrgStatus } from '../platform/types';
 import { OrgStatusBadge } from '../platform/ui';
+import { AdminSmsReport } from './AdminSmsReport';
 
 /** Defensive KES formatter so undefined/null/non-integer values never crash a report view. */
 function kes(value: unknown): string {
@@ -31,6 +32,7 @@ export type AdminReportKey =
   | 'reconciliation'
   | 'price-variance'
   | 'salespeople'
+  | 'sms'
   | 'audit';
 
 const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; usesDateRange: boolean }> = {
@@ -84,6 +86,11 @@ const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; use
     subtitle: 'Book of business, active/trial organisations, let units, MRR, collections, and arrears per operator.',
     usesDateRange: true,
   },
+  sms: {
+    title: 'SMS',
+    subtitle: 'SMS units sold, paid for and used per organisation in a month.',
+    usesDateRange: false,
+  },
   audit: {
     title: 'Platform audit log',
     subtitle: 'Immutable log of platform admin, billing, and security actions.',
@@ -124,11 +131,12 @@ const REPORT_KEYS: AdminReportKey[] = [
   'onboarding',
   'subscription-changes',
   'salespeople',
+  'sms',
   'audit',
 ];
 
 /**
- * Admin → Reports (`/admin/reports/:report`): all 11 Superadmin platform reports.
+ * Admin → Reports (`/admin/reports/:report`): all 12 Superadmin platform reports.
  */
 export function AdminReportsPage() {
   const { report: rawKey = 'collections' } = useParams();
@@ -151,6 +159,7 @@ export function AdminReportsPage() {
       return api.get<unknown>(`/platform/reports/${encodeURIComponent(reportKey)}`, params).then((b) => unwrap<Record<string, unknown>>(b));
     },
     placeholderData: keepPreviousData,
+    enabled: reportKey !== 'sms',
   });
 
   return (
@@ -214,8 +223,9 @@ export function AdminReportsPage() {
         </div>
       ) : null}
 
-      {query.isError ? <p className="ad__error" role="alert">{platformErrorMessage(query.error)}</p> : null}
-      {query.isPending ? (
+      {reportKey === 'sms' ? <AdminSmsReport /> : null}
+      {reportKey !== 'sms' && query.isError ? <p className="ad__error" role="alert">{platformErrorMessage(query.error)}</p> : null}
+      {reportKey === 'sms' ? null : query.isPending ? (
         <p className="ad__muted" role="status">Loading report…</p>
       ) : query.data ? (
         <ReportBody

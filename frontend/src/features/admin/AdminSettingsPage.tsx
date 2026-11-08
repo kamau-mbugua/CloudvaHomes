@@ -12,6 +12,7 @@ import { DARAJA_ENV } from '../mpesa/labels';
 import { checkDaraja } from '../mpesa/rules';
 import type { DarajaDraft } from '../mpesa/rules';
 import { useListFilters } from '../portfolio/hooks';
+import { AdminSmsSettings } from './AdminSmsSettings';
 import { mriRate, parseRatePercent } from '../reports/rules';
 import { Badge, Field } from '../portfolio/ui';
 import { keys, platformErrorMessage, usePlans, usePlatformLocks, usePlatformSettings } from '../platform/api';
@@ -91,7 +92,7 @@ export function AdminSettingsPage() {
             Rate-limit locks
           </button>
           <button type="button" role="tab" aria-selected={tab === 'sms'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'sms' })}>
-            SMS (Africa’s Talking)
+            SMS
           </button>
           <button type="button" role="tab" aria-selected={tab === 'app'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'app' })}>
             App & Maintenance
@@ -116,7 +117,7 @@ export function AdminSettingsPage() {
         ) : tab === 'locks' ? (
           <SecurityLocksSection />
         ) : tab === 'sms' ? (
-          <SmsSettingsForm key={`${s.sms?.username ?? ''}-${s.sms?.senderId ?? ''}-${s.sms?.apiKey}`} settings={s} />
+          <AdminSmsSettings key={`${s.sms?.username ?? ''}-${s.sms?.senderId ?? ''}-${s.sms?.apiKey}`} settings={s} />
         ) : (
           <>
             <AppAndMaintenanceForm
@@ -483,70 +484,6 @@ function SecurityLocksSection() {
         </div>
       )}
     </section>
-  );
-}
-
-function SmsSettingsForm({ settings }: { settings: PlatformSettings }) {
-  const queryClient = useQueryClient();
-  const toast = useToast();
-  const [username, setUsername] = useState(settings.sms?.username ?? '');
-  const [senderId, setSenderId] = useState(settings.sms?.senderId ?? '');
-  const [apiKey, setApiKey] = useState('');
-  const apiKeySet = Boolean(settings.sms?.apiKeySet ?? settings.sms?.apiKey);
-
-  const save = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.put<unknown>('/platform/settings', body),
-    onSuccess: async () => {
-      toast.saved('Africa’s Talking SMS settings saved.');
-      setApiKey('');
-      await queryClient.invalidateQueries({ queryKey: keys.platform });
-    },
-    onError: (error) => toast.failed(platformErrorMessage(error)),
-  });
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    save.mutate({
-      atUsername: username.trim() || null,
-      atSenderId: senderId.trim() || null,
-      ...(apiKey ? { atApiKey: apiKey } : {}),
-    });
-  };
-
-  return (
-    <form className="fm__section" onSubmit={submit} noValidate autoComplete="off">
-      <div className="mp__cardhead">
-        <h2>Africa’s Talking SMS gateway</h2>
-        <div className="mp__badges">
-          {settings.sms?.configured
-            ? <span className="ad__badge ad__badge--ok">Configured</span>
-            : <span className="ad__badge ad__badge--off">Using environment / log</span>}
-          {apiKeySet ? <span className="ad__badge ad__badge--info">API key saved</span> : null}
-        </div>
-      </div>
-      <p>
-        Used for OTP verification codes, owner invitations, and tenant rent receipts sent by SMS.
-      </p>
-
-      <div className="fm__grid">
-        <Field id="at-user" label="Username" hint="e.g. sandbox or your production Africa’s Talking username">
-          <input id="at-user" value={username} onChange={(e) => setUsername(e.target.value)} />
-        </Field>
-        <Field id="at-sender" label="Sender ID / shortcode" optional hint="e.g. HODI">
-          <input id="at-sender" value={senderId} onChange={(e) => setSenderId(e.target.value)} />
-        </Field>
-        <Field id="at-key" label="API key" optional wide
-          hint={apiKeySet ? 'Stored encrypted. Leave blank to keep the current API key.' : 'Stored encrypted and never shown again.'}>
-          <input id="at-key" type="password" autoComplete="new-password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
-        </Field>
-      </div>
-
-      <div className="pg-actions">
-        <button type="submit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
-          {save.isPending ? 'Saving…' : 'Save SMS settings'}
-        </button>
-      </div>
-    </form>
   );
 }
 

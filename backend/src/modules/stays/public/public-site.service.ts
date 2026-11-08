@@ -399,9 +399,9 @@ export class PublicSiteService {
     const site = await this.requireSite(slug);
     const biz = site.businessName || site.organization.name;
     const code = await this.otp.issue(phone, 'GUEST_BOOKING', null);
-    await this.notifications.sendCode(
-      { phone },
-      'booking',
+    await this.notifications.sendBookingCode(
+      site.orgId,
+      phone,
       code,
       OTP_TTL_MINUTES.GUEST_BOOKING,
       biz,
@@ -592,6 +592,7 @@ export class PublicSiteService {
         }
         await this.notifications
           .sendSms(
+            { kind: 'org', orgId: site.orgId, type: 'booking' },
             phone,
             guestSms('HELD', {
               biz,
@@ -608,6 +609,7 @@ export class PublicSiteService {
       } else if (created.status === 'CONFIRMED') {
         await this.notifications
           .sendSms(
+            { kind: 'org', orgId: site.orgId, type: 'booking' },
             phone,
             guestSms('CONFIRMED', {
               biz,
@@ -631,6 +633,7 @@ export class PublicSiteService {
       } else if (created.status === 'REQUESTED') {
         await this.notifications
           .sendSms(
+            { kind: 'org', orgId: site.orgId, type: 'booking' },
             phone,
             guestSms('REQUESTED', {
               biz,
@@ -829,9 +832,9 @@ export class PublicSiteService {
     const biz = site?.businessName || site?.organization.name || 'KodiHub';
 
     const code = await this.otp.issue(phone, 'GUEST_BOOKING', null);
-    await this.notifications.sendCode(
-      { phone },
-      'booking',
+    await this.notifications.sendBookingCode(
+      booking.orgId,
+      phone,
       code,
       OTP_TTL_MINUTES.GUEST_BOOKING,
       biz,
@@ -875,6 +878,7 @@ export class PublicSiteService {
 
       await this.notifications
         .sendSms(
+          { kind: 'org', orgId: booking.orgId, type: 'booking' },
           phone,
           guestSms('CANCELLED', {
             biz,

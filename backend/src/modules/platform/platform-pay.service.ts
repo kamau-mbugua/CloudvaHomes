@@ -27,8 +27,15 @@ import {
   toMsisdn,
 } from '../mpesa/daraja.js';
 import { AT_API_KEY_CONTEXT } from '../notifications/notifications.service.js';
+import {
+  HOSTPINNACLE_KEY_CONTEXT,
+  HOSTPINNACLE_PASSWORD_CONTEXT,
+  TEXTSMS_KEY_CONTEXT,
+} from '../notifications/sms/sms.service.js';
 import { requiredPhone } from '../portfolio/fields.js';
+import { checkBundleUnits } from '../notifications/sms/sms-math.js';
 import { PlatformBillingService } from './platform-billing.service.js';
+import { SmsPurchasesService } from './sms-purchases.service.js';
 import {
   type LandingPageContent,
   mergeLandingPageContent,
@@ -50,6 +57,7 @@ export class PlatformPayService {
     private readonly audit: AuditService,
     private readonly daraja: DarajaClient,
     private readonly billing: PlatformBillingService,
+    private readonly smsPurchases: SmsPurchasesService,
   ) {}
 
   // ── Settings ──
@@ -97,6 +105,22 @@ export class PlatformPayService {
           : this.env.SMS_PROVIDER === 'africastalking'
             ? ('env' as const)
             : ('log' as const),
+        provider: s.smsProvider,
+        textsms: {
+          partnerId: s.textsmsPartnerId,
+          senderId: s.textsmsSenderId,
+          apiKeySet: Boolean(s.textsmsKeyEnc),
+        },
+        hostpinnacle: {
+          userId: s.hostpinnacleUserId,
+          senderId: s.hostpinnacleSenderId,
+          apiKeySet: Boolean(s.hostpinnacleKeyEnc),
+          passwordSet: Boolean(s.hostpinnaclePasswordEnc),
+        },
+        unitPrice: s.smsUnitPrice.toString(),
+        bundles: s.smsBundles,
+        minUnits: s.smsMinUnits,
+        freeUnits: s.smsFreeUnits,
       },
       allowPublicSignup: s.allowPublicSignup,
       minAppVersionCode: s.minAppVersionCode,
@@ -221,6 +245,73 @@ export class PlatformPayService {
     });
   }
 
+  /** SMS provider, credentials (write-only) and unit pricing from the settings form. */
+  private smsSettingsData(
+    dto: PlatformSettingsDto,
+    before: PlatformSettings,
+  ): Prisma.PlatformSettingsUpdateInput {
+    const minUnits = dto.smsMinUnits ?? before.smsMinUnits;
+    const bundles =
+      dto.smsBundles ?? (dto.smsMinUnits !== undefined ? before.smsBundles : undefined);
+    if (bundles?.some((b) => b < minUnits)) {
+      throw AppError.fieldInvalid('smsBundles', `Every bundle needs at least ${minUnits} units`);
+    }
+    const text = (v: string | null | undefined) =>
+      v === undefined ? undefined : v?.trim() || null;
+    if (dto.smsProvider !== undefined && dto.smsProvider !== before.smsProvider) {
+      // Never let KodiHub's SMS (sign-in codes included) switch to a provider it can't use.
+      const has = (next: string | null | undefined, saved: unknown) =>
+        next === undefined ? Boolean(saved) : Boolean(next?.trim());
+      const complete = {
+        AFRICASTALKING:
+          this.env.SMS_PROVIDER === 'africastalking' ||
+          (has(dto.atUsername, before.atUsername) && has(dto.atApiKey, before.atApiKeyEnc)),
+        TEXTSMS:
+          has(dto.textsmsPartnerId, before.textsmsPartnerId) &&
+          has(dto.textsmsApiKey, before.textsmsKeyEnc),
+        HOSTPINNACLE:
+          has(dto.hostpinnacleUserId, before.hostpinnacleUserId) &&
+          has(dto.hostpinnacleApiKey, before.hostpinnacleKeyEnc) &&
+          has(dto.hostpinnaclePassword, before.hostpinnaclePasswordEnc) &&
+          has(dto.hostpinnacleSenderId, before.hostpinnacleSenderId),
+      }[dto.smsProvider];
+      if (!complete) {
+        throw AppError.fieldInvalid(
+          'smsProvider',
+          'Fill in and save every detail of this provider before choosing it',
+        );
+      }
+    }
+    const out: Prisma.PlatformSettingsUpdateInput = {};
+    if (dto.smsProvider !== undefined) out.smsProvider = dto.smsProvider;
+    if (dto.textsmsPartnerId !== undefined) out.textsmsPartnerId = text(dto.textsmsPartnerId);
+    if (dto.textsmsSenderId !== undefined) out.textsmsSenderId = text(dto.textsmsSenderId);
+    if (dto.hostpinnacleUserId !== undefined) out.hostpinnacleUserId = text(dto.hostpinnacleUserId);
+    if (dto.hostpinnacleSenderId !== undefined) {
+      out.hostpinnacleSenderId = text(dto.hostpinnacleSenderId);
+    }
+    if (dto.textsmsApiKey?.trim()) {
+      out.textsmsKeyEnc = this.cipher.encrypt(dto.textsmsApiKey.trim(), TEXTSMS_KEY_CONTEXT);
+    }
+    if (dto.hostpinnacleApiKey?.trim()) {
+      out.hostpinnacleKeyEnc = this.cipher.encrypt(
+        dto.hostpinnacleApiKey.trim(),
+        HOSTPINNACLE_KEY_CONTEXT,
+      );
+    }
+    if (dto.hostpinnaclePassword?.trim()) {
+      out.hostpinnaclePasswordEnc = this.cipher.encrypt(
+        dto.hostpinnaclePassword.trim(),
+        HOSTPINNACLE_PASSWORD_CONTEXT,
+      );
+    }
+    if (dto.smsUnitPrice !== undefined) out.smsUnitPrice = BigInt(dto.smsUnitPrice);
+    if (bundles !== undefined) out.smsBundles = bundles;
+    if (dto.smsMinUnits !== undefined) out.smsMinUnits = dto.smsMinUnits;
+    if (dto.smsFreeUnits !== undefined) out.smsFreeUnits = dto.smsFreeUnits;
+    return out;
+  }
+
   async updateSettings(dto: PlatformSettingsDto) {
     const keysChange =
       dto.consumerKey !== undefined ||
@@ -271,6 +362,7 @@ export class PlatformPayService {
       } else if (dto.atApiKey?.trim()) {
         data.atApiKeyEnc = this.cipher.encrypt(dto.atApiKey.trim(), AT_API_KEY_CONTEXT);
       }
+      Object.assign(data, this.smsSettingsData(dto, before));
       if (dto.invoiceInstructions !== undefined || dto.receiptInstructions !== undefined) {
         const prevContainer =
           before.emailTemplates &&
@@ -380,6 +472,98 @@ export class PlatformPayService {
         return this.viewStk(existing);
       }
     }
+    const amount = BigInt(dto.amount);
+    if (amount <= 0n || amount % 100n !== 0n)
+      throw AppError.fieldInvalid('amount', 'M-Pesa takes whole shillings only');
+    const org = await this.db.organization.findUniqueOrThrow({ where: { id: ctx.orgId } });
+    const request = await this.pushStk({
+      orgId: ctx.orgId,
+      userId: ctx.userId,
+      phone: dto.phone,
+      amount,
+      idempotencyKey,
+      purpose: 'INVOICE',
+      accountReference: org.billingRef ?? 'KODIHUB',
+      description: 'KodiHub bill',
+    });
+    return this.viewStk(request);
+  }
+
+  /** An SMS bundle: M-Pesa prompt to KodiHub's paybill, account "SMS<billing ref>" (spec §5). */
+  async buySms(dto: { units: number; phone?: string }, idempotencyKey?: string) {
+    const ctx = orgContext();
+    if (idempotencyKey) {
+      const existing = await this.db.platformStkRequest.findFirst({
+        where: { idempotencyKey, orgId: ctx.orgId },
+      });
+      if (existing) {
+        const purchase = await this.smsPurchases.byStk(existing.id);
+        if (!purchase || purchase.units !== dto.units) {
+          throw AppError.conflict(
+            'This Idempotency-Key was already used for a different request',
+            'IDEMPOTENCY_MISMATCH',
+          );
+        }
+        return this.smsPurchases.view(purchase);
+      }
+    }
+    const quote = await this.smsPurchases.quote(ctx.orgId);
+    const problem = checkBundleUnits(dto.units, quote.minUnits);
+    if (problem) throw AppError.fieldInvalid('units', problem);
+    const org = await this.db.organization.findUniqueOrThrow({ where: { id: ctx.orgId } });
+    const phone = await this.payerPhone(ctx.userId, dto.phone);
+    const purchase = await this.smsPurchases.createPending({
+      orgId: ctx.orgId,
+      units: dto.units,
+      unitPrice: quote.unitPrice,
+      phone,
+      requestedById: ctx.userId,
+    });
+    let request: PlatformStkRequest;
+    try {
+      request = await this.pushStk({
+        orgId: ctx.orgId,
+        userId: ctx.userId,
+        phone,
+        amount: purchase.amount,
+        idempotencyKey,
+        purpose: 'SMS',
+        accountReference: `SMS${org.billingRef ?? ''}`,
+        description: 'KodiHub SMS',
+      });
+    } catch (e) {
+      await this.db.smsPurchase.update({ where: { id: purchase.id }, data: { state: 'FAILED' } });
+      throw e;
+    }
+    const linked = await this.db.smsPurchase.update({
+      where: { id: purchase.id },
+      data: { stkRequestId: request.id },
+    });
+    return this.smsPurchases.view(linked);
+  }
+
+  private async payerPhone(userId: string, given?: string): Promise<string> {
+    const user = await this.db.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { phone: true },
+    });
+    const phone = requiredPhone('phone', given ?? user.phone ?? '');
+    if (!/^\+254[17]\d{8}$/.test(phone))
+      throw AppError.fieldInvalid('phone', 'Enter a Safaricom number');
+    return phone;
+  }
+
+  /** Sends an M-Pesa prompt to KodiHub's paybill and records the request. */
+  private async pushStk(p: {
+    orgId: string;
+    userId: string;
+    phone: string | undefined;
+    amount: bigint;
+    idempotencyKey?: string;
+    purpose: 'INVOICE' | 'SMS';
+    accountReference: string;
+    description: string;
+  }): Promise<PlatformStkRequest> {
     const settings = await this.billing.settings();
     const setup = this.stkSetup(settings);
     if (!setup)
@@ -387,33 +571,25 @@ export class PlatformPayService {
         'Paying in the app isn’t available yet. Use the paybill.',
         'NO_MPESA',
       );
-    const amount = BigInt(dto.amount);
-    if (amount <= 0n || amount % 100n !== 0n)
-      throw AppError.fieldInvalid('amount', 'M-Pesa takes whole shillings only');
-    const [org, user] = await Promise.all([
-      this.db.organization.findUniqueOrThrow({ where: { id: ctx.orgId } }),
-      this.db.user.findUniqueOrThrow({ where: { id: ctx.userId }, select: { phone: true } }),
-    ]);
-    const phone = requiredPhone('phone', dto.phone ?? user.phone ?? '');
-    if (!/^\+254[17]\d{8}$/.test(phone))
-      throw AppError.fieldInvalid('phone', 'Enter a Safaricom number');
+    const phone = await this.payerPhone(p.userId, p.phone);
 
     let request: PlatformStkRequest;
     try {
       request = await this.db.platformStkRequest.create({
         data: {
-          orgId: ctx.orgId,
+          orgId: p.orgId,
           phone,
-          amount,
-          idempotencyKey: idempotencyKey ?? null,
-          requestedById: ctx.userId,
+          amount: p.amount,
+          idempotencyKey: p.idempotencyKey ?? null,
+          requestedById: p.userId,
+          purpose: p.purpose,
         },
       });
     } catch (e) {
-      if (idempotencyKey && violatesUnique(e, 'idempotencyKey')) {
-        return this.viewStk(
-          await this.db.platformStkRequest.findFirstOrThrow({ where: { idempotencyKey } }),
-        );
+      if (p.idempotencyKey && violatesUnique(e, 'idempotencyKey')) {
+        return this.db.platformStkRequest.findFirstOrThrow({
+          where: { idempotencyKey: p.idempotencyKey },
+        });
       }
       throw e;
     }
@@ -422,11 +598,11 @@ export class PlatformPayService {
         businessShortCode: setup.businessShortCode,
         partyB: setup.businessShortCode,
         transactionType: 'CustomerPayBillOnline',
-        amountKes: Number(amount / 100n),
+        amountKes: Number(p.amount / 100n),
         phone: toMsisdn(phone),
         callbackUrl: setup.callbackUrl,
-        accountReference: org.billingRef ?? 'KODIHUB',
-        description: 'KodiHub bill',
+        accountReference: p.accountReference,
+        description: p.description,
         password: setup.password,
         timestamp: setup.timestamp,
       });
@@ -449,9 +625,9 @@ export class PlatformPayService {
       action: 'platform_stk.push',
       entity: 'platform_stk_request',
       entityId: request.id,
-      after: { amount, phone },
+      after: { amount: p.amount, phone, purpose: p.purpose },
     });
-    return this.viewStk(request);
+    return request;
   }
 
   async getStk(id: string) {
@@ -480,6 +656,7 @@ export class PlatformPayService {
       const state = stkStateFor(cb.resultCode);
       if (state !== 'SUCCESS') {
         await this.finish(req.id, { state, resultDesc: cb.resultDesc });
+        if (req.purpose === 'SMS') await this.smsPurchases.markFailed(req.id);
         return;
       }
       // Daraja doesn't sign callbacks: confirm with Safaricom before believing it.
@@ -501,10 +678,21 @@ export class PlatformPayService {
             state: stkStateFor(confirmed.resultCode),
             resultDesc: confirmed.resultDesc,
           });
+          if (req.purpose === 'SMS') await this.smsPurchases.markFailed(req.id);
         }
         return;
       }
       if (!cb.receipt || !cb.amount) return;
+      if (req.purpose === 'SMS') {
+        // SMS bundles become units, never a platform payment (spec §5).
+        await this.smsPurchases.creditFromStk(req.id, cb.receipt);
+        await this.finish(req.id, {
+          state: 'SUCCESS',
+          resultDesc: cb.resultDesc,
+          mpesaReceipt: cb.receipt,
+        });
+        return;
+      }
       const paymentId = await this.recordOnce(req.orgId, {
         amount: cb.amount,
         source: 'STK',
@@ -525,6 +713,11 @@ export class PlatformPayService {
   handleC2b(c: C2bConfirmation, body: unknown) {
     return withoutOrgScope(async () => {
       const ref = normalizeAccountRef(c.accountRef);
+      const sms = ref ? /^SMS(H\d{5,})$/.exec(ref) : null;
+      if (sms) {
+        await this.smsPurchases.creditFromC2b(sms[1]!, c.receipt, c.amount);
+        return;
+      }
       const org = ref
         ? await this.db.organization.findUnique({
             where: { billingRef: ref },

@@ -13,6 +13,7 @@ import { broadcastRecipients, type Recipient } from './broadcast-rules.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { CreateBroadcastDto } from './broadcasts.dto.js';
 import { MessagesService } from './messages.service.js';
+import { SmsService } from '../notifications/sms/sms.service.js';
 
 const RATE_SECONDS = 60;
 const STALE_MS = 2 * 60_000;
@@ -33,6 +34,7 @@ export class BroadcastsService {
     private readonly audit: AuditService,
     private readonly messages: MessagesService,
     private readonly notifications: NotificationsService,
+    private readonly sms: SmsService,
   ) {}
 
   /** The properties, each visible to the caller (property-limited staff included). */
@@ -67,12 +69,17 @@ export class BroadcastsService {
     );
   }
 
-  async preview(propertyIds: string[]) {
+  async preview(propertyIds: string[], text?: string) {
     const list = await this.recipients(await this.properties(propertyIds));
-    return {
+    const counts = {
       recipients: list.length,
       withEmail: list.filter((r) => r.email).length,
       withPortal: list.filter((r) => r.userId).length,
+    };
+    if (!text?.trim()) return counts;
+    return {
+      ...counts,
+      ...(await this.sms.bulkUnits(orgContext().orgId, text.trim(), list.length)),
     };
   }
 
@@ -86,6 +93,7 @@ export class BroadcastsService {
     const since = last ? (Date.now() - last.createdAt.getTime()) / 1000 : Infinity;
     if (since < RATE_SECONDS) throw AppError.rateLimited(Math.ceil(RATE_SECONDS - since));
     const recipients = (await this.recipients(propertyIds)).length;
+    await this.sms.bulkUnits(ctx.orgId, dto.text.trim(), recipients, true);
     const row = await this.db.$transaction(async (tx) => {
       const b = await tx.broadcast.create({
         data: {

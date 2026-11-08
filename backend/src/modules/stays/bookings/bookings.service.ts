@@ -121,6 +121,7 @@ export class BookingsService {
     if (booking.guest?.phone) {
       await this.notifications
         .sendSms(
+          { kind: 'org', orgId: orgId, type: 'booking' },
           booking.guest.phone,
           guestSms('CONFIRMED', {
             biz,
@@ -141,6 +142,7 @@ export class BookingsService {
         const instructions = checkInInstructions?.trim() ?? '';
         await this.notifications
           .sendSms(
+            { kind: 'org', orgId: orgId, type: 'booking' },
             booking.guest.phone,
             guestSms('CHECKIN_INFO', {
               biz,
@@ -187,6 +189,7 @@ export class BookingsService {
     });
     await this.notifications
       .sendSms(
+        { kind: 'org', orgId: b.orgId, type: 'booking' },
         b.guest.phone,
         guestSms('CHECKIN_INFO', {
           biz: await this.bizName(b.orgId),
@@ -652,6 +655,7 @@ export class BookingsService {
       if (nextStatus === 'HELD') {
         await this.notifications
           .sendSms(
+            { kind: 'org', orgId: ctx.orgId, type: 'booking' },
             updated.guest.phone,
             guestSms('PAY_NOW', {
               biz,
@@ -701,6 +705,7 @@ export class BookingsService {
       const biz = await this.bizName(ctx.orgId);
       await this.notifications
         .sendSms(
+          { kind: 'org', orgId: ctx.orgId, type: 'booking' },
           updated.guest.phone,
           guestSms('DECLINED', {
             biz,
@@ -827,6 +832,7 @@ export class BookingsService {
       const biz = await this.bizName(ctx.orgId);
       await this.notifications
         .sendSms(
+          { kind: 'org', orgId: ctx.orgId, type: 'booking' },
           updated.guest.phone,
           guestSms('CANCELLED', {
             biz,
@@ -1009,6 +1015,7 @@ export class BookingsService {
           const biz = await this.bizName(b.orgId);
           await this.notifications
             .sendSms(
+              { kind: 'org', orgId: b.orgId, type: 'booking' },
               b.guest.phone,
               guestSms('EXPIRED', {
                 biz,
@@ -1080,6 +1087,7 @@ export class BookingsService {
         const biz = await this.bizName(b.orgId);
         await this.notifications
           .sendSms(
+            { kind: 'org', orgId: b.orgId, type: 'booking' },
             b.guest!.phone,
             guestSms('BALANCE_DUE', {
               biz,
@@ -1110,6 +1118,7 @@ export class BookingsService {
         });
         await this.notifications
           .sendSms(
+            { kind: 'org', orgId: b.orgId, type: 'booking' },
             b.guest!.phone,
             guestSms('CHECKIN_INFO', {
               biz,

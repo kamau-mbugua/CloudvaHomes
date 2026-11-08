@@ -20,6 +20,7 @@ import type { TermsDraft } from '../platform/rules';
 import type { PlatformInvoice, PlatformOrganization, PlatformPayment } from '../platform/types';
 import { CustomBadge, HodiInvoicesTable, OrgStatusBadge, PlatformPaymentsTable } from '../platform/ui';
 import { AdminInvoiceActions, RecordHodiPaymentSheet, VoidHodiInvoiceSheet } from './sheets';
+import { AdminOrgSms } from './AdminOrgSms';
 
 /**
  * Admin → an organisation (`/admin/organizations/:id`): its status, billing account, owner
@@ -45,7 +46,7 @@ export function OrganizationDetailPage() {
   return <OrganizationDetail org={org.data} />;
 }
 
-type OrgDetailTab = 'terms' | 'invoices' | 'payments';
+type OrgDetailTab = 'terms' | 'invoices' | 'payments' | 'sms';
 
 function OrganizationDetail({ org }: { org: PlatformOrganization }) {
   const { user } = useSession();
@@ -59,8 +60,8 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
   const tab: OrgDetailTab =
     rawTab === 'invoices' || rawTab === 'payments'
       ? rawTab
-      : rawTab === 'terms' && superAdmin
-        ? 'terms'
+      : (rawTab === 'terms' || rawTab === 'sms') && superAdmin
+        ? rawTab
         : defaultTab;
 
   const selectTab = (nextTab: OrgDetailTab) => {
@@ -163,11 +164,24 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
           >
             Payments
           </button>
+          {superAdmin ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'sms'}
+              className="pf__tab"
+              onClick={() => selectTab('sms')}
+            >
+              SMS
+            </button>
+          ) : null}
         </div>
       </div>
 
       {tab === 'terms' && superAdmin ? (
         <TermsForm key={`${org.id}-${org.plan?.id ?? ''}-${org.priceOverride ?? ''}-${org.minimumOverride ?? ''}-${org.trialEndsAt ?? ''}-${org.noSuspendUntil ?? ''}-${org.price?.pricePerUnit}-${org.price?.minimumMonthly}-${org.onboardedById ?? ''}`} org={org} />
+      ) : tab === 'sms' && superAdmin ? (
+        <AdminOrgSms orgId={org.id} />
       ) : tab === 'invoices' ? (
         <OrgInvoices orgId={org.id} superAdmin={superAdmin} />
       ) : (

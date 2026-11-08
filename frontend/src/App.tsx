@@ -54,6 +54,7 @@ const OwnerStatementsPage = lazy(() => import('./features/agency/OwnerStatements
 const RemittancesPage = lazy(() => import('./features/agency/RemittancesPage').then((m) => ({ default: m.RemittancesPage })));
 const RemittanceDetailPage = lazy(() => import('./features/agency/RemittanceDetailPage').then((m) => ({ default: m.RemittanceDetailPage })));
 const PlanBillingPage = lazy(() => import('./features/platform/PlanBillingPage').then((m) => ({ default: m.PlanBillingPage })));
+const SmsPage = lazy(() => import('./features/sms/SmsPage').then((m) => ({ default: m.SmsPage })));
 const PayoutsPage = lazy(() => import('./features/banks/PayoutsPage').then((m) => ({ default: m.PayoutsPage })));
 const ListingsPage = lazy(() => import('./features/stays/ListingsPage').then((m) => ({ default: m.ListingsPage })));
 const ListingEditorPage = lazy(() => import('./features/stays/ListingEditorPage').then((m) => ({ default: m.ListingEditorPage })));
@@ -123,6 +124,7 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; tit
   },
   'settings/audit': { element: <AuditLogPage /> },
   'settings/plan': { element: <PlanBillingPage /> },
+  'settings/sms': { element: <SmsPage /> },
   'settings/payouts': { element: <PayoutsPage /> },
   listings: {
     element: <ListingsPage />,

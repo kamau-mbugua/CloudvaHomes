@@ -43,7 +43,7 @@ export interface PushSender {
 }
 
 export type OutboxEntry =
-  | { channel: 'sms'; to: string; text: string; at: Date }
+  | { channel: 'sms'; to: string; text: string; at: Date; via?: string }
   | {
       channel: 'email';
       to: string;
@@ -73,10 +73,13 @@ function maskPhone(phone: string): string {
 /** Dev/test: records the message and logs it. Message bodies are only logged outside production. */
 export class LogSmsSender implements SmsSender {
   private readonly logger = new Logger('SMS');
-  constructor(private readonly showBodies: boolean) {}
+  constructor(
+    private readonly showBodies: boolean,
+    private readonly via = 'platform',
+  ) {}
 
   async send(to: string, text: string): Promise<void> {
-    outbox.push({ channel: 'sms', to, text, at: new Date() });
+    outbox.push({ channel: 'sms', to, text, at: new Date(), via: this.via });
     this.logger.log(this.showBodies ? `→ ${to}: ${text}` : `→ ${maskPhone(to)} (body hidden)`);
   }
 }
@@ -105,9 +108,10 @@ export class AfricasTalkingSmsSender implements SmsSender {
     private readonly username: string,
     private readonly apiKey: string,
     private readonly senderId?: string,
+    sandbox = false,
   ) {
     this.url =
-      username === 'sandbox'
+      sandbox || username === 'sandbox'
         ? 'https://api.sandbox.africastalking.com/version1/messaging'
         : 'https://api.africastalking.com/version1/messaging';
   }

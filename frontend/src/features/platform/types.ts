@@ -279,6 +279,14 @@ export interface PlatformSettings {
     apiKeySet?: boolean;
     apiKey?: boolean;
     source?: 'database' | 'env' | 'log';
+    provider?: 'AFRICASTALKING' | 'TEXTSMS' | 'HOSTPINNACLE';
+    textsms?: { partnerId: string | null; senderId: string | null; apiKeySet: boolean };
+    hostpinnacle?: { userId: string | null; senderId: string | null; apiKeySet: boolean; passwordSet: boolean };
+    /** Cents per unit. */
+    unitPrice?: string;
+    bundles?: number[];
+    minUnits?: number;
+    freeUnits?: number;
   };
   allowPublicSignup?: boolean;
   minAppVersionCode?: number;

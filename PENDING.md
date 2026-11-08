@@ -2,6 +2,15 @@
 
 Small changes agreed but not done yet. Newest first.
 
+## SMS (platform vs organisation)
+
+- Mobile app: SMS balance and Buy SMS in settings (web has both; API ready). Spec §6, call 6.
+- HostPinnacle: confirm the success reply against a real account with its API key (errors
+  come back as HTTP 200 `{status:"error",statusCode,reason}`; a test-mode call without the API
+  key returned "Invalid credentials"). Use Admin → Organisation → SMS → Send test SMS.
+- TextSMS: confirm the balance endpoint with TextSMS before showing a provider balance.
+- Delivery reports (non-goal for now).
+
 ## Hosts and short stays
 
 - Reconciliation is tenant-only: a host can't assign an unmatched M-Pesa or bank payment to a

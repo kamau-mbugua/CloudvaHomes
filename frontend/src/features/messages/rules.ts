@@ -42,3 +42,18 @@ export function broadcastSummary(b: BroadcastCounts): string {
   if (b.notified) parts.push(`${b.notified} in the tenant app`);
   return parts.join(' · ');
 }
+
+/**
+ * The SMS-units line under a notice: units needed vs the organisation's KodiHub balance.
+ * `short` means the balance can't cover it (the server would refuse with SMS_UNITS_LOW).
+ */
+export function unitsLine(
+  partsPerMessage: number,
+  recipients: number,
+  account: { mode: 'PLATFORM' | 'OWN'; balance: number } | null,
+): { text: string; short: boolean } | null {
+  if (!account) return null;
+  if (account.mode === 'OWN') return { text: 'Sent from your own SMS account', short: false };
+  const needed = partsPerMessage * recipients;
+  return { text: `About ${needed} SMS units · you have ${account.balance}`, short: needed > account.balance };
+}

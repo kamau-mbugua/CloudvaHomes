@@ -219,7 +219,11 @@ export class RentChangesService {
     });
     const text = `Hi ${t.tenant.firstName}, your rent for ${t.unit.number} changes from KES ${formatKesMinor(t.rentAmount)} to KES ${formatKesMinor(newRent)} from ${shortPeriodLabel(period)}. ${org.name}`;
     try {
-      await this.notifications.sendSms(t.tenant.phone, text);
+      await this.notifications.sendSms(
+        { kind: 'org', orgId: t.orgId, type: 'rent_change' },
+        t.tenant.phone,
+        text,
+      );
     } catch (err) {
       this.log.warn({ err, tenantId: t.tenant.id }, 'Rent change SMS failed');
     }
