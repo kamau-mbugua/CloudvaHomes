@@ -181,14 +181,29 @@ export class ListingsService {
 
     try {
       const created = await this.db.$transaction(async (tx) => {
-        const unit = await tx.unit.create({
-          data: {
-            orgId: ctx.orgId,
-            propertyId: dto.propertyId,
-            number: dto.unitNumber.trim(),
-            rentAmount: 0n,
-          },
+        // A unit with this number may already exist (e.g. from the portfolio CSV import):
+        // turn it into a listing instead of failing; a unit gets at most one listing.
+        const number = dto.unitNumber.trim();
+        const existing = await tx.unit.findFirst({
+          where: { orgId: ctx.orgId, propertyId: dto.propertyId, number },
+          select: { id: true, listing: { select: { id: true } } },
         });
+        if (existing?.listing) {
+          throw AppError.conflict(
+            `Unit ${number} in that property already has a listing`,
+            'UNIT_ALREADY_LISTED',
+          );
+        }
+        const unit =
+          existing ??
+          (await tx.unit.create({
+            data: {
+              orgId: ctx.orgId,
+              propertyId: dto.propertyId,
+              number,
+              rentAmount: 0n,
+            },
+          }));
         const row = await tx.listing.create({
           data: {
             orgId: ctx.orgId,

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
@@ -12,6 +13,7 @@ import { useListFilters } from '../portfolio/hooks';
 import { useAuthedBlobUrl } from '../uploads/api';
 import { staysErrorMessage, staysKeys } from './api';
 import { formatKES } from '../../lib/money';
+import { ListingsCsvImportSheet } from './ListingsCsvImportSheet';
 import type { Listing } from './types';
 
 const PAGE_SIZE = 20;
@@ -41,6 +43,7 @@ function CoverThumb({ uploadId, title }: { uploadId: string | null; title: strin
 }
 
 export function ListingsPage() {
+  const [importingCsv, setImportingCsv] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
   const filters = useListFilters();
@@ -106,11 +109,17 @@ export function ListingsPage() {
         </select>
 
         {canCreate ? (
-          <Link to="/app/listings/new" className="nx-btn nx-btn--primary pg-push">
-            Add listing
-          </Link>
+          <>
+            <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>
+              Import CSV
+            </button>
+            <Link to="/app/listings/new" className="nx-btn nx-btn--primary">
+              Add listing
+            </Link>
+          </>
         ) : null}
       </div>
+      {importingCsv ? <ListingsCsvImportSheet onClose={() => setImportingCsv(false)} /> : null}
 
       {list.isError ? (
         <p className="ad__error" role="alert">

@@ -296,4 +296,54 @@ describe('Host site settings & listings API (e2e)', () => {
       .expect(200);
     expect(patched.body.data.guestPayments).toEqual({ paybill: true, mpesaPrompt: false });
   });
+
+  it('turns an existing unit (e.g. from the portfolio import) into a listing, once', async () => {
+    const { owner } = await onboardOrg(t, admin, {
+      name: 'Imported Stays',
+      ownerEmail: 'host-imported@example.invalid',
+      ownerPhone: '+254700000406',
+      kind: 'HOST',
+    });
+    const prop = (
+      await t
+        .http()
+        .post('/api/v1/properties')
+        .set(auth(owner))
+        .send({ name: 'Makini Court', code: 'MKC' })
+        .expect(201)
+    ).body.data;
+    const unit = (
+      await t
+        .http()
+        .post('/api/v1/units')
+        .set(auth(owner))
+        .send({ propertyId: prop.id, number: '101', rentAmount: 450000 })
+        .expect(201)
+    ).body.data;
+
+    const listingBody = {
+      propertyId: prop.id,
+      unitNumber: '101',
+      title: 'Cozy 1BR',
+      maxGuests: 2,
+      bedrooms: 1,
+      bathrooms: 1,
+      nightlyPrice: '450000',
+    };
+    const listing = (
+      await t.http().post('/api/v1/host/listings').set(auth(owner)).send(listingBody).expect(201)
+    ).body.data;
+    expect(listing.unitId).toBe(unit.id);
+
+    const again = await t
+      .http()
+      .post('/api/v1/host/listings')
+      .set(auth(owner))
+      .send(listingBody)
+      .expect(409);
+    expect(again.body.error.code).toBe('UNIT_ALREADY_LISTED');
+
+    const units = await t.prisma.unit.count({ where: { propertyId: prop.id } });
+    expect(units).toBe(1);
+  });
 });

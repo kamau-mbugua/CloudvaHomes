@@ -968,3 +968,44 @@
 .site-datepicker__empty {
   aspect-ratio: 1;
 }
+
+/* ── Home: search row lined up, welcome empty state, footer width ─────────── */
+.site-search-field input,
+.site-search-actions .site-btn {
+  box-sizing: border-box;
+  height: 2.75rem;
+}
+
+.site-search-field input {
+  width: 100%;
+  background: #ffffff;
+  color: #1c1917;
+}
+
+.site-search-actions .site-btn--primary {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.site-empty h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.site-empty--welcome {
+  max-width: 520px;
+  margin: 0.25rem auto 2rem;
+  padding: 2.5rem 1.75rem;
+}
+
+.site-empty--welcome .site-not-found__icon {
+  margin: 0;
+}
+
+.site-footer {
+  padding: 1.25rem 0;
+}
+
+.site-footer__inner {
+  padding: 0 1.25rem;
+}

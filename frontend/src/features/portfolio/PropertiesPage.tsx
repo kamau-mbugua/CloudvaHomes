@@ -29,6 +29,9 @@ const PAGE_SIZE = 20;
 export function PropertiesPage() {
   const session = useSession();
   const isAgency = session.activeOrganization?.kind === 'AGENCY';
+  // Hosts add units as listings (Short stays → Listings, with their own import); the
+  // portfolio import creates monthly-rent units that can't be booked.
+  const isHost = session.activeOrganization?.kind === 'HOST';
   const queryClient = useQueryClient();
   const toast = useToast();
   const filters = useListFilters();
@@ -82,8 +85,8 @@ export function PropertiesPage() {
         ) : null}
         {canCreate ? (
           <>
-            <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>Import CSV</button>
-            <button type="button" className="nx-btn nx-btn--primary" onClick={() => setEditing('new')}>Add property</button>
+            {isHost ? null : <button type="button" className="nx-btn pg-push" onClick={() => setImportingCsv(true)}>Import CSV</button>}
+            <button type="button" className={`nx-btn nx-btn--primary${isHost ? ' pg-push' : ''}`} onClick={() => setEditing('new')}>Add property</button>
           </>
         ) : null}
       </div>
