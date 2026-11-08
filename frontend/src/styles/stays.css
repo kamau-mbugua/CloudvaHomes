@@ -289,3 +289,34 @@
   height: 100%;
   object-fit: cover;
 }
+
+/* Settings → Booking site: the shareable link with Copy / Open */
+.site-link-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.site-link-row__url {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  color: var(--primary);
+  background: var(--muted, var(--input-background));
+  cursor: text;
+}
+.site-link-row .nx-btn {
+  height: 48px;
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .site-link-row {
+    flex-wrap: wrap;
+  }
+  .site-link-row__url {
+    flex-basis: 100%;
+  }
+  .site-link-row .nx-btn {
+    flex: 1;
+  }
+}

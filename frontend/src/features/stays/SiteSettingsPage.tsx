@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { copyText } from '../../lib/clipboard';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
@@ -183,24 +184,14 @@ function SiteSettingsForm({ site }: { site: HostSite }) {
             gap: '1rem',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Web address & publishing</h2>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                Share this link on Instagram, WhatsApp or Google Maps so guests can book directly.
-              </p>
-            </div>
-            {site.address ? (
-              <a
-                href={site.address}
-                target="_blank"
-                rel="noreferrer"
-                className="nx-btn nx-btn--sm"
-              >
-                Open my site ↗
-              </a>
-            ) : null}
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.05rem' }}>Web address & publishing</h2>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Share this link on Instagram, WhatsApp or Google Maps so guests can book directly.
+            </p>
           </div>
+
+          {site.address ? <SiteLinkRow address={site.address} published={site.published} /> : null}
 
           <div className="au__field">
             <div className="au__labelrow">
@@ -487,4 +478,49 @@ export function SiteSettingsPage() {
 
   const site = siteQuery.data.data;
   return <SiteSettingsForm key={`${site.slug ?? ''}:${site.published}:${site.businessName}`} site={site} />;
+}
+
+/** The booking site's full address, with Copy and Open buttons. */
+function SiteLinkRow({ address, published }: { address: string; published: boolean }) {
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await copyText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2_000);
+    } catch {
+      toast.failed('Could not copy the link. Select it and copy it yourself.');
+    }
+  }
+
+  return (
+    <div className="au__field">
+      <div className="au__labelrow">
+        <span>Your booking link</span>
+      </div>
+      <div className="site-link-row">
+        <input
+          className="au__input site-link-row__url"
+          type="text"
+          readOnly
+          value={address}
+          aria-label="Your booking link"
+          onFocus={(e) => e.currentTarget.select()}
+        />
+        <button type="button" className="nx-btn nx-btn--primary" onClick={() => void copy()} aria-live="polite">
+          {copied ? 'Copied ✓' : 'Copy link'}
+        </button>
+        <a href={address} target="_blank" rel="noreferrer" className="nx-btn">
+          Open ↗
+        </a>
+      </div>
+      {!published ? (
+        <p className="ad__muted" style={{ margin: '0.25rem 0 0', fontSize: '0.8rem' }}>
+          Not published yet: guests who open this link won’t see your site until you publish it below.
+        </p>
+      ) : null}
+    </div>
+  );
 }
