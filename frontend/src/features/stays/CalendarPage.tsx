@@ -146,7 +146,7 @@ export function CalendarPage() {
             <div
               className="st__cal__head"
               style={{
-                gridTemplateColumns: `200px repeat(${WINDOW_DAYS}, minmax(0, 1fr))`,
+                gridTemplateColumns: `var(--st-cal-unit) repeat(${WINDOW_DAYS}, minmax(0, 1fr))`,
               }}
             >
               <div className="st__cal__unithead">Unit</div>
@@ -164,7 +164,7 @@ export function CalendarPage() {
                   key={u.unitId}
                   className="st__cal__row"
                   style={{
-                    gridTemplateColumns: `200px repeat(${WINDOW_DAYS}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `var(--st-cal-unit) repeat(${WINDOW_DAYS}, minmax(0, 1fr))`,
                   }}
                 >
                   <div className="st__cal__unit">
@@ -174,12 +174,13 @@ export function CalendarPage() {
                     </span>
                   </div>
 
-                  {cols.map((d) => (
+                  {cols.map((d, i) => (
                     <button
                       key={d}
                       type="button"
                       disabled={!canCreate && !canUpdate}
                       onClick={() => setCellChoice({ unit: u, date: d })}
+                      style={{ gridColumn: i + 2 }}
                       className="st__cal__cell"
                       title={`Book or block ${u.title} starting ${d}`}
                     />

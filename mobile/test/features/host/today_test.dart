@@ -38,6 +38,29 @@ Session _session({required Set<String> permissions}) => Session(
 );
 
 void main() {
+  group('in-house', () {
+    const today = '2026-11-09';
+    test('lists checked-in guests', () {
+      expect(
+        isInHouse('CHECKED_IN', '2026-11-08', '2026-11-11', today),
+        isTrue,
+      );
+    });
+    test('does not list today\'s arrivals who have not checked in', () {
+      expect(isInHouse('CONFIRMED', today, '2026-11-11', today), isFalse);
+    });
+    test(
+      'lists a confirmed stay that began earlier but was never checked in',
+      () {
+        expect(
+          isInHouse('CONFIRMED', '2026-11-07', '2026-11-11', today),
+          isTrue,
+        );
+        expect(isInHouse('CONFIRMED', '2026-11-07', today, today), isFalse);
+      },
+    );
+  });
+
   testWidgets(
     'today screen renders arrivals, requests and hides money for caretaker without stay-payments:view',
     (tester) async {

@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { type PublicBookingDetail, publicSiteApi } from './api';
 import {
+  amountDueNow,
   bookingErrorMessage,
   digitsOnly,
   formatMinorKES,
   guestStatusLabel,
   holdTimeLeft,
+  howToPayLine,
 } from './booking';
 
 export function BookingPage() {
@@ -133,6 +135,8 @@ export function BookingPage() {
     ? Math.max(0, Math.floor((new Date(booking.holdExpiresAt).getTime() - nowMs) / 1000))
     : 0;
   const owedBig = BigInt(booking.owed || '0');
+  const dueNowAmount = amountDueNow(booking);
+  const payLine = howToPayLine(booking);
   const canCancel = ['REQUESTED', 'HELD', 'CONFIRMED'].includes(booking.status);
   const waDigits = digitsOnly(booking.contact.whatsappPhone);
 
@@ -166,7 +170,7 @@ export function BookingPage() {
 
       {booking.status === 'HELD' && (
         <div className="site-hold-banner">
-          <strong>Hold active:</strong> Complete payment of {formatMinorKES(booking.dueNow)} within{' '}
+          <strong>Hold active:</strong> Complete payment of {formatMinorKES(dueNowAmount.toString())} within{' '}
           <span className="site-countdown">
             {holdTimeLeft(holdRemainingSec)}
           </span>{' '}
@@ -189,9 +193,7 @@ export function BookingPage() {
               <p>
                 Amount due now:{' '}
                 <strong>
-                  {formatMinorKES(
-                    booking.status === 'HELD' ? booking.dueNow : booking.owed,
-                  )}
+                  {formatMinorKES(dueNowAmount.toString())}
                 </strong>
               </p>
 
@@ -221,6 +223,8 @@ export function BookingPage() {
                   )}
                 </div>
               )}
+
+              {payLine ? <p className="site-muted">{payLine}</p> : null}
 
               {booking.paybill && (
                 <div className="site-paybill-box">

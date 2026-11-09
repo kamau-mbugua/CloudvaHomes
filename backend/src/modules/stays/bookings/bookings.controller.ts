@@ -40,8 +40,9 @@ export class BookingsController {
     return { data: await this.bookings.calendar(query) };
   }
 
+  /** Prices a new stay — for people who can make bookings (caretakers can't see prices). */
   @Post('bookings/quote')
-  @RequirePermission('bookings:view')
+  @RequirePermission('bookings:create')
   async quote(@Body() dto: QuoteBookingDto) {
     return {
       data: await this.bookings.quoteForApi(dto.listingId, dto.checkIn, dto.checkOut, dto.guests),

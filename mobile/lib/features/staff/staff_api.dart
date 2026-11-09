@@ -267,6 +267,17 @@ class StaffApi {
         ),
       );
 
+  /// Hosts: records the whole amount on a stay booking.
+  Future<Inbound> assignInboundToBooking(String id, String bookingId) async =>
+      Inbound.fromJson(
+        _data(
+          await _api.post(
+            '/inbound-transactions/$id/assign',
+            body: {'bookingId': bookingId},
+          ),
+        ),
+      );
+
   Future<void> ignoreInbound(String id, String reason) =>
       _api.post('/inbound-transactions/$id/ignore', body: {'reason': reason});
 

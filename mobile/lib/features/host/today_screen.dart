@@ -11,6 +11,15 @@ import 'host_api.dart';
 import 'host_models.dart';
 import 'host_shell.dart';
 
+/// The Today board's "In-house": checked-in guests, or a confirmed stay that began before today
+/// but was never checked in. Today's arrivals who haven't checked in are under Arrivals only.
+bool isInHouse(String status, String checkIn, String checkOut, String today) {
+  if (status == 'CHECKED_IN') return true;
+  return status == 'CONFIRMED' &&
+      checkIn.compareTo(today) < 0 &&
+      checkOut.compareTo(today) > 0;
+}
+
 class TodayScreen extends ConsumerStatefulWidget {
   const TodayScreen({super.key});
 
@@ -58,11 +67,7 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
           ];
           final inHouse = [
             for (final b in all)
-              if (b.status == 'CHECKED_IN' ||
-                  (b.status == 'CONFIRMED' &&
-                      b.checkIn.compareTo(today) <= 0 &&
-                      b.checkOut.compareTo(today) > 0))
-                b,
+              if (isInHouse(b.status, b.checkIn, b.checkOut, today)) b,
           ];
           final requests = [
             for (final b in all)

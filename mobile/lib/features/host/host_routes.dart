@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 
 import '../billing/plan_billing_screen.dart';
+import '../sms/sms_screen.dart';
 import '../staff/more/expenses_screens.dart';
 import '../staff/more/parity_screens.dart';
 import 'booking_detail_screen.dart';
@@ -87,6 +88,7 @@ List<RouteBase> hostRoutes() => [
   ),
   GoRoute(path: '/host/site', builder: (_, _) => const SiteSettingsScreen()),
   GoRoute(path: '/host/billing', builder: (_, _) => const PlanBillingScreen()),
+  GoRoute(path: '/host/sms', builder: (_, _) => const SmsScreen()),
   GoRoute(path: '/host/cleaning', builder: (_, _) => const CleaningScreen()),
   GoRoute(path: '/host/guests', builder: (_, _) => const GuestsScreen()),
   GoRoute(path: '/host/expenses', builder: (_, _) => const ExpensesScreen()),

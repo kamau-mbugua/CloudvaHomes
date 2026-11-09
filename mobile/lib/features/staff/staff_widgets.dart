@@ -10,6 +10,7 @@ import '../../core/widgets/notifications_sheet.dart';
 import '../../core/widgets/side_drawer.dart';
 import '../billing/billing_banner.dart';
 import 'staff_models.dart';
+import '../sms/sms_banner.dart';
 
 // ───────────────────────────────────────────── labels (same words as the web app)
 
@@ -164,6 +165,7 @@ class StaffTabScaffold extends ConsumerWidget {
       body: Column(
         children: [
           const BillingBanner(),
+          const SmsBanner(),
           Expanded(child: body),
         ],
       ),

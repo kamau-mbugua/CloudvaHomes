@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
-import { useCan } from '../../lib/auth/useAuth';
+import { useCan, useSession } from '../../lib/auth/useAuth';
 import { countText } from '../../app/navigation';
 import { formatDateTime, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
@@ -16,7 +16,7 @@ import { optionsOf, personName } from '../portfolio/labels';
 import { Badge } from '../portfolio/ui';
 import { keys, mpesaErrorMessage, useUnmatchedCount } from './api';
 import { MATCHED_BY, SOURCE } from './labels';
-import { isMpesaKind } from './rules';
+import { bookingRefText, isMpesaKind, reconciliationEmptyText } from './rules';
 import type { InboundTransaction, MatchStatus } from './types';
 
 /**
@@ -35,6 +35,7 @@ const TABS: { id: MatchStatus; label: string }[] = [
 ];
 
 export function ReconciliationPage() {
+  const orgKind = useSession().activeOrganization?.kind;
   const filters = useListFilters();
   const { q, page } = filters;
   const statusParam = filters.get('status');
@@ -114,13 +115,14 @@ export function ReconciliationPage() {
           {filtered ? (
             <EmptyState title="No transactions match" detail="Try a different search, or clear the filters." onClear={() => filters.clear(['status'])} />
           ) : status === 'UNMATCHED' ? (
-            <EmptyState title="Nothing to match"
-              detail="Every M-Pesa payment KodiHub has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number." />
+            <EmptyState title="Nothing to match" detail={reconciliationEmptyText(orgKind)} />
           ) : status === 'MATCHED' ? (
             <EmptyState title="No matched transactions yet"
               detail="M-Pesa payments that were recorded — automatically or by hand — show here once a paybill or till is connected under Payment channels." />
           ) : (
-            <EmptyState title="Nothing ignored" detail="Transactions marked as not rent (for example a personal payment) show here, with the reason." />
+            <EmptyState title="Nothing ignored" detail={orgKind === 'HOST'
+              ? 'Transactions marked as not for a stay (for example a personal payment) show here, with the reason.'
+              : 'Transactions marked as not rent (for example a personal payment) show here, with the reason.'} />
           )}
         </div>
       ) : (
@@ -164,7 +166,10 @@ function InboundTable({ rows, status }: { rows: InboundTransaction[]; status: Ma
               <td className="num">{formatKES(r.amount)}</td>
               {status === 'MATCHED' ? (
                 <td>
-                  {r.payment ? <Link to={`/app/payments/${r.payment.id}`} className="code">{r.payment.number}</Link> : <span className="nx-muted">—</span>}
+                  {r.booking ? (
+                    <Link to={`/app/bookings/${r.booking.id}`} className="code">{r.booking.code}</Link>
+                  ) : r.payment ? <Link to={`/app/payments/${r.payment.id}`} className="code">{r.payment.number}</Link> : <span className="nx-muted">—</span>}
+                  {r.booking ? <span className="ad__sub">{bookingRefText({ ...r.booking, code: '' })}</span> : null}
                   {r.tenant ? <span className="ad__sub">{personName(r.tenant)} · <span className="code">{r.tenant.code}</span></span> : null}
                   {r.matchedBy ? <span className="ad__sub">{MATCHED_BY[r.matchedBy] ?? r.matchedBy}</span> : null}
                 </td>

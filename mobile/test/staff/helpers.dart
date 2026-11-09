@@ -74,28 +74,29 @@ ApiClient fakeApi(FakeAdapter adapter) => ApiClient(
     ..httpClientAdapter = adapter,
 );
 
-Session staffSession(Set<String> permissions) => Session(
-  accessToken: 'token',
-  user: SessionUser(
-    id: 'u1',
-    firstName: 'Staff',
-    lastName: 'User',
-    email: 'staff@example.invalid',
-    phone: '+254700000001',
-  ),
-  organizations: [
-    OrgMembership(id: 'o1', name: 'Test Org', roleName: 'Manager'),
-  ],
-  activeOrganization: ActiveOrg(
-    id: 'o1',
-    name: 'Test Org',
-    kind: 'LANDLORD',
-    status: 'ACTIVE',
-  ),
-  permissions: permissions,
-  tenantOf: const [],
-  ownerOf: const [],
-);
+Session staffSession(Set<String> permissions, {String kind = 'LANDLORD'}) =>
+    Session(
+      accessToken: 'token',
+      user: SessionUser(
+        id: 'u1',
+        firstName: 'Staff',
+        lastName: 'User',
+        email: 'staff@example.invalid',
+        phone: '+254700000001',
+      ),
+      organizations: [
+        OrgMembership(id: 'o1', name: 'Test Org', roleName: 'Manager'),
+      ],
+      activeOrganization: ActiveOrg(
+        id: 'o1',
+        name: 'Test Org',
+        kind: kind,
+        status: 'ACTIVE',
+      ),
+      permissions: permissions,
+      tenantOf: const [],
+      ownerOf: const [],
+    );
 
 class FakeSession extends SessionController {
   FakeSession(this.session);
@@ -104,9 +105,15 @@ class FakeSession extends SessionController {
   Future<Session?> build() async => session;
 }
 
-List<Override> overridesFor(FakeAdapter adapter, Set<String> permissions) => [
+List<Override> overridesFor(
+  FakeAdapter adapter,
+  Set<String> permissions, {
+  String orgKind = 'LANDLORD',
+}) => [
   apiClientProvider.overrideWithValue(fakeApi(adapter)),
-  sessionProvider.overrideWith(() => FakeSession(staffSession(permissions))),
+  sessionProvider.overrideWith(
+    () => FakeSession(staffSession(permissions, kind: orgKind)),
+  ),
 ];
 
 /// A phone-sized screen (360 × 800 logical pixels).
@@ -121,11 +128,12 @@ Future<void> pumpScreen(
   Widget child, {
   required FakeAdapter adapter,
   required Set<String> permissions,
+  String orgKind = 'LANDLORD',
 }) async {
   phoneSize(tester);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overridesFor(adapter, permissions),
+      overrides: overridesFor(adapter, permissions, orgKind: orgKind),
       child: MaterialApp(home: child),
     ),
   );

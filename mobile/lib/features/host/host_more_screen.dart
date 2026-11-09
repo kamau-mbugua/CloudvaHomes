@@ -73,6 +73,13 @@ class HostMoreScreen extends ConsumerWidget {
               subtitle: 'Your KodiHub plan and monthly bill',
               onTap: () => context.push('/host/billing'),
             ),
+          if (can(ref, 'sms:view'))
+            (
+              icon: Icons.sms_outlined,
+              title: 'SMS',
+              subtitle: 'SMS units, usage and how your messages are sent',
+              onTap: () => context.push('/host/sms'),
+            ),
         ];
 
     return HostTabScaffold(

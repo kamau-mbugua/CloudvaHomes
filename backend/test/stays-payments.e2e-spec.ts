@@ -480,4 +480,132 @@ describe('Stays — Payments, refunds, M-Pesa prompts and booking matching (e2e)
     expect(requestAfter.status).toBe('EXPIRED');
     expect(requestAfter.hostNote).toBe('Paid after the booking expired — refund the guest');
   });
+
+  describe('Reconciliation for hosts', () => {
+    const unmatched = async (receipt: string) => {
+      const list = (await get(host, '/inbound-transactions?status=UNMATCHED')).data as {
+        id: string;
+        providerRef: string;
+      }[];
+      return list.find((r) => r.providerRef === receipt)!;
+    };
+    const bookingFor = async (
+      listingId: string,
+      phone: string,
+      name: string,
+      checkIn: string,
+      checkOut: string,
+    ) =>
+      (
+        await post(
+          host,
+          '/host/bookings',
+          { listingId, checkIn, checkOut, guests: 1, guest: { name, phone }, confirm: true },
+          201,
+        )
+      ).data;
+
+    it('assigns an unmatched payment to a booking by hand, suggesting the booking by guest phone', async () => {
+      const { listing, token } = await setUpHostWithMpesa();
+      const b = await bookingFor(
+        listing.id,
+        '+254722111222',
+        'Brian Otieno',
+        '2026-12-15',
+        '2026-12-17',
+      );
+      // Wrong account number: lands in Reconciliation.
+      await hook(
+        `${token}/c2b/confirm`,
+        c2b('RECBK00001', KES(3000), 'WRONG', '254722111222'),
+      ).expect(200);
+      const row = await unmatched('RECBK00001');
+      expect(row).toBeTruthy();
+
+      const detail = (await get(host, `/inbound-transactions/${row.id}`)).data;
+      expect(detail.suggestions).toEqual([]);
+      expect(detail.bookingSuggestions).toEqual([
+        expect.objectContaining({
+          booking: expect.objectContaining({ id: b.id, code: b.code, guestName: 'Brian Otieno' }),
+          reason: 'Guest phone matches',
+        }),
+      ]);
+
+      const assigned = (
+        await post(host, `/inbound-transactions/${row.id}/assign`, { bookingId: b.id }, 200)
+      ).data;
+      expect(assigned).toMatchObject({
+        matchStatus: 'MATCHED',
+        matchedBy: 'MANUAL',
+        booking: { id: b.id, code: b.code, guestName: 'Brian Otieno' },
+      });
+      const after = (await get(host, `/host/bookings/${b.id}`)).data;
+      expect(after.amountPaid).toBe(String(KES(3000)));
+
+      // Twice: refused, nothing recorded again.
+      const again = await t
+        .http()
+        .post(`/api/v1/inbound-transactions/${row.id}/assign`)
+        .set(auth(host))
+        .send({ bookingId: b.id });
+      expect(again.status).toBe(409);
+      expect((await get(host, `/host/bookings/${b.id}`)).data.amountPaid).toBe(String(KES(3000)));
+
+      // Voiding the payment on the booking puts it back in Reconciliation.
+      const payments = (await get(host, `/host/bookings/${b.id}`)).data.payments as {
+        id: string;
+      }[];
+      await post(
+        host,
+        `/host/bookings/${b.id}/payments/${payments[0]!.id}/void`,
+        { reason: 'Wrong booking' },
+        200,
+      );
+      expect(await unmatched('RECBK00001')).toBeTruthy();
+    });
+
+    it('suggests an open booking that owes exactly the amount paid', async () => {
+      const { listing, token } = await setUpHostWithMpesa();
+      const b = await bookingFor(
+        listing.id,
+        '+254733000444',
+        'Carol Wambui',
+        '2026-12-20',
+        '2026-12-22',
+      );
+      const owed = Number(b.total);
+      await hook(`${token}/c2b/confirm`, c2b('RECBK00002', owed, 'XYZ', '254799999999')).expect(
+        200,
+      );
+      const row = await unmatched('RECBK00002');
+      const detail = (await get(host, `/inbound-transactions/${row.id}`)).data;
+      expect(detail.bookingSuggestions).toEqual([
+        expect.objectContaining({
+          booking: expect.objectContaining({ id: b.id }),
+          reason: 'Owes exactly this amount',
+        }),
+      ]);
+    });
+
+    it('needs exactly one of a tenant or a booking', async () => {
+      const { listing, token } = await setUpHostWithMpesa();
+      const b = await bookingFor(
+        listing.id,
+        '+254722111333',
+        'Dan Kip',
+        '2026-12-24',
+        '2026-12-26',
+      );
+      await hook(
+        `${token}/c2b/confirm`,
+        c2b('RECBK00003', KES(1000), 'NOPE', '254700000123'),
+      ).expect(200);
+      const row = await unmatched('RECBK00003');
+      const send = (body: object) =>
+        t.http().post(`/api/v1/inbound-transactions/${row.id}/assign`).set(auth(host)).send(body);
+      expect((await send({})).status).toBe(422);
+      expect((await send({ bookingId: b.id, tenantId: b.id })).status).toBe(422);
+      expect((await send({ bookingId: '01a1b704-0985-7488-97a2-f0d7b945b075' })).status).toBe(404);
+    });
+  });
 });

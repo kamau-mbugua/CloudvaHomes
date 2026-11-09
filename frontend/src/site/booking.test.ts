@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  amountDueNow,
+  howToPayLine,
   bookingErrorMessage,
   STEP_LABELS,
   checkOutAfter,
@@ -138,3 +140,50 @@ describe('site/booking — steps, labels, date availability, and DATES_TAKEN err
     expect(dateRangeProblem('2026-11-08', '2026-11-10', today)).toBeNull();
   });
 });
+
+describe('amount due now (same rule as the server’s M-Pesa prompt)', () => {
+  const b = (status: string, dueNow: number, paid: number, refunded: number, owed: number) => ({
+    status,
+    dueNow: String(dueNow),
+    amountPaid: String(paid),
+    amountRefunded: String(refunded),
+    owed: String(owed),
+  });
+
+  it('takes a part payment off the deposit while dates are held', () => {
+    expect(amountDueNow(b('HELD', 500000, 200000, 0, 800000))).toBe(300000n);
+    expect(amountDueNow(b('HELD', 500000, 0, 0, 1000000))).toBe(500000n);
+  });
+
+  it('counts refunds back in', () => {
+    expect(amountDueNow(b('HELD', 500000, 200000, 50000, 850000))).toBe(350000n);
+  });
+
+  it('asks for the rest of the stay once the deposit is covered or the stay is confirmed', () => {
+    expect(amountDueNow(b('HELD', 500000, 500000, 0, 500000))).toBe(500000n);
+    expect(amountDueNow(b('CONFIRMED', 500000, 500000, 0, 500000))).toBe(500000n);
+    expect(amountDueNow(b('CONFIRMED', 500000, 1000000, 0, 0))).toBe(0n);
+  });
+});
+
+describe('how to pay when the host takes no payments in the site', () => {
+  const contact = { businessName: 'Makini Homes', phone: '+254712000001', whatsappPhone: null };
+
+  it('tells the guest the host will say how to pay, with a way to reach them', () => {
+    expect(howToPayLine({ canPayInApp: false, paybill: null, contact })).toBe(
+      'Makini Homes will tell you how to pay. Call +254712000001 if you have not heard from them.',
+    );
+    expect(howToPayLine({ canPayInApp: false, paybill: null, contact: { ...contact, phone: null, whatsappPhone: '+254700000002' } })).toBe(
+      'Makini Homes will tell you how to pay. WhatsApp +254700000002 if you have not heard from them.',
+    );
+    expect(howToPayLine({ canPayInApp: false, paybill: null, contact: { ...contact, phone: null } })).toBe(
+      'Makini Homes will tell you how to pay.',
+    );
+  });
+
+  it('says nothing when the guest can pay by M-Pesa here', () => {
+    expect(howToPayLine({ canPayInApp: true, paybill: null, contact })).toBeNull();
+    expect(howToPayLine({ canPayInApp: false, paybill: { number: '522522', accountRef: 'B00012' }, contact })).toBeNull();
+  });
+});
+

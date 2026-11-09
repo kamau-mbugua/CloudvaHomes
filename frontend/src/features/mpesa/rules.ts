@@ -1,6 +1,7 @@
+import { formatDay } from '../../lib/dates';
 import { formatKES, minorToInput, parseAmount } from '../../lib/money';
 import type { ChannelKind, DarajaEnvironment, PaymentChannel } from '../payments/types';
-import type { StkRequest, StkState } from './types';
+import type { MpesaBookingRef, StkRequest, StkState } from './types';
 
 /**
  * Pure M-Pesa rules the screens share: phone numbers, STK amounts and polling, the
@@ -226,3 +227,22 @@ export function prettyJson(raw: unknown): string {
 export function payerText(row: { payerName: string | null; payerPhone: string | null }): string {
   return [row.payerName?.trim(), row.payerPhone?.trim()].filter(Boolean).join(' · ') || '—';
 }
+
+/** "B00012 · Brian Otieno · 15 Dec 2026 → 17 Dec 2026". */
+export function bookingRefText(b: Pick<MpesaBookingRef, 'code' | 'guestName' | 'checkIn' | 'checkOut'>): string {
+  return [b.code, b.guestName, `${formatDay(b.checkIn)} → ${formatDay(b.checkOut)}`].filter(Boolean).join(' · ');
+}
+
+/** Why a host's payment is waiting in Reconciliation. */
+export function hostUnmatchedText(accountRef: string | null): string {
+  return accountRef
+    ? `KodiHub couldn’t tell which booking this is — the account reference “${accountRef}” isn’t a booking number.`
+    : 'KodiHub couldn’t tell which booking this is — there was no account reference.';
+}
+
+export function reconciliationEmptyText(kind: string | null | undefined): string {
+  return kind === 'HOST'
+    ? 'Every M-Pesa and bank payment KodiHub has been told about found its booking. Payments it can’t place wait here — for example a wrong booking number.'
+    : 'Every M-Pesa payment KodiHub has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number.';
+}
+

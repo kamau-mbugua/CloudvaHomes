@@ -4,7 +4,6 @@ Small changes agreed but not done yet. Newest first.
 
 ## SMS (platform vs organisation)
 
-- Mobile app: SMS balance and Buy SMS in settings (web has both; API ready). Spec §6, call 6.
 - HostPinnacle: do one real "Send test SMS" (Admin → Organisation → SMS) with an account that has
   its API key, before switching anyone over. Their error-code list confirms success is
   `status: "success"`; a demo account only sends to whitelisted numbers (code 183).
@@ -15,11 +14,6 @@ Small changes agreed but not done yet. Newest first.
 
 ## Hosts and short stays
 
-- Reconciliation is tenant-only: a host can't assign an unmatched M-Pesa or bank payment to a
-  booking by hand (automatic matching by booking number like B00012 works). Page copy also
-  says "tenant" (`frontend/src/features/mpesa/ReconciliationPage.tsx`, `InboundDetailPage.tsx`).
-- Mobile app: host Site settings don't have the new "Look of your booking site" (theme) and
-  "Legal pages" sections yet (web has both; the API is ready).
 - Legal: have KodiHub Legal review the starter Terms and Conditions, Terms of Use and Privacy
   Policy texts once (`backend/src/modules/stays/rules/legal.ts`).
 
@@ -33,11 +27,3 @@ Small changes agreed but not done yet. Newest first.
   - Keep: guest booking links (`/b/…`) are never redirected; a renamed site forwards to its new
     name with the same path (30 days).
   - 302, not 301: browsers keep a 301 forever and a host may claim the name later.
-- Guest site: "Amount due now" on the booking page ignores a part payment while the booking is
-  waiting for payment (`frontend/src/site/BookingPage.tsx`).
-- Guests whose host has no paybill/till still see only "Amount due now"; add a "the host will
-  tell you how to pay" line (hosts are now warned in Settings → Booking site).
-- `POST /host/bookings/quote` needs only `bookings:view`, so a caretaker can see prices.
-- Today page: "In-house" also lists today's arrivals who have not checked in yet.
-- Calendar: each unit row is twice as tall as needed (bars sit above a separate row of empty
-  cells); on phones the unit column takes about half the width.

@@ -8,6 +8,7 @@ import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
 import '../../core/widgets/side_drawer.dart';
 import '../billing/billing_banner.dart';
+import '../sms/sms_banner.dart';
 
 class HostTabSpec {
   const HostTabSpec({
@@ -158,6 +159,7 @@ class HostTabScaffold extends ConsumerWidget {
       body: Column(
         children: [
           const BillingBanner(),
+          const SmsBanner(),
           Expanded(child: body),
         ],
       ),

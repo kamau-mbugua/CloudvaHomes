@@ -100,6 +100,13 @@ class MoreScreen extends ConsumerWidget {
           subtitle: 'Your KodiHub plan and bill',
           onTap: () => context.push('/staff/billing'),
         ),
+      if (can(ref, 'sms:view'))
+        _MoreItem(
+          icon: Icons.sms_outlined,
+          title: 'SMS',
+          subtitle: 'SMS units, usage and how your messages are sent',
+          onTap: () => context.push('/staff/sms'),
+        ),
     ];
 
     return StaffTabScaffold(

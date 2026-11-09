@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api/api_error.dart';
+import '../../../core/auth/session_controller.dart';
 import '../../../core/dates.dart';
 import '../../../core/files.dart';
 import '../../../core/money.dart';
@@ -10,6 +11,8 @@ import '../../../core/providers.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
+import '../../host/host_api.dart';
+import '../../host/host_models.dart';
 import '../staff_api.dart';
 import '../staff_models.dart';
 import '../staff_widgets.dart';
@@ -867,10 +870,64 @@ class _InboundDetailScreenState extends ConsumerState<InboundDetailScreen> {
     if (tenant != null && mounted) await _assign(t, tenant);
   }
 
+  Future<void> _assignBooking(Inbound t, InboundBooking b) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Assign this payment?'),
+        content: Text(
+          '${formatKes(t.amount)} (${t.providerRef}) will be recorded on booking ${b.code}'
+          '${b.guestName != null ? ' for ${b.guestName}' : ''}, and the guest gets their receipt.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Assign'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ref.read(staffApiProvider).assignInboundToBooking(t.id, b.id);
+      if (!mounted) return;
+      ref.invalidate(inboundProvider(t.id));
+      ref.invalidate(dashboardProvider);
+      ref.read(listsVersionProvider.notifier).state++;
+      showMessage(context, 'Recorded on booking ${b.code}.');
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      if (e.code == 'ALREADY_RESOLVED') ref.invalidate(inboundProvider(t.id));
+      setState(() => _error = staffErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pickBooking(Inbound t) async {
+    final b = await showModalBottomSheet<InboundBooking>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => const BookingPicker(),
+    );
+    if (b != null && mounted) await _assignBooking(t, b);
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = ref.watch(inboundProvider(widget.inboundId));
     final canUpdate = can(ref, 'reconciliation:update');
+    final isHost = ref.watch(sessionProvider).value?.isHost ?? false;
     return Scaffold(
       appBar: KodiHubAppBar(
         title: Text(item.valueOrNull?.providerRef ?? 'M-Pesa payment'),
@@ -902,6 +959,14 @@ class _InboundDetailScreenState extends ConsumerState<InboundDetailScreen> {
                 if (t.accountRef != null)
                   FactRow('Account entered', t.accountRef!),
                 FactRow('Into', t.channelName),
+                if (t.booking != null)
+                  FactRow(
+                    'Booking',
+                    t.booking!.label,
+                    onTap: can(ref, 'bookings:view')
+                        ? () => context.push('/host/bookings/${t.booking!.id}')
+                        : null,
+                  ),
                 if (t.tenant != null)
                   FactRow(
                     'Tenant',
@@ -928,7 +993,46 @@ class _InboundDetailScreenState extends ConsumerState<InboundDetailScreen> {
               const SizedBox(height: 12),
               ErrorBox(_error!),
             ],
-            if (t.matchStatus == 'UNMATCHED' && canUpdate) ...[
+            if (t.matchStatus == 'UNMATCHED' && canUpdate && isHost) ...[
+              if (t.bookingSuggestions.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SectionCard(
+                  title: 'Suggested bookings',
+                  children: [
+                    for (final s in t.bookingSuggestions)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(s.booking.label),
+                        subtitle: Text(
+                          '${s.reason} · owes ${formatKes(s.booking.owed)}',
+                        ),
+                        trailing: TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () => _assignBooking(t, s.booking),
+                          child: const Text('Assign'),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                key: const Key('inbound-assign'),
+                icon: const Icon(Icons.event_available_outlined),
+                label: const Text('Assign to a booking'),
+                onPressed: _busy || !can(ref, 'bookings:view')
+                    ? null
+                    : () => _pickBooking(t),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                key: const Key('inbound-ignore'),
+                onPressed: _busy ? null : () => _ignore(t),
+                child: const Text('Ignore (not for a stay)'),
+              ),
+            ],
+            if (t.matchStatus == 'UNMATCHED' && canUpdate && !isHost) ...[
               if (t.suggestions.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 SectionCard(
@@ -1020,6 +1124,65 @@ class _IgnoreDialogState extends State<_IgnoreDialog> {
 }
 
 /// Search tenants and pick one (returns a [TenantRef]).
+/// Hosts: search stay bookings by number or guest name; pops the chosen one.
+class BookingPicker extends ConsumerStatefulWidget {
+  const BookingPicker({super.key});
+  @override
+  ConsumerState<BookingPicker> createState() => _BookingPickerState();
+}
+
+class _BookingPickerState extends ConsumerState<BookingPicker> {
+  String _q = '';
+
+  static InboundBooking _ref(HostBooking b) {
+    final paid = (b.amountPaidCents ?? 0) - (b.amountRefundedCents ?? 0);
+    final owed = (b.totalCents ?? 0) - paid;
+    return InboundBooking(
+      id: b.id,
+      code: b.code,
+      status: b.status,
+      guestName: b.guestName,
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
+      owed: owed > 0 ? owed : 0,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final api = ref.watch(hostApiProvider);
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * 0.75,
+      child: Column(
+        children: [
+          SearchField(
+            hint: 'Booking number or guest name',
+            onChanged: (v) => setState(() => _q = v),
+          ),
+          Expanded(
+            child: PagedList<InboundBooking>(
+              resetKey: _q,
+              load: (page) async {
+                final p = await api.bookings(page: page, q: _q);
+                return (
+                  rows: [for (final b in p.rows) _ref(b)],
+                  hasMore: p.hasMore,
+                );
+              },
+              empty: const EmptyState(title: 'No bookings match'),
+              itemBuilder: (context, b) => ListTile(
+                title: Text(b.label),
+                subtitle: Text('Owes ${formatKes(b.owed)}'),
+                onTap: () => Navigator.of(context).pop(b),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class TenantPicker extends ConsumerStatefulWidget {
   const TenantPicker({super.key});
   @override

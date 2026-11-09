@@ -260,6 +260,14 @@ describe('Host bookings, blocks, statuses & calendar API (e2e)', () => {
       .set(auth(caretaker))
       .expect(200);
     expect(caretakerView.body.data.total).toBeUndefined();
+
+    // …and can't price stays either: quoting is for making bookings (bookings:create).
+    await t
+      .http()
+      .post('/api/v1/host/bookings/quote')
+      .set(auth(caretaker))
+      .send({ listingId, checkIn: '2026-12-10', checkOut: '2026-12-13', guests: 2 })
+      .expect(403);
     expect(caretakerView.body.data.guest.phone).toBeNull();
 
     // Check-in then check-out -> COMPLETED and creates a CleaningTask

@@ -1,6 +1,7 @@
 /* Short-stay host calendar & compact helper layouts — uses design tokens from tokens.css */
 
 .st__cal {
+  --st-cal-unit: 200px;
   overflow-x: auto;
   background: var(--card);
   border: 1px solid var(--border);
@@ -24,6 +25,11 @@
 .st__cal__unithead {
   padding: 10px 12px;
   border-right: 1px solid var(--border);
+  /* The unit column stays put while the days scroll sideways. */
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--secondary);
 }
 
 .st__cal__dayhead {
@@ -43,9 +49,17 @@
 }
 
 .st__cal__unit {
+  /* Placed explicitly in row 1: the bars layer is, too, and auto-placed items would otherwise
+     be pushed to a second row (bars above a row of empty cells — twice the height). */
+  grid-row: 1;
+  grid-column: 1;
   padding: 10px 12px;
   border-right: 1px solid var(--border);
   overflow: hidden;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card);
 }
 
 .st__cal__unit strong {
@@ -56,6 +70,7 @@
 }
 
 .st__cal__cell {
+  grid-row: 1;
   height: 56px;
   border: 0;
   border-right: 1px solid var(--border-soft);
@@ -320,3 +335,24 @@
     flex: 1;
   }
 }
+
+/* Phones: a narrower unit column, so most of the screen shows days. */
+@media (max-width: 640px) {
+  .st__cal {
+    --st-cal-unit: 116px;
+  }
+  .st__cal__unit,
+  .st__cal__unithead {
+    padding: 8px;
+  }
+  .st__cal__unit strong {
+    font-size: 13px;
+  }
+  .st__cal__unit .ad__sub {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+

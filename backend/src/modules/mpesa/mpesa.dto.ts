@@ -128,10 +128,17 @@ class AllocationDto {
   amount!: number;
 }
 
+/** Exactly one of `tenantId` (landlords, agencies) or `bookingId` (hosts). */
 export class AssignInboundDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
+
+  @ApiPropertyOptional({ description: 'Hosts: the stay booking the money is for' })
+  @IsOptional()
+  @IsUUID()
+  bookingId?: string;
 
   @ApiPropertyOptional({ type: [AllocationDto], description: 'Omit for oldest due first' })
   @IsOptional()

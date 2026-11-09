@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_error.dart';
@@ -7,6 +8,7 @@ import '../../core/widgets/common.dart';
 import '../staff/staff_widgets.dart';
 import 'host_api.dart';
 import 'host_models.dart';
+import 'legal_page_editor.dart';
 
 class SiteSettingsScreen extends ConsumerStatefulWidget {
   const SiteSettingsScreen({super.key});
@@ -24,6 +26,7 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
   final _checkInTime = TextEditingController(text: '14:00');
   final _checkOutTime = TextEditingController(text: '11:00');
   final _houseRules = TextEditingController();
+  final _brand = TextEditingController();
 
   bool _published = false;
   String _bookingMode = 'INSTANT';
@@ -31,6 +34,10 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
   String _cancelKind = 'MODERATE';
   String? _address;
   bool? _guestCanPay;
+  String _themePreset = 'forest';
+  String? _brandError;
+  Map<String, HostLegalPage> _legal = const {};
+  final Map<String, String> _legalText = {};
   StayRules _loadedRules = const StayRules();
   String? _slugStatus;
   bool _loading = true;
@@ -53,6 +60,7 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
     _checkInTime.dispose();
     _checkOutTime.dispose();
     _houseRules.dispose();
+    _brand.dispose();
     super.dispose();
   }
 
@@ -74,6 +82,12 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
       _address = site.address;
       _guestCanPay = site.guestCanPay;
       _loadedRules = site.rules;
+      _themePreset = site.themePreset;
+      _brand.text = site.brandColor ?? '';
+      _legal = site.legal;
+      for (final e in site.legal.entries) {
+        _legalText[e.key] = e.value.text;
+      }
     } on ApiError catch (e) {
       _error = e.message;
     } finally {
@@ -101,11 +115,43 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
     }
   }
 
+  Future<void> _editLegal(
+    ({String key, String title, String field, String path}) page,
+  ) async {
+    final legal = _legal[page.key];
+    if (legal == null) return;
+    final text = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => LegalPageEditor(
+          title: page.title,
+          text: _legalText[page.key] ?? legal.text,
+          starter: legal.starter,
+          viewUrl: _address == null ? null : '$_address${page.path}',
+          canEdit: can(ref, 'site:update'),
+        ),
+      ),
+    );
+    if (text != null && mounted) setState(() => _legalText[page.key] = text);
+  }
+
+  Future<void> _copyLink() async {
+    final address = _address;
+    if (address == null) return;
+    await Clipboard.setData(ClipboardData(text: address));
+    if (mounted) showMessage(context, 'Link copied.');
+  }
+
   Future<void> _save() async {
     if (_published && _slug.text.trim().isEmpty) {
       setState(() => _error = 'Choose a web address first');
       return;
     }
+    final brand = _brand.text.trim();
+    if (brand.isNotEmpty && !isHexColor(brand)) {
+      setState(() => _brandError = 'Use a colour like #1F4D3A');
+      return;
+    }
+    setState(() => _brandError = null);
     setState(() {
       _saving = true;
       _error = null;
@@ -131,6 +177,14 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
         'houseRules': _houseRules.text.trim().isEmpty
             ? null
             : _houseRules.text.trim(),
+        'themePreset': _themePreset,
+        'brandColor': brand.isEmpty ? null : brand.toUpperCase(),
+        for (final page in siteLegalPages)
+          if (_legal[page.key] case final legal?)
+            page.field: legalPayload(
+              _legalText[page.key] ?? legal.text,
+              legal.starter,
+            ),
         'rules': StayRules(
           bookingMode: _bookingMode,
           // Keep deposit / custom-policy details set elsewhere (e.g. on the web) when only
@@ -183,6 +237,23 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
                     helperText: _slugStatus ?? _address,
                   ),
                 ),
+                if (_address != null)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _address!,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      TextButton.icon(
+                        key: const Key('site-copy-link'),
+                        onPressed: _copyLink,
+                        icon: const Icon(Icons.copy_outlined, size: 18),
+                        label: const Text('Copy link'),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 12),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -258,6 +329,7 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _bookingMode,
                   decoration: const InputDecoration(labelText: 'Booking mode'),
                   items: const [
@@ -276,6 +348,7 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _paymentKind,
                   decoration: const InputDecoration(labelText: 'Payment terms'),
                   items: const [
@@ -299,6 +372,7 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _cancelKind,
                   decoration: const InputDecoration(
                     labelText: 'Cancellation policy',
@@ -325,9 +399,89 @@ class _SiteSettingsScreenState extends ConsumerState<SiteSettingsScreen> {
                   maxLines: 3,
                   decoration: const InputDecoration(labelText: 'House rules'),
                 ),
+                const SizedBox(height: 24),
+                Text(
+                  'Look of your booking site',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Pick a theme, or use your own brand colour. Text always stays readable.',
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final p in siteThemePresets)
+                      ChoiceChip(
+                        avatar: CircleAvatar(backgroundColor: Color(p.accent)),
+                        label: Text(p.label),
+                        selected:
+                            _themePreset == p.key && _brand.text.trim().isEmpty,
+                        onSelected: canUpdate
+                            ? (_) => setState(() {
+                                _themePreset = p.key;
+                                _brand.clear();
+                              })
+                            : null,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('site-brand'),
+                  controller: _brand,
+                  enabled: canUpdate,
+                  onChanged: (_) => setState(() => _brandError = null),
+                  decoration: InputDecoration(
+                    labelText: 'Own brand colour (optional)',
+                    hintText: '#1F4D3A',
+                    helperText: 'Leave empty to use the theme colour.',
+                    errorText: _brandError,
+                    prefixIcon: isHexColor(_brand.text.trim())
+                        ? Icon(
+                            Icons.circle,
+                            color: Color(
+                              int.parse(
+                                'FF${_brand.text.trim().substring(1)}',
+                                radix: 16,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+                if (_legal.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    'Legal pages',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Shown on your booking site and linked in its footer and at booking. '
+                    'Each starts from a plain-English starter text you can change.',
+                  ),
+                  for (final page in siteLegalPages)
+                    if (_legal[page.key] case final legal?)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(page.title),
+                        subtitle: Text(
+                          (_legalText[page.key] ?? legal.text).trim() ==
+                                  legal.starter.trim()
+                              ? 'Starter text'
+                              : 'Your text',
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _editLegal(page),
+                      ),
+                ],
                 const SizedBox(height: 20),
                 if (canUpdate)
                   FilledButton(
+                    key: const Key('site-save'),
                     onPressed: _saving ? null : _save,
                     child: KodiHubButtonChild(
                       loading: _saving,

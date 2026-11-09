@@ -674,6 +674,8 @@ class Inbound {
     required this.paymentNumber,
     required this.ignoredReason,
     required this.suggestions,
+    this.booking,
+    this.bookingSuggestions = const [],
   });
   final String id;
   final String source;
@@ -695,9 +697,16 @@ class Inbound {
   /// Only on the detail answer.
   final List<({TenantRef tenant, String reason})> suggestions;
 
+  /// Hosts: the booking the money was recorded on.
+  final InboundBooking? booking;
+
+  /// Hosts, detail answer only: likely bookings while unmatched.
+  final List<({InboundBooking booking, String reason})> bookingSuggestions;
+
   factory Inbound.fromJson(Json j) {
     final t = j['tenant'];
     final p = j['payment'] as Map?;
+    final b = j['booking'];
     return Inbound(
       id: j['id'] as String,
       source: _s(j['source']) ?? '',
@@ -721,8 +730,56 @@ class Inbound {
               reason: _s(s['reason']) ?? '',
             ),
       ],
+      booking: b is Map<String, dynamic> ? InboundBooking.fromJson(b) : null,
+      bookingSuggestions: [
+        for (final s in _list(j['bookingSuggestions']))
+          if (s['booking'] is Map<String, dynamic>)
+            (
+              booking: InboundBooking.fromJson(s['booking'] as Json),
+              reason: _s(s['reason']) ?? '',
+            ),
+      ],
     );
   }
+}
+
+/// A stay booking as Reconciliation shows it (hosts).
+class InboundBooking {
+  const InboundBooking({
+    required this.id,
+    required this.code,
+    required this.status,
+    required this.guestName,
+    required this.checkIn,
+    required this.checkOut,
+    required this.owed,
+  });
+  final String id;
+  final String code;
+  final String status;
+  final String? guestName;
+  final String checkIn;
+  final String checkOut;
+
+  /// Still owed on the booking, in cents.
+  final int owed;
+
+  /// "B00012 · Brian Otieno · 2026-12-15 → 2026-12-17".
+  String get label => [
+    code,
+    if (guestName != null && guestName!.isNotEmpty) guestName!,
+    '$checkIn → $checkOut',
+  ].join(' · ');
+
+  factory InboundBooking.fromJson(Json j) => InboundBooking(
+    id: j['id'] as String,
+    code: _s(j['code']) ?? '',
+    status: _s(j['status']) ?? '',
+    guestName: _s(j['guestName']),
+    checkIn: _s(j['checkIn']) ?? '',
+    checkOut: _s(j['checkOut']) ?? '',
+    owed: centsFrom(j['owed']),
+  );
 }
 
 // ───────────────────────────────────────────── meters, expenses

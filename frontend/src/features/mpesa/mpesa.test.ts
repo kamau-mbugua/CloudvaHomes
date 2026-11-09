@@ -4,7 +4,7 @@ import type { PaymentChannel } from '../payments/types';
 import { mpesaErrorMessage } from './api';
 import {
   STK_POLL_MS, STK_WAIT_MS, checkDaraja, checkStkAmount, checkStkPhone, describeStk, isFinalStk, isMpesaKind, keyFor,
-  mpesaNoun, normaliseKenyanPhone, payerText, prettyJson, signatureOf, stkChannels, stkPollDelay, stkWaitedTooLong,
+  bookingRefText, hostUnmatchedText, mpesaNoun, normaliseKenyanPhone, payerText, reconciliationEmptyText, prettyJson, signatureOf, stkChannels, stkPollDelay, stkWaitedTooLong,
 } from './rules';
 
 /** Synthetic data only: phones +2547000000xx, receipts TEST0000xx. */
@@ -205,3 +205,32 @@ describe('mpesaErrorMessage', () => {
     expect(mpesaErrorMessage(new Error('x'))).toBe('Something went wrong. Try again.');
   });
 });
+
+describe('Reconciliation for hosts', () => {
+  const booking = {
+    id: 'b1',
+    code: 'B00012',
+    status: 'CONFIRMED',
+    guestName: 'Brian Otieno',
+    checkIn: '2026-12-15',
+    checkOut: '2026-12-17',
+    total: '800000',
+    owed: '500000',
+  };
+
+  it('names a booking by code, guest and dates', () => {
+    expect(bookingRefText(booking)).toBe('B00012 · Brian Otieno · 15 Dec 2026 → 17 Dec 2026');
+    expect(bookingRefText({ ...booking, guestName: null })).toBe('B00012 · 15 Dec 2026 → 17 Dec 2026');
+  });
+
+  it('explains an unmatched payment in booking terms', () => {
+    expect(hostUnmatchedText('WRONG')).toBe('KodiHub couldn’t tell which booking this is — the account reference “WRONG” isn’t a booking number.');
+    expect(hostUnmatchedText(null)).toBe('KodiHub couldn’t tell which booking this is — there was no account reference.');
+  });
+
+  it('describes an empty list for hosts and for landlords', () => {
+    expect(reconciliationEmptyText('HOST')).toBe('Every M-Pesa and bank payment KodiHub has been told about found its booking. Payments it can’t place wait here — for example a wrong booking number.');
+    expect(reconciliationEmptyText('LANDLORD')).toBe('Every M-Pesa payment KodiHub has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number.');
+  });
+});
+

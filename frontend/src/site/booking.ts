@@ -150,3 +150,34 @@ export function dateRangeProblem(checkIn: string, checkOut: string, today: strin
   if (checkOut <= checkIn) return 'Check-out must be at least one night after check-in.';
   return null;
 }
+
+/**
+ * What the guest owes right now — the same rule as the server's M-Pesa prompt: while dates are
+ * held, the deposit less what is already paid (net of refunds); after that, the rest of the stay.
+ */
+export function amountDueNow(b: {
+  status: string;
+  dueNow: string;
+  amountPaid: string;
+  amountRefunded: string;
+  owed: string;
+}): bigint {
+  const netPaid = BigInt(b.amountPaid || '0') - BigInt(b.amountRefunded || '0');
+  const dueNow = BigInt(b.dueNow || '0');
+  if (b.status === 'HELD' && dueNow > netPaid) return dueNow - netPaid;
+  const owed = BigInt(b.owed || '0');
+  return owed > 0n ? owed : 0n;
+}
+
+/** For hosts with no paybill/till on the site: who tells the guest how to pay (null = guest can pay here). */
+export function howToPayLine(b: {
+  canPayInApp: boolean;
+  paybill: { number: string; accountRef: string } | null;
+  contact: { businessName: string; phone: string | null; whatsappPhone: string | null };
+}): string | null {
+  if (b.canPayInApp || b.paybill) return null;
+  const head = `${b.contact.businessName} will tell you how to pay.`;
+  if (b.contact.phone) return `${head} Call ${b.contact.phone} if you have not heard from them.`;
+  if (b.contact.whatsappPhone) return `${head} WhatsApp ${b.contact.whatsappPhone} if you have not heard from them.`;
+  return head;
+}

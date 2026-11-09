@@ -183,6 +183,9 @@ class HostSite {
     required this.checkOutTime,
     required this.address,
     this.guestCanPay,
+    this.themePreset = 'forest',
+    this.brandColor,
+    this.legal = const {},
   });
 
   final String? slug;
@@ -201,6 +204,13 @@ class HostSite {
 
   /// Whether guests have a way to pay (paybill/till or M-Pesa prompt); null when unknown.
   final bool? guestCanPay;
+
+  /// The booking site's look: one of [siteThemePresets], or the host's own colour.
+  final String themePreset;
+  final String? brandColor;
+
+  /// terms, termsOfUse, privacy — each the host's text or the starter text.
+  final Map<String, HostLegalPage> legal;
 
   factory HostSite.fromJson(Map<String, dynamic> j) => HostSite(
     slug: j['slug'] as String?,
@@ -222,7 +232,73 @@ class HostSite {
         ? (j['guestPayments']['paybill'] == true ||
               j['guestPayments']['mpesaPrompt'] == true)
         : null,
+    themePreset: (j['theme'] as Map?)?['preset'] as String? ?? 'forest',
+    brandColor: (j['theme'] as Map?)?['brandColor'] as String?,
+    legal: {
+      if (j['legal'] is Map)
+        for (final e in (j['legal'] as Map).entries)
+          if (e.value is Map)
+            e.key as String: HostLegalPage.fromJson(e.value as Map),
+    },
   );
+}
+
+/// One legal page of the booking site (Markdown). [isDefault] = still the starter text.
+class HostLegalPage {
+  const HostLegalPage({
+    required this.text,
+    required this.isDefault,
+    required this.starter,
+  });
+  final String text;
+  final bool isDefault;
+  final String starter;
+
+  factory HostLegalPage.fromJson(Map j) => HostLegalPage(
+    text: j['text'] as String? ?? '',
+    isDefault: j['isDefault'] == true,
+    starter: j['starter'] as String? ?? '',
+  );
+}
+
+/// The legal pages, in order: key in [HostSite.legal], title, field to save, path on the site.
+const siteLegalPages = [
+  (
+    key: 'terms',
+    title: 'Terms and Conditions',
+    field: 'termsText',
+    path: '/terms',
+  ),
+  (
+    key: 'termsOfUse',
+    title: 'Terms of Use',
+    field: 'termsOfUseText',
+    path: '/terms-of-use',
+  ),
+  (
+    key: 'privacy',
+    title: 'Privacy Policy',
+    field: 'privacyText',
+    path: '/privacy',
+  ),
+];
+
+/// Booking site themes — the same six as the web (`frontend/src/site/theme.ts`).
+const siteThemePresets = [
+  (key: 'forest', label: 'Forest', accent: 0xFF1F4D3A),
+  (key: 'ocean', label: 'Ocean', accent: 0xFF0E6E8C),
+  (key: 'sunset', label: 'Sunset', accent: 0xFFB4400B),
+  (key: 'terracotta', label: 'Terracotta', accent: 0xFFA14B2C),
+  (key: 'plum', label: 'Plum', accent: 0xFF6B2F6B),
+  (key: 'charcoal', label: 'Charcoal', accent: 0xFF27272A),
+];
+
+bool isHexColor(String v) => RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(v);
+
+/// What to save for a legal page: null keeps (or goes back to) the starter text.
+String? legalPayload(String text, String starter) {
+  final t = text.trim();
+  return t.isEmpty || t == starter.trim() ? null : t;
 }
 
 /// Warning for site settings when guests have nothing to pay with but the host asks for money

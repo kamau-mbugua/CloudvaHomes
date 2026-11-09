@@ -53,6 +53,8 @@ export interface InboundTransaction {
   matchedBy: MatchedBy | null;
   channel: { id: string; name: string; kind: ChannelKind };
   tenant: MpesaTenantRef | null;
+  /** Hosts: the booking the money was recorded on. */
+  booking: MpesaBookingRef | null;
   payment: { id: string; number: string } | null;
   ignoredReason: string | null;
   resolvedBy: { id: string; name: string } | null;
@@ -70,4 +72,24 @@ export interface MatchSuggestion {
 export interface InboundDetail extends InboundTransaction {
   raw: unknown;
   suggestions: MatchSuggestion[];
+  /** Hosts: likely bookings while unmatched. */
+  bookingSuggestions?: BookingSuggestion[];
+}
+
+/** A stay booking as Reconciliation shows it. Money in cents, as strings. */
+export interface MpesaBookingRef {
+  id: string;
+  code: string;
+  status: string;
+  guestName: string | null;
+  checkIn: string;
+  checkOut: string;
+  total: string;
+  owed: string;
+}
+
+export interface BookingSuggestion {
+  booking: MpesaBookingRef;
+  /** e.g. "Guest phone matches", "Owes exactly this amount". */
+  reason: string;
 }

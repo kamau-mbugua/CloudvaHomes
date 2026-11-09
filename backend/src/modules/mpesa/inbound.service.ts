@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { currentContext } from '../../common/context/request-context.js';
-import { parseDateOnly } from '../../common/dates/date-only.js';
+import { formatDateOnly, parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { toSkipTake } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
@@ -36,6 +36,45 @@ export interface InboundInput {
 }
 
 const TENANT = { select: { id: true, code: true, firstName: true, lastName: true } } as const;
+
+const BOOKING = {
+  select: {
+    id: true,
+    code: true,
+    status: true,
+    checkIn: true,
+    checkOut: true,
+    total: true,
+    amountPaid: true,
+    amountRefunded: true,
+    guest: { select: { name: true, phone: true } },
+  },
+} as const;
+
+/** A booking as Reconciliation shows it: who, when, and what is still owed (cents). */
+function bookingView(b: {
+  id: string;
+  code: string;
+  status: string;
+  checkIn: Date;
+  checkOut: Date;
+  total: bigint;
+  amountPaid: bigint;
+  amountRefunded: bigint;
+  guest: { name: string; phone: string } | null;
+}) {
+  const owed = b.total - (b.amountPaid - b.amountRefunded);
+  return {
+    id: b.id,
+    code: b.code,
+    status: b.status,
+    guestName: b.guest?.name ?? null,
+    checkIn: formatDateOnly(b.checkIn),
+    checkOut: formatDateOnly(b.checkOut),
+    total: b.total.toString(),
+    owed: (owed > 0n ? owed : 0n).toString(),
+  };
+}
 
 /**
  * Raw M-Pesa money-in: stored once (unique per channel + receipt), then matched to a tenant
@@ -294,6 +333,13 @@ export class InboundService {
     const tenantIds = [...new Set(rows.map((r) => r.tenantId).filter((x): x is string => !!x))];
     const paymentIds = [...new Set(rows.map((r) => r.paymentId).filter((x): x is string => !!x))];
     const userIds = [...new Set(rows.map((r) => r.resolvedById).filter((x): x is string => !!x))];
+    const bookingIds = [...new Set(rows.map((r) => r.bookingId).filter((x): x is string => !!x))];
+    const bookings = new Map(
+      (bookingIds.length
+        ? await this.db.booking.findMany({ where: { id: { in: bookingIds } }, ...BOOKING })
+        : []
+      ).map((b) => [b.id, bookingView(b)]),
+    );
     const [tenants, payments, users] = await Promise.all([
       tenantIds.length
         ? this.db.tenant.findMany({ where: { id: { in: tenantIds } }, ...TENANT })
@@ -327,6 +373,7 @@ export class InboundService {
       matchedBy: r.matchedBy,
       channel: { id: r.channel.id, name: r.channel.name, kind: r.channel.kind },
       tenant: r.tenantId ? (t.get(r.tenantId) ?? null) : null,
+      booking: r.bookingId ? (bookings.get(r.bookingId) ?? null) : null,
       payment: r.paymentId ? (p.get(r.paymentId) ?? null) : null,
       ignoredReason: r.ignoredReason,
       resolvedBy: r.resolvedById ? (u.get(r.resolvedById) ?? null) : null,
@@ -371,7 +418,12 @@ export class InboundService {
   async get(id: string) {
     const r = await this.find(id);
     const [item] = await this.view([r]);
-    return { ...item!, raw: r.raw, suggestions: await this.suggestions(r) };
+    return {
+      ...item!,
+      raw: r.raw,
+      suggestions: await this.suggestions(r),
+      bookingSuggestions: await this.bookingSuggestions(r),
+    };
   }
 
   /** Likely tenants for an unmatched transaction (phone, then name), visible to the caller. */
@@ -413,19 +465,29 @@ export class InboundService {
   }
 
   async assign(id: string, dto: AssignInboundDto) {
+    if (Boolean(dto.tenantId) === Boolean(dto.bookingId)) {
+      throw AppError.validation([
+        {
+          field: dto.bookingId ? 'tenantId' : 'bookingId',
+          message: 'Choose a tenant or a booking',
+        },
+      ]);
+    }
+    if (dto.bookingId) return this.assignToBooking(id, dto.bookingId);
+    const tenantId = dto.tenantId!;
     const ctx = orgContext();
     const r = await this.find(id);
-    await this.tenants.find(dto.tenantId);
+    await this.tenants.find(tenantId);
     const paymentId = await this.db.$transaction(async (tx) => {
       // Claim it first: two people assigning at once can't both create a payment.
       const { count } = await tx.inboundTransaction.updateMany({
         where: { id, matchStatus: 'UNMATCHED' },
-        data: { matchStatus: 'MATCHED', matchedBy: 'MANUAL', tenantId: dto.tenantId },
+        data: { matchStatus: 'MATCHED', matchedBy: 'MANUAL', tenantId: tenantId },
       });
       if (!count) throw alreadyResolved();
       const created = await this.payments.recordAutomatic(tx, {
         orgId: ctx.orgId,
-        tenantId: dto.tenantId,
+        tenantId: tenantId,
         channel: r.channel,
         amount: r.amount,
         reference: r.providerRef,
@@ -437,7 +499,7 @@ export class InboundService {
       await tx.payment.update({ where: { id: created }, data: { recordedById: ctx.userId } });
       await this.resolve(tx, id, {
         matchedBy: 'MANUAL',
-        tenantId: dto.tenantId,
+        tenantId: tenantId,
         paymentId: created,
       });
       await this.audit.record(
@@ -445,7 +507,7 @@ export class InboundService {
           action: 'inbound.assign',
           entity: 'inbound_transaction',
           entityId: id,
-          after: { providerRef: r.providerRef, tenantId: dto.tenantId, paymentId: created },
+          after: { providerRef: r.providerRef, tenantId: tenantId, paymentId: created },
         },
         tx,
       );
@@ -453,6 +515,112 @@ export class InboundService {
     });
     await this.payments.notifyReceipt(paymentId);
     return this.get(id);
+  }
+
+  /** Hosts: the money is for a stay — recorded on the booking exactly as an automatic match is. */
+  private async assignToBooking(id: string, bookingId: string) {
+    const ctx = orgContext();
+    const r = await this.find(id);
+    const booking = await this.db.booking.findFirst({
+      where: { id: bookingId, kind: 'STAY' },
+      select: { id: true, code: true },
+    });
+    if (!booking) throw AppError.notFound('Booking');
+    const stayPaymentId = await this.db.$transaction(async (tx) => {
+      // Claim it first: two people assigning at once can't both record a payment.
+      const { count } = await tx.inboundTransaction.updateMany({
+        where: { id, matchStatus: 'UNMATCHED' },
+        data: { matchStatus: 'MATCHED', matchedBy: 'MANUAL', bookingId },
+      });
+      if (!count) throw alreadyResolved();
+      const created = await this.stayPayments.record(tx, {
+        bookingId,
+        kind: 'PAYMENT',
+        method: r.channel.kind as PaymentMethod,
+        channelId: r.channel.id,
+        amount: r.amount,
+        reference: r.providerRef,
+        receivedAt: r.occurredAt,
+        inboundId: r.id,
+        recordedById: ctx.userId,
+      });
+      await tx.inboundTransaction.update({
+        where: { id },
+        data: { stayPaymentId: created, resolvedById: ctx.userId ?? null, resolvedAt: new Date() },
+      });
+      await this.audit.record(
+        {
+          action: 'inbound.assign',
+          entity: 'inbound_transaction',
+          entityId: id,
+          after: {
+            providerRef: r.providerRef,
+            bookingId,
+            bookingCode: booking.code,
+            stayPaymentId: created,
+          },
+        },
+        tx,
+      );
+      return created;
+    });
+    await this.stayPayments.notifyPayment(stayPaymentId);
+    return this.get(id);
+  }
+
+  /**
+   * Hosts: likely bookings for an unmatched transaction — guest phone, then guest name, then a
+   * booking owing exactly the amount. Only active or recent stays.
+   */
+  private async bookingSuggestions(r: {
+    matchStatus: string;
+    payerPhone: string | null;
+    payerName: string | null;
+    amount: bigint;
+  }) {
+    if (r.matchStatus !== 'UNMATCHED') return [];
+    const org = await this.db.organization.findUnique({
+      where: { id: orgContext().orgId },
+      select: { kind: true },
+    });
+    if (org?.kind !== 'HOST') return [];
+    const since = new Date(Date.now() - 30 * 86_400_000);
+    const candidates = await this.db.booking.findMany({
+      where: {
+        kind: 'STAY',
+        status: { in: ['REQUESTED', 'HELD', 'CONFIRMED', 'CHECKED_IN', 'EXPIRED', 'COMPLETED'] },
+        checkOut: { gte: since },
+      },
+      orderBy: { checkIn: 'asc' },
+      take: 300,
+      ...BOOKING,
+    });
+    const words = (r.payerName ?? '')
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 1);
+    const out: { booking: ReturnType<typeof bookingView>; reason: string }[] = [];
+    const add = (b: (typeof candidates)[number], reason: string) => {
+      if (!out.some((o) => o.booking.id === b.id)) out.push({ booking: bookingView(b), reason });
+    };
+    for (const b of candidates) {
+      if (r.payerPhone && b.guest?.phone === r.payerPhone) add(b, 'Guest phone matches');
+    }
+    if (words.length >= 2) {
+      for (const b of candidates) {
+        const name = (b.guest?.name ?? '').toLowerCase().split(/\s+/);
+        if (words.filter((w) => name.includes(w)).length >= 2) add(b, 'Guest name matches');
+      }
+    }
+    for (const b of candidates) {
+      if (
+        ['HELD', 'CONFIRMED', 'CHECKED_IN'].includes(b.status) &&
+        bookingView(b).owed === r.amount.toString()
+      ) {
+        add(b, 'Owes exactly this amount');
+      }
+    }
+    return out.slice(0, 5);
   }
 
   async ignore(id: string, dto: IgnoreInboundDto) {

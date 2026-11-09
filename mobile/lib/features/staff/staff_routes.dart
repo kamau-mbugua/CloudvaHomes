@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/navigation.dart';
 import '../billing/plan_billing_screen.dart';
+import '../sms/sms_screen.dart';
 import 'home/home_screen.dart';
 import 'money/money_screens.dart';
 import 'more/expenses_screens.dart';
@@ -30,6 +31,11 @@ RouteBase staffRoutes() => StatefulShellRoute.indexedStack(
               path: 'billing',
               parentNavigatorKey: rootNavigatorKey,
               builder: (_, _) => const PlanBillingScreen(),
+            ),
+            GoRoute(
+              path: 'sms',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const SmsScreen(),
             ),
           ],
         ),

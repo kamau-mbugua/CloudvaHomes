@@ -9,6 +9,7 @@ import { staysKeys } from './api';
 import { addDays, bookingStatusBadge, daysBetween, todayIso } from './calendar';
 import type { HostCleaningTask } from './ops';
 import type { Booking, Listing } from './types';
+import { isInHouse } from './today';
 
 function formatTimeLeft(expiresAt: string | null | undefined): string {
   if (!expiresAt) return '—';
@@ -91,11 +92,7 @@ export function TodayPage() {
       b.checkOut === today &&
       (b.status === 'CHECKED_IN' || b.status === 'CONFIRMED'),
   );
-  const inHouse = all.filter(
-    (b) =>
-      b.status === 'CHECKED_IN' ||
-      (b.status === 'CONFIRMED' && b.checkIn <= today && b.checkOut > today),
-  );
+  const inHouse = all.filter((b) => isInHouse(b, today));
   const requests = all.filter((b) => b.status === 'REQUESTED');
   const balancesDue = all.filter((b) => {
     if (b.total === undefined) return false;

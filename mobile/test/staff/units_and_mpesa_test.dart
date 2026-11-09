@@ -91,6 +91,76 @@ void main() {
     expect(last().containsKey('occupancy'), isFalse);
   });
 
+  testWidgets('hosts assign an unmatched payment to a suggested booking', (
+    tester,
+  ) async {
+    const booking = {
+      'id': 'bk1',
+      'code': 'B00012',
+      'status': 'CONFIRMED',
+      'guestName': 'Brian Otieno',
+      'checkIn': '2026-12-15',
+      'checkOut': '2026-12-17',
+      'total': '800000',
+      'owed': '500000',
+    };
+    var assigned = false;
+    Map<String, Object?> json() => {
+      ...inboundJson(status: assigned ? 'MATCHED' : 'UNMATCHED'),
+      'suggestions': const [],
+      'bookingSuggestions': assigned
+          ? const []
+          : [
+              {'booking': booking, 'reason': 'Guest phone matches'},
+            ],
+      'booking': assigned ? booking : null,
+      'payment': null,
+      'tenant': null,
+    };
+    final adapter = FakeAdapter({
+      'GET /inbound-transactions/x1': (_) => {'data': json()},
+      'POST /inbound-transactions/x1/assign': (_) {
+        assigned = true;
+        return {'data': json()};
+      },
+    });
+    await pumpScreen(
+      tester,
+      const InboundDetailScreen(inboundId: 'x1'),
+      adapter: adapter,
+      permissions: {
+        'reconciliation:view',
+        'reconciliation:update',
+        'bookings:view',
+      },
+      orgKind: 'HOST',
+    );
+    expect(find.text('Suggested bookings'), findsOneWidget);
+    expect(find.textContaining('Guest phone matches'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Ignore (not for a stay)'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Assign to a booking'), findsOneWidget);
+    expect(find.text('Ignore (not for a stay)'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Assign'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('will be recorded on booking B00012'),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Assign').last);
+    await tester.pumpAndSettle();
+
+    final posts = adapter.sent('POST', '/inbound-transactions/x1/assign');
+    expect(posts.single.data, {'bookingId': 'bk1'});
+    expect(find.text('Recorded on booking B00012.'), findsOneWidget);
+    expect(find.text('Booking'), findsOneWidget);
+    expect(find.byKey(const Key('inbound-assign')), findsNothing);
+  });
+
   testWidgets('assigning an unmatched M-Pesa payment to a suggested tenant', (
     tester,
   ) async {
