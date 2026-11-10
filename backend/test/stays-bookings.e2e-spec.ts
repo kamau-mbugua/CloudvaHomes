@@ -336,7 +336,9 @@ describe('Host bookings, blocks, statuses & calendar API (e2e)', () => {
       .send({})
       .expect(409);
     expect(early.body.error.code).toBe('TOO_EARLY');
-    expect(early.body.error.message).toBe(`You can mark a no-show from the check-in day (${day(5)}).`);
+    expect(early.body.error.message).toBe(
+      `You can mark a no-show from the check-in day (${day(5)}).`,
+    );
 
     const arriving = await book(today, day(2));
     const marked = await t
