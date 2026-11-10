@@ -46,4 +46,31 @@ void main() {
       expect(day('2026-12-12').status, DayStatus.free);
     },
   );
+
+  test('a no-show can be marked only from the check-in day', () {
+    expect(canMarkNoShow('CONFIRMED', '2026-11-12', '2026-11-11'), isFalse);
+    expect(canMarkNoShow('CONFIRMED', '2026-11-12', '2026-11-12'), isTrue);
+    expect(canMarkNoShow('CONFIRMED', '2026-11-12', '2026-11-14'), isTrue);
+    expect(canMarkNoShow('CHECKED_IN', '2026-11-12', '2026-11-12'), isFalse);
+  });
+
+  test(
+    'closed bookings owe nothing; an unpaid no-show shows as not collected',
+    () {
+      expect(balanceRow('CONFIRMED', 1700000), (
+        label: 'Balance owed',
+        cents: 1700000,
+      ));
+      expect(balanceRow('NO_SHOW', 1700000), (
+        label: 'Not collected',
+        cents: 1700000,
+      ));
+      expect(balanceRow('NO_SHOW', 0), (label: 'Balance owed', cents: 0));
+      for (final s in ['CANCELLED', 'EXPIRED', 'DECLINED']) {
+        expect(balanceRow(s, 1700000), (label: 'Balance owed', cents: 0));
+      }
+      expect(isClosedBooking('NO_SHOW'), isTrue);
+      expect(isClosedBooking('COMPLETED'), isFalse);
+    },
+  );
 }

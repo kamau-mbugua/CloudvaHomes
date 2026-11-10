@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  balanceStat,
   barFor,
+  bookingActions,
   bookingActionsForStatus,
   dayColumns,
   initialCancelRefundInput,
@@ -52,5 +54,22 @@ describe('stays/calendar & booking actions', () => {
     expect(initialCancelRefundInput('1000000')).toBe('10000');
     expect(initialCancelRefundInput('0')).toBe('0');
     expect(initialCancelRefundInput(null)).toBe('0');
+  });
+
+  it('offers no-show only from the check-in day', () => {
+    const b = { status: 'CONFIRMED' as const, checkIn: '2026-11-12' };
+    expect(bookingActions(b, '2026-11-11')).not.toContain('noShow');
+    expect(bookingActions(b, '2026-11-11')).toContain('checkIn');
+    expect(bookingActions(b, '2026-11-12')).toContain('noShow');
+    expect(bookingActions(b, '2026-11-14')).toContain('noShow');
+  });
+
+  it('shows an unpaid no-show as not collected, and nothing due on other closed bookings', () => {
+    expect(balanceStat('CONFIRMED', 1700000n)).toEqual({ label: 'Balance due', amount: 1700000n });
+    expect(balanceStat('NO_SHOW', 1700000n)).toEqual({ label: 'Not collected', amount: 1700000n });
+    expect(balanceStat('NO_SHOW', 0n)).toEqual({ label: 'Balance due', amount: 0n });
+    for (const s of ['CANCELLED', 'EXPIRED', 'DECLINED'] as const) {
+      expect(balanceStat(s, 1700000n)).toEqual({ label: 'Balance due', amount: 0n });
+    }
   });
 });

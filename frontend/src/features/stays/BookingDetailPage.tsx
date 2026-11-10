@@ -9,7 +9,7 @@ import { useToast } from '../../lib/useToast';
 import { CardSkeleton } from '../../components/Loading';
 import { Breadcrumbs, Fact } from '../portfolio/ui';
 import { staysErrorMessage, staysKeys } from './api';
-import { bookingActionsForStatus, bookingStatusBadge } from './calendar';
+import { balanceStat, bookingActions, bookingStatusBadge, todayIso } from './calendar';
 import { CancelSheet } from './CancelSheet';
 import { PaymentSheet } from './PaymentSheet';
 import { RefundSheet } from './RefundSheet';
@@ -75,7 +75,7 @@ export function BookingDetailPage() {
 
   const b = bookingQuery.data;
   const badge = bookingStatusBadge(b.status);
-  const actions = bookingActionsForStatus(b.status);
+  const actions = bookingActions(b, todayIso());
 
   const canUpdate = perms.has('bookings:update');
   const canCancel = perms.has('bookings:cancel');
@@ -90,6 +90,7 @@ export function BookingDetailPage() {
     hasMoney && BigInt(b.total ?? '0') > netPaid
       ? BigInt(b.total ?? '0') - netPaid
       : 0n;
+  const balanceTile = balanceStat(b.status, balance);
 
   return (
     <div className="pg pf__page">
@@ -238,9 +239,9 @@ export function BookingDetailPage() {
             </span>
           </div>
           <div className="ad__stat">
-            <span className="ad__stat__label">Balance due</span>
+            <span className="ad__stat__label">{balanceTile.label}</span>
             <span className="ad__stat__value num">
-              {formatKES(Number(balance))}
+              {formatKES(Number(balanceTile.amount))}
             </span>
           </div>
         </div>

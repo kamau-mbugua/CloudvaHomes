@@ -1,5 +1,6 @@
 import { hashPassword } from '../src/modules/auth/crypto.js';
 import { outbox } from '../src/modules/notifications/senders.js';
+import { nairobiToday } from '../src/modules/stays/bookings/booking-view.js';
 import {
   auth,
   createPlatformAdmin,
@@ -300,5 +301,53 @@ describe('Host bookings, blocks, statuses & calendar API (e2e)', () => {
       .send({ reason: 'Too late' })
       .expect(409);
     expect(invalidCancel.body.error.code).toBe('INVALID_STATUS');
+  });
+
+  it('allows a no-show only from the check-in day, then frees the dates', async () => {
+    const { owner, listingId } = await setupHost();
+    const today = nairobiToday();
+    const day = (n: number) => {
+      const d = new Date(`${today}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    const book = async (checkIn: string, checkOut: string) =>
+      (
+        await t
+          .http()
+          .post('/api/v1/host/bookings')
+          .set(auth(owner))
+          .send({
+            listingId,
+            checkIn,
+            checkOut,
+            guests: 2,
+            guest: { name: 'Late Guest', phone: '0733111223' },
+            confirm: true,
+          })
+          .expect(201)
+      ).body.data.id as string;
+
+    const future = await book(day(5), day(7));
+    const early = await t
+      .http()
+      .post(`/api/v1/host/bookings/${future}/no-show`)
+      .set(auth(owner))
+      .send({})
+      .expect(409);
+    expect(early.body.error.code).toBe('TOO_EARLY');
+    expect(early.body.error.message).toBe(`You can mark a no-show from the check-in day (${day(5)}).`);
+
+    const arriving = await book(today, day(2));
+    const marked = await t
+      .http()
+      .post(`/api/v1/host/bookings/${arriving}/no-show`)
+      .set(auth(owner))
+      .send({})
+      .expect(200);
+    expect(marked.body.data.status).toBe('NO_SHOW');
+
+    // The nights are free again.
+    await book(today, day(2));
   });
 });

@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_error.dart';
 import '../../core/auth/session_controller.dart';
+import '../../core/dates.dart';
 import '../../core/money.dart';
 import '../../core/widgets/common.dart';
+import 'calendar_rules.dart';
 import 'host_api.dart';
 import 'host_models.dart';
 import 'payment_sheet.dart';
@@ -144,6 +146,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
         data: (b) {
           final netPaid =
               (b.amountPaidCents ?? 0) - (b.amountRefundedCents ?? 0);
+          final balance = balanceRow(b.status, b.owedCents ?? 0);
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -213,10 +216,11 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                       onPressed: _busy ? null : () => _runAction('check-in'),
                       child: const Text('Check in'),
                     ),
-                    OutlinedButton(
-                      onPressed: _busy ? null : () => _runAction('no-show'),
-                      child: const Text('No-show'),
-                    ),
+                    if (canMarkNoShow(b.status, b.checkIn, todayIso()))
+                      OutlinedButton(
+                        onPressed: _busy ? null : () => _runAction('no-show'),
+                        child: const Text('No-show'),
+                      ),
                   ],
                   if (canUpdate && b.status == 'CHECKED_IN')
                     FilledButton(
@@ -226,8 +230,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                   if (b.hasMoney &&
                       canPayCreate &&
                       (b.owedCents ?? 0) > 0 &&
-                      b.status != 'CANCELLED' &&
-                      b.status != 'EXPIRED') ...[
+                      !isClosedBooking(b.status)) ...[
                     OutlinedButton(
                       onPressed: _busy
                           ? null
@@ -343,14 +346,14 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Balance owed',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                            balance.label,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                         Text(
-                          formatKes(b.owedCents ?? 0),
+                          formatKes(balance.cents),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ],

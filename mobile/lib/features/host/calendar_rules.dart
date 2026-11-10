@@ -112,3 +112,21 @@ List<DayState> monthDays(String month, List<CalItem> items) {
   }
   return out;
 }
+
+/// Closed bookings: nothing more happens on them except refunds, and no reminders go out.
+bool isClosedBooking(String status) =>
+    const {'NO_SHOW', 'CANCELLED', 'EXPIRED', 'DECLINED'}.contains(status);
+
+/// A guest can only fail to arrive once their stay has started (dates are "YYYY-MM-DD").
+bool canMarkNoShow(String status, String checkIn, String today) =>
+    status == 'CONFIRMED' && checkIn.compareTo(today) <= 0;
+
+/// The last money row on a booking: an unpaid no-show shows what was never collected;
+/// other closed bookings owe nothing.
+({String label, int cents}) balanceRow(String status, int owedCents) {
+  if (status == 'NO_SHOW' && owedCents > 0) {
+    return (label: 'Not collected', cents: owedCents);
+  }
+  if (isClosedBooking(status)) return (label: 'Balance owed', cents: 0);
+  return (label: 'Balance owed', cents: owedCents);
+}

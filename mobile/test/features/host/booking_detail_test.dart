@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hodi/core/auth/session.dart';
 import 'package:hodi/core/auth/session_controller.dart';
+import 'package:hodi/core/dates.dart';
 import 'package:hodi/core/providers.dart';
 import 'package:hodi/features/host/booking_detail_screen.dart';
 import 'package:hodi/features/host/bookings_screen.dart';
@@ -234,5 +235,69 @@ void main() {
     expect(find.textContaining('Jane PageOne'), findsOneWidget);
     expect(find.textContaining('Peter PageTwo'), findsOneWidget);
     expect(find.textContaining('KES 6,500.00'), findsWidgets);
+  });
+
+  Future<void> pumpDetail(
+    WidgetTester tester,
+    Map<String, Object?> booking,
+  ) async {
+    phoneSize(tester);
+    final adapter = FakeAdapter({
+      'GET /host/bookings/b1': (_) => {'data': booking},
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(fakeApi(adapter)),
+          sessionProvider.overrideWith(
+            () => FakeSession(
+              _session(
+                permissions: const {
+                  'bookings:view',
+                  'bookings:update',
+                  'stay-payments:view',
+                  'stay-payments:create',
+                },
+              ),
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: BookingDetailScreen(bookingId: 'b1')),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  String day(int n) =>
+      toDay(DateTime.parse('${todayIso()}T00:00:00Z').add(Duration(days: n)));
+
+  testWidgets('No-show appears only from the check-in day', (tester) async {
+    await pumpDetail(tester, {
+      ..._bookingJson(status: 'CONFIRMED', includeMoney: true),
+      'checkIn': day(1),
+      'checkOut': day(3),
+    });
+    expect(find.text('Check in'), findsOneWidget);
+    expect(find.text('No-show'), findsNothing);
+
+    await pumpDetail(tester, {
+      ..._bookingJson(status: 'CONFIRMED', includeMoney: true),
+      'checkIn': todayIso(),
+      'checkOut': day(2),
+    });
+    expect(find.text('No-show'), findsOneWidget);
+  });
+
+  testWidgets('an unpaid no-show shows Not collected and offers no payment', (
+    tester,
+  ) async {
+    await pumpDetail(
+      tester,
+      _bookingJson(status: 'NO_SHOW', includeMoney: true),
+    );
+    expect(find.text('Not collected'), findsOneWidget);
+    expect(find.text('Balance owed'), findsNothing);
+    expect(find.text('M-Pesa prompt'), findsNothing);
+    expect(find.text('Record payment'), findsNothing);
   });
 }

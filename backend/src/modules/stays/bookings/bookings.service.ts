@@ -780,6 +780,14 @@ export class BookingsService {
     if (!existing) {
       throw AppError.notFound('Booking');
     }
+    // A guest can only fail to arrive once their stay has started.
+    const checkIn = formatDateOnly(existing.checkIn);
+    if (existing.status === 'CONFIRMED' && checkIn > nairobiToday()) {
+      throw AppError.conflict(
+        `You can mark a no-show from the check-in day (${checkIn}).`,
+        'TOO_EARLY',
+      );
+    }
 
     const updated = await this.move(id, 'NO_SHOW', {
       userId: ctx.userId,
