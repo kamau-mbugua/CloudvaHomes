@@ -48,6 +48,9 @@ export class MessagesService {
     to: string;
     text: string;
     broadcastId?: string;
+    /** The day the message counts against (YYYY-MM-DD, Nairobi); defaults to today. The
+     *  reminder run passes the day it is running for, so its once-a-day check and this agree. */
+    day?: string;
   }) {
     let row;
     try {
@@ -60,7 +63,7 @@ export class MessagesService {
           to: p.to,
           text: p.text,
           status: 'SENT',
-          day: parseDateOnly(todayInNairobi()),
+          day: parseDateOnly(p.day ?? todayInNairobi()),
           broadcastId: p.broadcastId ?? null,
           createdById: currentContext()?.userId ?? null,
         },

@@ -477,6 +477,7 @@ export class TenantAccountsService {
         kind: plan.kind,
         to: t.phone,
         text,
+        day: today,
       });
       if (t.userId) {
         await this.notifications.notifyUser({
