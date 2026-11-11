@@ -6,7 +6,7 @@ import { api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
 import { acceptSession } from '../../lib/auth/session';
 import { safeNext } from '../../lib/auth/next';
-import { homeFor, rememberedPlace } from '../../lib/auth/lastPlace';
+import { homeFor } from '../../lib/auth/lastPlace';
 import { isOtpCode } from '../../lib/auth/passwordPolicy';
 import { useAuthState } from '../../lib/auth/useAuth';
 import type { AdminTwoFactorChallenge, SessionPayload } from '../../lib/auth/types';
@@ -61,7 +61,7 @@ export function LoginPage() {
 
   const finish = (payload: SessionPayload) => {
     const session = acceptSession(payload);
-    navigate(askedFor ? next : homeFor(session, rememberedPlace(session.user.id)), { replace: true });
+    navigate(askedFor ? next : homeFor(session), { replace: true });
   };
 
   const login = useMutation({
@@ -102,7 +102,7 @@ export function LoginPage() {
 
   // Already signed in (a restored session, or the back button after signing in).
   if (status === 'signedIn') {
-    return <Navigate to={askedFor || !current ? next : homeFor(current, rememberedPlace(current.user.id))} replace />;
+    return <Navigate to={askedFor || !current ? next : homeFor(current)} replace />;
   }
   if (status === 'loading') return <Splash />;
 

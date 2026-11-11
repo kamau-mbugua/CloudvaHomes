@@ -6,7 +6,7 @@ import { NoOrganizationPage } from '../features/auth/NoOrganizationPage';
 import { PortalChooserPage } from '../features/auth/PortalChooserPage';
 import { loginPath } from '../lib/auth/next';
 import { isPlatformOperator, isSuperAdmin, landingFor } from '../lib/auth/portals';
-import { homeFor, rememberedPlace } from '../lib/auth/lastPlace';
+import { homeFor } from '../lib/auth/lastPlace';
 import { hasPermission } from '../lib/auth/permissions';
 import type { OrgKind } from '../lib/auth/types';
 import { useAuthState } from '../lib/auth/useAuth';
@@ -46,7 +46,7 @@ export function HomeRedirect() {
   const { status, session } = useAuthState();
   if (status === 'loading') return <Splash />;
   if (status === 'signedIn' && session) {
-    return <Navigate to={homeFor(session, rememberedPlace(session.user.id))} replace />;
+    return <Navigate to={homeFor(session)} replace />;
   }
   return <Navigate to="/app" replace />;
 }

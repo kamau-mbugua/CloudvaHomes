@@ -17,6 +17,9 @@ import {
 const CLIENTS = ['web', 'mobile'] as const;
 export type ClientKind = (typeof CLIENTS)[number];
 
+export const PLACES = ['STAFF', 'TENANT', 'OWNER', 'PLATFORM'] as const;
+export type PlaceKind = (typeof PLACES)[number];
+
 class ClientDto {
   @ApiPropertyOptional({
     enum: CLIENTS,
@@ -139,6 +142,11 @@ export class SwitchOrgDto {
   @IsUUID()
   propertyId?: string | null;
 
+  @ApiPropertyOptional({ enum: PLACES })
+  @IsOptional()
+  @IsIn(PLACES)
+  place?: PlaceKind;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()
@@ -171,12 +179,26 @@ export class SwitchContextDto {
 
   @ApiPropertyOptional({
     nullable: true,
+    description: 'Active home (tenancy) ID, or null for all homes',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  homeId?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
     description: 'Active landlord account ID, or null for consolidated view across all properties',
   })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @IsUUID()
   landlordId?: string | null;
+
+  @ApiPropertyOptional({ enum: PLACES })
+  @IsOptional()
+  @IsIn(PLACES)
+  place?: PlaceKind;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()

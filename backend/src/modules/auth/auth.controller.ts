@@ -5,6 +5,7 @@ import {
   HttpCode,
   Inject,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -177,6 +178,7 @@ export class AuthController {
         dto.organizationId,
         dto.propertyId,
         dto.setAsDefault ?? true,
+        dto.place,
       ),
     );
   }
@@ -191,7 +193,9 @@ export class AuthController {
         organizationId: dto.organizationId,
         propertyId: dto.propertyId,
         tenantId: dto.tenantId,
+        homeId: dto.homeId,
         landlordId: dto.landlordId,
+        place: dto.place,
         setAsDefault: dto.setAsDefault,
       }),
     );
@@ -226,6 +230,14 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     return this.respond(res, await this.invitations.accept(dto.token, dto.password), dto.client);
+  }
+
+  @ApiBearerAuth()
+  @Post('memberships/:membershipId/accept')
+  @HttpCode(200)
+  async acceptMyInvitation(@Param('membershipId', ParseUUIDPipe) membershipId: string) {
+    const ctx = authContext();
+    return ok(await this.invitations.acceptMine(ctx.userId, membershipId));
   }
 
   @ApiBearerAuth()

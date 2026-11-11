@@ -210,13 +210,35 @@ void main() {
     );
 
     test(
-      'signing in again returns to the workspace chosen last (a salesperson back on the platform)',
+      'lands in the server\'s defaultPlace and falls back when access is gone',
       () async {
-        final json = sessionJson(staff: true);
-        (json['user'] as Map<String, dynamic>)['platformRole'] = 'SALESPERSON';
+        Map<String, Object?> payload({
+          required String? defaultPlace,
+          String? platformRole = 'SALESPERSON',
+          bool tenant = false,
+          bool owner = false,
+        }) {
+          final json = sessionJson(staff: true, tenant: tenant);
+          final user = Map<String, Object?>.from(json['user'] as Map);
+          user['platformRole'] = platformRole;
+          user['defaultPlace'] = defaultPlace;
+          json['user'] = user;
+          if (owner) {
+            json['ownerOf'] = [
+              {
+                'landlordId': 'l1',
+                'name': 'Olive Landlord',
+                'organization': {'id': 'o2', 'name': 'Apex Agency'},
+              },
+            ];
+          }
+          return json;
+        }
+
+        var nextLogin = payload(defaultPlace: 'PLATFORM');
         adapter = FakeAdapter(
           (call) => switch (call.path) {
-            '/auth/login' => (200, {'data': json}),
+            '/auth/login' => (200, {'data': nextLogin}),
             '/auth/logout' => (204, null),
             _ => (404, null),
           },
@@ -224,16 +246,35 @@ void main() {
         c = make();
         await c.read(sessionProvider.future);
         final auth = c.read(sessionProvider.notifier);
-        await auth.signInWithPassword('owner@example.invalid', 'pw');
-        expect(c.read(modeProvider), AppMode.staff);
 
-        c.read(appModeProvider.notifier).state = AppMode.platform;
-        await Future<void>.delayed(Duration.zero);
-        await auth.signOut();
-        expect(c.read(modeProvider), isNull);
-
+        // Salesperson with an org and defaultPlace = PLATFORM lands on platform.
         await auth.signInWithPassword('owner@example.invalid', 'pw');
         expect(c.read(modeProvider), AppMode.platform);
+        await auth.signOut();
+
+        // Demoted operator with stale defaultPlace = PLATFORM falls back to staff.
+        nextLogin = payload(defaultPlace: 'PLATFORM', platformRole: null);
+        await auth.signInWithPassword('owner@example.invalid', 'pw');
+        expect(c.read(modeProvider), AppMode.staff);
+        await auth.signOut();
+
+        // Tenant and owner defaultPlace values land in those portals when allowed.
+        nextLogin = payload(
+          defaultPlace: 'TENANT',
+          platformRole: null,
+          tenant: true,
+        );
+        await auth.signInWithPassword('owner@example.invalid', 'pw');
+        expect(c.read(modeProvider), AppMode.tenant);
+        await auth.signOut();
+
+        nextLogin = payload(
+          defaultPlace: 'OWNER',
+          platformRole: null,
+          owner: true,
+        );
+        await auth.signInWithPassword('owner@example.invalid', 'pw');
+        expect(c.read(modeProvider), AppMode.owner);
       },
     );
 

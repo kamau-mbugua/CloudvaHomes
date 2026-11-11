@@ -2,9 +2,9 @@ import { homeText } from './rules';
 import type { ConsolidatedOverview, ConsolidatedTenancy } from './types';
 
 /**
- * The tenant portal's home switcher (tenant portal redesign): everything across all my
- * homes, or one home (a tenancy) and the landlord account it belongs to. Kept on this
- * device only, so it can never quietly follow the person to another device.
+ * The tenant portal's home scope: everything across all my homes, or one home (a tenancy)
+ * and the landlord account it belongs to, backed by `User.defaultHomeId` on the server so
+ * the choice follows the person across browsers and devices.
  */
 export type HomeScope = { kind: 'all' } | { kind: 'home'; tenantId: string; tenancyId: string };
 
@@ -27,24 +27,14 @@ export function homeOptions(o: ConsolidatedOverview): HomeOption[] {
   }));
 }
 
-export function scopeStorageKey(userId: string): string {
-  return `kodihub:tenant-home:${userId}`;
-}
-
-export function serializeScope(s: HomeScope): string {
-  return JSON.stringify(s);
-}
-
-/** A saved choice, if it still names one of the options; otherwise all homes. */
-export function resolveScope(stored: string | null, options: readonly HomeOption[]): HomeScope {
-  if (!stored) return ALL_HOMES;
-  try {
-    const s = JSON.parse(stored) as Partial<{ kind: string; tenantId: string; tenancyId: string }>;
-    const match = s?.kind === 'home' ? options.find((o) => o.tenancyId === s.tenancyId) : undefined;
-    return match ? { kind: 'home', tenantId: match.tenantId, tenancyId: match.tenancyId } : ALL_HOMES;
-  } catch {
-    return ALL_HOMES;
-  }
+/** The server-remembered home, if it still names a home lived in; otherwise all homes. */
+export function resolveScope(
+  defaultHomeId: string | null | undefined,
+  options: readonly HomeOption[],
+): HomeScope {
+  if (!defaultHomeId) return ALL_HOMES;
+  const match = options.find((o) => o.tenancyId === defaultHomeId);
+  return match ? { kind: 'home', tenantId: match.tenantId, tenancyId: match.tenancyId } : ALL_HOMES;
 }
 
 /** The landlord accounts (tenant ids) a scope covers, in overview order. */

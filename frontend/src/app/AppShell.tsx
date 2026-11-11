@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useRememberPlace } from '../lib/auth/lastPlace';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { PageBoundary } from '../components/ErrorBoundary';
 import { composeTitle, usePageTitleOverride } from '../lib/pageTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { SessionAccountMenu } from './SessionAccountMenu';
 import { CommandPalette } from './CommandPalette';
 import { NotificationBell } from './NotificationBell';
@@ -43,7 +43,6 @@ export function AppShell() {
   const navigate = useNavigate();
   const [theme, setTheme] = useTheme();
   const session = useSession();
-  useRememberPlace(session.user.id, 'staff');
 
   const groups = useMemo(() => filterNav(ORG_NAV, session.permissions, session.activeOrganization?.kind), [session.permissions, session.activeOrganization?.kind]);
   const pages = useMemo(() => destinations(groups), [groups]);
@@ -126,6 +125,13 @@ export function AppShell() {
       <Sidebar
         groups={groups}
         orgName={org?.name ?? 'KodiHub'}
+        switcher={
+          <WorkspaceSwitcher
+            here="staff"
+            collapsed={collapsed}
+            onChosen={() => setDrawerOpen(false)}
+          />
+        }
         collapsed={collapsed}
         onToggleCollapsed={toggleCollapsed}
         // Following a link on a phone must close the overlay, or the page loads behind it.

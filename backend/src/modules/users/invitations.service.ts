@@ -7,8 +7,13 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import type { Tx } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
 import { hashPassword, randomToken, sha256 } from '../auth/crypto.js';
+import { authContext } from '../auth/decorators.js';
 import { passwordProblem } from '../auth/identifiers.js';
-import { type IssuedSession, SessionsService } from '../auth/sessions.service.js';
+import {
+  type IssuedSession,
+  type SessionPayload,
+  SessionsService,
+} from '../auth/sessions.service.js';
 import { todayInNairobi } from '../billing/billing-math.js';
 import {
   NotificationsService,
@@ -235,6 +240,55 @@ export class InvitationsService {
       }),
     );
     return this.sessions.start(user.id, inv.orgId);
+  }
+
+  async acceptMine(userId: string, membershipId: string): Promise<SessionPayload> {
+    const ctx = authContext();
+    const membership = await this.prisma.membership.findFirst({
+      where: { id: membershipId, userId },
+      include: { user: true, organization: true },
+    });
+    if (!membership) throw AppError.notFound('Invitation');
+    if (
+      membership.status !== 'INVITED' ||
+      membership.organization.status === 'CLOSED' ||
+      membership.user.status !== 'ACTIVE'
+    ) {
+      throw this.invalid();
+    }
+
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.invitation.updateMany({
+        where: {
+          membershipId,
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { acceptedAt: now },
+      });
+      if (claimed.count === 0) throw this.invalid();
+      await tx.membership.update({
+        where: { id: membershipId },
+        data: { status: 'ACTIVE', joinedAt: now },
+      });
+    });
+
+    await withoutOrgScope(() =>
+      this.audit.record({
+        action: 'user.invitation_accept',
+        entity: 'membership',
+        entityId: membershipId,
+        orgId: membership.orgId,
+        actorId: userId,
+      }),
+    );
+
+    return this.sessions.switchContext(userId, ctx.sessionId, ctx.orgId, {
+      organizationId: membership.orgId,
+      place: 'STAFF',
+    });
   }
 
   private async newToken(tx: Tx, orgId: string, membershipId: string, invitedById: string | null) {

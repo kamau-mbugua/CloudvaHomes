@@ -2,7 +2,7 @@ import { configureAuth, request, setAccessToken, setStepUpGrant } from '../api/c
 import type { DataEnvelope } from '../api/types';
 import { queryClient } from '../api/queryClient';
 import { singleFlight } from '../singleFlight';
-import type { AuthState, Session, SessionPayload } from './types';
+import type { AuthState, Place, Session, SessionPayload } from './types';
 
 /**
  * The signed-in session — a small external store (read with `useSyncExternalStore`, see
@@ -35,6 +35,7 @@ export function toSession(payload: SessionPayload): Session {
   return {
     user: payload.user,
     organizations: payload.organizations ?? [],
+    invitations: Array.isArray(payload.invitations) ? payload.invitations : [],
     activeOrganization: payload.activeOrganization ?? null,
     activePropertyId: payload.activePropertyId ?? null,
     properties: Array.isArray(payload.properties) ? payload.properties : [],
@@ -138,13 +139,26 @@ export async function switchContext(input: {
   organizationId?: string;
   propertyId?: string | null;
   tenantId?: string | null;
+  homeId?: string | null;
   landlordId?: string | null;
+  place?: Place;
   setAsDefault?: boolean;
 }): Promise<Session> {
   const result = await request<DataEnvelope<SessionPayload>>('/auth/switch-context', {
     method: 'POST',
     body: { ...input, setAsDefault: input.setAsDefault ?? true },
   });
+  setStepUpGrant(null);
+  queryClient.clear();
+  return acceptSession(result.data);
+}
+
+/** Accept one of the signed-in user's own pending invitations in place and switch into it. */
+export async function acceptInvitation(membershipId: string): Promise<Session> {
+  const result = await request<DataEnvelope<SessionPayload>>(
+    `/auth/memberships/${encodeURIComponent(membershipId)}/accept`,
+    { method: 'POST', body: {} },
+  );
   setStepUpGrant(null);
   queryClient.clear();
   return acceptSession(result.data);

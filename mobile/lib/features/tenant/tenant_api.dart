@@ -736,18 +736,32 @@ final allHomesProvider = FutureProvider.autoDispose<ConsolidatedOverview>(
 final homeScopeProvider = Provider<HomeScope>((ref) {
   final all = ref.watch(allHomesProvider).valueOrNull;
   if (all == null) return const AllHomes();
-  return resolveScope(ref.watch(homeScopeRawProvider), homeOptions(all.homes));
+  final options = homeOptions(all.homes);
+  final raw = ref.watch(homeScopeRawProvider);
+  if (raw != null) return resolveScope(raw, options);
+  final defaultHomeId = ref
+      .watch(sessionProvider)
+      .valueOrNull
+      ?.user
+      .defaultHomeId;
+  if (defaultHomeId != null) {
+    final match = options
+        .where((o) => o.tenancyId == defaultHomeId)
+        .firstOrNull;
+    if (match != null) return OneHome(match.tenantId, match.tenancyId);
+  }
+  return const AllHomes();
 });
 
 final currentTenantIdProvider = Provider<String?>((ref) {
   final session = ref.watch(sessionProvider).valueOrNull;
   final accounts = session?.tenantOf ?? const [];
+  if (accounts.isEmpty) return null;
   final scope = ref.watch(homeScopeProvider);
   if (scope is OneHome && accounts.any((a) => a.tenantId == scope.tenantId)) {
     return scope.tenantId;
   }
   final chosen = ref.watch(chosenTenantProvider) ?? session?.activeTenantId;
-  if (accounts.isEmpty) return null;
   return accounts.any((a) => a.tenantId == chosen)
       ? chosen
       : accounts.first.tenantId;

@@ -46,6 +46,7 @@ const ICONS: Record<GroupId, ReactNode> = {
 export function Sidebar({
   groups,
   orgName,
+  switcher,
   label = 'Main',
   collapsed,
   onToggleCollapsed,
@@ -55,6 +56,8 @@ export function Sidebar({
   /** The navigation this person may see (already permission-filtered). */
   groups: NavGroup[];
   orgName: string;
+  /** Optional workspace switcher replacing the static title (omitted in the admin area). */
+  switcher?: ReactNode;
   /** Names the menu for screen readers; the admin area says so. */
   label?: string;
   collapsed: boolean;
@@ -78,10 +81,14 @@ export function Sidebar({
   return (
     <nav className={`sb ${collapsed ? 'is-collapsed' : ''}`} aria-label={label}>
       <div className="sb__brand">
-        <span className="sb__mark" aria-hidden="true">
-          <BrandIcon tone="navy" size={22} />
-        </span>
-        <span className="sb__brandname" title={orgName}>{orgName}</span>
+        {switcher ?? (
+          <>
+            <span className="sb__mark" aria-hidden="true">
+              <BrandIcon tone="navy" size={22} />
+            </span>
+            <span className="sb__brandname" title={orgName}>{orgName}</span>
+          </>
+        )}
 
         <button
           type="button"

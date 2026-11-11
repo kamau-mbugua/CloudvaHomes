@@ -88,8 +88,20 @@ export interface Session {
   body: {
     activeOrganization: { id: string; status?: string } | null;
     permissions: string[];
-    user: { id: string };
+    user: {
+      id: string;
+      defaultPlace?: 'STAFF' | 'TENANT' | 'OWNER' | 'PLATFORM' | null;
+      defaultHomeId?: string | null;
+      defaultTenantId?: string | null;
+      defaultOrgId?: string | null;
+      defaultLandlordId?: string | null;
+    };
     organizations: { id: string }[];
+    invitations?: {
+      membershipId: string;
+      organization: { id: string; name: string; kind: string };
+      roleName: string;
+    }[];
   };
 }
 

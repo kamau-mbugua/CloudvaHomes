@@ -17,6 +17,7 @@ export const REFRESH_TTL_DAYS = 30;
 export const REUSE_GRACE_MS = 30_000;
 
 export type Client = 'web' | 'mobile';
+export type Place = 'STAFF' | 'TENANT' | 'OWNER' | 'PLATFORM';
 
 export interface SessionPayload {
   accessToken: string;
@@ -35,8 +36,15 @@ export interface SessionPayload {
     defaultPropertyId: string | null;
     defaultTenantId: string | null;
     defaultLandlordId: string | null;
+    defaultPlace: Place | null;
+    defaultHomeId: string | null;
   };
   organizations: { id: string; name: string; kind: string; roleName: string; isOwner: boolean }[];
+  invitations: {
+    membershipId: string;
+    organization: { id: string; name: string; kind: string };
+    roleName: string;
+  }[];
   activeOrganization: { id: string; name: string; kind: string; status: string } | null;
   activePropertyId: string | null;
   properties: {
@@ -183,11 +191,13 @@ export class SessionsService {
     orgId: string,
     propertyId?: string | null,
     setAsDefault = true,
+    place?: Place,
   ): Promise<SessionPayload> {
     return this.switchContext(userId, sessionId, orgId, {
       organizationId: orgId,
       propertyId: propertyId ?? null,
       setAsDefault,
+      ...(place !== undefined ? { place } : {}),
     });
   }
 
@@ -204,7 +214,9 @@ export class SessionsService {
       organizationId?: string;
       propertyId?: string | null;
       tenantId?: string | null;
+      homeId?: string | null;
       landlordId?: string | null;
+      place?: Place;
       setAsDefault?: boolean;
     },
   ): Promise<SessionPayload> {
@@ -212,6 +224,38 @@ export class SessionsService {
       where: { familyId: sessionId, revokedAt: null, usedAt: null },
       select: { orgId: true, propertyId: true, tenantId: true, landlordId: true },
     });
+
+    if (opts.place === 'PLATFORM') {
+      const op = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { status: true, isPlatformAdmin: true, platformRole: true },
+      });
+      if (!op || op.status !== 'ACTIVE' || (!op.isPlatformAdmin && !op.platformRole)) {
+        throw AppError.notFound('Account');
+      }
+    } else if (opts.place === 'TENANT') {
+      const hasTenant = await this.prisma.tenant.findFirst({
+        where: { userId, organization: { status: { not: 'CLOSED' } } },
+        select: { id: true },
+      });
+      if (!hasTenant) throw AppError.notFound('Account');
+    } else if (opts.place === 'OWNER') {
+      const hasLandlord = await this.prisma.landlord.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE',
+          organization: { kind: 'AGENCY', status: { not: 'CLOSED' } },
+        },
+        select: { id: true },
+      });
+      if (!hasLandlord) throw AppError.notFound('Landlord');
+    } else if (opts.place === 'STAFF') {
+      const hasMembership = await this.prisma.membership.findFirst({
+        where: { userId, status: 'ACTIVE', organization: { status: { not: 'CLOSED' } } },
+        select: { id: true },
+      });
+      if (!hasMembership) throw AppError.notFound('Organisation');
+    }
 
     let targetOrgId = opts.organizationId ?? currentOrgId ?? liveToken?.orgId ?? null;
     if (opts.organizationId) {
@@ -251,9 +295,28 @@ export class SessionsService {
       }
     }
 
+    // A home belongs to exactly one tenant account. Sent alone, it brings that account with
+    // it; sent with a tenant account (or with null = all homes), the two must match.
+    let homeTenantId: string | null = null;
+    if (opts.homeId) {
+      const home = await this.prisma.tenancy.findFirst({
+        where: {
+          id: opts.homeId,
+          status: { not: 'ENDED' },
+          tenant: { userId, organization: { status: { not: 'CLOSED' } } },
+        },
+        select: { tenantId: true },
+      });
+      if (!home) throw AppError.notFound('Home');
+      if (opts.tenantId !== undefined && opts.tenantId !== home.tenantId) {
+        throw AppError.notFound('Home');
+      }
+      homeTenantId = home.tenantId;
+    }
+
     const targetTenantId =
-      opts.tenantId !== undefined ? opts.tenantId : (liveToken?.tenantId ?? null);
-    if (targetTenantId) {
+      homeTenantId ?? (opts.tenantId !== undefined ? opts.tenantId : (liveToken?.tenantId ?? null));
+    if (targetTenantId && !homeTenantId) {
       const t = await this.prisma.tenant.findFirst({
         where: { id: targetTenantId, userId, organization: { status: { not: 'CLOSED' } } },
         select: { id: true },
@@ -292,8 +355,12 @@ export class SessionsService {
         data: {
           ...(opts.organizationId !== undefined ? { defaultOrgId: targetOrgId } : {}),
           ...(opts.propertyId !== undefined ? { defaultPropertyId: targetPropertyId } : {}),
-          ...(opts.tenantId !== undefined ? { defaultTenantId: targetTenantId } : {}),
+          ...(opts.tenantId !== undefined || homeTenantId
+            ? { defaultTenantId: targetTenantId }
+            : {}),
+          ...(opts.homeId !== undefined ? { defaultHomeId: opts.homeId } : {}),
           ...(opts.landlordId !== undefined ? { defaultLandlordId: targetLandlordId } : {}),
+          ...(opts.place !== undefined ? { defaultPlace: opts.place } : {}),
         },
       });
     }
@@ -483,6 +550,24 @@ export class SessionsService {
         ? wantedLandlordId
         : null;
 
+    const now = new Date();
+    const invitedMemberships = await this.prisma.membership.findMany({
+      where: {
+        userId,
+        status: 'INVITED',
+        organization: { status: { not: 'CLOSED' } },
+        invitations: {
+          some: {
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: now },
+          },
+        },
+      },
+      include: { organization: true, role: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
     const platformRole = user.platformRole ?? (user.isPlatformAdmin ? 'SUPERADMIN' : null);
     const isPlatformAdmin = platformRole === 'SUPERADMIN';
     const access = await this.tokens.signAccess({
@@ -510,6 +595,8 @@ export class SessionsService {
         defaultPropertyId: user.defaultPropertyId ?? null,
         defaultTenantId: user.defaultTenantId ?? null,
         defaultLandlordId: user.defaultLandlordId ?? null,
+        defaultPlace: user.defaultPlace ?? null,
+        defaultHomeId: user.defaultHomeId ?? null,
       },
       organizations: user.memberships.map((m) => ({
         id: m.orgId,
@@ -517,6 +604,15 @@ export class SessionsService {
         kind: m.organization.kind,
         roleName: m.role.name,
         isOwner: m.role.systemKey === 'OWNER',
+      })),
+      invitations: invitedMemberships.map((m) => ({
+        membershipId: m.id,
+        organization: {
+          id: m.orgId,
+          name: m.organization.name,
+          kind: m.organization.kind,
+        },
+        roleName: m.role.name,
       })),
       activeOrganization: active
         ? {

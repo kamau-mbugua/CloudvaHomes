@@ -45,13 +45,6 @@ class SessionController extends AsyncNotifier<Session?> {
       ..onRefresh = _refresh
       ..onAuthLost = _lost
       ..onSuspended = () => reload();
-    // Remember the workspace the person picks, so signing in again returns to it.
-    ref.listen<AppMode?>(appModeProvider, (_, mode) {
-      final userId = state.valueOrNull?.user.id;
-      if (mode != null && userId != null) {
-        _store.writeLastMode(userId, mode.name);
-      }
-    });
     final token = await _store.read();
     if (token == null) return null;
     try {
@@ -84,15 +77,6 @@ class SessionController extends AsyncNotifier<Session?> {
     }
   }
 
-  /// Back to the workspace this user chose last on this device (effectiveMode ignores it
-  /// if they no longer have it). Only when nothing is chosen yet in this run of the app.
-  Future<void> _restoreLastMode(String userId) async {
-    if (ref.read(appModeProvider) != null) return;
-    final saved = await _store.readLastMode(userId);
-    final mode = AppMode.values.where((m) => m.name == saved).firstOrNull;
-    if (mode != null) ref.read(appModeProvider.notifier).state = mode;
-  }
-
   void _lost() {
     _store.clear();
     _api.accessToken = null;
@@ -104,7 +88,6 @@ class SessionController extends AsyncNotifier<Session?> {
     if (refresh is String) await _store.write(refresh);
     final session = Session.fromJson(data);
     _api.accessToken = session.accessToken;
-    await _restoreLastMode(session.user.id);
     await ref.read(pushNotificationsServiceProvider).registerCurrentDevice();
     return session;
   }
@@ -193,25 +176,61 @@ class SessionController extends AsyncNotifier<Session?> {
     await switchContext(
       organizationId: organizationId,
       propertyId: propertyId,
+      place: 'STAFF',
       setAsDefault: true,
     );
   }
 
-  /// Switches the active organisation, property, tenant account, or landlord account
+  /// Saves the chosen kind of place (`STAFF`, `TENANT`, `OWNER`, `PLATFORM`) on the server.
+  Future<void> setPlace(String place) async {
+    final prev = ref.read(appModeProvider);
+    ref.read(appModeProvider.notifier).state = switch (place) {
+      'PLATFORM' => AppMode.platform,
+      'TENANT' => AppMode.tenant,
+      'OWNER' => AppMode.owner,
+      'STAFF' =>
+        state.valueOrNull?.activeOrganization?.kind == 'HOST'
+            ? AppMode.host
+            : AppMode.staff,
+      _ => prev,
+    };
+    try {
+      await switchContext(place: place);
+    } on Object {
+      ref.read(appModeProvider.notifier).state = prev;
+      rethrow;
+    }
+  }
+
+  /// Accepts a pending membership invitation belonging to the signed-in user and switches into it.
+  Future<Session> acceptInvitation(String membershipId) async {
+    final res = await _api.post('/auth/memberships/$membershipId/accept');
+    final next = await _accept(res['data'] as Map<String, dynamic>);
+    state = AsyncData(next);
+    ref.read(appModeProvider.notifier).state =
+        next.activeOrganization?.kind == 'HOST' ? AppMode.host : AppMode.staff;
+    return next;
+  }
+
+  /// Switches the active organisation, property, tenant account, home, or landlord account
   /// (`null` = consolidated view across all properties/units), rotates the JWT access token,
   /// and saves the choice as the user's default on the server.
   Future<void> switchContext({
     String? organizationId,
     Object? propertyId = _omit,
     Object? tenantId = _omit,
+    Object? homeId = _omit,
     Object? landlordId = _omit,
+    String? place,
     bool setAsDefault = true,
   }) async {
     final body = <String, dynamic>{
       'organizationId': ?organizationId,
       if (!identical(propertyId, _omit)) 'propertyId': propertyId,
       if (!identical(tenantId, _omit)) 'tenantId': tenantId,
+      if (!identical(homeId, _omit)) 'homeId': homeId,
       if (!identical(landlordId, _omit)) 'landlordId': landlordId,
+      'place': ?place,
       'setAsDefault': setAsDefault,
     };
     try {
@@ -330,8 +349,8 @@ final sessionProvider = AsyncNotifierProvider<SessionController, Session?>(
 /// The mode the person chose; null = the default for their session.
 final appModeProvider = StateProvider<AppMode?>((ref) => null);
 
-/// The mode to show: host/staff when they belong to an organisation, else tenant, else owner, else platform
-/// (any operator — superadmin or salesperson).
+/// The mode to show: an in-session override (`chosen`), else the server's `defaultPlace` if
+/// still allowed, else the fallback order (staff/host → tenant → owner → platform).
 AppMode? effectiveMode(Session? s, AppMode? chosen) {
   if (s == null) return null;
   final orgMode = s.activeOrganization?.kind == 'HOST'
@@ -345,6 +364,18 @@ AppMode? effectiveMode(Session? s, AppMode? chosen) {
   }
   if (chosen == AppMode.tenant && s.isTenant) return AppMode.tenant;
   if (chosen == AppMode.owner && s.isOwner) return AppMode.owner;
+  if (chosen == null) {
+    switch (s.user.defaultPlace) {
+      case 'PLATFORM':
+        if (s.isPlatformOperator) return AppMode.platform;
+      case 'TENANT':
+        if (s.isTenant) return AppMode.tenant;
+      case 'OWNER':
+        if (s.isOwner) return AppMode.owner;
+      case 'STAFF':
+        if (s.isStaff) return orgMode;
+    }
+  }
   if (s.isStaff) return orgMode;
   if (s.isTenant) return AppMode.tenant;
   if (s.isOwner) return AppMode.owner;

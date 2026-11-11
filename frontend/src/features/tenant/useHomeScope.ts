@@ -1,44 +1,66 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { readStored, writeStored } from '../../lib/storage';
+import { errorMessage } from '../../lib/api/client';
+import { switchContext } from '../../lib/auth/session';
+import { useSession } from '../../lib/auth/useAuth';
+import { useToast } from '../../lib/useToast';
 import {
   ALL_HOMES,
   type HomeScope,
   homeOptions,
   legacyAccountScope,
   resolveScope,
-  scopeStorageKey,
-  serializeScope,
 } from './scope';
 import type { ConsolidatedOverview } from './types';
 
 /**
- * The home switcher's choice for this person on this device (localStorage). An old
- * `?account=` link wins while it is in the address; it is saved and then dropped.
+ * The home switcher's choice for this person, read from `session.user.defaultHomeId` and
+ * saved on the server via `POST /auth/switch-context`. An old `?account=` link is converted
+ * into that server call once and then dropped from the address.
  */
-export function useHomeScope(userId: string, overview: ConsolidatedOverview | undefined): [HomeScope, (s: HomeScope) => void] {
-  const key = scopeStorageKey(userId);
+export function useHomeScope(
+  overview: ConsolidatedOverview | undefined,
+): [HomeScope, (s: HomeScope) => void] {
+  const session = useSession();
+  const toast = useToast();
   const [params, setParams] = useSearchParams();
-  const [, rerender] = useState(0);
   const options = useMemo(() => (overview ? homeOptions(overview) : []), [overview]);
 
-  const setScope = useCallback((s: HomeScope) => {
-    writeStored(key, serializeScope(s));
-    rerender((n) => n + 1);
-  }, [key]);
+  const setScope = useCallback(
+    (s: HomeScope) => {
+      const payload =
+        s.kind === 'home'
+          ? { tenantId: s.tenantId, homeId: s.tenancyId, place: 'TENANT' as const }
+          : { tenantId: null, homeId: null, place: 'TENANT' as const };
+      void switchContext(payload).catch((caught) => {
+        toast.failed(errorMessage(caught));
+      });
+    },
+    [toast],
+  );
 
   const legacy = params.get('account');
-  const legacyScope = legacy && overview ? legacyAccountScope(legacy, overview) : null;
+  const legacyScope = useMemo(
+    () => (legacy && overview ? legacyAccountScope(legacy, overview) : null),
+    [legacy, overview],
+  );
+  const convertedRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!legacyScope) return;
-    writeStored(key, serializeScope(legacyScope));
-    setParams((p) => {
-      const next = new URLSearchParams(p);
-      next.delete('account');
-      return next;
-    }, { replace: true });
-  }, [key, legacyScope, setParams]);
+    if (!legacy || !legacyScope) return;
+    if (convertedRef.current === legacy) return;
+    convertedRef.current = legacy;
+    setScope(legacyScope);
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        next.delete('account');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [legacy, legacyScope, setParams, setScope]);
 
   if (!overview) return [ALL_HOMES, setScope];
-  return [legacyScope ?? resolveScope(readStored(key), options), setScope];
+  return [legacyScope ?? resolveScope(session.user.defaultHomeId, options), setScope];
 }

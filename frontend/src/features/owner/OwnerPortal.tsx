@@ -33,23 +33,20 @@ const TABS = [
 
 export function OwnerShell() {
   const session = useSession();
-  const [params, setParams] = useSearchParams();
-  const owner = pickOwnerProfile(session.ownerOf, params.get('landlord'));
+  const [params] = useSearchParams();
+  const owner = pickOwnerProfile(
+    session.ownerOf,
+    params.get('landlord') ?? session.activeLandlordId ?? session.user.defaultLandlordId,
+  );
 
   if (!owner) return null;
   const search = session.ownerOf.length > 1 ? `?landlord=${encodeURIComponent(owner.landlordId)}` : '';
-  const severalAgencies = new Set(session.ownerOf.map((o) => o.organization.id)).size > 1;
 
   return (
     <PortalShell
       portal="owner"
       label="Owner portal"
-      orgName={owner.organization.name}
       accountName={owner.name}
-      accounts={session.ownerOf.map((o) => ({ id: o.landlordId, label: severalAgencies ? `${o.name} · ${o.organization.name}` : o.name }))}
-      currentId={owner.landlordId}
-      switchLabel="Landlord"
-      onSwitch={(id) => setParams((p) => { const next = new URLSearchParams(p); next.set('landlord', id); return next; })}
       tabs={TABS}
       search={search}
       footer={`Read only. Questions about these figures? Contact ${owner.organization.name}.`}

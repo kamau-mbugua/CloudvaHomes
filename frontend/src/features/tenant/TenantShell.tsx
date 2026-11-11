@@ -1,19 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useRememberPlace } from '../../lib/auth/lastPlace';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { PageBoundary } from '../../components/ErrorBoundary';
 import { CardSkeleton, TopRouteProgress } from '../../components/Loading';
 import { EmptyState } from '../../components/EmptyState';
 import { NotificationBell } from '../../app/NotificationBell';
 import { MenuIcon, MoonIcon, SunIcon } from '../../app/icons';
 import { SessionAccountMenu } from '../../app/SessionAccountMenu';
-import { portalsOf } from '../../lib/auth/portals';
 import { useSession } from '../../lib/auth/useAuth';
 import { readStored, writeStored } from '../../lib/storage';
 import { useTheme } from '../../lib/theme';
 import { tenantErrorMessage, useConsolidatedOverview } from './api';
 import { homeText } from './rules';
-import { ALL_HOMES, homeOptions } from './scope';
+import { ALL_HOMES } from './scope';
 import { TenantSidebar } from './TenantSidebar';
 import { TENANT_MENU } from './tenantMenu';
 import type { TenantContext } from './tenantContext';
@@ -22,21 +20,18 @@ import { useHomeScope } from './useHomeScope';
 const COLLAPSED_KEY = 'kodihub:tenant-menu-collapsed';
 
 /**
- * The tenant portal shell (tenant portal redesign): side menu with the home switcher, a top
- * bar with the page title, bell, theme and sign out, and — while one home is selected — a
- * strip naming it on every page. Pages read `useTenantContext()`.
+ * The tenant portal shell (tenant portal redesign): side menu with the workspace switcher,
+ * a top bar with the page title, bell, theme and sign out, and — while one home is selected
+ * — a strip naming it on every page. Pages read `useTenantContext()`.
  */
 export function TenantShell() {
   const session = useSession();
-  useRememberPlace(session.user.id, 'tenant');
   const { pathname } = useLocation();
   const [theme, setTheme] = useTheme();
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) === '1');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const overview = useConsolidatedOverview();
-  const [scope, setScope] = useHomeScope(session.user.id, overview.data);
-  const options = useMemo(() => (overview.data ? homeOptions(overview.data) : []), [overview.data]);
-  const places = portalsOf(session);
+  const [scope, setScope] = useHomeScope(overview.data);
   const page = TENANT_MENU.find((m) => (m.end ? pathname === m.to : pathname.startsWith(m.to)))?.label ?? 'Dashboard';
 
   useEffect(() => {
@@ -58,9 +53,6 @@ export function TenantShell() {
   return (
     <div className={`ms tsh ${drawerOpen ? 'is-drawer-open' : ''}`}>
       <TenantSidebar
-        options={options}
-        scope={scope}
-        onScope={setScope}
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed((was) => { writeStored(COLLAPSED_KEY, was ? '0' : '1'); return !was; })}
         onNavigate={() => setDrawerOpen(false)}
@@ -117,10 +109,6 @@ export function TenantShell() {
               />
             </PageBoundary>
           ) : null}
-          <footer className="tsh__foot">
-            {places.staff ? <Link to="/app">Staff app</Link> : null}
-            {places.owner ? <Link to="/owner">Owner portal</Link> : null}
-          </footer>
         </main>
       </div>
     </div>

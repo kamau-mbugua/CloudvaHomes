@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../features/owner/owner_screens.dart';
+import '../../features/tenant/home_scope.dart';
 import '../../features/tenant/tenant_api.dart';
 import '../api/api_error.dart';
 import '../auth/session.dart';
@@ -35,19 +36,123 @@ class AccountSheet extends ConsumerWidget {
 
     Future<void> switchOrg(String id, String kind) async {
       final nav = Navigator.of(context);
+      final prevMode = ref.read(appModeProvider);
       final targetMode = kind == 'HOST' ? AppMode.host : AppMode.staff;
+      ref.read(appModeProvider.notifier).state = targetMode;
+      nav.pop();
       try {
-        if (session.activeOrganization?.id != id) {
-          await ref.read(sessionProvider.notifier).switchOrganization(id);
-        }
-        ref.read(appModeProvider.notifier).state = targetMode;
+        await ref
+            .read(sessionProvider.notifier)
+            .switchContext(organizationId: id, place: 'STAFF');
+      } on ApiError catch (e) {
+        ref.read(appModeProvider.notifier).state = prevMode;
+        if (context.mounted) showMessage(context, e.message);
+      }
+    }
+
+    Future<void> confirmAndAcceptInvite(OrgInvitation inv) async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Join ${inv.orgName} as ${inv.roleName}?'),
+          content: Text(
+            'Accepting joins ${inv.orgName} and opens its workspace.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Join'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+      final nav = Navigator.of(context);
+      try {
+        await ref
+            .read(sessionProvider.notifier)
+            .acceptInvitation(inv.membershipId);
         nav.pop();
+        if (context.mounted) {
+          showMessage(context, 'You joined ${inv.orgName}.');
+        }
       } on ApiError catch (e) {
         if (context.mounted) showMessage(context, e.message);
       }
     }
 
-    final activeTenantId = ref.watch(currentTenantIdProvider);
+    Future<void> switchHome({
+      required String? tenantId,
+      required String? homeId,
+    }) async {
+      final nav = Navigator.of(context);
+      final prevMode = ref.read(appModeProvider);
+      ref.read(chosenTenantProvider.notifier).state = tenantId;
+      ref
+          .read(homeScopeRawProvider.notifier)
+          .set(
+            tenantId != null && homeId != null
+                ? OneHome(tenantId, homeId)
+                : const AllHomes(),
+          );
+      ref.read(appModeProvider.notifier).state = AppMode.tenant;
+      nav.pop();
+      try {
+        await ref
+            .read(sessionProvider.notifier)
+            .switchContext(tenantId: tenantId, homeId: homeId, place: 'TENANT');
+      } on ApiError catch (e) {
+        ref.read(appModeProvider.notifier).state = prevMode;
+        if (context.mounted) showMessage(context, e.message);
+      }
+    }
+
+    Future<void> switchOwner(String landlordId) async {
+      final nav = Navigator.of(context);
+      final prevMode = ref.read(appModeProvider);
+      ref.read(chosenOwnerProvider.notifier).state = landlordId;
+      ref.read(appModeProvider.notifier).state = AppMode.owner;
+      nav.pop();
+      try {
+        await ref
+            .read(sessionProvider.notifier)
+            .switchContext(landlordId: landlordId, place: 'OWNER');
+      } on ApiError catch (e) {
+        ref.read(appModeProvider.notifier).state = prevMode;
+        if (context.mounted) showMessage(context, e.message);
+      }
+    }
+
+    Future<void> switchPlatform() async {
+      final nav = Navigator.of(context);
+      nav.pop();
+      try {
+        await ref.read(sessionProvider.notifier).setPlace('PLATFORM');
+      } on ApiError catch (e) {
+        if (context.mounted) showMessage(context, e.message);
+      }
+    }
+
+    final activeTenantId = session.isTenant
+        ? ref.watch(currentTenantIdProvider)
+        : null;
+    final homes = [
+      for (final account in session.tenantOf)
+        for (final unit in account.units)
+          (
+            tenantId: account.tenantId,
+            homeId: unit.tenancyId,
+            name: unit.label,
+            orgName: account.orgName,
+          ),
+    ];
+    final chosenHome = homes
+        .where((h) => h.homeId == session.user.defaultHomeId)
+        .firstOrNull;
     final contactParts = [
       if (session.user.email != null && session.user.email!.isNotEmpty)
         session.user.email!,
@@ -92,9 +197,178 @@ class AccountSheet extends ConsumerWidget {
           'You can switch between these any time from the top corner.',
           style: TextStyle(fontSize: 13.5, color: muted),
         ),
-        if (session.isPlatformOperator) ...[
+        if (session.organizations.isNotEmpty ||
+            session.invitations.isNotEmpty) ...[
           const SizedBox(height: 16),
-          _Heading('Platform · KodiHub', muted),
+          _Heading('Organisations', muted),
+          for (final o in session.organizations)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AccountDestCard(
+                badge: InitialsBadge(
+                  name: _initialsOf(o.name),
+                  size: 44,
+                  radius: 12,
+                  fontSize: 14,
+                  lime: false,
+                ),
+                title: o.name,
+                subtitle: '${orgKindLabel(o.kind)} · ${o.roleName}',
+                selected:
+                    (mode == AppMode.staff || mode == AppMode.host) &&
+                    session.activeOrganization?.id == o.id,
+                onTap: () => switchOrg(o.id, o.kind),
+              ),
+            ),
+          for (final inv in session.invitations)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AccountDestCard(
+                badge: InitialsBadge(
+                  name: _initialsOf(inv.orgName),
+                  size: 44,
+                  radius: 12,
+                  fontSize: 14,
+                  lime: false,
+                ),
+                title: inv.orgName,
+                subtitle: '${orgKindLabel(inv.orgKind)} · ${inv.roleName}',
+                pill: const StatusChip('Invited', tone: Tone.warn),
+                selected: false,
+                onTap: () => confirmAndAcceptInvite(inv),
+              ),
+            ),
+        ],
+        if (session.isTenant) ...[
+          const SizedBox(height: 12),
+          _Heading('Homes I rent', muted),
+          if (homes.length >= 2) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AccountDestCard(
+                badge: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: HodiColors.paper2,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.apartment_outlined,
+                    color: HodiColors.navy,
+                  ),
+                ),
+                title: 'All my homes',
+                subtitle: 'Tenant · ${homes.length} homes',
+                selected: mode == AppMode.tenant && chosenHome == null,
+                onTap: () => switchHome(tenantId: null, homeId: null),
+              ),
+            ),
+            for (final h in homes)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _AccountDestCard(
+                  badge: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: HodiColors.paper2,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.home_outlined,
+                      color: HodiColors.navy,
+                    ),
+                  ),
+                  title: h.name,
+                  subtitle: 'Tenant · ${h.orgName}',
+                  selected:
+                      mode == AppMode.tenant && chosenHome?.homeId == h.homeId,
+                  onTap: () =>
+                      switchHome(tenantId: h.tenantId, homeId: h.homeId),
+                ),
+              ),
+          ] else if (homes.length == 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AccountDestCard(
+                badge: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: HodiColors.paper2,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.home_outlined,
+                    color: HodiColors.navy,
+                  ),
+                ),
+                title: homes.first.name,
+                subtitle: 'Tenant · ${homes.first.orgName}',
+                selected: mode == AppMode.tenant,
+                onTap: () => switchHome(
+                  tenantId: homes.first.tenantId,
+                  homeId: homes.first.homeId,
+                ),
+              ),
+            )
+          else
+            for (final t in session.tenantOf)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _AccountDestCard(
+                  badge: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: HodiColors.paper2,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.home_outlined,
+                      color: HodiColors.navy,
+                    ),
+                  ),
+                  title: t.orgName,
+                  subtitle: 'Tenant · ${t.orgName}',
+                  selected:
+                      mode == AppMode.tenant && activeTenantId == t.tenantId,
+                  onTap: () => switchHome(tenantId: t.tenantId, homeId: null),
+                ),
+              ),
+        ],
+        if (session.isOwner) ...[
+          const SizedBox(height: 12),
+          _Heading('Landlord of', muted),
+          for (final o in session.ownerOf)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AccountDestCard(
+                badge: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: HodiColors.paper2,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.domain_outlined,
+                    color: HodiColors.navy,
+                  ),
+                ),
+                title: o.name,
+                subtitle: 'Landlord · ${o.orgName}',
+                selected:
+                    mode == AppMode.owner &&
+                    ref.watch(currentOwnerIdProvider) == o.landlordId,
+                onTap: () => switchOwner(o.landlordId),
+              ),
+            ),
+        ],
+        if (session.isPlatformOperator) ...[
+          const SizedBox(height: 12),
+          _Heading('Platform', muted),
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _AccountDestCard(
@@ -119,136 +393,9 @@ class AccountSheet extends ConsumerWidget {
                 tone: Tone.info,
               ),
               selected: mode == AppMode.platform,
-              onTap: () {
-                ref.read(appModeProvider.notifier).state = AppMode.platform;
-                Navigator.of(context).pop();
-              },
+              onTap: switchPlatform,
             ),
           ),
-        ],
-        if (session.organizations.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          _Heading('Work · Organisations', muted),
-          for (final o in session.organizations)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _AccountDestCard(
-                badge: InitialsBadge(
-                  name: _initialsOf(o.name),
-                  size: 44,
-                  radius: 12,
-                  fontSize: 14,
-                  lime: false,
-                ),
-                title: o.name,
-                subtitle: o.roleName,
-                pill: StatusChip(o.roleName, tone: Tone.good),
-                selected:
-                    (mode == AppMode.staff || mode == AppMode.host) &&
-                    session.activeOrganization?.id == o.id,
-                onTap: () => switchOrg(o.id, o.kind),
-              ),
-            ),
-        ],
-        if (session.isTenant) ...[
-          const SizedBox(height: 12),
-          _Heading('Home · Where I rent', muted),
-          if (session.tenantOf.length == 1)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _AccountDestCard(
-                badge: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: HodiColors.paper2,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.home_outlined,
-                    color: HodiColors.navy,
-                  ),
-                ),
-                title: 'My rent',
-                subtitle: session.tenantOf.first.orgName,
-                selected: mode == AppMode.tenant,
-                onTap: () {
-                  final tid = session.tenantOf.first.tenantId;
-                  ref.read(chosenTenantProvider.notifier).state = tid;
-                  ref
-                      .read(sessionProvider.notifier)
-                      .switchContext(tenantId: tid);
-                  ref.read(appModeProvider.notifier).state = AppMode.tenant;
-                  Navigator.of(context).pop();
-                },
-              ),
-            )
-          else
-            for (final t in session.tenantOf)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _AccountDestCard(
-                  badge: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: HodiColors.paper2,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.home_outlined,
-                      color: HodiColors.navy,
-                    ),
-                  ),
-                  title: t.orgName,
-                  subtitle: t.name,
-                  selected:
-                      mode == AppMode.tenant && activeTenantId == t.tenantId,
-                  onTap: () {
-                    ref.read(chosenTenantProvider.notifier).state = t.tenantId;
-                    ref
-                        .read(sessionProvider.notifier)
-                        .switchContext(tenantId: t.tenantId);
-                    ref.read(appModeProvider.notifier).state = AppMode.tenant;
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ),
-        ],
-        if (session.isOwner) ...[
-          const SizedBox(height: 12),
-          _Heading('Where I own property', muted),
-          for (final o in session.ownerOf)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _AccountDestCard(
-                badge: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: HodiColors.paper2,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.domain_outlined,
-                    color: HodiColors.navy,
-                  ),
-                ),
-                title: o.name,
-                subtitle: o.orgName,
-                selected:
-                    mode == AppMode.owner &&
-                    ref.watch(currentOwnerIdProvider) == o.landlordId,
-                onTap: () {
-                  ref.read(chosenOwnerProvider.notifier).state = o.landlordId;
-                  ref
-                      .read(sessionProvider.notifier)
-                      .switchContext(landlordId: o.landlordId);
-                  ref.read(appModeProvider.notifier).state = AppMode.owner;
-                  Navigator.of(context).pop();
-                },
-              ),
-            ),
         ],
         const SizedBox(height: 12),
         _Heading('Account & preferences', muted),
@@ -459,13 +606,13 @@ class _Heading extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
     child: Text(
-      text.toUpperCase(),
+      text,
       style: TextStyle(
         fontFamily: 'JetBrainsMono',
         color: color,
-        fontSize: 10.5,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
-        letterSpacing: 1.4,
+        letterSpacing: 0.6,
       ),
     ),
   );

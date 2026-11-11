@@ -32,6 +32,8 @@ model User {
   defaultPropertyId  String?       @db.Uuid
   defaultTenantId    String?       @db.Uuid
   defaultLandlordId  String?       @db.Uuid
+  defaultPlace       Place?
+  defaultHomeId      String?       @db.Uuid
   lastLoginAt        DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -47,6 +49,13 @@ model User {
 enum PlatformRole {
   SUPERADMIN
   SALESPERSON
+}
+
+enum Place {
+  STAFF
+  TENANT
+  OWNER
+  PLATFORM
 }
 
 enum UserStatus {

@@ -479,5 +479,492 @@ describe('Auth (e2e)', () => {
         })
         .expect(403);
     });
+
+    it('accepts my own pending invitation while signed in and switches into it', async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Makini Homes',
+        ownerEmail: OWNER_EMAIL,
+        ownerPhone: OWNER_PHONE,
+      });
+
+      const uzuri = (
+        await t
+          .http()
+          .post('/api/v1/platform/organizations')
+          .set(auth(admin))
+          .send({
+            name: 'Uzuri Stays',
+            kind: 'HOST',
+            phone: '0711000030',
+            email: 'uzuri30@example.invalid',
+            owner: {
+              firstName: 'Olive',
+              lastName: 'Owner',
+              email: OWNER_EMAIL,
+              phone: OWNER_PHONE,
+            },
+          })
+          .expect(201)
+      ).body.data;
+
+      const me = (await t.http().get('/api/v1/me').set(auth(owner)).expect(200)).body.data;
+      const membershipId: string = me.invitations[0].membershipId;
+
+      const res = await t
+        .http()
+        .post(`/api/v1/auth/memberships/${membershipId}/accept`)
+        .set(auth(owner))
+        .send({})
+        .expect(200);
+
+      expect(res.body.data.activeOrganization.id).toBe(uzuri.id);
+      expect(res.body.data.user.defaultPlace).toBe('STAFF');
+      expect(res.body.data.user.defaultOrgId).toBe(uzuri.id);
+      expect(res.body.data.invitations).toEqual([]);
+
+      const membership = await t.prisma.membership.findUniqueOrThrow({
+        where: { id: membershipId },
+      });
+      expect(membership.status).toBe('ACTIVE');
+      expect(membership.joinedAt).not.toBeNull();
+
+      const invRows = await t.prisma.invitation.findMany({ where: { membershipId } });
+      expect(invRows).toHaveLength(1);
+      expect(invRows[0]!.acceptedAt).not.toBeNull();
+
+      const audit = await t.prisma.auditLog.findFirst({
+        where: { action: 'user.invitation_accept', entityId: membershipId },
+      });
+      expect(audit).toMatchObject({
+        entity: 'membership',
+        orgId: uzuri.id,
+        actorId: owner.body.user.id,
+      });
+
+      const again = await t
+        .http()
+        .post(`/api/v1/auth/memberships/${membershipId}/accept`)
+        .set(auth(owner))
+        .send({})
+        .expect(410);
+      expect(again.body.error.code).toBe('INVITATION_INVALID');
+    });
+
+    it("refuses someone else's, an expired or a revoked invitation", async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Makini Homes',
+        ownerEmail: OWNER_EMAIL,
+        ownerPhone: OWNER_PHONE,
+      });
+
+      const otherOrg = (
+        await t
+          .http()
+          .post('/api/v1/platform/organizations')
+          .set(auth(admin))
+          .send({
+            name: 'Other Org',
+            kind: 'LANDLORD',
+            phone: '0711000031',
+            email: 'other31@example.invalid',
+            owner: {
+              firstName: 'Other',
+              lastName: 'Person',
+              email: 'other-owner@example.invalid',
+              phone: '+254700000031',
+            },
+          })
+          .expect(201)
+      ).body.data;
+      const otherMembership = await t.prisma.membership.findFirstOrThrow({
+        where: { orgId: otherOrg.id },
+      });
+
+      const expiredOrg = (
+        await t
+          .http()
+          .post('/api/v1/platform/organizations')
+          .set(auth(admin))
+          .send({
+            name: 'Expired Org',
+            kind: 'AGENCY',
+            phone: '0711000032',
+            email: 'expired32@example.invalid',
+            owner: {
+              firstName: 'Olive',
+              lastName: 'Owner',
+              email: OWNER_EMAIL,
+              phone: OWNER_PHONE,
+            },
+          })
+          .expect(201)
+      ).body.data;
+      const expiredMembership = await t.prisma.membership.findFirstOrThrow({
+        where: { orgId: expiredOrg.id },
+      });
+      await t.prisma.invitation.updateMany({
+        where: { membershipId: expiredMembership.id },
+        data: { expiresAt: new Date(Date.now() - 60_000) },
+      });
+
+      const revokedOrg = (
+        await t
+          .http()
+          .post('/api/v1/platform/organizations')
+          .set(auth(admin))
+          .send({
+            name: 'Revoked Org',
+            kind: 'HOST',
+            phone: '0711000033',
+            email: 'revoked33@example.invalid',
+            owner: {
+              firstName: 'Olive',
+              lastName: 'Owner',
+              email: OWNER_EMAIL,
+              phone: OWNER_PHONE,
+            },
+          })
+          .expect(201)
+      ).body.data;
+      const revokedMembership = await t.prisma.membership.findFirstOrThrow({
+        where: { orgId: revokedOrg.id },
+      });
+      await t.prisma.invitation.updateMany({
+        where: { membershipId: revokedMembership.id },
+        data: { revokedAt: new Date() },
+      });
+
+      await t
+        .http()
+        .post(`/api/v1/auth/memberships/${otherMembership.id}/accept`)
+        .set(auth(owner))
+        .send({})
+        .expect(404);
+
+      const expRes = await t
+        .http()
+        .post(`/api/v1/auth/memberships/${expiredMembership.id}/accept`)
+        .set(auth(owner))
+        .send({})
+        .expect(410);
+      expect(expRes.body.error.code).toBe('INVITATION_INVALID');
+
+      const revRes = await t
+        .http()
+        .post(`/api/v1/auth/memberships/${revokedMembership.id}/accept`)
+        .set(auth(owner))
+        .send({})
+        .expect(410);
+      expect(revRes.body.error.code).toBe('INVITATION_INVALID');
+
+      expect(
+        (await t.prisma.membership.findUniqueOrThrow({ where: { id: expiredMembership.id } }))
+          .status,
+      ).toBe('INVITED');
+      expect(
+        (await t.prisma.membership.findUniqueOrThrow({ where: { id: revokedMembership.id } }))
+          .status,
+      ).toBe('INVITED');
+    });
+  });
+
+  describe('remembered place', () => {
+    it('saves the place and home and returns them on the next sign-in (another device)', async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Makini Homes',
+        ownerEmail: OWNER_EMAIL,
+        ownerPhone: OWNER_PHONE,
+      });
+      const { owner: landlord } = await onboardOrg(t, admin, {
+        name: 'Baraka Estates',
+        ownerEmail: 'baraka@example.invalid',
+        ownerPhone: '+254700000004',
+      });
+      const prop = (
+        await t
+          .http()
+          .post('/api/v1/properties')
+          .set(auth(landlord))
+          .send({ name: 'Baraka Court', code: 'BAR' })
+          .expect(201)
+      ).body.data;
+      await t
+        .http()
+        .post('/api/v1/units/bulk')
+        .set(auth(landlord))
+        .send({ propertyId: prop.id, numbers: ['B1'], rentAmount: 2_000_000 })
+        .expect(201);
+      const units = (
+        await t.http().get(`/api/v1/units?propertyId=${prop.id}`).set(auth(landlord)).expect(200)
+      ).body.data;
+      const tenancy = (
+        await t
+          .http()
+          .post('/api/v1/tenancies')
+          .set(auth(landlord))
+          .send({
+            unitId: units[0].id,
+            tenant: {
+              firstName: 'Olive',
+              lastName: 'Owner',
+              phone: OWNER_PHONE,
+              email: OWNER_EMAIL,
+            },
+            startDate: '2026-11-01',
+            billingDay: 1,
+          })
+          .expect(201)
+      ).body.data;
+
+      const me = (await t.http().get('/api/v1/me').set(auth(owner)).expect(200)).body.data;
+      const tenantId: string = me.tenantOf[0].tenantId;
+
+      const switched = await t
+        .http()
+        .post('/api/v1/auth/switch-context')
+        .set(auth(owner))
+        .send({ tenantId, homeId: tenancy.id, place: 'TENANT' })
+        .expect(200);
+      expect(switched.body.data.user.defaultPlace).toBe('TENANT');
+      expect(switched.body.data.user.defaultHomeId).toBe(tenancy.id);
+
+      const secondDevice = await login(t, OWNER_EMAIL);
+      expect(secondDevice.body.user).toMatchObject({
+        defaultPlace: 'TENANT',
+        defaultHomeId: tenancy.id,
+      });
+
+      const allHomes = await t
+        .http()
+        .post('/api/v1/auth/switch-context')
+        .set(auth(owner))
+        .send({ tenantId: null, homeId: null, place: 'TENANT' })
+        .expect(200);
+      expect(allHomes.body.data.user).toMatchObject({
+        defaultPlace: 'TENANT',
+        defaultTenantId: null,
+        defaultHomeId: null,
+      });
+    });
+
+    it('refuses a place the person does not have', async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Makini Homes',
+        ownerEmail: OWNER_EMAIL,
+        ownerPhone: OWNER_PHONE,
+      });
+      const prop = (
+        await t
+          .http()
+          .post('/api/v1/properties')
+          .set(auth(owner))
+          .send({ name: 'Makini Court', code: 'MAK' })
+          .expect(201)
+      ).body.data;
+      await t
+        .http()
+        .post('/api/v1/units/bulk')
+        .set(auth(owner))
+        .send({ propertyId: prop.id, numbers: ['M1'], rentAmount: 1_500_000 })
+        .expect(201);
+      const units = (
+        await t.http().get(`/api/v1/units?propertyId=${prop.id}`).set(auth(owner)).expect(200)
+      ).body.data;
+      const someoneElseTenancy = (
+        await t
+          .http()
+          .post('/api/v1/tenancies')
+          .set(auth(owner))
+          .send({
+            unitId: units[0].id,
+            tenant: {
+              firstName: 'Sam',
+              lastName: 'Renter',
+              phone: '+254700000019',
+              email: 'sam@example.invalid',
+            },
+            startDate: '2026-11-01',
+            billingDay: 1,
+          })
+          .expect(201)
+      ).body.data;
+
+      await t
+        .http()
+        .post('/api/v1/auth/switch-context')
+        .set(auth(owner))
+        .send({ place: 'PLATFORM' })
+        .expect(404);
+      await t
+        .http()
+        .post('/api/v1/auth/switch-context')
+        .set(auth(owner))
+        .send({ place: 'TENANT' })
+        .expect(404);
+      await t
+        .http()
+        .post('/api/v1/auth/switch-context')
+        .set(auth(owner))
+        .send({ place: 'OWNER' })
+        .expect(404);
+      await t
+        .http()
+        .post('/api/v1/auth/switch-context')
+        .set(auth(owner))
+        .send({ homeId: someoneElseTenancy.id })
+        .expect(404);
+    });
+
+    it('a home must belong to the tenant account sent with it', async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Makini Homes',
+        ownerEmail: OWNER_EMAIL,
+        ownerPhone: OWNER_PHONE,
+      });
+      // The same person rents one home from each of two landlords: two tenant accounts.
+      const rentFrom = async (name: string, email: string, phone: string, code: string) => {
+        const { owner: landlord } = await onboardOrg(t, admin, {
+          name,
+          ownerEmail: email,
+          ownerPhone: phone,
+        });
+        const prop = (
+          await t
+            .http()
+            .post('/api/v1/properties')
+            .set(auth(landlord))
+            .send({ name: `${name} Court`, code })
+            .expect(201)
+        ).body.data;
+        await t
+          .http()
+          .post('/api/v1/units/bulk')
+          .set(auth(landlord))
+          .send({ propertyId: prop.id, numbers: [`${code}1`], rentAmount: 2_000_000 })
+          .expect(201);
+        const units = (
+          await t.http().get(`/api/v1/units?propertyId=${prop.id}`).set(auth(landlord)).expect(200)
+        ).body.data;
+        const created = (
+          await t
+            .http()
+            .post('/api/v1/tenancies')
+            .set(auth(landlord))
+            .send({
+              unitId: units[0].id,
+              tenant: {
+                firstName: 'Olive',
+                lastName: 'Owner',
+                phone: OWNER_PHONE,
+                email: OWNER_EMAIL,
+              },
+              startDate: '2026-11-01',
+              billingDay: 1,
+            })
+            .expect(201)
+        ).body.data as { id: string };
+        const row = await t.prisma.tenancy.findUniqueOrThrow({ where: { id: created.id } });
+        return { id: row.id, tenantId: row.tenantId };
+      };
+      const homeA = await rentFrom(
+        'Baraka Estates',
+        'baraka@example.invalid',
+        '+254700000004',
+        'BAR',
+      );
+      const homeB = await rentFrom(
+        'Tumaini Estates',
+        'tumaini@example.invalid',
+        '+254700000005',
+        'TUM',
+      );
+      expect(homeA.tenantId).not.toBe(homeB.tenantId);
+
+      const switchTo = (body: object) =>
+        t.http().post('/api/v1/auth/switch-context').set(auth(owner)).send(body);
+
+      // Mismatched pairs are refused and nothing is saved.
+      await switchTo({ tenantId: homeA.tenantId, homeId: homeB.id, place: 'TENANT' }).expect(404);
+      await switchTo({ tenantId: null, homeId: homeA.id, place: 'TENANT' }).expect(404);
+      const me = (await t.http().get('/api/v1/me').set(auth(owner)).expect(200)).body.data;
+      expect(me.user).toMatchObject({ defaultHomeId: null, defaultTenantId: null });
+
+      // A home alone brings its own tenant account with it.
+      const picked = (await switchTo({ homeId: homeB.id, place: 'TENANT' }).expect(200)).body.data;
+      expect(picked.activeTenantId).toBe(homeB.tenantId);
+      expect(picked.user).toMatchObject({
+        defaultHomeId: homeB.id,
+        defaultTenantId: homeB.tenantId,
+      });
+    });
+
+    it('lists pending invitations and omits accepted or expired ones', async () => {
+      const { owner } = await onboardOrg(t, admin, {
+        name: 'Makini Homes',
+        ownerEmail: OWNER_EMAIL,
+        ownerPhone: OWNER_PHONE,
+      });
+
+      const uzuri = (
+        await t
+          .http()
+          .post('/api/v1/platform/organizations')
+          .set(auth(admin))
+          .send({
+            name: 'Uzuri Stays',
+            kind: 'HOST',
+            phone: '0711000021',
+            email: 'uzuri-office@example.invalid',
+            owner: {
+              firstName: 'Olive',
+              lastName: 'Owner',
+              email: OWNER_EMAIL,
+              phone: OWNER_PHONE,
+            },
+          })
+          .expect(201)
+      ).body.data;
+      const uzuriToken = lastInviteToken(OWNER_EMAIL);
+
+      const expiredOrg = (
+        await t
+          .http()
+          .post('/api/v1/platform/organizations')
+          .set(auth(admin))
+          .send({
+            name: 'Expired Estates',
+            kind: 'AGENCY',
+            phone: '0711000022',
+            email: 'expired-office@example.invalid',
+            owner: {
+              firstName: 'Olive',
+              lastName: 'Owner',
+              email: OWNER_EMAIL,
+              phone: OWNER_PHONE,
+            },
+          })
+          .expect(201)
+      ).body.data;
+      await t.prisma.invitation.updateMany({
+        where: { orgId: expiredOrg.id },
+        data: { expiresAt: new Date(Date.now() - 60_000) },
+      });
+
+      const me = (await t.http().get('/api/v1/me').set(auth(owner)).expect(200)).body.data;
+      expect(me.invitations).toEqual([
+        {
+          membershipId: expect.any(String),
+          organization: { id: uzuri.id, name: 'Uzuri Stays', kind: 'HOST' },
+          roleName: 'Owner',
+        },
+      ]);
+
+      const accepted = await t
+        .http()
+        .post('/api/v1/auth/invitations/accept')
+        .send({ token: uzuriToken })
+        .expect(200);
+      expect(accepted.body.data.invitations).toEqual([]);
+    });
   });
 });

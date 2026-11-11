@@ -1,58 +1,50 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BuildingIcon, CheckIcon, HomeIcon, KeyIcon, MoonIcon, PersonIcon, ShieldIcon, SignOutIcon, SunIcon, SwitchIcon } from './icons';
+import { ChevronIcon, MoonIcon, PersonIcon, ShieldIcon, SignOutIcon, SunIcon } from './icons';
+import { WorkspaceGroupList } from './WorkspaceSwitcher';
+import type { WorkspaceGroup, WorkspaceRow } from './workspaces';
 import { initials } from '../lib/text';
 import { useTheme } from '../lib/theme';
-import type { OrganizationMembership } from '../lib/auth/types';
 
 /**
- * Who you are, and what you can do about it — ported from pos-react's AccountMenu.
+ * Who you are, and what you can do about it.
  *
- * Says whose account this is (a shared office computer may not belong to the person in
- * front of it) and in which organisation, carries the Appearance choice, the organisation
- * switcher (only for people in more than one), My account, and Sign out — the action you
- * want least often, so it is not a permanent button.
+ * Keeps who is signed in, Appearance, "Sales console" / "Platform admin" (for operators),
+ * My account, and Sign out. In the admin area (which has no sidebar switcher), also
+ * offers "Back to <name>" and the grouped workspace list.
  */
 export function AccountMenu({
   name,
   contact,
   role,
-  organizations,
-  listOrganizations = organizations.length > 1,
-  activeOrganizationId,
-  switchingTo,
-  onSwitch,
+  busy = false,
+  busyKey = null,
+  platformLabel = null,
+  onOpenPlatform,
+  backToLabel = null,
+  onBackTo,
+  workspaceGroups = [],
+  onChooseWorkspace,
   onSignOut,
-  ownerPortal = false,
-  tenantPortal = false,
-  platformAdmin = false,
-  platformLabel = 'Platform admin',
-  staffApp = false,
   accountPath = '/app/account',
 }: {
   name: string;
   /** Email or phone, whichever the account has. */
   contact: string | null;
   role: string | null;
-  organizations: OrganizationMembership[];
-  /** Show the organisation list (default: only when there are several to switch between). */
-  listOrganizations?: boolean;
-  activeOrganizationId: string | null;
-  /** The organisation a switch is in progress to. */
-  switchingTo: string | null;
-  onSwitch: (organizationId: string) => void;
+  busy?: boolean;
+  busyKey?: string | null;
+  /** "Platform admin" for superadmins, "Sales console" for salespeople, null otherwise. */
+  platformLabel?: string | null;
+  onOpenPlatform?: () => void;
+  /** In the admin area: "Back to <name>" for the remembered or first-available place. */
+  backToLabel?: string | null;
+  onBackTo?: () => void;
+  /** In the admin area: the same grouped workspace rows as the sidebar switcher. */
+  workspaceGroups?: readonly WorkspaceGroup[];
+  onChooseWorkspace?: (row: WorkspaceRow, closeMenu: () => void) => void;
   onSignOut: () => void;
-  /** The person is also a landlord of an agency: offer the owner portal (phase 6b). */
-  ownerPortal?: boolean;
-  /** The person is also a tenant somewhere: offer the tenant portal (phase 7). */
-  tenantPortal?: boolean;
-  /** A platform operator in the staff app: offer the admin area (phase 8). */
-  platformAdmin?: boolean;
-  /** What that link says: "Platform admin" for superadmins, "Sales console" for salespeople. */
-  platformLabel?: string;
-  /** In the admin area, for someone who is also staff somewhere: offer the staff app. */
-  staffApp?: boolean;
-  /** Where "My account" goes — the admin area has its own, for admins with no organisation; null hides it. */
+  /** Where "My account" goes — null hides it. */
   accountPath?: string | null;
 }) {
   const [open, setOpen] = useState(false);
@@ -97,63 +89,48 @@ export function AccountMenu({
             {role ? <span className="sh__menurole">{role}</span> : null}
           </div>
 
-          {listOrganizations && organizations.length > 0 ? (
-            <div className="sh__orgs" role="group" aria-label="Switch organisation">
-              <span className="sh__themelabel"><SwitchIcon /> {activeOrganizationId ? 'Organisation' : 'Your organisations'}</span>
-              {organizations.map((org) => {
-                const active = org.id === activeOrganizationId;
-                return (
-                  <button
-                    key={org.id}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={active}
-                    className={`sh__orgitem ${active ? 'is-on' : ''}`}
-                    disabled={switchingTo !== null}
-                    onClick={() => {
-                      if (active) return;
-                      onSwitch(org.id);
-                    }}
-                  >
-                    <span className="sh__orgname">
-                      <strong>{org.name}</strong>
-                      <span>{switchingTo === org.id ? 'Switching…' : org.roleName}</span>
-                    </span>
-                    {active ? <CheckIcon /> : null}
-                  </button>
-                );
-              })}
+          {backToLabel && onBackTo ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="sh__menuitem sh__menuitem--back"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                onBackTo();
+              }}
+            >
+              <ChevronIcon direction="left" />
+              {backToLabel}
+            </button>
+          ) : null}
+
+          {workspaceGroups.length > 0 && onChooseWorkspace ? (
+            <div className="sh__places">
+              <WorkspaceGroupList
+                groups={workspaceGroups}
+                busyKey={busyKey}
+                onChoose={(row) => onChooseWorkspace(row, () => setOpen(false))}
+              />
             </div>
           ) : null}
 
           <ThemeChoice />
 
-          {platformAdmin ? (
-            <Link className="sh__menuitem" role="menuitem" to="/admin" onClick={() => setOpen(false)}>
+          {platformLabel && onOpenPlatform ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="sh__menuitem"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                onOpenPlatform();
+              }}
+            >
               <ShieldIcon />
               {platformLabel}
-            </Link>
-          ) : null}
-
-          {staffApp ? (
-            <Link className="sh__menuitem" role="menuitem" to="/app" onClick={() => setOpen(false)}>
-              <BuildingIcon />
-              Staff app
-            </Link>
-          ) : null}
-
-          {ownerPortal ? (
-            <Link className="sh__menuitem" role="menuitem" to="/owner" onClick={() => setOpen(false)}>
-              <HomeIcon />
-              Owner portal
-            </Link>
-          ) : null}
-
-          {tenantPortal ? (
-            <Link className="sh__menuitem" role="menuitem" to="/tenant" onClick={() => setOpen(false)}>
-              <KeyIcon />
-              Tenant portal
-            </Link>
+            </button>
           ) : null}
 
           {accountPath ? (

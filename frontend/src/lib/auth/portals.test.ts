@@ -71,47 +71,147 @@ describe('platformLinkLabel', () => {
 });
 
 describe('menuPlaces', () => {
-  // Like a salesperson who owns a host organisation and rents a home somewhere.
+  // Like a salesperson who owns a host organisation and rents two homes somewhere.
+  const tenantWithHomes: TenantOf[] = [
+    {
+      tenantId: 't-1',
+      name: 'Test Person',
+      organization: { id: 'org-2', name: 'Ivory Breeze' },
+      units: [
+        { tenancyId: 'ty-1', unitNumber: 'G1', propertyName: 'Acacia Heights' },
+        { tenancyId: 'ty-2', unitNumber: 'B4', propertyName: 'Palm Gardens' },
+      ],
+    },
+  ];
+
   const salesTenant = toSession(
     payload({
-      user: { id: 'u-1', firstName: 'Test', lastName: 'Person', email: null, phone: '+254700000001', isPlatformAdmin: false, platformRole: 'SALESPERSON' },
+      user: {
+        id: 'u-1',
+        firstName: 'Test',
+        lastName: 'Person',
+        email: 'person@example.invalid',
+        phone: '+254700000001',
+        isPlatformAdmin: false,
+        platformRole: 'SALESPERSON',
+        defaultPlace: 'PLATFORM',
+        defaultHomeId: null,
+      },
       organizations: [membership],
       activeOrganization: { id: 'org-1', name: 'Sample Agency', kind: 'AGENCY', status: 'ACTIVE' },
-      tenantOf: tenants,
+      tenantOf: tenantWithHomes,
+      ownerOf: owners,
     }),
   );
 
-  it('from the tenant portal: every organisation, the sales console, never the tenant portal itself', () => {
-    expect(menuPlaces(salesTenant, 'tenant')).toEqual({
-      organizations: 'all',
-      staffApp: false,
-      ownerPortal: false,
-      tenantPortal: false,
-      platform: 'Sales console',
-    });
-  });
+  it('outside the admin area: hides organisations and portal links (the switcher owns those) and keeps only platform', () => {
+    for (const here of ['staff', 'tenant', 'owner'] as const) {
+      expect(menuPlaces(salesTenant, here)).toEqual({
+        organizations: 'none',
+        staffApp: false,
+        ownerPortal: false,
+        tenantPortal: false,
+        platform: 'Sales console',
+        backTo: null,
+        list: false,
+      });
+    }
 
-  it('from the staff app: the switcher only when there is somewhere else to go', () => {
-    expect(menuPlaces(salesTenant, 'staff')).toEqual({
-      organizations: 'several',
-      staffApp: false,
-      ownerPortal: false,
-      tenantPortal: true,
-      platform: 'Sales console',
-    });
-  });
-
-  it('from the admin area: the staff app and portals, never a link to the admin area itself', () => {
-    expect(menuPlaces(salesTenant, 'admin')).toMatchObject({ staffApp: true, tenantPortal: true, platform: null });
-  });
-
-  it('a plain tenant sees no organisations and no platform', () => {
     expect(menuPlaces(toSession(payload({ tenantOf: tenants })), 'tenant')).toEqual({
       organizations: 'none',
       staffApp: false,
       ownerPortal: false,
       tenantPortal: false,
       platform: null,
+      backTo: null,
+      list: false,
+    });
+  });
+
+  it('in the admin area: offers "Back to <name>" for the remembered place (with first-available fallback) and enables the full list', () => {
+    // Fallback when defaultPlace is PLATFORM -> active/first org
+    expect(menuPlaces(salesTenant, 'admin')).toEqual({
+      organizations: 'none',
+      staffApp: false,
+      ownerPortal: false,
+      tenantPortal: false,
+      platform: null,
+      backTo: {
+        label: 'Back to Sample Agency',
+        to: '/app',
+        place: 'STAFF',
+        organizationId: 'org-1',
+      },
+      list: true,
+    });
+
+    // Remembered specific home
+    const rememberedHome = toSession(
+      payload({
+        user: {
+          ...salesTenant.user,
+          defaultPlace: 'TENANT',
+          defaultHomeId: 'ty-2',
+        },
+        organizations: [membership],
+        activeOrganization: { id: 'org-1', name: 'Sample Agency', kind: 'AGENCY', status: 'ACTIVE' },
+        tenantOf: tenantWithHomes,
+      }),
+    );
+    expect(menuPlaces(rememberedHome, 'admin').backTo).toEqual({
+      label: 'Back to B4, Palm Gardens',
+      to: '/tenant',
+      place: 'TENANT',
+      tenantId: 't-1',
+      homeId: 'ty-2',
+    });
+
+    // Remembered landlord
+    const rememberedOwner = toSession(
+      payload({
+        user: {
+          ...salesTenant.user,
+          defaultPlace: 'OWNER',
+        },
+        organizations: [membership],
+        ownerOf: owners,
+      }),
+    );
+    expect(menuPlaces(rememberedOwner, 'admin').backTo).toEqual({
+      label: 'Back to Test Landlord',
+      to: '/owner?landlord=ll-1',
+      place: 'OWNER',
+      landlordId: 'll-1',
+    });
+
+    // Pure superadmin with no other places -> backTo is null, list is true
+    const pureOperator = toSession(
+      payload({
+        user: {
+          id: 'u-admin',
+          firstName: 'Admin',
+          lastName: 'User',
+          email: 'admin@example.invalid',
+          phone: null,
+          isPlatformAdmin: true,
+          platformRole: 'SUPERADMIN',
+        },
+      }),
+    );
+    expect(menuPlaces(pureOperator, 'admin')).toMatchObject({
+      platform: null,
+      backTo: null,
+      list: true,
+    });
+
+    // Entering /admin from /tenant (after setPlace('PLATFORM') sets defaultPlace='PLATFORM')
+    // still names the place the operator just left ("Back to All my homes").
+    expect(menuPlaces(salesTenant, 'admin', 'TENANT').backTo).toEqual({
+      label: 'Back to All my homes',
+      to: '/tenant',
+      place: 'TENANT',
+      tenantId: null,
+      homeId: null,
     });
   });
 });

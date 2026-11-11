@@ -3,16 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hodi/core/auth/session.dart';
 import 'package:hodi/core/auth/session_controller.dart';
+import 'package:hodi/core/auth/token_store.dart';
 import 'package:hodi/core/providers.dart';
 import 'package:hodi/core/router.dart';
 import 'package:hodi/core/theme.dart';
 import 'package:hodi/core/widgets/account_sheet.dart';
 
+import '../helpers/app_harness.dart';
 import '../helpers/fake_http.dart';
 
 Map<String, Object?> _hostSessionJson({
   bool tenant = false,
+  bool owner = false,
   String? platformRole,
+  List<Map<String, Object?>> invitations = const [],
+  String activeOrgId = 'org-host-1',
+  String activeOrgName = 'Diani Breezes',
+  String activeOrgKind = 'HOST',
 }) => {
   'accessToken': 'access-host',
   'accessTokenExpiresAt': '2026-11-06T12:00:00.000Z',
@@ -22,7 +29,7 @@ Map<String, Object?> _hostSessionJson({
     'firstName': 'Wanjiku',
     'lastName': 'Host',
     'email': 'wanjiku@example.invalid',
-    'phone': '+254712345678',
+    'phone': '+254700000012',
     'isPlatformAdmin': platformRole == 'SUPERADMIN',
     'platformRole': platformRole,
   },
@@ -34,11 +41,20 @@ Map<String, Object?> _hostSessionJson({
       'roleName': 'Owner',
       'isOwner': true,
     },
+    if (activeOrgId != 'org-host-1')
+      {
+        'id': activeOrgId,
+        'name': activeOrgName,
+        'kind': activeOrgKind,
+        'roleName': 'Caretaker',
+        'isOwner': false,
+      },
   ],
+  'invitations': invitations,
   'activeOrganization': {
-    'id': 'org-host-1',
-    'name': 'Diani Breezes',
-    'kind': 'HOST',
+    'id': activeOrgId,
+    'name': activeOrgName,
+    'kind': activeOrgKind,
     'status': 'ACTIVE',
   },
   'permissions': [
@@ -51,13 +67,28 @@ Map<String, Object?> _hostSessionJson({
     'site:view',
     'site:update',
   ],
-  'ownerOf': <Object?>[],
+  'ownerOf': owner
+      ? [
+          {
+            'landlordId': 'land-1',
+            'name': 'Wanjiku Landlord',
+            'organization': {'id': 'org-agency-1', 'name': 'Apex Agency'},
+          },
+        ]
+      : <Object?>[],
   'tenantOf': tenant
       ? [
           {
             'tenantId': 'ten-1',
             'name': 'Wanjiku Host',
             'organization': {'id': 'org-landlord-1', 'name': 'Kilimani Courts'},
+            'units': [
+              {
+                'tenancyId': 'ty-1',
+                'unitNumber': 'B4',
+                'propertyName': 'Palm Gardens',
+              },
+            ],
           },
         ]
       : <Object?>[],
@@ -118,6 +149,7 @@ void main() {
         ProviderScope(
           overrides: [
             apiClientProvider.overrideWithValue(fakeClient(adapter)),
+            tokenStoreProvider.overrideWithValue(MemoryTokenStore()),
             sessionProvider.overrideWith(
               () => _FixedSessionController(dualSession),
             ),
@@ -153,20 +185,26 @@ void main() {
       expect(capturedRef.read(modeProvider), AppMode.host);
       expect(find.text('MODE:host'), findsOneWidget);
 
-      // Open the mode switcher sheet: both the HOST org and tenant account are listed.
+      // Open the mode switcher sheet: group headings and per-home rows match spec.
       await tester.tap(find.text('Open switcher'));
       await tester.pumpAndSettle();
 
+      expect(find.text('Organisations'), findsOneWidget);
+      expect(find.text('Homes I rent'), findsOneWidget);
       expect(find.text('Diani Breezes'), findsOneWidget);
-      expect(find.text('My rent'), findsOneWidget);
-      expect(find.text('Kilimani Courts'), findsOneWidget);
+      expect(find.text('Short stays · Owner'), findsOneWidget);
+      expect(find.text('B4, Palm Gardens'), findsOneWidget);
+      expect(find.text('Tenant · Kilimani Courts'), findsOneWidget);
 
-      // Tap the tenant account to switch to tenant mode.
-      await tester.tap(find.text('My rent'));
+      // Tap the home to switch to tenant mode and save place + homeId.
+      await tester.tap(find.text('B4, Palm Gardens'));
       await tester.pumpAndSettle();
 
       expect(capturedRef.read(modeProvider), AppMode.tenant);
       expect(find.text('MODE:tenant'), findsOneWidget);
+      expect(adapter.calls.last.path, '/auth/switch-context');
+      expect((adapter.calls.last.body as Map)['place'], 'TENANT');
+      expect((adapter.calls.last.body as Map)['homeId'], 'ty-1');
 
       // Re-open the switcher and tap the HOST organisation to return to host mode.
       await tester.tap(find.text('Open switcher'));
@@ -176,6 +214,8 @@ void main() {
 
       expect(capturedRef.read(modeProvider), AppMode.host);
       expect(find.text('MODE:host'), findsOneWidget);
+      expect(adapter.calls.last.path, '/auth/switch-context');
+      expect((adapter.calls.last.body as Map)['place'], 'STAFF');
     },
   );
 
@@ -222,6 +262,7 @@ void main() {
         ProviderScope(
           overrides: [
             apiClientProvider.overrideWithValue(fakeClient(adapter)),
+            tokenStoreProvider.overrideWithValue(MemoryTokenStore()),
             sessionProvider.overrideWith(() => _FixedSessionController(s)),
           ],
           child: MaterialApp(
@@ -253,12 +294,192 @@ void main() {
       await tester.tap(find.text('KodiHub Platform'));
       await tester.pumpAndSettle();
       expect(capturedRef.read(modeProvider), AppMode.platform);
+      expect(adapter.calls.last.path, '/auth/switch-context');
+      expect((adapter.calls.last.body as Map)['place'], 'PLATFORM');
 
       await tester.tap(find.text('Open switcher'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Diani Breezes'));
       await tester.pumpAndSettle();
       expect(capturedRef.read(modeProvider), AppMode.host);
+    },
+  );
+
+  testWidgets(
+    'account sheet shows Invited tag, asks to confirm, and accepts invitation in place',
+    (tester) async {
+      final initialJson = _hostSessionJson(
+        invitations: [
+          {
+            'membershipId': 'mem-inv-1',
+            'organization': {
+              'id': 'org-land-2',
+              'name': 'Savannah Courts',
+              'kind': 'LANDLORD',
+            },
+            'roleName': 'Caretaker',
+          },
+        ],
+      );
+      final acceptedJson = _hostSessionJson(
+        activeOrgId: 'org-land-2',
+        activeOrgName: 'Savannah Courts',
+        activeOrgKind: 'LANDLORD',
+      );
+      final adapter = FakeAdapter(
+        (call) => switch (call.path) {
+          '/auth/memberships/mem-inv-1/accept' => (200, {'data': acceptedJson}),
+          _ => (404, null),
+        },
+      );
+
+      late WidgetRef capturedRef;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(fakeClient(adapter)),
+            tokenStoreProvider.overrideWithValue(MemoryTokenStore()),
+            sessionProvider.overrideWith(
+              () => _FixedSessionController(Session.fromJson(initialJson)),
+            ),
+          ],
+          child: MaterialApp(
+            theme: hodiTheme(Brightness.light),
+            home: Consumer(
+              builder: (context, ref, _) {
+                capturedRef = ref;
+                ref.watch(modeProvider);
+                return Scaffold(
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () => AccountSheet.show(context),
+                      child: const Text('Open switcher'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open switcher'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Savannah Courts'), findsOneWidget);
+      expect(find.text('Landlord · Caretaker'), findsOneWidget);
+      expect(find.text('Invited'), findsOneWidget);
+
+      await tapAndWait(
+        tester,
+        find.text('Savannah Courts'),
+        () => find.text('Join').evaluate().isNotEmpty,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Join Savannah Courts as Caretaker?'), findsOneWidget);
+      await tapAndWait(
+        tester,
+        find.text('Join'),
+        () => capturedRef.read(modeProvider) == AppMode.staff,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        adapter.calls.any(
+          (c) =>
+              c.method == 'POST' &&
+              c.path == '/auth/memberships/mem-inv-1/accept',
+        ),
+        isTrue,
+      );
+      expect(capturedRef.read(modeProvider), AppMode.staff);
+      expect(
+        capturedRef.read(sessionProvider).valueOrNull?.activeOrganization?.id,
+        'org-land-2',
+      );
+    },
+  );
+
+  testWidgets(
+    'account sheet shows All my homes with >=2 homes and Landlord of group',
+    (tester) async {
+      final json = _hostSessionJson(owner: true);
+      json['tenantOf'] = [
+        {
+          'tenantId': 'ten-1',
+          'name': 'Wanjiku Host',
+          'organization': {'id': 'org-landlord-1', 'name': 'Kilimani Courts'},
+          'units': [
+            {
+              'tenancyId': 'ty-1',
+              'unitNumber': 'G1',
+              'propertyName': 'Acacia Heights',
+            },
+            {
+              'tenancyId': 'ty-2',
+              'unitNumber': 'B4',
+              'propertyName': 'Palm Gardens',
+            },
+          ],
+        },
+      ];
+      final adapter = FakeAdapter((_) => (200, {'data': json}));
+      late WidgetRef capturedRef;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(fakeClient(adapter)),
+            tokenStoreProvider.overrideWithValue(MemoryTokenStore()),
+            sessionProvider.overrideWith(
+              () => _FixedSessionController(Session.fromJson(json)),
+            ),
+          ],
+          child: MaterialApp(
+            theme: hodiTheme(Brightness.light),
+            home: Consumer(
+              builder: (context, ref, _) {
+                capturedRef = ref;
+                ref.watch(modeProvider);
+                return Scaffold(
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () => AccountSheet.show(context),
+                      child: const Text('Open switcher'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Open switcher'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('All my homes'), findsOneWidget);
+      expect(find.text('Tenant · 2 homes'), findsOneWidget);
+      expect(find.text('G1, Acacia Heights'), findsOneWidget);
+      expect(find.text('B4, Palm Gardens'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('Wanjiku Landlord'),
+        150,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.text('Landlord of'), findsOneWidget);
+      expect(find.text('Wanjiku Landlord'), findsOneWidget);
+      expect(find.text('Landlord · Apex Agency'), findsOneWidget);
+
+      await tester.tap(find.text('Wanjiku Landlord'));
+      await tester.pumpAndSettle();
+      expect(capturedRef.read(modeProvider), AppMode.owner);
+      expect(adapter.calls.last.path, '/auth/switch-context');
+      expect((adapter.calls.last.body as Map)['place'], 'OWNER');
+      expect((adapter.calls.last.body as Map)['landlordId'], 'land-1');
     },
   );
 }

@@ -4,6 +4,8 @@
 
 export type PlatformRole = 'SUPERADMIN' | 'SALESPERSON';
 
+export type Place = 'STAFF' | 'TENANT' | 'OWNER' | 'PLATFORM';
+
 export interface SessionUser {
   id: string;
   firstName: string;
@@ -13,6 +15,12 @@ export interface SessionUser {
   isPlatformAdmin: boolean;
   platformRole?: PlatformRole | null;
   mustChangePassword?: boolean;
+  defaultOrgId?: string | null;
+  defaultPropertyId?: string | null;
+  defaultTenantId?: string | null;
+  defaultLandlordId?: string | null;
+  defaultPlace?: Place | null;
+  defaultHomeId?: string | null;
 }
 
 export interface AdminTwoFactorChallenge {
@@ -31,6 +39,12 @@ export interface OrganizationMembership {
   kind: OrgKind;
   roleName: string;
   isOwner: boolean;
+}
+
+export interface SessionInvitation {
+  membershipId: string;
+  organization: { id: string; name: string; kind: OrgKind };
+  roleName: string;
 }
 
 /**
@@ -64,10 +78,19 @@ export interface OwnerOf {
  * portal (`/tenant`) for it. One person may rent from several organisations, and may also
  * be staff or a landlord somewhere.
  */
+export interface TenantUnit {
+  tenancyId: string;
+  unitId?: string;
+  unitNumber: string;
+  propertyId?: string;
+  propertyName: string;
+}
+
 export interface TenantOf {
   tenantId: string;
   name: string;
   organization: { id: string; name: string };
+  units?: TenantUnit[];
 }
 
 export interface SessionProperty {
@@ -84,6 +107,7 @@ export interface SessionPayload {
   refreshToken?: string;
   user: SessionUser;
   organizations: OrganizationMembership[];
+  invitations?: SessionInvitation[];
   activeOrganization: ActiveOrganization | null;
   activePropertyId?: string | null;
   properties?: SessionProperty[];
@@ -100,6 +124,7 @@ export interface SessionPayload {
 export interface Session {
   user: SessionUser;
   organizations: OrganizationMembership[];
+  invitations: SessionInvitation[];
   activeOrganization: ActiveOrganization | null;
   activePropertyId: string | null;
   properties: SessionProperty[];

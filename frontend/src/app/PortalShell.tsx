@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { useRememberPlace } from '../lib/auth/lastPlace';
 import type { ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageBoundary } from '../components/ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 import { BrandLockup } from '../components/BrandMark';
 import { TopRouteProgress } from '../components/Loading';
 import { MoonIcon, SunIcon } from './icons';
 import { SessionAccountMenu } from './SessionAccountMenu';
-import { portalsOf } from '../lib/auth/portals';
-import { useSession } from '../lib/auth/useAuth';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { useTheme } from '../lib/theme';
 import { scrollEdges } from '../lib/scrollEdges';
 
@@ -27,10 +25,10 @@ export interface PortalAccount {
 export function PortalShell({
   portal,
   label,
-  orgName,
+  orgName = '',
   accountName,
-  accounts,
-  currentId,
+  accounts = [],
+  currentId = '',
   onSwitch,
   switchLabel = 'Account',
   tabs,
@@ -41,12 +39,12 @@ export function PortalShell({
   portal: 'owner' | 'tenant';
   /** Names the tab row, e.g. "Owner portal". */
   label: string;
-  orgName: string;
+  orgName?: string;
   accountName: string;
   /** Every account the person can switch between; a switcher shows when there are several. */
-  accounts: PortalAccount[];
-  currentId: string;
-  onSwitch: (id: string) => void;
+  accounts?: PortalAccount[];
+  currentId?: string;
+  onSwitch?: (id: string) => void;
   /** Names the switcher for screen readers, e.g. "Landlord". */
   switchLabel?: string;
   tabs: { to: string; label: string; end: boolean }[];
@@ -56,10 +54,7 @@ export function PortalShell({
   /** Handed to the pages through `useOutletContext`. */
   context: unknown;
 }) {
-  const session = useSession();
-  useRememberPlace(session.user.id, portal);
   const [theme, setTheme] = useTheme();
-  const places = portalsOf(session);
 
   useEffect(() => {
     document.title = `${accountName || label} · KodiHub`;
@@ -71,13 +66,21 @@ export function PortalShell({
     <div className={`ow ow--${portal}`}>
       <header className="ow__top">
         <div className="ow__who">
-          {portal === 'owner' ? <BrandLockup tone="navy" size="sm" /> : null}
-          <span className="ow__org">{orgName}</span>
-          {accounts.length > 1 ? (
-            <select className="ow__switch" aria-label={switchLabel} value={currentId} onChange={(e) => onSwitch(e.target.value)}>
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
-            </select>
-          ) : <strong className="ow__name">{accountName}</strong>}
+          {portal === 'owner' ? (
+            <>
+              <BrandLockup tone="navy" size="sm" />
+              <WorkspaceSwitcher here="owner" collapsed={false} />
+            </>
+          ) : (
+            <>
+              <span className="ow__org">{orgName}</span>
+              {accounts.length > 1 && onSwitch ? (
+                <select className="ow__switch" aria-label={switchLabel} value={currentId} onChange={(e) => onSwitch(e.target.value)}>
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+                </select>
+              ) : <strong className="ow__name">{accountName}</strong>}
+            </>
+          )}
         </div>
         <div className="ow__actions">
           <NotificationBell />
@@ -105,11 +108,6 @@ export function PortalShell({
           <span className="ow__powered">
             Powered by <BrandLockup tone="light" size="xs" />
           </span>
-        </span>
-        <span className="ow__places">
-          {places.staff ? <Link to="/app">Staff app</Link> : null}
-          {places.owner && portal !== 'owner' ? <Link to="/owner">Owner portal</Link> : null}
-          {places.tenant && portal !== 'tenant' ? <Link to="/tenant">Tenant portal</Link> : null}
         </span>
       </footer>
     </div>

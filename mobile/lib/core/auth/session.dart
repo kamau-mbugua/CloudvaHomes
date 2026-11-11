@@ -4,6 +4,7 @@ class Session {
     required this.accessToken,
     required this.user,
     required this.organizations,
+    this.invitations = const [],
     required this.activeOrganization,
     this.activePropertyId,
     this.properties = const [],
@@ -17,6 +18,7 @@ class Session {
   final String accessToken;
   final SessionUser user;
   final List<OrgMembership> organizations;
+  final List<OrgInvitation> invitations;
   final ActiveOrg? activeOrganization;
   final String? activePropertyId;
   final List<SessionProperty> properties;
@@ -52,6 +54,7 @@ class Session {
     accessToken: accessToken ?? this.accessToken,
     user: user,
     organizations: organizations,
+    invitations: invitations,
     activeOrganization: activeOrganization,
     activePropertyId: identical(activePropertyId, _keep)
         ? this.activePropertyId
@@ -76,6 +79,10 @@ class Session {
       organizations: [
         for (final o in (j['organizations'] as List? ?? const []))
           OrgMembership.fromJson(o as Map<String, dynamic>),
+      ],
+      invitations: [
+        for (final i in (j['invitations'] as List? ?? const []))
+          if (i is Map<String, dynamic>) OrgInvitation.fromJson(i),
       ],
       activeOrganization: active is Map<String, dynamic>
           ? ActiveOrg.fromJson(active)
@@ -141,6 +148,8 @@ class SessionUser {
     this.isPlatformAdmin = false,
     this.platformRole,
     this.mustChangePassword = false,
+    this.defaultPlace,
+    this.defaultHomeId,
   });
   final String id;
   final String firstName;
@@ -150,6 +159,8 @@ class SessionUser {
   final bool isPlatformAdmin;
   final String? platformRole;
   final bool mustChangePassword;
+  final String? defaultPlace;
+  final String? defaultHomeId;
 
   String get fullName => '$firstName $lastName';
   String get initials =>
@@ -165,6 +176,8 @@ class SessionUser {
     isPlatformAdmin: j['isPlatformAdmin'] == true,
     platformRole: j['platformRole'] as String?,
     mustChangePassword: j['mustChangePassword'] == true,
+    defaultPlace: j['defaultPlace'] as String?,
+    defaultHomeId: j['defaultHomeId'] as String?,
   );
 }
 
@@ -187,6 +200,32 @@ class OrgMembership {
   );
 }
 
+class OrgInvitation {
+  OrgInvitation({
+    required this.membershipId,
+    required this.orgId,
+    required this.orgName,
+    required this.orgKind,
+    required this.roleName,
+  });
+  final String membershipId;
+  final String orgId;
+  final String orgName;
+  final String orgKind;
+  final String roleName;
+
+  factory OrgInvitation.fromJson(Map<String, dynamic> j) {
+    final org = j['organization'] as Map;
+    return OrgInvitation(
+      membershipId: j['membershipId'] as String,
+      orgId: org['id'] as String,
+      orgName: org['name'] as String,
+      orgKind: org['kind'] as String? ?? 'LANDLORD',
+      roleName: j['roleName'] as String? ?? '',
+    );
+  }
+}
+
 /// `status` drives the Hodi bill banner: TRIAL, ACTIVE, GRACE, SUSPENDED, CLOSED.
 class ActiveOrg {
   ActiveOrg({
@@ -207,21 +246,55 @@ class ActiveOrg {
   );
 }
 
+class TenantUnitRef {
+  TenantUnitRef({
+    required this.tenancyId,
+    required this.unitNumber,
+    required this.propertyName,
+  });
+  final String tenancyId;
+  final String unitNumber;
+  final String propertyName;
+
+  String get label =>
+      [unitNumber, propertyName].where((s) => s.isNotEmpty).join(', ');
+
+  factory TenantUnitRef.fromJson(Map<String, dynamic> j) => TenantUnitRef(
+    tenancyId: j['tenancyId'] as String,
+    unitNumber: j['unitNumber'] as String? ?? '',
+    propertyName: j['propertyName'] as String? ?? '',
+  );
+}
+
 class TenantAccountRef {
   TenantAccountRef({
     required this.tenantId,
     required this.name,
     required this.orgName,
+    this.units = const [],
   });
   final String tenantId;
   final String name;
   final String orgName;
+  final List<TenantUnitRef> units;
   factory TenantAccountRef.fromJson(Map<String, dynamic> j) => TenantAccountRef(
     tenantId: j['tenantId'] as String,
     name: j['name'] as String,
     orgName: (j['organization'] as Map)['name'] as String,
+    units: [
+      for (final u in (j['units'] as List? ?? const []))
+        if (u is Map<String, dynamic>) TenantUnitRef.fromJson(u),
+    ],
   );
 }
+
+/// Maps `LANDLORD | AGENCY | HOST` to the user-facing kind label.
+String orgKindLabel(String kind) => switch (kind) {
+  'LANDLORD' => 'Landlord',
+  'AGENCY' => 'Agency',
+  'HOST' => 'Short stays',
+  _ => kind,
+};
 
 /// The operator's platform role in words ("Superadmin", "Salesperson"), or null.
 String? platformRoleLabel(SessionUser user) => switch (user.platformRole) {

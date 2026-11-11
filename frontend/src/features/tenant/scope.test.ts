@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ALL_HOMES,
   accountsInScope,
   homeOptions,
   legacyAccountScope,
   otherHomesOnAccount,
   resolveScope,
-  scopeStorageKey,
-  serializeScope,
 } from './scope';
 import type { ConsolidatedOverview, ConsolidatedTenancy } from './types';
 
@@ -49,17 +48,13 @@ describe('home switcher', () => {
     ]);
   });
 
-  it('restores a saved home, and falls back to all for an ended or unknown one', () => {
+  it('restores the server defaultHomeId when still lived in, and falls back to all for an ended or absent one', () => {
     const options = homeOptions(overview);
-    const saved = serializeScope({ kind: 'home', tenantId: 'acc2', tenancyId: 'ty3' });
-    expect(resolveScope(saved, options)).toEqual({ kind: 'home', tenantId: 'acc2', tenancyId: 'ty3' });
-    expect(resolveScope(serializeScope({ kind: 'home', tenantId: 'acc2', tenancyId: 'ty0' }), options)).toEqual({ kind: 'all' });
-    expect(resolveScope('not json', options)).toEqual({ kind: 'all' });
-    expect(resolveScope(null, options)).toEqual({ kind: 'all' });
-  });
-
-  it('keys the saved choice by person', () => {
-    expect(scopeStorageKey('u1')).toBe('kodihub:tenant-home:u1');
+    expect(resolveScope('ty3', options)).toEqual({ kind: 'home', tenantId: 'acc2', tenancyId: 'ty3' });
+    expect(resolveScope('ty0', options)).toEqual(ALL_HOMES);
+    expect(resolveScope('unknown', options)).toEqual(ALL_HOMES);
+    expect(resolveScope(null, options)).toEqual(ALL_HOMES);
+    expect(resolveScope(undefined, options)).toEqual(ALL_HOMES);
   });
 
   it('knows which landlord accounts a scope covers', () => {
