@@ -25,3 +25,6 @@ service-account*.json
 
 # Local file storage (receipts, meter photos)
 .storage/
+
+# Brainstorm mockups (superpowers visual companion)
+.superpowers/
