@@ -6,6 +6,7 @@ import { NoOrganizationPage } from '../features/auth/NoOrganizationPage';
 import { PortalChooserPage } from '../features/auth/PortalChooserPage';
 import { loginPath } from '../lib/auth/next';
 import { isPlatformOperator, isSuperAdmin, landingFor } from '../lib/auth/portals';
+import { homeFor, rememberedPlace } from '../lib/auth/lastPlace';
 import { hasPermission } from '../lib/auth/permissions';
 import type { OrgKind } from '../lib/auth/types';
 import { useAuthState } from '../lib/auth/useAuth';
@@ -35,6 +36,19 @@ export function RequireAuth({ children }: { children?: ReactNode }) {
   }
 
   return children ? <>{children}</> : <Outlet />;
+}
+
+/**
+ * The site root: signed in, back to the place the person was last in (staff app, sales
+ * console / admin area, or a portal); signed out, to the staff app, which asks them to sign in.
+ */
+export function HomeRedirect() {
+  const { status, session } = useAuthState();
+  if (status === 'loading') return <Splash />;
+  if (status === 'signedIn' && session) {
+    return <Navigate to={homeFor(session, rememberedPlace(session.user.id))} replace />;
+  }
+  return <Navigate to="/app" replace />;
 }
 
 /**

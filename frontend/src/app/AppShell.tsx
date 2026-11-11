@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useRememberPlace } from '../lib/auth/lastPlace';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { PageBoundary } from '../components/ErrorBoundary';
 import { composeTitle, usePageTitleOverride } from '../lib/pageTitle';
@@ -42,6 +43,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const [theme, setTheme] = useTheme();
   const session = useSession();
+  useRememberPlace(session.user.id, 'staff');
 
   const groups = useMemo(() => filterNav(ORG_NAV, session.permissions, session.activeOrganization?.kind), [session.permissions, session.activeOrganization?.kind]);
   const pages = useMemo(() => destinations(groups), [groups]);

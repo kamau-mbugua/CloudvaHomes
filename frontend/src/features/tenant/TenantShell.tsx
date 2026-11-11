@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useRememberPlace } from '../../lib/auth/lastPlace';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { PageBoundary } from '../../components/ErrorBoundary';
 import { CardSkeleton, TopRouteProgress } from '../../components/Loading';
@@ -27,6 +28,7 @@ const COLLAPSED_KEY = 'kodihub:tenant-menu-collapsed';
  */
 export function TenantShell() {
   const session = useSession();
+  useRememberPlace(session.user.id, 'tenant');
   const { pathname } = useLocation();
   const [theme, setTheme] = useTheme();
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) === '1');

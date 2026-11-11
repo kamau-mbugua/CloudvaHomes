@@ -62,6 +62,11 @@ abstract class TokenStore {
   Future<List<SavedCredential>> readSavedCredentials() async => const [];
   Future<void> saveCredential(SavedCredential credential) async {}
   Future<void> removeSavedCredential(String identifier) async {}
+
+  /// The workspace (staff, host, tenant, owner, platform) a user last chose on this device.
+  /// Kept across sign-out on purpose: signing in again goes back there.
+  Future<String?> readLastMode(String userId) async => null;
+  Future<void> writeLastMode(String userId, String mode) async {}
 }
 
 class SecureTokenStore extends TokenStore {
@@ -77,6 +82,24 @@ class SecureTokenStore extends TokenStore {
   static const _key = 'hodi.refreshToken';
   static const _savedCredentialsKey = 'hodi.savedCredentials';
   final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> readLastMode(String userId) async {
+    try {
+      return await _storage.read(key: 'hodi.lastMode.$userId');
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> writeLastMode(String userId, String mode) async {
+    try {
+      await _storage.write(key: 'hodi.lastMode.$userId', value: mode);
+    } on Object {
+      // Only a convenience: the default workspace still works.
+    }
+  }
 
   @override
   Future<String?> read() => _storage.read(key: _key);
@@ -160,6 +183,13 @@ class SecureTokenStore extends TokenStore {
 class MemoryTokenStore extends TokenStore {
   String? token;
   final List<SavedCredential> savedCredentials = [];
+  final Map<String, String> lastModes = {};
+
+  @override
+  Future<String?> readLastMode(String userId) async => lastModes[userId];
+  @override
+  Future<void> writeLastMode(String userId, String mode) async =>
+      lastModes[userId] = mode;
 
   @override
   Future<String?> read() async => token;

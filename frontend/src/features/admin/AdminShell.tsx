@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useRememberPlace } from '../../lib/auth/lastPlace';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { PageBoundary } from '../../components/ErrorBoundary';
 import { Sidebar } from '../../app/Sidebar';
@@ -28,6 +29,7 @@ export function AdminShell() {
   const navigate = useNavigate();
   const [theme, setTheme] = useTheme();
   const session = useSession();
+  useRememberPlace(session.user.id, 'admin');
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) === '1');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const superAdmin = isSuperAdmin(session.user);

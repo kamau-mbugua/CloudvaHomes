@@ -6,6 +6,7 @@ import { api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
 import { acceptSession } from '../../lib/auth/session';
 import { safeNext } from '../../lib/auth/next';
+import { homeFor, rememberedPlace } from '../../lib/auth/lastPlace';
 import { isOtpCode } from '../../lib/auth/passwordPolicy';
 import { useAuthState } from '../../lib/auth/useAuth';
 import type { AdminTwoFactorChallenge, SessionPayload } from '../../lib/auth/types';
@@ -41,8 +42,10 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [params] = useSearchParams();
-  const { status } = useAuthState();
-  const next = safeNext(params.get('next'));
+  const { status, session: current } = useAuthState();
+  // An explicit `next` (a deep link) wins; otherwise back to where they were last.
+  const askedFor = params.get('next');
+  const next = safeNext(askedFor);
   const handedOver = (location.state ?? {}) as LoginNotice;
 
   const [mode, setMode] = useState<Mode>('password');
@@ -57,8 +60,8 @@ export function LoginPage() {
   const appConfig = useAppConfig();
 
   const finish = (payload: SessionPayload) => {
-    acceptSession(payload);
-    navigate(next, { replace: true });
+    const session = acceptSession(payload);
+    navigate(askedFor ? next : homeFor(session, rememberedPlace(session.user.id)), { replace: true });
   };
 
   const login = useMutation({
@@ -98,7 +101,9 @@ export function LoginPage() {
   });
 
   // Already signed in (a restored session, or the back button after signing in).
-  if (status === 'signedIn') return <Navigate to={next} replace />;
+  if (status === 'signedIn') {
+    return <Navigate to={askedFor || !current ? next : homeFor(current, rememberedPlace(current.user.id))} replace />;
+  }
   if (status === 'loading') return <Splash />;
 
   const submitPassword = (event: FormEvent) => {

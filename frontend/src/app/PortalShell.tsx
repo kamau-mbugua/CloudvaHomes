@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useRememberPlace } from '../lib/auth/lastPlace';
 import type { ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageBoundary } from '../components/ErrorBoundary';
@@ -56,6 +57,7 @@ export function PortalShell({
   context: unknown;
 }) {
   const session = useSession();
+  useRememberPlace(session.user.id, portal);
   const [theme, setTheme] = useTheme();
   const places = portalsOf(session);
 

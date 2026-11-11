@@ -210,6 +210,34 @@ void main() {
     );
 
     test(
+      'signing in again returns to the workspace chosen last (a salesperson back on the platform)',
+      () async {
+        final json = sessionJson(staff: true);
+        (json['user'] as Map<String, dynamic>)['platformRole'] = 'SALESPERSON';
+        adapter = FakeAdapter(
+          (call) => switch (call.path) {
+            '/auth/login' => (200, {'data': json}),
+            '/auth/logout' => (204, null),
+            _ => (404, null),
+          },
+        );
+        c = make();
+        await c.read(sessionProvider.future);
+        final auth = c.read(sessionProvider.notifier);
+        await auth.signInWithPassword('owner@example.invalid', 'pw');
+        expect(c.read(modeProvider), AppMode.staff);
+
+        c.read(appModeProvider.notifier).state = AppMode.platform;
+        await Future<void>.delayed(Duration.zero);
+        await auth.signOut();
+        expect(c.read(modeProvider), isNull);
+
+        await auth.signInWithPassword('owner@example.invalid', 'pw');
+        expect(c.read(modeProvider), AppMode.platform);
+      },
+    );
+
+    test(
       'registers FCM push device token on sign-in and unregisters on sign-out',
       () async {
         adapter = FakeAdapter(

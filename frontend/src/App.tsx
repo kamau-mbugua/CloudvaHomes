@@ -6,7 +6,7 @@ import { ToastProvider } from './components/Toast';
 import { RouteDrawer, WithRouteDrawer } from './components/RouteDrawer';
 import { AppShell } from './app/AppShell';
 import { UpdatePrompt } from './app/UpdatePrompt';
-import { RequireAdmin, RequireAuth, RequireOwner, RequirePermission, RequireSuperAdmin, RequireTenant } from './app/guards';
+import { HomeRedirect, RequireAdmin, RequireAuth, RequireOwner, RequirePermission, RequireSuperAdmin, RequireTenant } from './app/guards';
 import { NotFoundPage, PlaceholderPage } from './app/PlaceholderPage';
 import { ORG_NAV, destinations } from './app/navigation';
 import { LoginPage } from './features/auth/LoginPage';
@@ -193,7 +193,7 @@ export default function App() {
           <StepUpProvider>
             <Suspense fallback={<div className="p-8 text-sm text-slate-500">Loading…</div>}>
             <Routes>
-              <Route path="/" element={<Navigate to="/app" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />

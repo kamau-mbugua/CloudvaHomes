@@ -45,6 +45,13 @@ class SessionController extends AsyncNotifier<Session?> {
       ..onRefresh = _refresh
       ..onAuthLost = _lost
       ..onSuspended = () => reload();
+    // Remember the workspace the person picks, so signing in again returns to it.
+    ref.listen<AppMode?>(appModeProvider, (_, mode) {
+      final userId = state.valueOrNull?.user.id;
+      if (mode != null && userId != null) {
+        _store.writeLastMode(userId, mode.name);
+      }
+    });
     final token = await _store.read();
     if (token == null) return null;
     try {
@@ -77,6 +84,15 @@ class SessionController extends AsyncNotifier<Session?> {
     }
   }
 
+  /// Back to the workspace this user chose last on this device (effectiveMode ignores it
+  /// if they no longer have it). Only when nothing is chosen yet in this run of the app.
+  Future<void> _restoreLastMode(String userId) async {
+    if (ref.read(appModeProvider) != null) return;
+    final saved = await _store.readLastMode(userId);
+    final mode = AppMode.values.where((m) => m.name == saved).firstOrNull;
+    if (mode != null) ref.read(appModeProvider.notifier).state = mode;
+  }
+
   void _lost() {
     _store.clear();
     _api.accessToken = null;
@@ -88,6 +104,7 @@ class SessionController extends AsyncNotifier<Session?> {
     if (refresh is String) await _store.write(refresh);
     final session = Session.fromJson(data);
     _api.accessToken = session.accessToken;
+    await _restoreLastMode(session.user.id);
     await ref.read(pushNotificationsServiceProvider).registerCurrentDevice();
     return session;
   }
