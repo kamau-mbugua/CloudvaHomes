@@ -28,6 +28,8 @@ import {
   resolveEmailTemplate,
 } from '../notifications/email-templates.js';
 import {
+  EMAIL_LOG_BODY_CONTEXT,
+  EMAIL_LOG_SECRET_CONTEXT,
   isForbiddenSmtpHost,
   NotificationsService,
   SMTP_PASS_CONTEXT,
@@ -974,11 +976,71 @@ export class PlatformAdminService {
           status: r.status,
           error: r.error,
           triggeredBy: r.triggeredById ? (actorById.get(r.triggeredById) ?? null) : null,
+          canOpen: r.bodyEnc !== null,
+          hasSecret: r.secretEnc !== null,
           createdAt: r.createdAt,
         })),
         total,
         q,
       );
+    });
+  }
+
+  /**
+   * One logged email as it was sent, with any secret (code, invitation link, temporary password)
+   * still blanked out. Emails logged before bodies were kept come back with `text: null`.
+   */
+  emailLog(id: string) {
+    return withoutOrgScope(async () => {
+      const r = await this.db.platformEmailLog.findUnique({ where: { id } });
+      if (!r) throw AppError.notFound('Email');
+      const actor = r.triggeredById
+        ? await this.db.user.findUnique({
+            where: { id: r.triggeredById },
+            select: { id: true, firstName: true, lastName: true, email: true },
+          })
+        : null;
+      return {
+        id: r.id,
+        to: r.to,
+        subject: r.subject,
+        kind: r.kind,
+        status: r.status,
+        error: r.error,
+        triggeredBy: actor,
+        createdAt: r.createdAt,
+        text: r.bodyEnc ? this.cipher.decrypt(r.bodyEnc, EMAIL_LOG_BODY_CONTEXT) : null,
+        secret: r.secretEnc ? { label: r.secretLabel ?? 'Secret', hidden: true } : null,
+      };
+    });
+  }
+
+  /**
+   * The secret in a logged email, for a superadmin helping someone whose email never arrived.
+   * Always audited with the reason given — never with the secret itself.
+   */
+  revealEmailSecret(id: string, reason: string) {
+    return withoutOrgScope(async () => {
+      const r = await this.db.platformEmailLog.findUnique({ where: { id } });
+      if (!r) throw AppError.notFound('Email');
+      if (!r.secretEnc)
+        throw AppError.conflict('This email has nothing hidden to reveal', 'NO_SECRET');
+      const secret = this.cipher.decrypt(r.secretEnc, EMAIL_LOG_SECRET_CONTEXT);
+      await this.audit.record({
+        action: 'platform.email_secret_reveal',
+        entity: 'platform_email_log',
+        entityId: r.id,
+        orgId: null,
+        after: {
+          reason,
+          to: r.to,
+          kind: r.kind,
+          subject: r.subject,
+          secretLabel: r.secretLabel,
+          sentAt: r.createdAt.toISOString(),
+        },
+      });
+      return { label: r.secretLabel ?? 'Secret', secret };
     });
   }
 

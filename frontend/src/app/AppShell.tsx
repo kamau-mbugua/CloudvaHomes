@@ -4,7 +4,7 @@ import { PageBoundary } from '../components/ErrorBoundary';
 import { composeTitle, usePageTitleOverride } from '../lib/pageTitle';
 import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';
-import { AccountMenu } from './AccountMenu';
+import { SessionAccountMenu } from './SessionAccountMenu';
 import { CommandPalette } from './CommandPalette';
 import { NotificationBell } from './NotificationBell';
 import { TopRouteProgress } from '../components/Loading';
@@ -12,12 +12,9 @@ import { MenuIcon, MoonIcon, SunIcon } from './icons';
 import { ACCOUNT_ENTRY, ORG_NAV, bestEntry, destinations, filterNav, hintFor, matchScore } from './navigation';
 import { readStored, writeStored } from '../lib/storage';
 import { useTheme } from '../lib/theme';
-import { ApiError, ORG_SUSPENDED, errorMessage } from '../lib/api/client';
-import { displayName } from '../lib/auth/permissions';
-import { isPlatformOperator, platformLinkLabel } from '../lib/auth/portals';
-import { logout, reloadSessionDetails, switchOrganization } from '../lib/auth/session';
+import { ApiError, ORG_SUSPENDED } from '../lib/api/client';
+import { reloadSessionDetails } from '../lib/auth/session';
 import { useSession } from '../lib/auth/useAuth';
-import { useToast } from '../lib/useToast';
 import { useUnmatchedCount } from '../features/mpesa/api';
 import { BillingBanner } from '../features/platform/BillingBanner';
 import { SmsBanner } from '../features/sms/SmsBanner';
@@ -45,8 +42,6 @@ export function AppShell() {
   const navigate = useNavigate();
   const [theme, setTheme] = useTheme();
   const session = useSession();
-  const toast = useToast();
-  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
 
   const groups = useMemo(() => filterNav(ORG_NAV, session.permissions, session.activeOrganization?.kind), [session.permissions, session.activeOrganization?.kind]);
   const pages = useMemo(() => destinations(groups), [groups]);
@@ -117,23 +112,7 @@ export function AppShell() {
     });
   };
 
-  const signOut = async () => {
-    await logout();
-    navigate('/login', { replace: true });
-  };
 
-  const switchTo = async (organizationId: string) => {
-    setSwitchingTo(organizationId);
-    try {
-      const next = await switchOrganization(organizationId);
-      navigate('/app', { replace: true });
-      toast.saved(`Switched to ${next.activeOrganization?.name ?? 'the organisation'}.`);
-    } catch (caught) {
-      toast.failed(errorMessage(caught));
-    } finally {
-      setSwitchingTo(null);
-    }
-  };
 
   const org = session.activeOrganization;
   const membership = session.organizations.find((m) => m.id === org?.id);
@@ -196,20 +175,7 @@ export function AppShell() {
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
             </button>
 
-            <AccountMenu
-              name={displayName(session.user)}
-              contact={session.user.email ?? session.user.phone}
-              role={membership?.roleName ?? null}
-              organizations={session.organizations}
-              activeOrganizationId={org?.id ?? null}
-              switchingTo={switchingTo}
-              onSwitch={switchTo}
-              onSignOut={signOut}
-              ownerPortal={session.ownerOf.length > 0}
-              tenantPortal={session.tenantOf.length > 0}
-              platformAdmin={isPlatformOperator(session.user)}
-              platformLabel={platformLinkLabel(session.user) ?? undefined}
-            />
+            <SessionAccountMenu here="staff" role={membership?.roleName ?? null} accountPath="/app/account" />
           </div>
           <TopRouteProgress />
         </header>

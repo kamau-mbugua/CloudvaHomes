@@ -352,7 +352,23 @@ export interface PlatformEmailLog {
   status: 'SENT' | 'FAILED';
   error: string | null;
   triggeredBy?: { id: string; firstName: string; lastName: string; email: string | null } | null;
+  /** The text was kept (emails logged before that can't be opened). */
+  canOpen?: boolean;
+  /** A code, invitation link or temporary password is hidden in it. */
+  hasSecret?: boolean;
   createdAt: string;
+}
+
+/** `GET /platform/email/logs/:id`: the email as sent, with any secret blanked out. */
+export interface PlatformEmailLogDetail extends PlatformEmailLog {
+  text: string | null;
+  secret: { label: string; hidden: true } | null;
+}
+
+/** `POST /platform/email/logs/:id/reveal`: the hidden value, after a reason (audited). */
+export interface PlatformEmailSecret {
+  label: string;
+  secret: string;
 }
 
 export interface PlatformEmailTemplateVariable {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { landingFor, pickTenantAccount, platformLinkLabel, portalsOf } from './portals';
+import { landingFor, menuPlaces, pickTenantAccount, platformLinkLabel, portalsOf } from './portals';
 import { toSession } from './session';
 import type { OwnerOf, SessionPayload, TenantOf } from './types';
 
@@ -67,5 +67,51 @@ describe('platformLinkLabel', () => {
     expect(platformLinkLabel({ isPlatformAdmin: false, platformRole: 'SALESPERSON' })).toBe('Sales console');
     expect(platformLinkLabel({ isPlatformAdmin: true, platformRole: 'SUPERADMIN' })).toBe('Platform admin');
     expect(platformLinkLabel({ isPlatformAdmin: false, platformRole: null })).toBeNull();
+  });
+});
+
+describe('menuPlaces', () => {
+  // Like a salesperson who owns a host organisation and rents a home somewhere.
+  const salesTenant = toSession(
+    payload({
+      user: { id: 'u-1', firstName: 'Test', lastName: 'Person', email: null, phone: '+254700000001', isPlatformAdmin: false, platformRole: 'SALESPERSON' },
+      organizations: [membership],
+      activeOrganization: { id: 'org-1', name: 'Sample Agency', kind: 'AGENCY', status: 'ACTIVE' },
+      tenantOf: tenants,
+    }),
+  );
+
+  it('from the tenant portal: every organisation, the sales console, never the tenant portal itself', () => {
+    expect(menuPlaces(salesTenant, 'tenant')).toEqual({
+      organizations: 'all',
+      staffApp: false,
+      ownerPortal: false,
+      tenantPortal: false,
+      platform: 'Sales console',
+    });
+  });
+
+  it('from the staff app: the switcher only when there is somewhere else to go', () => {
+    expect(menuPlaces(salesTenant, 'staff')).toEqual({
+      organizations: 'several',
+      staffApp: false,
+      ownerPortal: false,
+      tenantPortal: true,
+      platform: 'Sales console',
+    });
+  });
+
+  it('from the admin area: the staff app and portals, never a link to the admin area itself', () => {
+    expect(menuPlaces(salesTenant, 'admin')).toMatchObject({ staffApp: true, tenantPortal: true, platform: null });
+  });
+
+  it('a plain tenant sees no organisations and no platform', () => {
+    expect(menuPlaces(toSession(payload({ tenantOf: tenants })), 'tenant')).toEqual({
+      organizations: 'none',
+      staffApp: false,
+      ownerPortal: false,
+      tenantPortal: false,
+      platform: null,
+    });
   });
 });

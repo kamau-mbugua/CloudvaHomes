@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { PageBoundary } from '../components/ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 import { BrandLockup } from '../components/BrandMark';
 import { TopRouteProgress } from '../components/Loading';
-import { MoonIcon, SignOutIcon, SunIcon } from './icons';
+import { MoonIcon, SunIcon } from './icons';
+import { SessionAccountMenu } from './SessionAccountMenu';
 import { portalsOf } from '../lib/auth/portals';
-import { logout } from '../lib/auth/session';
 import { useSession } from '../lib/auth/useAuth';
 import { useTheme } from '../lib/theme';
 import { scrollEdges } from '../lib/scrollEdges';
@@ -56,20 +56,12 @@ export function PortalShell({
   context: unknown;
 }) {
   const session = useSession();
-  const navigate = useNavigate();
   const [theme, setTheme] = useTheme();
-  const [signingOut, setSigningOut] = useState(false);
   const places = portalsOf(session);
 
   useEffect(() => {
     document.title = `${accountName || label} · KodiHub`;
   }, [accountName, label]);
-
-  const signOut = async () => {
-    setSigningOut(true);
-    await logout();
-    navigate('/login', { replace: true });
-  };
 
   const nextTheme = theme === 'dark' ? 'light' : 'dark';
 
@@ -90,9 +82,7 @@ export function PortalShell({
           <button type="button" className="sh__icon" onClick={() => setTheme(nextTheme)} aria-label={`Switch to ${nextTheme} theme`} title={`Switch to ${nextTheme} theme`}>
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
-          <button type="button" className="ow__signout" onClick={signOut} disabled={signingOut} aria-label="Sign out">
-            <SignOutIcon /> <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
-          </button>
+          <SessionAccountMenu here={portal} role={portal === 'owner' ? 'Landlord' : 'Tenant'} accountPath={null} />
         </div>
         <TopRouteProgress />
       </header>

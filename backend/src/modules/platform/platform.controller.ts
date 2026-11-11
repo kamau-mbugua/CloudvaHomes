@@ -46,6 +46,7 @@ import {
   CreatePlanDto,
   InvoicesReportQueryDto,
   ListEmailLogsQueryDto,
+  RevealEmailSecretDto,
   ListOrgsQueryDto,
   ListPlatformInvoicesDto,
   ListPlatformPaymentsDto,
@@ -413,6 +414,24 @@ export class PlatformController {
   @PlatformAdminOnly()
   async emailLogs(@Query() q: ListEmailLogsQueryDto) {
     return this.admin.emailLogs(q);
+  }
+
+  /** One logged email as sent, with any code, invitation link or temporary password hidden. */
+  @Get('email/logs/:id')
+  @PlatformAdminOnly()
+  async emailLog(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.admin.emailLog(id));
+  }
+
+  /** The hidden code/link/password of a logged email; needs a reason, which is audited. */
+  @Post('email/logs/:id/reveal')
+  @PlatformAdminOnly()
+  @HttpCode(200)
+  async revealEmailSecret(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RevealEmailSecretDto,
+  ) {
+    return ok(await this.admin.revealEmailSecret(id, dto.reason));
   }
 
   @Get('email/templates')

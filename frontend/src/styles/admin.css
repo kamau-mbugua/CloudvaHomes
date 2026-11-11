@@ -218,3 +218,21 @@
 th.num .sorth { flex-direction: row-reverse; }
 .tn__credit { color: var(--success); font-weight: 500; }
 .ad__toolbar-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+
+/* ---- a logged email, opened (features/admin/EmailLogSheet) ---- */
+.ad__emailbody {
+  margin: 16px 0 0; padding: 14px 16px; max-height: 50vh; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font: inherit; font-size: 13.5px; line-height: 1.55;
+  background: var(--secondary); border: 1px solid var(--border); border-radius: 10px;
+}
+.ad__secret {
+  display: grid; gap: 10px; margin-top: 16px; padding: 14px 16px;
+  border: 1px dashed var(--border); border-radius: 10px;
+}
+.ad__secret p { margin: 0; }
+.ad__secretrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ad__secretvalue {
+  font-family: var(--font-figures); font-size: 18px; letter-spacing: 0.08em;
+  overflow-wrap: anywhere; user-select: all;
+}

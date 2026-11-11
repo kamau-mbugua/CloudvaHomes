@@ -178,6 +178,17 @@ export function isAllowedByAllowlist(
   });
 }
 
+/** A secret inside an email (code, invitation link, temporary password) and what to call it. */
+export interface EmailSecret {
+  value: string;
+  label: string;
+}
+
+/** What a secret looks like in a logged email body. */
+export const HIDDEN_SECRET = '••••••';
+export const EMAIL_LOG_BODY_CONTEXT = 'platform-email-log:body';
+export const EMAIL_LOG_SECRET_CONTEXT = 'platform-email-log:secret';
+
 /**
  * Account messages (codes, invitations). Phase 1 sends synchronously; moving to Cloud Tasks
  * later only changes this class. Wording stays short: SMS over 160 characters costs double.
@@ -242,6 +253,7 @@ export class NotificationsService {
           this.dispatchEmail(
             { to: emailAddr, subject: rendered.subject, text: rendered.text },
             kind,
+            { value: code, label: 'Code' },
           ),
         ),
       );
@@ -328,6 +340,7 @@ export class NotificationsService {
               text: rendered.text,
             },
             'invitation',
+            { value: link, label: 'Invitation link' },
           ),
         );
       } else {
@@ -345,6 +358,7 @@ export class NotificationsService {
               text: rendered.text,
             },
             'invitation',
+            { value: link, label: 'Invitation link' },
           ),
         );
       }
@@ -686,7 +700,15 @@ export class NotificationsService {
 
     const tasks: Promise<void>[] = [];
     if (to.email) {
-      tasks.push(this.dispatchEmail({ to: to.email, subject, text: emailBody }, 'invitation'));
+      tasks.push(
+        this.dispatchEmail(
+          { to: to.email, subject, text: emailBody },
+          'invitation',
+          p.temporaryPassword
+            ? { value: p.temporaryPassword, label: 'Temporary password' }
+            : undefined,
+        ),
+      );
     }
     if (to.phone) {
       tasks.push(
@@ -797,8 +819,13 @@ export class NotificationsService {
     }
   }
 
-  private async dispatchEmail(m: EmailMessage, kind: string): Promise<void> {
+  /**
+   * `secret` is a code, invitation link or temporary password inside the text. The log keeps the
+   * text with it blanked out and the secret encrypted apart, for a superadmin to reveal with a reason.
+   */
+  private async dispatchEmail(m: EmailMessage, kind: string, secret?: EmailSecret): Promise<void> {
     const triggeredById = currentContext()?.userId ?? null;
+    const stored = this.storedEmailBody(m.text, secret);
     const settings = this.prisma
       ? await this.prisma.platformSettings.findUnique({ where: { id: 1 } })
       : null;
@@ -812,6 +839,7 @@ export class NotificationsService {
         status: 'FAILED',
         error,
         triggeredById,
+        ...stored,
       });
       throw new Error(error);
     }
@@ -867,6 +895,7 @@ export class NotificationsService {
         status: 'SENT',
         error: null,
         triggeredById,
+        ...stored,
       });
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
@@ -877,8 +906,37 @@ export class NotificationsService {
         status: 'FAILED',
         error,
         triggeredById,
+        ...stored,
       });
       throw e;
+    }
+  }
+
+  /** The body to keep in the email log: encrypted, with the secret blanked out and kept apart. */
+  private storedEmailBody(
+    text: string,
+    secret?: EmailSecret,
+  ): {
+    bodyEnc?: Uint8Array<ArrayBuffer>;
+    secretEnc?: Uint8Array<ArrayBuffer>;
+    secretLabel?: string;
+  } {
+    if (!this.cipher) return {};
+    try {
+      const value = secret?.value;
+      const hidden = value ? text.split(value).join(HIDDEN_SECRET) : text;
+      return {
+        bodyEnc: this.cipher.encrypt(hidden, EMAIL_LOG_BODY_CONTEXT),
+        ...(value
+          ? {
+              secretEnc: this.cipher.encrypt(value, EMAIL_LOG_SECRET_CONTEXT),
+              secretLabel: secret.label,
+            }
+          : {}),
+      };
+    } catch (err) {
+      this.logger.warn({ err }, 'Could not encrypt the email body for the log');
+      return {};
     }
   }
 
@@ -889,6 +947,9 @@ export class NotificationsService {
     status: 'SENT' | 'FAILED';
     error: string | null;
     triggeredById: string | null;
+    bodyEnc?: Uint8Array<ArrayBuffer>;
+    secretEnc?: Uint8Array<ArrayBuffer>;
+    secretLabel?: string;
   }): Promise<void> {
     if (!this.prisma) return;
     try {

@@ -1608,6 +1608,12 @@ model PlatformEmailLog {
   status        MessageStatus
   error         String?
   triggeredById String?       @db.Uuid
+  /// The plain-text body as sent, encrypted, with any secret (code, invite link, temporary
+  /// password) blanked out. Null for emails logged before bodies were kept.
+  bodyEnc       Bytes?
+  /// That secret, encrypted on its own. Superadmins see it only by giving a reason (audited).
+  secretEnc     Bytes?
+  secretLabel   String?
   createdAt     DateTime      @default(now())
 
   @@index([createdAt])

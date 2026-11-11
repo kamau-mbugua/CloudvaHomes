@@ -471,4 +471,71 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     const audit = await get(admin, '/platform/reports/audit');
     expect(audit.data.length).toBeGreaterThan(0);
   });
+
+  it('opens a logged email with its secret hidden, and reveals it only with a reason (audited)', async () => {
+    const { owner } = await onboardOrg(t, admin, {
+      name: 'Makini Homes',
+      ownerEmail: 'olive@makini.test',
+      ownerPhone: '0700000301',
+    });
+    expect(owner.token).toBeTruthy();
+    await t
+      .http()
+      .post('/api/v1/auth/password/forgot')
+      .send({ identifier: 'olive@makini.test' })
+      .expect(202);
+    const code = lastCode('olive@makini.test');
+
+    const logs = (await get(admin, '/platform/email/logs?q=olive@makini.test')).data;
+    const reset = logs.find((l: any) => l.kind === 'password_reset');
+    const invite = logs.find((l: any) => l.kind === 'invitation');
+    expect(reset.canOpen).toBe(true);
+
+    // Opening shows the email as sent, with the code blanked out.
+    const opened = (await get(admin, `/platform/email/logs/${reset.id}`)).data;
+    expect(opened.to).toBe('olive@makini.test');
+    expect(opened.text).toContain('password reset code');
+    expect(opened.text).not.toContain(code);
+    expect(opened.secret).toEqual({ label: 'Code', hidden: true });
+    expect(JSON.stringify(opened)).not.toContain(code);
+
+    // The invitation link carries a token: hidden the same way.
+    const inv = (await get(admin, `/platform/email/logs/${invite.id}`)).data;
+    expect(inv.secret.label).toBe('Invitation link');
+    expect(inv.text).not.toMatch(/\/invite\/[A-Za-z0-9_-]{10,}/);
+
+    // Revealing needs a reason.
+    await post(admin, `/platform/email/logs/${reset.id}/reveal`, {}, 422);
+    await post(admin, `/platform/email/logs/${reset.id}/reveal`, { reason: 'short' }, 422);
+    const reason = 'Owner phoned support: the reset email never arrived';
+    const revealed = (await post(admin, `/platform/email/logs/${reset.id}/reveal`, { reason }))
+      .data;
+    expect(revealed.secret).toBe(code);
+
+    // The reveal is audited with who, which email and why, never the code itself.
+    const entry = await t.prisma.auditLog.findFirst({
+      where: { action: 'platform.email_secret_reveal', entityId: reset.id },
+    });
+    expect(entry?.actorId).toBe(admin.body.user.id);
+    expect(entry?.after).toMatchObject({ reason, to: 'olive@makini.test', kind: 'password_reset' });
+    expect(JSON.stringify(entry)).not.toContain(code);
+
+    // Salespeople can neither open nor reveal.
+    const sales = await post(
+      admin,
+      '/platform/operators',
+      {
+        firstName: 'Sam',
+        lastName: 'Sales',
+        email: 'sam@hodi.test',
+        password: PASSWORD,
+        role: 'SALESPERSON',
+      },
+      201,
+    );
+    expect(sales.data).toBeTruthy();
+    const sam = await login(t, 'sam@hodi.test');
+    await get(sam, `/platform/email/logs/${reset.id}`, 403);
+    await post(sam, `/platform/email/logs/${reset.id}/reveal`, { reason }, 403);
+  });
 });

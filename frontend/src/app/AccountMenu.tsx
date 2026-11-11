@@ -18,6 +18,7 @@ export function AccountMenu({
   contact,
   role,
   organizations,
+  listOrganizations = organizations.length > 1,
   activeOrganizationId,
   switchingTo,
   onSwitch,
@@ -34,6 +35,8 @@ export function AccountMenu({
   contact: string | null;
   role: string | null;
   organizations: OrganizationMembership[];
+  /** Show the organisation list (default: only when there are several to switch between). */
+  listOrganizations?: boolean;
   activeOrganizationId: string | null;
   /** The organisation a switch is in progress to. */
   switchingTo: string | null;
@@ -49,8 +52,8 @@ export function AccountMenu({
   platformLabel?: string;
   /** In the admin area, for someone who is also staff somewhere: offer the staff app. */
   staffApp?: boolean;
-  /** Where "My account" goes — the admin area has its own, for admins with no organisation. */
-  accountPath?: string;
+  /** Where "My account" goes — the admin area has its own, for admins with no organisation; null hides it. */
+  accountPath?: string | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -94,9 +97,9 @@ export function AccountMenu({
             {role ? <span className="sh__menurole">{role}</span> : null}
           </div>
 
-          {organizations.length > 1 ? (
+          {listOrganizations && organizations.length > 0 ? (
             <div className="sh__orgs" role="group" aria-label="Switch organisation">
-              <span className="sh__themelabel"><SwitchIcon /> Organisation</span>
+              <span className="sh__themelabel"><SwitchIcon /> {activeOrganizationId ? 'Organisation' : 'Your organisations'}</span>
               {organizations.map((org) => {
                 const active = org.id === activeOrganizationId;
                 return (
@@ -153,10 +156,12 @@ export function AccountMenu({
             </Link>
           ) : null}
 
-          <Link className="sh__menuitem" role="menuitem" to={accountPath} onClick={() => setOpen(false)}>
-            <PersonIcon />
-            My account
-          </Link>
+          {accountPath ? (
+            <Link className="sh__menuitem" role="menuitem" to={accountPath} onClick={() => setOpen(false)}>
+              <PersonIcon />
+              My account
+            </Link>
+          ) : null}
 
           <button className="sh__menuitem" role="menuitem" type="button" onClick={onSignOut}>
             <SignOutIcon />

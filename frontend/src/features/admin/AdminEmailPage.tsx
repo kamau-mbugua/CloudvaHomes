@@ -11,6 +11,7 @@ import { Pager } from '../../components/Pager';
 import { unwrap } from '../payments/rules';
 import { useListFilters } from '../portfolio/hooks';
 import { Field } from '../portfolio/ui';
+import { EmailLogSheet } from './EmailLogSheet';
 import { PAGE_SIZE, keys, platformErrorMessage, usePlatformEmailSettings, usePlatformEmailTemplates } from '../platform/api';
 import type { PlatformEmailLog, PlatformEmailSettings, PlatformEmailTemplate } from '../platform/types';
 
@@ -720,9 +721,11 @@ function EmailLogsTab() {
     placeholderData: keepPreviousData,
   });
   const rows = list.data?.data ?? [];
+  const [opened, setOpened] = useState<PlatformEmailLog | null>(null);
 
   return (
     <div>
+      {opened ? <EmailLogSheet log={opened} onClose={() => setOpened(null)} /> : null}
       <div className="ad__filters">
         <input
           className="ad__search"
@@ -762,6 +765,7 @@ function EmailLogsTab() {
                 <th>Subject</th>
                 <th>Template</th>
                 <th>Status</th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -778,6 +782,18 @@ function EmailLogsTab() {
                     <span className={`ad__badge ${log.status === 'SENT' ? 'ad__badge--ok' : 'ad__badge--warn'}`}>
                       {log.status === 'SENT' ? 'Sent' : 'Failed'}
                     </span>
+                  </td>
+                  <td className="ad__rowactions">
+                    <div>
+                      <button
+                        type="button"
+                        className="nx-btn nx-btn--sm"
+                        onClick={() => setOpened(log)}
+                        aria-label={`Open the email “${log.subject}” to ${log.to ?? log.recipient}`}
+                      >
+                        Open
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

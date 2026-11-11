@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { PageBoundary } from '../../components/ErrorBoundary';
 import { CardSkeleton, TopRouteProgress } from '../../components/Loading';
 import { EmptyState } from '../../components/EmptyState';
 import { NotificationBell } from '../../app/NotificationBell';
-import { MenuIcon, MoonIcon, SignOutIcon, SunIcon } from '../../app/icons';
+import { MenuIcon, MoonIcon, SunIcon } from '../../app/icons';
+import { SessionAccountMenu } from '../../app/SessionAccountMenu';
 import { portalsOf } from '../../lib/auth/portals';
-import { logout } from '../../lib/auth/session';
 import { useSession } from '../../lib/auth/useAuth';
 import { readStored, writeStored } from '../../lib/storage';
 import { useTheme } from '../../lib/theme';
@@ -27,12 +27,10 @@ const COLLAPSED_KEY = 'kodihub:tenant-menu-collapsed';
  */
 export function TenantShell() {
   const session = useSession();
-  const navigate = useNavigate();
   const { pathname } = useLocation();
   const [theme, setTheme] = useTheme();
   const [collapsed, setCollapsed] = useState(() => readStored(COLLAPSED_KEY) === '1');
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
   const overview = useConsolidatedOverview();
   const [scope, setScope] = useHomeScope(session.user.id, overview.data);
   const options = useMemo(() => (overview.data ? homeOptions(overview.data) : []), [overview.data]);
@@ -54,12 +52,6 @@ export function TenantShell() {
   const account = (scope.kind === 'home' ? accounts.find((a) => a.tenantId === scope.tenantId) : undefined) ?? accounts[0];
   const selected = scope.kind === 'home' ? overview.data?.tenancies.find((t) => t.id === scope.tenancyId) : undefined;
   const nextTheme = theme === 'dark' ? 'light' : 'dark';
-
-  const signOut = async () => {
-    setSigningOut(true);
-    await logout();
-    navigate('/login', { replace: true });
-  };
 
   return (
     <div className={`ms tsh ${drawerOpen ? 'is-drawer-open' : ''}`}>
@@ -87,9 +79,7 @@ export function TenantShell() {
             <button type="button" className="sh__icon" onClick={() => setTheme(nextTheme)} aria-label={`Switch to ${nextTheme} theme`} title={`Switch to ${nextTheme} theme`}>
               {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
             </button>
-            <button type="button" className="nx-btn nx-btn--sm tsh__signout" onClick={() => void signOut()} disabled={signingOut} aria-label="Sign out">
-              <SignOutIcon /> <span>{signingOut ? 'Signing out…' : 'Sign out'}</span>
-            </button>
+            <SessionAccountMenu here="tenant" role="Tenant" accountPath="/tenant/profile" />
           </div>
           <TopRouteProgress />
         </header>

@@ -520,6 +520,16 @@ export class ListEmailLogsQueryDto extends PaginationQueryDto {
   status?: 'SENT' | 'FAILED';
 }
 
+/** Why a superadmin needs to see the code or link hidden in a logged email. Kept in the audit log. */
+export class RevealEmailSecretDto {
+  @ApiProperty({ minLength: 10, maxLength: 500 })
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(10, { message: 'Say why you need to see it (at least 10 characters)' })
+  @MaxLength(500)
+  reason!: string;
+}
+
 export class ReportDateRangeQueryDto {
   @ApiPropertyOptional({ format: 'date' })
   @IsOptional()

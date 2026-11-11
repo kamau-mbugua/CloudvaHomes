@@ -67,3 +67,37 @@ export function portalsOf(session: Pick<Session, 'organizations' | 'ownerOf'> & 
     tenant: (session.tenantOf?.length ?? 0) > 0,
   };
 }
+
+/** Where an account menu is shown. */
+export type MenuHere = 'staff' | 'owner' | 'tenant' | 'admin';
+
+/**
+ * What the account menu offers, wherever the person is — the one way between their places.
+ *
+ * - `organizations`: in a portal, every organisation is listed (each opens the staff app in
+ *   it), so even someone in one organisation can get back to it; in the staff app and admin
+ *   area, only when there is another to switch to.
+ * - Links never point at the place the person is already in.
+ * - `platform` names the link to the admin area for operators ("Sales console" for salespeople).
+ */
+export function menuPlaces(
+  session: Pick<Session, 'organizations' | 'ownerOf' | 'user'> & { tenantOf?: Session['tenantOf'] },
+  here: MenuHere,
+): {
+  organizations: 'none' | 'several' | 'all';
+  staffApp: boolean;
+  ownerPortal: boolean;
+  tenantPortal: boolean;
+  platform: string | null;
+} {
+  const places = portalsOf(session);
+  const inPortal = here === 'owner' || here === 'tenant';
+  const orgCount = session.organizations.length;
+  return {
+    organizations: orgCount === 0 ? 'none' : inPortal ? 'all' : 'several',
+    staffApp: here === 'admin' && places.staff,
+    ownerPortal: places.owner && here !== 'owner',
+    tenantPortal: places.tenant && here !== 'tenant',
+    platform: here === 'admin' ? null : platformLinkLabel(session.user),
+  };
+}
