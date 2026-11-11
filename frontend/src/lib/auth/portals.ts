@@ -13,6 +13,17 @@ export function isSuperAdmin(
 }
 
 /**
+ * The account-menu link back to the platform, for an operator who is also working in an
+ * organisation: superadmins go back to "Platform admin", salespeople to their "Sales console".
+ */
+export function platformLinkLabel(
+  user?: Pick<SessionUser, 'isPlatformAdmin' | 'platformRole'> | null,
+): string | null {
+  if (!isPlatformOperator(user)) return null;
+  return isSuperAdmin(user) ? 'Platform admin' : 'Sales console';
+}
+
+/**
  * Where someone without an organisation of their own belongs. Staff land in the org app;
  * people who are only a landlord of an agency (`ownerOf`, phase 6b) or only a tenant
  * (`tenantOf`, phase 7) land in that portal; someone who is both is asked which.

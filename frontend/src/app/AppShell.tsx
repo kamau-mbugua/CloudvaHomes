@@ -14,7 +14,7 @@ import { readStored, writeStored } from '../lib/storage';
 import { useTheme } from '../lib/theme';
 import { ApiError, ORG_SUSPENDED, errorMessage } from '../lib/api/client';
 import { displayName } from '../lib/auth/permissions';
-import { isPlatformOperator } from '../lib/auth/portals';
+import { isPlatformOperator, platformLinkLabel } from '../lib/auth/portals';
 import { logout, reloadSessionDetails, switchOrganization } from '../lib/auth/session';
 import { useSession } from '../lib/auth/useAuth';
 import { useToast } from '../lib/useToast';
@@ -208,6 +208,7 @@ export function AppShell() {
               ownerPortal={session.ownerOf.length > 0}
               tenantPortal={session.tenantOf.length > 0}
               platformAdmin={isPlatformOperator(session.user)}
+              platformLabel={platformLinkLabel(session.user) ?? undefined}
             />
           </div>
           <TopRouteProgress />

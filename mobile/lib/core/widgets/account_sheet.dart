@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../features/owner/owner_screens.dart';
 import '../../features/tenant/tenant_api.dart';
 import '../api/api_error.dart';
+import '../auth/session.dart';
 import '../auth/session_controller.dart';
 import '../config.dart';
 import '../theme.dart';
@@ -91,9 +92,9 @@ class AccountSheet extends ConsumerWidget {
           'You can switch between these any time from the top corner.',
           style: TextStyle(fontSize: 13.5, color: muted),
         ),
-        if (session.isPlatformAdmin) ...[
+        if (session.isPlatformOperator) ...[
           const SizedBox(height: 16),
-          _Heading('Platform · KodiHub Admin', muted),
+          _Heading('Platform · KodiHub', muted),
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: _AccountDestCard(
@@ -110,9 +111,11 @@ class AccountSheet extends ConsumerWidget {
                 ),
               ),
               title: 'KodiHub Platform',
-              subtitle: session.user.platformRole ?? 'Platform Operator',
+              subtitle: session.isSuperAdmin
+                  ? 'Organisations, plans, billing and operators'
+                  : 'Your organisations, their plans and billing',
               pill: StatusChip(
-                session.user.platformRole ?? 'ADMIN',
+                platformRoleLabel(session.user) ?? 'Operator',
                 tone: Tone.info,
               ),
               selected: mode == AppMode.platform,

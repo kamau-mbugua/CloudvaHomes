@@ -381,7 +381,7 @@ class _StaffScopeSheetState extends ConsumerState<_StaffScopeSheet> {
         (session.organizations.length > 1 ||
             session.isTenant ||
             session.isOwner ||
-            session.isPlatformAdmin);
+            session.isPlatformOperator);
 
     return DraggableScrollableSheet(
       expand: false,

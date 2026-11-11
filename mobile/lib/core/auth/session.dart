@@ -33,6 +33,15 @@ class Session {
   bool get isOwner => ownerOf.isNotEmpty;
   bool get isPlatformAdmin => user.isPlatformAdmin;
 
+  /// Any KodiHub operator — a superadmin or a salesperson. They can open the platform
+  /// workspace, even when they also own or work in an organisation of their own.
+  bool get isPlatformOperator =>
+      user.isPlatformAdmin || user.platformRole != null;
+
+  /// A superadmin: may change organisations and manage operators (salespeople may not).
+  bool get isSuperAdmin =>
+      user.isPlatformAdmin || user.platformRole == 'SUPERADMIN';
+
   Session copyWith({
     String? accessToken,
     Object? activePropertyId = _keep,
@@ -213,3 +222,10 @@ class TenantAccountRef {
     orgName: (j['organization'] as Map)['name'] as String,
   );
 }
+
+/// The operator's platform role in words ("Superadmin", "Salesperson"), or null.
+String? platformRoleLabel(SessionUser user) => switch (user.platformRole) {
+  'SALESPERSON' => 'Salesperson',
+  'SUPERADMIN' => 'Superadmin',
+  _ => user.isPlatformAdmin ? 'Superadmin' : null,
+};

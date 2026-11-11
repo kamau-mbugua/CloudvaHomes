@@ -25,6 +25,7 @@ export function AccountMenu({
   ownerPortal = false,
   tenantPortal = false,
   platformAdmin = false,
+  platformLabel = 'Platform admin',
   staffApp = false,
   accountPath = '/app/account',
 }: {
@@ -42,8 +43,10 @@ export function AccountMenu({
   ownerPortal?: boolean;
   /** The person is also a tenant somewhere: offer the tenant portal (phase 7). */
   tenantPortal?: boolean;
-  /** A platform admin in the staff app: offer the admin area (phase 8). */
+  /** A platform operator in the staff app: offer the admin area (phase 8). */
   platformAdmin?: boolean;
+  /** What that link says: "Platform admin" for superadmins, "Sales console" for salespeople. */
+  platformLabel?: string;
   /** In the admin area, for someone who is also staff somewhere: offer the staff app. */
   staffApp?: boolean;
   /** Where "My account" goes — the admin area has its own, for admins with no organisation. */
@@ -125,7 +128,7 @@ export function AccountMenu({
           {platformAdmin ? (
             <Link className="sh__menuitem" role="menuitem" to="/admin" onClick={() => setOpen(false)}>
               <ShieldIcon />
-              Platform admin
+              {platformLabel}
             </Link>
           ) : null}
 

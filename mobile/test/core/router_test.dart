@@ -10,7 +10,10 @@ import 'package:hodi/core/widgets/account_sheet.dart';
 
 import '../helpers/fake_http.dart';
 
-Map<String, Object?> _hostSessionJson({bool tenant = false}) => {
+Map<String, Object?> _hostSessionJson({
+  bool tenant = false,
+  String? platformRole,
+}) => {
   'accessToken': 'access-host',
   'accessTokenExpiresAt': '2026-11-06T12:00:00.000Z',
   'refreshToken': 'refresh-host',
@@ -20,7 +23,8 @@ Map<String, Object?> _hostSessionJson({bool tenant = false}) => {
     'lastName': 'Host',
     'email': 'wanjiku@example.invalid',
     'phone': '+254712345678',
-    'isPlatformAdmin': false,
+    'isPlatformAdmin': platformRole == 'SUPERADMIN',
+    'platformRole': platformRole,
   },
   'organizations': [
     {
@@ -172,6 +176,89 @@ void main() {
 
       expect(capturedRef.read(modeProvider), AppMode.host);
       expect(find.text('MODE:host'), findsOneWidget);
+    },
+  );
+
+  test(
+    'a salesperson defaults to their organisation and can choose the platform',
+    () {
+      final s = Session.fromJson(_hostSessionJson(platformRole: 'SALESPERSON'));
+      expect(s.isPlatformOperator, isTrue);
+      expect(s.isSuperAdmin, isFalse);
+      expect(effectiveMode(s, null), AppMode.host);
+      expect(effectiveMode(s, AppMode.platform), AppMode.platform);
+
+      final raw = _hostSessionJson(platformRole: 'SALESPERSON')
+        ..['organizations'] = <Object?>[]
+        ..['activeOrganization'] = null;
+      expect(effectiveMode(Session.fromJson(raw), null), AppMode.platform);
+    },
+  );
+
+  test('platformRoleLabel names the role in words', () {
+    expect(
+      platformRoleLabel(
+        Session.fromJson(_hostSessionJson(platformRole: 'SALESPERSON')).user,
+      ),
+      'Salesperson',
+    );
+    expect(
+      platformRoleLabel(
+        Session.fromJson(_hostSessionJson(platformRole: 'SUPERADMIN')).user,
+      ),
+      'Superadmin',
+    );
+  });
+
+  testWidgets(
+    'a salesperson who owns a host organisation can switch to the platform and back',
+    (tester) async {
+      final json = _hostSessionJson(platformRole: 'SALESPERSON');
+      final s = Session.fromJson(json);
+      final adapter = FakeAdapter((_) => (200, {'data': json}));
+
+      late WidgetRef capturedRef;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            apiClientProvider.overrideWithValue(fakeClient(adapter)),
+            sessionProvider.overrideWith(() => _FixedSessionController(s)),
+          ],
+          child: MaterialApp(
+            theme: hodiTheme(Brightness.light),
+            home: Consumer(
+              builder: (context, ref, _) {
+                capturedRef = ref;
+                ref.watch(modeProvider);
+                return Scaffold(
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () => AccountSheet.show(context),
+                      child: const Text('Open switcher'),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(capturedRef.read(modeProvider), AppMode.host);
+
+      await tester.tap(find.text('Open switcher'));
+      await tester.pumpAndSettle();
+      expect(find.text('KodiHub Platform'), findsOneWidget);
+      expect(find.text('SALESPERSON'), findsNothing);
+      await tester.tap(find.text('KodiHub Platform'));
+      await tester.pumpAndSettle();
+      expect(capturedRef.read(modeProvider), AppMode.platform);
+
+      await tester.tap(find.text('Open switcher'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Diani Breezes'));
+      await tester.pumpAndSettle();
+      expect(capturedRef.read(modeProvider), AppMode.host);
     },
   );
 }

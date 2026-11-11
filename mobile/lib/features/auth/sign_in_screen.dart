@@ -58,7 +58,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   static String? _roleHintFor(Session? s) {
     if (s == null) return null;
     if (s.activeOrganization != null) return s.activeOrganization!.name;
-    if (s.isPlatformAdmin) return s.user.platformRole ?? 'Platform Admin';
+    if (s.isPlatformOperator) return platformRoleLabel(s.user) ?? 'KodiHub';
     if (s.tenantOf.isNotEmpty) return s.tenantOf.first.orgName;
     if (s.ownerOf.isNotEmpty) return s.ownerOf.first.orgName;
     return null;

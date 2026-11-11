@@ -313,13 +313,16 @@ final sessionProvider = AsyncNotifierProvider<SessionController, Session?>(
 /// The mode the person chose; null = the default for their session.
 final appModeProvider = StateProvider<AppMode?>((ref) => null);
 
-/// The mode to show: host/staff when they belong to an organisation, else tenant, else owner, else platform admin.
+/// The mode to show: host/staff when they belong to an organisation, else tenant, else owner, else platform
+/// (any operator — superadmin or salesperson).
 AppMode? effectiveMode(Session? s, AppMode? chosen) {
   if (s == null) return null;
   final orgMode = s.activeOrganization?.kind == 'HOST'
       ? AppMode.host
       : AppMode.staff;
-  if (chosen == AppMode.platform && s.isPlatformAdmin) return AppMode.platform;
+  if (chosen == AppMode.platform && s.isPlatformOperator) {
+    return AppMode.platform;
+  }
   if ((chosen == AppMode.staff || chosen == AppMode.host) && s.isStaff) {
     return orgMode;
   }
@@ -328,7 +331,7 @@ AppMode? effectiveMode(Session? s, AppMode? chosen) {
   if (s.isStaff) return orgMode;
   if (s.isTenant) return AppMode.tenant;
   if (s.isOwner) return AppMode.owner;
-  if (s.isPlatformAdmin) return AppMode.platform;
+  if (s.isPlatformOperator) return AppMode.platform;
   return null;
 }
 

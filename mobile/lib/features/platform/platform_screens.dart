@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_error.dart';
+import '../../core/auth/session.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/dates.dart';
 import '../../core/files.dart';
@@ -214,13 +215,14 @@ class PlatformShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final role = session.valueOrNull?.user.platformRole ?? 'ADMIN';
+    final user = session.valueOrNull?.user;
+    final role = (user == null ? null : platformRoleLabel(user)) ?? 'Operator';
     return Scaffold(
       drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         loading: session.isLoading,
         title: const Text('KodiHub Platform'),
-        subtitle: 'Platform Administration · $role',
+        subtitle: role,
         actions: const [NotificationButton(), AccountButton()],
       ),
       body: shell,
@@ -258,6 +260,8 @@ class PlatformOverviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(platformStatsProvider);
+    final isSuperAdmin =
+        ref.watch(sessionProvider).valueOrNull?.isSuperAdmin ?? false;
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(platformStatsProvider),
       child: AsyncBody(
@@ -389,7 +393,9 @@ class PlatformOverviewScreen extends ConsumerWidget {
                     child: _PlatformKpiTile(
                       label: 'Plans & Billing',
                       value: 'Manage',
-                      note: 'Plans, invoices & operators →',
+                      note: isSuperAdmin
+                          ? 'Plans, invoices & operators →'
+                          : 'Plans, invoices & payments →',
                       onTap: () => context.go('/platform/manage'),
                     ),
                   ),
@@ -605,6 +611,9 @@ class _PlatformOrgDetailScreenState
     final orgAsync = ref.watch(platformOrgProvider(orgId));
     final orgVal = orgAsync.valueOrNull;
     final api = ref.watch(platformApiProvider);
+    // Changing an organisation is for superadmins; the API refuses salespeople.
+    final isSuperAdmin =
+        ref.watch(sessionProvider).valueOrNull?.isSuperAdmin ?? false;
     return Scaffold(
       appBar: KodiHubAppBar(
         title: Text(
@@ -639,15 +648,19 @@ class _PlatformOrgDetailScreenState
                   ),
                   const SizedBox(height: 8),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '${_i(o['occupiedUnits'])} occupied units · ${plan?['name'] ?? 'Standard'}',
-                        style: const TextStyle(
-                          color: Color(0xFFB8C6D9),
-                          fontSize: 13,
+                      Expanded(
+                        child: Text(
+                          '${_i(o['occupiedUnits'])} occupied units · ${plan?['name'] ?? 'Standard'}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFB8C6D9),
+                            fontSize: 13,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         balance > 0
                             ? 'Owes ${formatKes(balance)}'
@@ -711,37 +724,41 @@ class _PlatformOrgDetailScreenState
                     ],
                   ),
                 ],
-                const SizedBox(height: 12),
-                SectionCard(
-                  title: 'Platform status actions',
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (status != 'ACTIVE')
-                          FilledButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _setStatus('ACTIVE'),
-                            child: const Text('Set Active'),
-                          ),
-                        if (status != 'GRACE')
-                          OutlinedButton(
-                            onPressed: _busy ? null : () => _setStatus('GRACE'),
-                            child: const Text('Set Grace'),
-                          ),
-                        if (status != 'SUSPENDED')
-                          OutlinedButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _setStatus('SUSPENDED'),
-                            child: const Text('Suspend'),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+                if (isSuperAdmin) ...[
+                  const SizedBox(height: 12),
+                  SectionCard(
+                    title: 'Platform status actions',
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          if (status != 'ACTIVE')
+                            FilledButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _setStatus('ACTIVE'),
+                              child: const Text('Set Active'),
+                            ),
+                          if (status != 'GRACE')
+                            OutlinedButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _setStatus('GRACE'),
+                              child: const Text('Set Grace'),
+                            ),
+                          if (status != 'SUSPENDED')
+                            OutlinedButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => _setStatus('SUSPENDED'),
+                              child: const Text('Suspend'),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ] else if (_tab == 1)
                 SizedBox(
                   height: 460,
@@ -820,13 +837,23 @@ class _PlatformManageScreenState extends ConsumerState<PlatformManageScreen> {
   Widget build(BuildContext context) {
     final api = ref.watch(platformApiProvider);
     final plans = ref.watch(platformPlansProvider);
-    final operators = ref.watch(platformOperatorsProvider);
+    final isSuperAdmin =
+        ref.watch(sessionProvider).valueOrNull?.isSuperAdmin ?? false;
+    // Operators are managed by superadmins only; the API refuses salespeople.
+    final operators = isSuperAdmin
+        ? ref.watch(platformOperatorsProvider)
+        : const AsyncValue<List<PlatformJson>>.data([]);
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: KodiHubSegmentedTabs(
-            tabs: const ['Plans', 'Invoices', 'Payments', 'Operators'],
+            tabs: [
+              'Plans',
+              'Invoices',
+              'Payments',
+              if (isSuperAdmin) 'Operators',
+            ],
             index: _tab,
             onChanged: (i) => setState(() => _tab = i),
           ),

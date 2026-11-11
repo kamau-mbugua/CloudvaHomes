@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/owner/owner_screens.dart';
 import '../../features/tenant/tenant_api.dart';
+import '../auth/session.dart';
 import '../auth/session_controller.dart';
 import '../theme.dart';
 import 'account_sheet.dart';
@@ -55,7 +56,9 @@ class KodiHubSideDrawer extends ConsumerWidget {
         modeBadge = 'Owner';
       case AppMode.platform:
         workspaceTitle = 'KodiHub Platform';
-        workspaceSubtitle = session?.user.platformRole ?? 'Platform Operator';
+        workspaceSubtitle =
+            (session == null ? null : platformRoleLabel(session.user)) ??
+            'Platform operator';
         modeBadge = 'Platform';
       case null:
         break;

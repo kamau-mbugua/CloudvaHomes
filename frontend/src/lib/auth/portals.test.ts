@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { landingFor, pickTenantAccount, portalsOf } from './portals';
+import { landingFor, pickTenantAccount, platformLinkLabel, portalsOf } from './portals';
 import { toSession } from './session';
 import type { OwnerOf, SessionPayload, TenantOf } from './types';
 
@@ -59,5 +59,13 @@ describe('portalsOf', () => {
   it('lists every place the person can open', () => {
     expect(portalsOf(toSession(payload({ ownerOf: owners, tenantOf: tenants, organizations: [membership] })))).toEqual({ staff: true, owner: true, tenant: true });
     expect(portalsOf(toSession(payload({ tenantOf: tenants })))).toEqual({ staff: false, owner: false, tenant: true });
+  });
+});
+
+describe('platformLinkLabel', () => {
+  it('names the way back to the platform after the operator role', () => {
+    expect(platformLinkLabel({ isPlatformAdmin: false, platformRole: 'SALESPERSON' })).toBe('Sales console');
+    expect(platformLinkLabel({ isPlatformAdmin: true, platformRole: 'SUPERADMIN' })).toBe('Platform admin');
+    expect(platformLinkLabel({ isPlatformAdmin: false, platformRole: null })).toBeNull();
   });
 });
