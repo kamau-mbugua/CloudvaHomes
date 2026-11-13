@@ -16,6 +16,7 @@ import { ShortLinksService } from '../../notifications/short-links.service.js';
 import type { EmailAttachment } from '../../notifications/senders.js';
 import { bookingLinkToken, bookingLinkUrl, hashAccessToken } from '../bookings/booking-link.js';
 import { renderStayReceiptPdf, STAY_METHOD_LABEL } from '../payments/stay-receipt-pdf.js';
+import { owedOn } from '../rules/balance.js';
 import { locationOf, mapLink, shortMapLink } from '../rules/location.js';
 import { guestSms, type GuestSmsData, type GuestSmsEvent } from '../rules/messages.js';
 
@@ -142,7 +143,7 @@ export class GuestNoticesService {
     const link = await this.guestLink(b);
     const location = locationOf(b.listing);
     const paid = b.amountPaid - b.amountRefunded;
-    const owed = b.total > paid ? b.total - paid : 0n;
+    const owed = owedOn(b);
     const checkIn = formatDateOnly(b.checkIn);
     const checkOut = formatDateOnly(b.checkOut);
     const checkInTime = site?.checkInTime ?? '14:00';
@@ -199,7 +200,11 @@ export class GuestNoticesService {
       `Guests: ${b.guests}`,
       `Total: ${smsKes(b.total)}`,
       `Paid: ${smsKes(paid)}`,
-      owed > 0n ? `Still to pay: ${smsKes(owed)}` : 'Still to pay: nothing, fully paid',
+      owed > 0n
+        ? `Still to pay: ${smsKes(owed)}`
+        : b.amountWrittenOff > 0n
+          ? 'Still to pay: nothing'
+          : 'Still to pay: nothing, fully paid',
     ].join('\n');
     const amount = smsKes(extra.amount ?? b.dueNow);
 

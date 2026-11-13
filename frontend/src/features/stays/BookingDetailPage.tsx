@@ -9,11 +9,18 @@ import { useToast } from '../../lib/useToast';
 import { CardSkeleton } from '../../components/Loading';
 import { Breadcrumbs, Fact } from '../portfolio/ui';
 import { staysErrorMessage, staysKeys } from './api';
-import { balanceStat, bookingActions, bookingStatusBadge, todayIso } from './calendar';
+import {
+  balanceStat,
+  bookingActions,
+  bookingBalance,
+  bookingStatusBadge,
+  todayIso,
+} from './calendar';
 import { CancelSheet } from './CancelSheet';
 import { PaymentSheet } from './PaymentSheet';
 import { RefundSheet } from './RefundSheet';
 import type { Booking } from './types';
+import { WriteOffSheet } from './WriteOffSheet';
 
 export function BookingDetailPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -26,6 +33,7 @@ export function BookingDetailPage() {
     null,
   );
   const [refundOpen, setRefundOpen] = useState(false);
+  const [writeOffOpen, setWriteOffOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
 
   const bookingQuery = useQuery({
@@ -86,11 +94,15 @@ export function BookingDetailPage() {
   const netPaid = hasMoney
     ? BigInt(b.amountPaid ?? '0') - BigInt(b.amountRefunded ?? '0')
     : 0n;
-  const balance =
-    hasMoney && BigInt(b.total ?? '0') > netPaid
-      ? BigInt(b.total ?? '0') - netPaid
-      : 0n;
+  const balance = hasMoney ? bookingBalance(b) : 0n;
   const balanceTile = balanceStat(b.status, balance);
+  // Check-in with a balance is allowed (with a warning); check-out waits until it is paid.
+  const warnAtCheckIn = actions.includes('checkIn') && canUpdate && balance > 0n;
+  const checkOutBlocked =
+    actions.includes('checkOut') && canUpdate && balance > 0n;
+  // A guest who left without paying: the owner can give up on the balance.
+  const canWriteOff =
+    b.status === 'CHECKED_IN' && canRefund && hasMoney && balance > 0n;
 
   return (
     <div className="pg pf__page">
@@ -148,7 +160,10 @@ export function BookingDetailPage() {
             <button
               type="button"
               className="nx-btn nx-btn--primary"
-              disabled={actionMutation.isPending}
+              disabled={actionMutation.isPending || checkOutBlocked}
+              title={
+                checkOutBlocked ? 'Collect the balance first' : undefined
+              }
               onClick={() => actionMutation.mutate({ action: 'check-out' })}
             >
               Check out
@@ -184,6 +199,15 @@ export function BookingDetailPage() {
                 Refund
               </button>
             )}
+          {canWriteOff && (
+            <button
+              type="button"
+              className="nx-btn"
+              onClick={() => setWriteOffOpen(true)}
+            >
+              Write off balance
+            </button>
+          )}
           {actions.includes('noShow') && canUpdate && (
             <button
               type="button"
@@ -206,10 +230,42 @@ export function BookingDetailPage() {
         </div>
       </div>
 
+      {warnAtCheckIn && (
+        <div className="ad__callout ad__callout--warn" role="note">
+          <p>
+            The guest still owes <strong>{formatKES(Number(balance))}</strong>.
+            You can check them in, but the stay must be paid in full before
+            check-out.
+          </p>
+        </div>
+      )}
+
+      {checkOutBlocked && (
+        <div className="ad__callout ad__callout--warn" role="note">
+          <p>
+            Collect the remaining <strong>{formatKES(Number(balance))}</strong>{' '}
+            before checking the guest out: send an M-Pesa prompt or record the
+            payment.
+            {canWriteOff &&
+              ' If the guest has left without paying, write off the balance.'}
+          </p>
+        </div>
+      )}
+
       {actionMutation.isError && (
         <p className="ad__error" role="alert">
           {staysErrorMessage(actionMutation.error)}
         </p>
+      )}
+
+      {b.writeOff && (
+        <div className="ad__callout" role="note">
+          <p>
+            <strong>{formatKES(Number(b.writeOff.amount))}</strong> written off
+            {b.writeOff.at ? ` on ${b.writeOff.at.slice(0, 10)}` : ''}
+            {b.writeOff.reason ? `: ${b.writeOff.reason}` : '.'}
+          </p>
+        </div>
       )}
 
       {b.hostNote && (
@@ -359,6 +415,14 @@ export function BookingDetailPage() {
           onClose={() => setPaymentModal(null)}
         />
       )}
+      {writeOffOpen && (
+        <WriteOffSheet
+          booking={b}
+          balance={balance}
+          onClose={() => setWriteOffOpen(false)}
+        />
+      )}
+
       {refundOpen && (
         <RefundSheet booking={b} onClose={() => setRefundOpen(false)} />
       )}

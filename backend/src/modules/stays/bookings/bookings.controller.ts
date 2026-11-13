@@ -19,6 +19,7 @@ import {
   DeclineBookingDto,
   ListBookingsQueryDto,
   QuoteBookingDto,
+  WriteOffBalanceDto,
 } from './bookings.dto.js';
 import { BookingsService } from './bookings.service.js';
 
@@ -87,6 +88,13 @@ export class BookingsController {
   @RequirePermission('bookings:update')
   async checkOut(@Param('id', ParseUUIDPipe) id: string) {
     return { data: await this.bookings.checkOut(id) };
+  }
+
+  @Post('bookings/:id/write-off')
+  @HttpCode(200)
+  @RequirePermission('stay-payments:refund')
+  async writeOff(@Param('id', ParseUUIDPipe) id: string, @Body() dto: WriteOffBalanceDto) {
+    return { data: await this.bookings.writeOff(id, dto) };
   }
 
   @Post('bookings/:id/no-show')

@@ -21,6 +21,9 @@ function sampleBooking(overrides: Partial<RawBookingForView> = {}): RawBookingFo
     balanceDueOn: null,
     amountPaid: 300000n,
     amountRefunded: 0n,
+    amountWrittenOff: 0n,
+    writtenOffAt: null,
+    writeOffReason: null,
     lines: [{ kind: 'NIGHT', date: '2026-11-10', label: 'Night of 2026-11-10', amount: '300000' }],
     rules: {
       bookingMode: 'INSTANT',

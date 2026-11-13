@@ -28,7 +28,7 @@ const STAYS_PERMISSIONS = [
   ...crud('bookings', 'bookings', ['view', 'create', 'update']),
   { key: 'bookings:cancel', label: 'Cancel bookings' },
   ...crud('stay-payments', 'stay payments', ['view', 'create']),
-  { key: 'stay-payments:refund', label: 'Refund or void stay payments' },
+  { key: 'stay-payments:refund', label: 'Refund, void or write off stay payments' },
   ...crud('guests', 'guests', ['view', 'update']),
   ...crud('cleaning', 'cleaning tasks', ['view', 'update']),
   ...crud('site', 'booking site settings', ['view', 'update']),

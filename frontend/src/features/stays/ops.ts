@@ -21,6 +21,8 @@ export interface HostReportUnitRow {
 export interface HostReportTotals {
   received: string;
   refunded: string;
+  /** Balances given up on (guests who left without paying). */
+  writtenOff?: string;
   bookedValue: string;
   unitExpenses: string;
   sharedExpenses: string;

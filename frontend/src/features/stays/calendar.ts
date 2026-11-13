@@ -102,16 +102,44 @@ export function bookingActionsForStatus(status: BookingStatus): BookingAction[] 
   }
 }
 
-/** Actions for one booking on `today` (Nairobi): a no-show can only be marked from the check-in day. */
-export function bookingActions(b: { status: BookingStatus; checkIn: string }, today: string): BookingAction[] {
-  const actions = bookingActionsForStatus(b.status);
-  return b.checkIn > today ? actions.filter((a) => a !== 'noShow') : actions;
+/**
+ * Actions for one booking on `today` (Nairobi): check-in only on a night of the stay (from the
+ * check-in day until the day before check-out); a no-show only from the check-in day.
+ */
+export function bookingActions(
+  b: { status: BookingStatus; checkIn: string; checkOut: string },
+  today: string,
+): BookingAction[] {
+  const checkIn = b.checkIn.slice(0, 10);
+  const checkOut = b.checkOut.slice(0, 10);
+  return bookingActionsForStatus(b.status).filter((a) => {
+    if (a === 'checkIn') return checkIn <= today && today < checkOut;
+    if (a === 'noShow') return checkIn <= today;
+    return true;
+  });
 }
 
 /**
  * The last money tile on a booking. Closed bookings get no reminders, so nothing is "due":
  * an unpaid no-show shows what was never collected; other closed bookings owe nothing.
  */
+/**
+ * What a guest still owes, in minor units: the server's figure (it knows about write-offs), else
+ * total less net paid. Zero when the caller can't see money.
+ */
+export function bookingBalance(b: {
+  total?: string;
+  amountPaid?: string;
+  amountRefunded?: string;
+  owed?: string;
+}): bigint {
+  if (b.owed !== undefined) return BigInt(b.owed);
+  if (b.total === undefined) return 0n;
+  const net = BigInt(b.amountPaid ?? '0') - BigInt(b.amountRefunded ?? '0');
+  const owed = BigInt(b.total) - net;
+  return owed > 0n ? owed : 0n;
+}
+
 export function balanceStat(status: BookingStatus, balance: bigint): { label: string; amount: bigint } {
   if (status === 'NO_SHOW' && balance > 0n) return { label: 'Not collected', amount: balance };
   if (status === 'CANCELLED' || status === 'EXPIRED' || status === 'DECLINED') {

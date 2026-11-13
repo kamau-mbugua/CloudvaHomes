@@ -20,6 +20,7 @@ import { tenantScope } from '../portfolio/property-scope.js';
 import { TenantsService } from '../portfolio/tenants/tenants.service.js';
 import { StayPaymentsService } from '../stays/payments/stay-payments.service.js';
 import { normalizeAccountRef } from './daraja.js';
+import { owedOn } from '../stays/rules/balance.js';
 import { guessesFor, unitSplits } from './matching.js';
 import type { AssignInboundDto, IgnoreInboundDto, ListInboundQueryDto } from './mpesa.dto.js';
 import type { WrapperType } from '../../common/di/wrapper-type.js';
@@ -47,6 +48,7 @@ const BOOKING = {
     total: true,
     amountPaid: true,
     amountRefunded: true,
+    amountWrittenOff: true,
     guest: { select: { name: true, phone: true } },
   },
 } as const;
@@ -61,9 +63,10 @@ function bookingView(b: {
   total: bigint;
   amountPaid: bigint;
   amountRefunded: bigint;
+  amountWrittenOff: bigint;
   guest: { name: string; phone: string } | null;
 }) {
-  const owed = b.total - (b.amountPaid - b.amountRefunded);
+  const owed = owedOn(b);
   return {
     id: b.id,
     code: b.code,
@@ -72,7 +75,7 @@ function bookingView(b: {
     checkIn: formatDateOnly(b.checkIn),
     checkOut: formatDateOnly(b.checkOut),
     total: b.total.toString(),
-    owed: (owed > 0n ? owed : 0n).toString(),
+    owed: owed.toString(),
   };
 }
 

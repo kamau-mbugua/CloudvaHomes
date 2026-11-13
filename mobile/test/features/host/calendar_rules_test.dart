@@ -47,6 +47,18 @@ void main() {
     },
   );
 
+  test('a guest can be checked in only on a night of the stay', () {
+    const s = 'CONFIRMED';
+    expect(canCheckIn(s, '2026-11-12', '2026-11-14', '2026-11-11'), isFalse);
+    expect(canCheckIn(s, '2026-11-12', '2026-11-14', '2026-11-12'), isTrue);
+    expect(canCheckIn(s, '2026-11-12', '2026-11-14', '2026-11-13'), isTrue);
+    expect(canCheckIn(s, '2026-11-12', '2026-11-14', '2026-11-14'), isFalse);
+    expect(
+      canCheckIn('CHECKED_IN', '2026-11-12', '2026-11-14', '2026-11-12'),
+      isFalse,
+    );
+  });
+
   test('a no-show can be marked only from the check-in day', () {
     expect(canMarkNoShow('CONFIRMED', '2026-11-12', '2026-11-11'), isFalse);
     expect(canMarkNoShow('CONFIRMED', '2026-11-12', '2026-11-12'), isTrue);

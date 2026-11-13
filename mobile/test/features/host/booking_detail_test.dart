@@ -136,7 +136,16 @@ void main() {
     phoneSize(tester);
     final adapter = FakeAdapter({
       'GET /host/bookings/b1': (_) => {
-        'data': _bookingJson(status: 'CONFIRMED', includeMoney: false),
+        'data': {
+          ..._bookingJson(status: 'CONFIRMED', includeMoney: false),
+          // Check-in shows only on a night of the stay.
+          'checkIn': todayIso(),
+          'checkOut': toDay(
+            DateTime.parse(
+              '${todayIso()}T00:00:00Z',
+            ).add(const Duration(days: 2)),
+          ),
+        },
       },
     });
 
@@ -239,9 +248,12 @@ void main() {
 
   Future<void> pumpDetail(
     WidgetTester tester,
-    Map<String, Object?> booking,
-  ) async {
+    Map<String, Object?> booking, {
+    Set<String> extraPermissions = const {},
+  }) async {
     phoneSize(tester);
+    // A fresh scope each time, so a different sign-in takes effect.
+    await tester.pumpWidget(const SizedBox());
     final adapter = FakeAdapter({
       'GET /host/bookings/b1': (_) => {'data': booking},
     });
@@ -252,11 +264,12 @@ void main() {
           sessionProvider.overrideWith(
             () => FakeSession(
               _session(
-                permissions: const {
+                permissions: {
                   'bookings:view',
                   'bookings:update',
                   'stay-payments:view',
                   'stay-payments:create',
+                  ...extraPermissions,
                 },
               ),
             ),
@@ -271,13 +284,15 @@ void main() {
   String day(int n) =>
       toDay(DateTime.parse('${todayIso()}T00:00:00Z').add(Duration(days: n)));
 
-  testWidgets('No-show appears only from the check-in day', (tester) async {
+  testWidgets('Check-in and no-show appear only from the check-in day', (
+    tester,
+  ) async {
     await pumpDetail(tester, {
       ..._bookingJson(status: 'CONFIRMED', includeMoney: true),
       'checkIn': day(1),
       'checkOut': day(3),
     });
-    expect(find.text('Check in'), findsOneWidget);
+    expect(find.text('Check in'), findsNothing);
     expect(find.text('No-show'), findsNothing);
 
     await pumpDetail(tester, {
@@ -285,7 +300,78 @@ void main() {
       'checkIn': todayIso(),
       'checkOut': day(2),
     });
+    expect(find.text('Check in'), findsOneWidget);
     expect(find.text('No-show'), findsOneWidget);
+    // Check-in with a balance is allowed, with a warning.
+    expect(
+      find.textContaining('The guest still owes KES 6,500'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Only owners see Write off balance on a checked-in stay', (
+    tester,
+  ) async {
+    final stay = {
+      ..._bookingJson(status: 'CHECKED_IN', includeMoney: true),
+      'checkIn': day(-1),
+      'checkOut': day(1),
+    };
+    await pumpDetail(tester, stay);
+    expect(find.text('Write off balance'), findsNothing);
+
+    await pumpDetail(
+      tester,
+      stay,
+      extraPermissions: const {'stay-payments:refund'},
+    );
+    expect(find.text('Write off balance'), findsOneWidget);
+
+    await pumpDetail(
+      tester,
+      {
+        ...stay,
+        'owed': '0',
+        'writeOff': {
+          'amount': '650000',
+          'at': '2026-11-13T10:00:00Z',
+          'reason': 'Left without paying',
+        },
+      },
+      extraPermissions: const {'stay-payments:refund'},
+    );
+    expect(find.text('Write off balance'), findsNothing);
+    expect(
+      find.textContaining('written off: Left without paying'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Check-out waits until the stay is paid in full', (tester) async {
+    await pumpDetail(tester, {
+      ..._bookingJson(status: 'CHECKED_IN', includeMoney: true),
+      'checkIn': day(-1),
+      'checkOut': day(1),
+    });
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Check out'),
+    );
+    expect(button.onPressed, isNull);
+    expect(
+      find.textContaining('Collect the remaining KES 6,500'),
+      findsOneWidget,
+    );
+
+    await pumpDetail(tester, {
+      ..._bookingJson(status: 'CHECKED_IN', includeMoney: true),
+      'checkIn': day(-1),
+      'checkOut': day(1),
+      'owed': '0',
+    });
+    final paid = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Check out'),
+    );
+    expect(paid.onPressed, isNotNull);
   });
 
   testWidgets('an unpaid no-show shows Not collected and offers no payment', (

@@ -1867,6 +1867,11 @@ model Booking {
   balanceDueOn     DateTime?     @db.Date
   amountPaid       BigInt        @default(0)
   amountRefunded   BigInt        @default(0)
+  /// Balance the host gave up on (guest left without paying); a later payment reduces it.
+  amountWrittenOff BigInt        @default(0)
+  writtenOffAt     DateTime?
+  writeOffReason   String?
+  writtenOffById   String?       @db.Uuid
   lines            Json
   rules            Json
   guestNote        String?

@@ -7,6 +7,7 @@ import {
 import { formatDateOnly, parseDateOnly } from '../../../common/dates/date-only.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
+import { smsKes } from '../../../common/money/money.js';
 import { paginated } from '../../../common/http/response.js';
 import { type BookingStatus, type Guest, Prisma } from '../../../generated/prisma/client.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
@@ -21,6 +22,7 @@ import { assertHostOrg } from '../host-org.js';
 import { parseWholeShillings } from '../listings/listings.service.js';
 import { shouldSendCheckInInfoNow } from '../rules/messages.js';
 import { quoteStay, type Quote, type QuoteLine } from '../rules/pricing.js';
+import { owedOn } from '../rules/balance.js';
 import { BLOCKING, canMove } from '../rules/status.js';
 import {
   balanceDueOn,
@@ -37,6 +39,7 @@ import type {
   CreateBlockDto,
   CreateHostBookingDto,
   ListBookingsQueryDto,
+  WriteOffBalanceDto,
 } from './bookings.dto.js';
 
 const HOLD_TTL_MS = 12 * 3600_000;
@@ -592,6 +595,24 @@ export class BookingsService {
     if (!existing) {
       throw AppError.notFound('Booking');
     }
+    // A guest arrives on a night of their stay: not before the check-in day, not once it is over.
+    if (existing.status === 'CONFIRMED') {
+      const checkIn = formatDateOnly(existing.checkIn);
+      const checkOut = formatDateOnly(existing.checkOut);
+      const today = nairobiToday();
+      if (checkIn > today) {
+        throw AppError.conflict(
+          `You can check the guest in from the check-in day (${checkIn}).`,
+          'TOO_EARLY',
+        );
+      }
+      if (checkOut <= today) {
+        throw AppError.conflict(
+          `This stay ended on ${checkOut}. Mark it as a no-show or cancel it instead.`,
+          'STAY_ENDED',
+        );
+      }
+    }
 
     const updated = await this.move(id, 'CHECKED_IN', {
       userId: ctx.userId,
@@ -611,6 +632,19 @@ export class BookingsService {
     if (!existing) {
       throw AppError.notFound('Booking');
     }
+    // A guest leaves only once the stay is paid in full (check-in with a balance is allowed).
+    if (existing.status === 'CHECKED_IN') {
+      const owed = owedOn(existing);
+      if (owed > 0n) {
+        const amount = this.callerPermissions().has('stay-payments:view')
+          ? `${smsKes(owed)} is`
+          : 'A balance is';
+        throw AppError.conflict(
+          `${amount} still owed on this stay. Record the payment, or write off the balance, before checking the guest out.`,
+          'BALANCE_DUE',
+        );
+      }
+    }
 
     const updated = await this.db.$transaction(async (tx) => {
       const moved = await this.move(id, 'COMPLETED', { userId: ctx.userId, actor: 'HOST' }, tx);
@@ -627,6 +661,62 @@ export class BookingsService {
       });
 
       return moved;
+    });
+
+    return viewBooking(updated, { permissions: this.callerPermissions() }, nairobiToday());
+  }
+
+  /**
+   * Gives up on what a checked-in guest still owes (e.g. they left without paying) so the stay can
+   * be checked out. Payments stay as recorded; a later payment brings the write-off back down.
+   */
+  async writeOff(id: string, dto: WriteOffBalanceDto) {
+    const ctx = orgContext();
+    await assertHostOrg(this.db, ctx.orgId);
+    const reason = dto.reason.trim();
+    if (reason.length < 3) {
+      throw AppError.fieldInvalid('reason', 'Say why the balance is written off');
+    }
+
+    const updated = await this.db.$transaction(async (tx) => {
+      const existing = await tx.booking.findFirst({
+        where: { id, orgId: ctx.orgId, property: propertyScope() },
+      });
+      if (!existing) {
+        throw AppError.notFound('Booking');
+      }
+      if (existing.status !== 'CHECKED_IN') {
+        throw AppError.conflict(
+          'Only a checked-in stay can have its balance written off.',
+          'INVALID_STATUS',
+        );
+      }
+      const owed = owedOn(existing);
+      if (owed <= 0n) {
+        throw AppError.conflict('Nothing is owed on this stay.', 'NOTHING_OWED');
+      }
+
+      const row = await tx.booking.update({
+        where: { id: existing.id },
+        data: {
+          amountWrittenOff: { increment: owed },
+          writtenOffAt: new Date(),
+          writeOffReason: reason,
+          writtenOffById: ctx.userId ?? null,
+        },
+        include: BOOKING_INCLUDE,
+      });
+      await this.audit.record(
+        {
+          action: 'booking.balance_written_off',
+          entity: 'booking',
+          entityId: existing.id,
+          before: { owed: owed.toString() },
+          after: { amountWrittenOff: row.amountWrittenOff.toString(), reason },
+        },
+        tx,
+      );
+      return row;
     });
 
     return viewBooking(updated, { permissions: this.callerPermissions() }, nairobiToday());
@@ -923,8 +1013,7 @@ export class BookingsService {
 
     let balanceDueCount = 0;
     for (const b of dueRows) {
-      const netPaid = b.amountPaid - b.amountRefunded;
-      const owed = b.total > netPaid ? b.total - netPaid : 0n;
+      const owed = owedOn(b);
       if (owed <= 0n || !b.guest?.phone) continue;
 
       await runWithContext(emptyContext({ orgId: b.orgId }), async () => {

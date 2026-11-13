@@ -4,6 +4,7 @@ import type {
   BookingSource,
   BookingStatus,
 } from '../../../generated/prisma/client.js';
+import { owedOn } from '../rules/balance.js';
 import type { QuoteLine } from '../rules/pricing.js';
 import type { StayRules } from '../rules/terms.js';
 
@@ -40,6 +41,9 @@ export interface RawBookingForView {
   balanceDueOn: Date | null;
   amountPaid: bigint;
   amountRefunded: bigint;
+  amountWrittenOff: bigint;
+  writtenOffAt: Date | null;
+  writeOffReason: string | null;
   lines: unknown;
   rules: unknown;
   guestNote: string | null;
@@ -101,6 +105,10 @@ export interface BookingView {
   dueNow?: string;
   amountPaid?: string;
   amountRefunded?: string;
+  /** What the guest still owes (total minus net paid and any write-off, never negative). */
+  owed?: string;
+  /** A balance the host gave up on; null when nothing was written off. */
+  writeOff?: { amount: string; at: string | null; reason: string | null } | null;
   lines?: QuoteLine[];
   payments?: {
     id: string;
@@ -183,6 +191,15 @@ export function viewBooking(
     dueNow: b.dueNow.toString(),
     amountPaid: b.amountPaid.toString(),
     amountRefunded: b.amountRefunded.toString(),
+    owed: owedOn(b).toString(),
+    writeOff:
+      b.amountWrittenOff > 0n
+        ? {
+            amount: b.amountWrittenOff.toString(),
+            at: b.writtenOffAt ? b.writtenOffAt.toISOString() : null,
+            reason: b.writeOffReason,
+          }
+        : null,
     lines: (Array.isArray(b.lines) ? b.lines : []) as QuoteLine[],
     ...(b.payments
       ? {

@@ -44,6 +44,57 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     }
   }
 
+  /// Gives up on what a checked-in guest still owes (e.g. they left without paying).
+  Future<void> _showWriteOffSheet(HostBooking b) async {
+    final reasonCtrl = TextEditingController();
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final bottom = MediaQuery.of(ctx).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, bottom + 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Write off balance on ${b.code}',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${b.guestName} still owes ${formatKes(b.owedCents ?? 0)}. Writing it off clears the balance so you can check the guest out. If the guest pays later, it comes off the write-off.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonCtrl,
+                maxLength: 300,
+                decoration: const InputDecoration(
+                  labelText: 'Reason',
+                  hintText: 'e.g. Guest left without paying',
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: () {
+                  final text = reasonCtrl.text.trim();
+                  if (text.length < 3) return;
+                  Navigator.of(ctx).pop(text);
+                },
+                child: Text('Write off ${formatKes(b.owedCents ?? 0)}'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (reason != null && mounted) {
+      await _runAction('write-off', body: {'reason': reason});
+    }
+  }
+
   Future<void> _showCancelSheet(HostBooking b) async {
     int suggested = 0;
     try {
@@ -197,6 +248,31 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                 ],
               ),
               const SizedBox(height: 12),
+              if ((b.writtenOffCents ?? 0) > 0) ...[
+                Text(
+                  '${formatKes(b.writtenOffCents ?? 0)} written off${b.writeOffReason != null ? ': ${b.writeOffReason}' : '.'}',
+                ),
+                const SizedBox(height: 8),
+              ],
+              // Check-in with a balance is allowed with a warning; check-out waits for payment.
+              if (canUpdate &&
+                  b.hasMoney &&
+                  (b.owedCents ?? 0) > 0 &&
+                  (b.status == 'CHECKED_IN' ||
+                      canCheckIn(
+                        b.status,
+                        b.checkIn,
+                        b.checkOut,
+                        todayIso(),
+                      ))) ...[
+                Text(
+                  b.status == 'CHECKED_IN'
+                      ? 'Collect the remaining ${formatKes(b.owedCents ?? 0)} before checking the guest out.'
+                      : 'The guest still owes ${formatKes(b.owedCents ?? 0)}. You can check them in, but the stay must be paid in full before check-out.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 8),
+              ],
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -212,10 +288,11 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                     ),
                   ],
                   if (canUpdate && b.status == 'CONFIRMED') ...[
-                    FilledButton(
-                      onPressed: _busy ? null : () => _runAction('check-in'),
-                      child: const Text('Check in'),
-                    ),
+                    if (canCheckIn(b.status, b.checkIn, b.checkOut, todayIso()))
+                      FilledButton(
+                        onPressed: _busy ? null : () => _runAction('check-in'),
+                        child: const Text('Check in'),
+                      ),
                     if (canMarkNoShow(b.status, b.checkIn, todayIso()))
                       OutlinedButton(
                         onPressed: _busy ? null : () => _runAction('no-show'),
@@ -224,7 +301,10 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                   ],
                   if (canUpdate && b.status == 'CHECKED_IN')
                     FilledButton(
-                      onPressed: _busy ? null : () => _runAction('check-out'),
+                      // Check-out waits until the stay is paid in full.
+                      onPressed: _busy || (b.owedCents ?? 0) > 0
+                          ? null
+                          : () => _runAction('check-out'),
                       child: const Text('Check out'),
                     ),
                   if (b.hasMoney &&
@@ -263,6 +343,14 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                       child: const Text('Record payment'),
                     ),
                   ],
+                  if (b.hasMoney &&
+                      canRefund &&
+                      b.status == 'CHECKED_IN' &&
+                      (b.owedCents ?? 0) > 0)
+                    OutlinedButton(
+                      onPressed: _busy ? null : () => _showWriteOffSheet(b),
+                      child: const Text('Write off balance'),
+                    ),
                   if (b.hasMoney && canRefund && netPaid > 0)
                     OutlinedButton(
                       onPressed: _busy

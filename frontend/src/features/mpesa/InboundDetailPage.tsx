@@ -26,6 +26,7 @@ import { keys, mpesaErrorMessage, useInboundDetail } from './api';
 import { MATCHED_BY, MATCH_STATUS, SOURCE } from './labels';
 import { bookingRefText, hostUnmatchedText, payerText, prettyJson } from './rules';
 import { staysKeys } from '../stays/api';
+import { bookingBalance } from '../stays/calendar';
 import type { Booking } from '../stays/types';
 import type { BookingSuggestion, InboundDetail, InboundTransaction, MatchSuggestion, MpesaBookingRef, MpesaTenantRef } from './types';
 
@@ -464,8 +465,7 @@ function AssignSheet({ inbound, suggestions, initial, onClose }: {
 /** A host booking from the bookings list, in Reconciliation's shape (owed only when money is visible). */
 function bookingRef(b: Booking): MpesaBookingRef {
   const total = b.total ?? '0';
-  const net = BigInt(b.amountPaid ?? '0') - BigInt(b.amountRefunded ?? '0');
-  const owed = BigInt(total) - net;
+  const owed = bookingBalance(b);
   return {
     id: b.id,
     code: b.code,
@@ -474,7 +474,7 @@ function bookingRef(b: Booking): MpesaBookingRef {
     checkIn: b.checkIn,
     checkOut: b.checkOut,
     total,
-    owed: (owed > 0n ? owed : 0n).toString(),
+    owed: owed.toString(),
   };
 }
 

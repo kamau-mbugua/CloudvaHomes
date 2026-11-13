@@ -6,7 +6,13 @@ import type { PageEnvelope } from '../../lib/api/types';
 import { useSession } from '../../lib/auth/useAuth';
 import { formatKES } from '../../lib/money';
 import { staysKeys } from './api';
-import { addDays, bookingStatusBadge, daysBetween, todayIso } from './calendar';
+import {
+  addDays,
+  bookingBalance,
+  bookingStatusBadge,
+  daysBetween,
+  todayIso,
+} from './calendar';
 import type { HostCleaningTask } from './ops';
 import type { Booking, Listing } from './types';
 import { isInHouse } from './today';
@@ -103,8 +109,7 @@ export function TodayPage() {
     ) {
       return false;
     }
-    const net = BigInt(b.amountPaid ?? '0') - BigInt(b.amountRefunded ?? '0');
-    return BigInt(b.total) > net;
+    return bookingBalance(b) > 0n;
   });
 
   let monthlyIncome = 0n;
@@ -121,8 +126,7 @@ export function TodayPage() {
         const net =
           BigInt(b.amountPaid ?? '0') - BigInt(b.amountRefunded ?? '0');
         monthlyIncome += net > 0n ? net : 0n;
-        const tot = BigInt(b.total ?? '0');
-        if (tot > net) monthlyOwed += tot - net;
+        monthlyOwed += bookingBalance(b);
 
         const start = b.checkIn < monthStart ? monthStart : b.checkIn;
         const end = b.checkOut > nextMonthStart ? nextMonthStart : b.checkOut;

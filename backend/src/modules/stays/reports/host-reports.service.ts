@@ -158,6 +158,8 @@ export class HostReportsService {
     const roomRevenueByUnit = new Map<string, bigint>();
     const bookedNightsByUnit = new Map<string, number>();
     const blockedNightsByUnit = new Map<string, number>();
+    // Balances given up on, counted with the stay they belong to.
+    const writtenOffByUnit = new Map<string, bigint>();
 
     for (const b of bookings) {
       const checkInIso = formatDateOnly(b.checkIn);
@@ -171,6 +173,10 @@ export class HostReportsService {
         }
         blockedNightsByUnit.set(b.unitId, (blockedNightsByUnit.get(b.unitId) ?? 0) + blocked);
         continue;
+      }
+
+      if (b.amountWrittenOff > 0n) {
+        writtenOffByUnit.set(b.unitId, (writtenOffByUnit.get(b.unitId) ?? 0n) + b.amountWrittenOff);
       }
 
       const allocations = nightAllocationsForStay({
@@ -200,6 +206,7 @@ export class HostReportsService {
     let totSharedExpenses = 0n;
     let totExpenses = 0n;
     let totProfit = 0n;
+    let totWrittenOff = 0n;
     let totNights = 0;
     let totBlockedNights = 0;
 
@@ -214,6 +221,7 @@ export class HostReportsService {
       const profit = received - refunded - totalExp;
       const nights = bookedNightsByUnit.get(l.unitId) ?? 0;
       const blocked = blockedNightsByUnit.get(l.unitId) ?? 0;
+      const writtenOff = writtenOffByUnit.get(l.unitId) ?? 0n;
       const occ = occupancy(nights, 1, q.from, q.to, blocked);
       const unitAdr = adr(roomRevenue, nights);
 
@@ -225,6 +233,7 @@ export class HostReportsService {
       totSharedExpenses += sharedExp;
       totExpenses += totalExp;
       totProfit += profit;
+      totWrittenOff += writtenOff;
       totNights += nights;
       totBlockedNights += blocked;
 
@@ -236,6 +245,7 @@ export class HostReportsService {
         property: l.property,
         received: received.toString(),
         refunded: refunded.toString(),
+        writtenOff: writtenOff.toString(),
         bookedValue: bookedValue.toString(),
         unitExpenses: unitExp.toString(),
         sharedExpenses: sharedExp.toString(),
@@ -270,6 +280,7 @@ export class HostReportsService {
       totals: {
         received: totReceived.toString(),
         refunded: totRefunded.toString(),
+        writtenOff: totWrittenOff.toString(),
         bookedValue: totBookedValue.toString(),
         unitExpenses: totUnitExpenses.toString(),
         sharedExpenses: totSharedExpenses.toString(),
@@ -296,6 +307,7 @@ export class HostReportsService {
         'Booked Value (KES)',
         'Received (KES)',
         'Refunded (KES)',
+        'Written Off (KES)',
         'Unit Expenses (KES)',
         'Shared Expenses (KES)',
         'Total Expenses (KES)',
@@ -310,6 +322,7 @@ export class HostReportsService {
         BigInt(r.bookedValue),
         BigInt(r.received),
         BigInt(r.refunded),
+        BigInt(r.writtenOff),
         BigInt(r.unitExpenses),
         BigInt(r.sharedExpenses),
         BigInt(r.expenses),

@@ -1,4 +1,5 @@
 import { hashPassword } from '../src/modules/auth/crypto.js';
+import { smsKes } from '../src/common/money/money.js';
 import { outbox } from '../src/modules/notifications/senders.js';
 import { nairobiToday } from '../src/modules/stays/bookings/booking-view.js';
 import {
@@ -273,13 +274,36 @@ describe('Host bookings, blocks, statuses & calendar API (e2e)', () => {
       .expect(403);
     expect(caretakerView.body.data.guest.phone).toBeNull();
 
-    // Check-in then check-out -> COMPLETED and creates a CleaningTask
-    await t
+    // Check-in then check-out -> COMPLETED and creates a CleaningTask. Check-in is only
+    // allowed on a night of the stay, so the stay is moved to start today.
+    await t.prisma.booking.update({
+      where: { id: bookingId },
+      data: { checkIn: new Date(`${nairobiToday()}T00:00:00Z`) },
+    });
+    // Check-in is allowed with a balance; check-out waits until the stay is paid in full.
+    const checkedIn = await t
       .http()
       .post(`/api/v1/host/bookings/${bookingId}/check-in`)
       .set(auth(owner))
       .send({})
       .expect(200);
+    const owed = BigInt(checkedIn.body.data.total) - 1_000_000n;
+    expect(owed).toBeGreaterThan(0n);
+    expect(checkedIn.body.data.owed).toBe(owed.toString());
+    const unpaid = await t
+      .http()
+      .post(`/api/v1/host/bookings/${bookingId}/check-out`)
+      .set(auth(owner))
+      .send({})
+      .expect(409);
+    expect(unpaid.body.error.code).toBe('BALANCE_DUE');
+    expect(unpaid.body.error.message).toBe(
+      `${smsKes(owed)} is still owed on this stay. Record the payment, or write off the balance, before checking the guest out.`,
+    );
+    await t.prisma.booking.update({
+      where: { id: bookingId },
+      data: { amountPaid: BigInt(checkedIn.body.data.total) },
+    });
     const checkedOut = await t
       .http()
       .post(`/api/v1/host/bookings/${bookingId}/check-out`)
@@ -353,5 +377,122 @@ describe('Host bookings, blocks, statuses & calendar API (e2e)', () => {
 
     // The nights are free again.
     await book(today, day(2));
+  });
+
+  it('writes off what a checked-in guest owes, so the stay can be checked out', async () => {
+    const { owner, listingId } = await setupHost();
+    const today = nairobiToday();
+    const inTwoDays = new Date(`${today}T00:00:00Z`);
+    inTwoDays.setUTCDate(inTwoDays.getUTCDate() + 2);
+    const created = await t
+      .http()
+      .post('/api/v1/host/bookings')
+      .set(auth(owner))
+      .send({
+        listingId,
+        checkIn: today,
+        checkOut: inTwoDays.toISOString().slice(0, 10),
+        guests: 2,
+        guest: { name: 'Gone Guest', phone: '0733111225' },
+        confirm: true,
+      })
+      .expect(201);
+    const id = created.body.data.id as string;
+    const total = BigInt(created.body.data.total);
+    const post = (path: string, body: object, status: number) =>
+      t
+        .http()
+        .post(`/api/v1/host/bookings/${id}/${path}`)
+        .set(auth(owner))
+        .send(body)
+        .expect(status);
+
+    // Only a checked-in stay can be written off.
+    const notYet = await post('write-off', { reason: 'Left without paying' }, 409);
+    expect(notYet.body.error.code).toBe('INVALID_STATUS');
+    await post('check-in', {}, 200);
+
+    await post('write-off', { reason: '  ' }, 422);
+    const written = await post('write-off', { reason: 'Left without paying' }, 200);
+    expect(written.body.data.owed).toBe('0');
+    expect(written.body.data.amountPaid).toBe('0');
+    expect(written.body.data.writeOff).toMatchObject({
+      amount: total.toString(),
+      reason: 'Left without paying',
+    });
+    const again = await post('write-off', { reason: 'Left without paying' }, 409);
+    expect(again.body.error.code).toBe('NOTHING_OWED');
+
+    // The guest pays KES 5,000 later: it comes off the write-off, and nothing is owed.
+    await post('payments', { method: 'CASH', amount: '500000' }, 201);
+    const after = await t.prisma.booking.findUniqueOrThrow({ where: { id } });
+    expect(after.amountPaid).toBe(500_000n);
+    expect(after.amountWrittenOff).toBe(total - 500_000n);
+
+    const audit = await t.prisma.auditLog.findFirst({
+      where: { entityId: id, action: 'booking.balance_written_off' },
+    });
+    expect(audit).toBeTruthy();
+
+    const out = await post('check-out', {}, 200);
+    expect(out.body.data.status).toBe('COMPLETED');
+  });
+
+  it('allows check-in only on a night of the stay', async () => {
+    const { owner, listingId } = await setupHost();
+    const today = nairobiToday();
+    const day = (n: number) => {
+      const d = new Date(`${today}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    const book = async (checkIn: string, checkOut: string) =>
+      (
+        await t
+          .http()
+          .post('/api/v1/host/bookings')
+          .set(auth(owner))
+          .send({
+            listingId,
+            checkIn,
+            checkOut,
+            guests: 2,
+            guest: { name: 'Early Guest', phone: '0733111224' },
+            confirm: true,
+          })
+          .expect(201)
+      ).body.data.id as string;
+    const checkIn = (id: string, status: number) =>
+      t
+        .http()
+        .post(`/api/v1/host/bookings/${id}/check-in`)
+        .set(auth(owner))
+        .send({})
+        .expect(status);
+
+    // Today's guest can.
+    const arriving = await book(today, day(1));
+    const done = await checkIn(arriving, 200);
+    expect(done.body.data.status).toBe('CHECKED_IN');
+
+    // Tomorrow's guest can't be checked in today.
+    const tomorrow = await book(day(1), day(3));
+    const early = await checkIn(tomorrow, 409);
+    expect(early.body.error.code).toBe('TOO_EARLY');
+    expect(early.body.error.message).toBe(
+      `You can check the guest in from the check-in day (${day(1)}).`,
+    );
+
+    // A stay that is already over can't be checked in either.
+    const ended = await book(day(10), day(12));
+    await t.prisma.booking.update({
+      where: { id: ended },
+      data: {
+        checkIn: new Date(`${day(-3)}T00:00:00Z`),
+        checkOut: new Date(`${today}T00:00:00Z`),
+      },
+    });
+    const late = await checkIn(ended, 409);
+    expect(late.body.error.code).toBe('STAY_ENDED');
   });
 });

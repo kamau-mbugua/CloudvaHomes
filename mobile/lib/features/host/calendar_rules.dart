@@ -117,6 +117,13 @@ List<DayState> monthDays(String month, List<CalItem> items) {
 bool isClosedBooking(String status) =>
     const {'NO_SHOW', 'CANCELLED', 'EXPIRED', 'DECLINED'}.contains(status);
 
+/// A guest can be checked in only on a night of their stay: from the check-in day until the
+/// day before check-out (dates are "YYYY-MM-DD").
+bool canCheckIn(String status, String checkIn, String checkOut, String today) =>
+    status == 'CONFIRMED' &&
+    checkIn.compareTo(today) <= 0 &&
+    today.compareTo(checkOut) < 0;
+
 /// A guest can only fail to arrive once their stay has started (dates are "YYYY-MM-DD").
 bool canMarkNoShow(String status, String checkIn, String today) =>
     status == 'CONFIRMED' && checkIn.compareTo(today) <= 0;

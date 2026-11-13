@@ -216,6 +216,10 @@ export interface Booking {
   dueNow?: string;
   amountPaid?: string;
   amountRefunded?: string;
+  /** What the guest still owes (after payments, refunds and any write-off). */
+  owed?: string;
+  /** A balance the host gave up on (guest left without paying). */
+  writeOff?: { amount: string; at: string | null; reason: string | null } | null;
   lines?: QuoteLine[];
   payments?: StayPaymentItem[];
 }

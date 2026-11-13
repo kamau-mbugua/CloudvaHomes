@@ -24,6 +24,7 @@ import { BOOKING_INCLUDE, BookingsService } from '../bookings/bookings.service.j
 import { bookingLinkToken, bookingLinkUrl, hashAccessToken } from '../bookings/booking-link.js';
 import { nairobiToday } from '../bookings/booking-view.js';
 import { GuestNoticesService } from '../notices/guest-notices.service.js';
+import { owedOn } from '../rules/balance.js';
 import { formatStayKes } from '../rules/messages.js';
 import { locationView } from '../rules/location.js';
 import { quoteStay } from '../rules/pricing.js';
@@ -713,8 +714,7 @@ export class PublicSiteService {
         1,
         Math.round((booking.checkOut.getTime() - booking.checkIn.getTime()) / DAY_MS),
       );
-      const netPaid = booking.amountPaid - booking.amountRefunded;
-      const owed = booking.total > netPaid ? booking.total - netPaid : 0n;
+      const owed = owedOn(booking);
       const showArrivalInfo = booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN';
       const location = locationView(booking.listing);
       const addressText =
@@ -774,9 +774,7 @@ export class PublicSiteService {
     const amount =
       booking.status === 'HELD' && booking.dueNow > netPaid
         ? booking.dueNow - netPaid
-        : booking.total > netPaid
-          ? booking.total - netPaid
-          : 0n;
+        : owedOn(booking);
 
     if (amount <= 0n) {
       throw AppError.conflict('Nothing is owed on this booking', 'NOTHING_OWED');

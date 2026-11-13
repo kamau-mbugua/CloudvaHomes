@@ -120,6 +120,14 @@ export class DeclineBookingDto {
   reason?: string;
 }
 
+/** Why the host is giving up on what a guest still owes (kept on the booking and in the audit log). */
+export class WriteOffBalanceDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  reason!: string;
+}
+
 export class CancelBookingDto {
   @IsOptional()
   @IsString()

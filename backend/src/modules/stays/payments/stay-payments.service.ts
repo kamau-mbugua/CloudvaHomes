@@ -18,6 +18,7 @@ import { BookingsService, isOverlapConstraintError } from '../bookings/bookings.
 import { GuestNoticesService } from '../notices/guest-notices.service.js';
 import { assertHostOrg } from '../host-org.js';
 import { parseWholeShillings } from '../listings/listings.service.js';
+import { owedOn } from '../rules/balance.js';
 import { formatStayKes } from '../rules/messages.js';
 import type {
   BookingMpesaPromptDto,
@@ -131,9 +132,14 @@ export class StayPaymentsService {
     });
 
     if (p.kind === 'PAYMENT') {
+      // Money for a balance that was written off brings it back off the write-off.
+      const recovered = p.amount < booking.amountWrittenOff ? p.amount : booking.amountWrittenOff;
       await tx.booking.update({
         where: { id: booking.id },
-        data: { amountPaid: { increment: p.amount } },
+        data: {
+          amountPaid: { increment: p.amount },
+          ...(recovered > 0n ? { amountWrittenOff: { decrement: recovered } } : {}),
+        },
       });
       await this.afterPayment(tx, booking.id, created.id);
     } else {
@@ -513,7 +519,7 @@ export class StayPaymentsService {
     const defaultAmount =
       booking.status === 'HELD' && booking.dueNow > netPaid
         ? booking.dueNow - netPaid
-        : booking.total - netPaid;
+        : owedOn(booking);
 
     const amount =
       dto.amount !== undefined && dto.amount !== null && dto.amount !== ''

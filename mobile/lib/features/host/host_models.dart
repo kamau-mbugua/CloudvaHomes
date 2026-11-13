@@ -557,6 +557,8 @@ class HostBooking {
     this.amountPaidCents,
     this.amountRefundedCents,
     this.owedCents,
+    this.writtenOffCents,
+    this.writeOffReason,
     this.balanceDueOn,
     this.lines = const [],
     this.payments = const [],
@@ -595,6 +597,10 @@ class HostBooking {
   final int? amountPaidCents;
   final int? amountRefundedCents;
   final int? owedCents;
+
+  /// A balance the host gave up on (guest left without paying); null when none.
+  final int? writtenOffCents;
+  final String? writeOffReason;
   final String? balanceDueOn;
   final List<HostBookingLine> lines;
   final List<HostPayment> payments;
@@ -643,6 +649,12 @@ class HostBooking {
           ? hostMinorToInt(j['amountRefunded'])
           : null,
       owedCents: hasTotal ? hostMinorToInt(j['owed']) : null,
+      writtenOffCents: j['writeOff'] is Map<String, dynamic>
+          ? hostMinorToInt((j['writeOff'] as Map<String, dynamic>)['amount'])
+          : null,
+      writeOffReason: j['writeOff'] is Map<String, dynamic>
+          ? (j['writeOff'] as Map<String, dynamic>)['reason'] as String?
+          : null,
       balanceDueOn: j['balanceDueOn'] as String?,
       lines: [
         for (final l in (j['lines'] as List? ?? const []))

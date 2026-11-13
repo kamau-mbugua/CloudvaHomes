@@ -4,6 +4,7 @@ import {
   barFor,
   bookingActions,
   bookingActionsForStatus,
+  bookingBalance,
   dayColumns,
   initialCancelRefundInput,
 } from './calendar';
@@ -57,11 +58,27 @@ describe('stays/calendar & booking actions', () => {
   });
 
   it('offers no-show only from the check-in day', () => {
-    const b = { status: 'CONFIRMED' as const, checkIn: '2026-11-12' };
+    const b = { status: 'CONFIRMED' as const, checkIn: '2026-11-12', checkOut: '2026-11-14' };
     expect(bookingActions(b, '2026-11-11')).not.toContain('noShow');
-    expect(bookingActions(b, '2026-11-11')).toContain('checkIn');
     expect(bookingActions(b, '2026-11-12')).toContain('noShow');
     expect(bookingActions(b, '2026-11-14')).toContain('noShow');
+  });
+
+  it('takes the balance from the server when it sends one', () => {
+    const b = { total: '2800000', amountPaid: '1400000', amountRefunded: '0' };
+    expect(bookingBalance(b)).toBe(1_400_000n);
+    expect(bookingBalance({ ...b, owed: '0' })).toBe(0n);
+    expect(bookingBalance({ total: '100', amountPaid: '200' })).toBe(0n);
+    expect(bookingBalance({})).toBe(0n);
+  });
+
+  it('offers check-in only on a night of the stay', () => {
+    const b = { status: 'CONFIRMED' as const, checkIn: '2026-11-12', checkOut: '2026-11-14' };
+    expect(bookingActions(b, '2026-11-11')).not.toContain('checkIn');
+    expect(bookingActions(b, '2026-11-12')).toContain('checkIn');
+    expect(bookingActions(b, '2026-11-13')).toContain('checkIn');
+    expect(bookingActions(b, '2026-11-14')).not.toContain('checkIn');
+    expect(bookingActions(b, '2026-11-11')).toContain('recordPayment');
   });
 
   it('shows an unpaid no-show as not collected, and nothing due on other closed bookings', () => {

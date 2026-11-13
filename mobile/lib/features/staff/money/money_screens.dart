@@ -1136,7 +1136,8 @@ class _BookingPickerState extends ConsumerState<BookingPicker> {
 
   static InboundBooking _ref(HostBooking b) {
     final paid = (b.amountPaidCents ?? 0) - (b.amountRefundedCents ?? 0);
-    final owed = (b.totalCents ?? 0) - paid;
+    // The server's figure knows about written-off balances.
+    final owed = b.owedCents ?? (b.totalCents ?? 0) - paid;
     return InboundBooking(
       id: b.id,
       code: b.code,

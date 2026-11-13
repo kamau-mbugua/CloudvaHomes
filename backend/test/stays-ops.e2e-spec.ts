@@ -1,5 +1,6 @@
 import { hashPassword } from '../src/modules/auth/crypto.js';
 import { outbox } from '../src/modules/notifications/senders.js';
+import { nairobiToday } from '../src/modules/stays/bookings/booking-view.js';
 import {
   auth,
   createPlatformAdmin,
@@ -126,13 +127,24 @@ describe('Stays — Guests and cleaning tasks (e2e)', () => {
       })
       .expect(201);
 
-    // Check-in and check-out booking 1 -> creates OPEN cleaning task
+    // Check-in and check-out booking 1 -> creates OPEN cleaning task. Check-in is only allowed
+    // on a night of the stay, so booking 1 is moved to start today.
+    await t.prisma.booking.update({
+      where: { id: booking1Id },
+      data: { checkIn: new Date(`${nairobiToday()}T00:00:00Z`) },
+    });
     await t
       .http()
       .post(`/api/v1/host/bookings/${booking1Id}/check-in`)
       .set(auth(owner))
       .send({})
       .expect(200);
+    // Check-out needs the stay paid in full.
+    const stay1 = await t.prisma.booking.findUniqueOrThrow({ where: { id: booking1Id } });
+    await t.prisma.booking.update({
+      where: { id: booking1Id },
+      data: { amountPaid: stay1.total },
+    });
     await t
       .http()
       .post(`/api/v1/host/bookings/${booking1Id}/check-out`)

@@ -142,6 +142,8 @@ export function HostReportsPage() {
               </span>
               <span className="ad__sub">
                 Refunded: {formatKES(Number(summary.totals.refunded))}
+                {BigInt(summary.totals.writtenOff ?? '0') > 0n &&
+                  ` · Written off: ${formatKES(Number(summary.totals.writtenOff))}`}
               </span>
             </div>
 
