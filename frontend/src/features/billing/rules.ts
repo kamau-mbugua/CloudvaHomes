@@ -1,6 +1,6 @@
 import { ApiError } from '../../lib/api/client';
-import { formatKES, parseAmount } from '../../lib/money';
-import type { Invoice, MoveInCharge, RunPreviewItem, RunResult } from './types';
+import { formatKES, minorToInput, parseAmount } from '../../lib/money';
+import type { ChargeType, Invoice, MoveInCharge, RunPreviewItem, RunResult } from './types';
 
 /**
  * Pure billing rules the screens share: move-in charge amounts, which invoice actions are
@@ -60,10 +60,14 @@ export const MAX_ADHOC_LINES = 20;
 export interface DraftLine {
   description: string;
   amount: string;
+  /** Set when the line was picked from the property's charges (Billing → Charges). */
+  chargeTypeId?: string;
 }
 
+type CheckedLine = { description: string; amount: number; chargeTypeId?: string };
+
 export type CheckedLines =
-  | { ok: true; lines: { description: string; amount: number }[]; total: number }
+  | { ok: true; lines: CheckedLine[]; total: number }
   | { ok: false; errors: { description?: string; amount?: string }[]; general?: string };
 
 /**
@@ -72,7 +76,7 @@ export type CheckedLines =
  */
 export function checkAdhocLines(drafts: DraftLine[]): CheckedLines {
   const errors: { description?: string; amount?: string }[] = drafts.map(() => ({}));
-  const lines: { description: string; amount: number }[] = [];
+  const lines: CheckedLine[] = [];
   let bad = false;
 
   drafts.forEach((draft, i) => {
@@ -84,13 +88,43 @@ export function checkAdhocLines(drafts: DraftLine[]): CheckedLines {
     const amount = parseAmount(amountText);
     if (!amount.ok) { errors[i].amount = amount.error; bad = true; }
     else if (amount.minor <= 0) { errors[i].amount = 'Above zero.'; bad = true; }
-    if (description && amount.ok && amount.minor > 0) lines.push({ description, amount: amount.minor });
+    if (description && amount.ok && amount.minor > 0) {
+      lines.push({ description, amount: amount.minor, ...(draft.chargeTypeId ? { chargeTypeId: draft.chargeTypeId } : {}) });
+    }
   });
 
   if (bad) return { ok: false, errors };
   if (lines.length === 0) return { ok: false, errors, general: 'Add at least one line.' };
   if (lines.length > MAX_ADHOC_LINES) return { ok: false, errors, general: `At most ${MAX_ADHOC_LINES} lines.` };
   return { ok: true, lines, total: lines.reduce((sum, l) => sum + l.amount, 0) };
+}
+
+/** The property's charges a one-off invoice for this unit can pick: active, and for this unit. */
+export function chargesForUnit(charges: ChargeType[], unitId: string | undefined): ChargeType[] {
+  return charges.filter((c) => c.status === 'ACTIVE' && (!c.unitIds.length || (unitId !== undefined && c.unitIds.includes(unitId))));
+}
+
+/** How a charge reads in the picker: "Garbage · KES 300 a month", "Water · KES 150 per m³". */
+export function chargeOptionLabel(c: ChargeType): string {
+  if (c.kind === 'FIXED' && c.amount !== null) return `${c.name} · ${formatKES(c.amount)} a month`;
+  if (c.kind === 'METERED' && c.unitRate !== null) return `${c.name} · ${formatKES(c.unitRate)} per ${c.unitLabel ?? 'unit'}`;
+  return `${c.name} · amount varies`;
+}
+
+/**
+ * Adds a picked charge as a line: its name, and its monthly amount when it has a fixed one (a
+ * varying or metered charge leaves the amount to type). Fills the first blank row first.
+ */
+export function addChargeLine(lines: DraftLine[], c: ChargeType): DraftLine[] {
+  const line: DraftLine = {
+    description: c.name,
+    amount: c.kind === 'FIXED' && c.amount !== null ? minorToInput(c.amount) : '',
+    chargeTypeId: c.id,
+  };
+  const blank = lines.findIndex((l) => !l.description.trim() && !l.amount.trim());
+  if (blank >= 0) return lines.map((l, i) => (i === blank ? line : l));
+  if (lines.length >= MAX_ADHOC_LINES) return lines;
+  return [...lines, line];
 }
 
 /** Running total of the rows that parse, for the sheet's footer while typing. */

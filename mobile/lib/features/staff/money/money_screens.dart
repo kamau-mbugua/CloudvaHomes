@@ -17,6 +17,7 @@ import '../../host/host_models.dart';
 import '../staff_api.dart';
 import '../staff_models.dart';
 import '../staff_widgets.dart';
+import 'charge_pick.dart';
 
 /// Money tab: payments, invoices and unmatched M-Pesa, each shown with its permission.
 class MoneyScreen extends ConsumerWidget {
@@ -1364,6 +1365,17 @@ class _AdHocInvoiceSheet extends ConsumerStatefulWidget {
 
 class _AdHocInvoiceSheetState extends ConsumerState<_AdHocInvoiceSheet> {
   TenantRef? _tenant;
+
+  /// The tenant's current tenancy, read when the tenant is chosen.
+  ({String tenancyId, String unitId, String propertyId, String propertyName})?
+  _tenancy;
+
+  /// The property's charges this unit can be billed (Billing → Charges).
+  List<Json> _charges = const [];
+
+  /// Set when the line was picked from those charges.
+  ({String id, String name})? _charge;
+  bool _loadingTenant = false;
   final _desc = TextEditingController();
   final _amount = TextEditingController();
   late final DateTime _dueDate = nairobiToday().add(const Duration(days: 5));
@@ -1375,6 +1387,78 @@ class _AdHocInvoiceSheetState extends ConsumerState<_AdHocInvoiceSheet> {
     _desc.dispose();
     _amount.dispose();
     super.dispose();
+  }
+
+  Future<void> _chooseTenant(TenantRef picked) async {
+    setState(() {
+      _tenant = picked;
+      _tenancy = null;
+      _charges = const [];
+      _charge = null;
+      _error = null;
+      _loadingTenant = true;
+    });
+    try {
+      final api = ref.read(staffApiProvider);
+      final t = await api.tenant(picked.id);
+      if (t.units.isEmpty) {
+        setState(
+          () => _error = 'This tenant does not have an active tenancy yet.',
+        );
+        return;
+      }
+      final u = t.units.first;
+      final charges = can(ref, 'charges:view') && u.propertyId.isNotEmpty
+          ? chargesForUnit(await api.propertyCharges(u.propertyId), u.unitId)
+          : const <Json>[];
+      if (!mounted || _tenant?.id != picked.id) return;
+      setState(() {
+        _tenancy = (
+          tenancyId: u.tenancyId,
+          unitId: u.unitId,
+          propertyId: u.propertyId,
+          propertyName: u.propertyName,
+        );
+        _charges = charges;
+      });
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = staffErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _loadingTenant = false);
+    }
+  }
+
+  Future<void> _pickCharge() async {
+    final c = await showModalBottomSheet<Json>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Charges at ${_tenancy?.propertyName ?? 'this property'}',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+            ),
+            for (final c in _charges)
+              ListTile(
+                title: Text(chargeOptionLabel(c)),
+                onTap: () => Navigator.of(ctx).pop(c),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (c == null || !mounted) return;
+    final line = chargeLineFor(c);
+    setState(() {
+      _desc.text = line.description;
+      _amount.text = line.amount;
+      _charge = (id: c['id'] as String, name: line.description);
+    });
   }
 
   Future<void> _save() async {
@@ -1393,18 +1477,22 @@ class _AdHocInvoiceSheetState extends ConsumerState<_AdHocInvoiceSheet> {
       _error = null;
     });
     try {
-      final t = await ref.read(staffApiProvider).tenant(_tenant!.id);
-      if (t.units.isEmpty) {
+      final tenancyId = _tenancy?.tenancyId;
+      if (tenancyId == null) {
         setState(
           () => _error = 'This tenant does not have an active tenancy yet.',
         );
         return;
       }
       await ref.read(staffApiProvider).createInvoice({
-        'tenancyId': t.units.first.tenancyId,
+        'tenancyId': tenancyId,
         'dueDate': toDay(_dueDate),
         'lines': [
-          {'description': _desc.text.trim(), 'amount': cents},
+          {
+            'description': _desc.text.trim(),
+            'amount': cents,
+            if (_charge != null) 'chargeTypeId': _charge!.id,
+          },
         ],
       });
       invalidateAfterPayment(ref, tenantId: _tenant!.id);
@@ -1453,9 +1541,38 @@ class _AdHocInvoiceSheetState extends ConsumerState<_AdHocInvoiceSheet> {
                   showDragHandle: true,
                   builder: (_) => const TenantPicker(),
                 );
-                if (picked != null) setState(() => _tenant = picked);
+                if (picked != null) await _chooseTenant(picked);
               },
             ),
+            if (_loadingTenant) ...[
+              const SizedBox(height: 8),
+              const LinearProgressIndicator(),
+            ],
+            if (_charges.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.playlist_add_outlined),
+                label: Text(
+                  'Pick a charge from ${_tenancy?.propertyName ?? 'the property'}',
+                ),
+                onPressed: _pickCharge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Monthly charges are added by the invoice run. Pick one here for an extra or missed charge.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (_charge != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: InputChip(
+                  label: Text('Charge: ${_charge!.name}'),
+                  onDeleted: () => setState(() => _charge = null),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _desc,

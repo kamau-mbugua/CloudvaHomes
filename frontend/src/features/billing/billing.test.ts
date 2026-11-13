@@ -3,8 +3,10 @@ import { ApiError } from '../../lib/api/client';
 import { billingErrorMessage } from './api';
 import { INVOICE_STATUS } from './labels';
 import { labelFor } from '../portfolio/labels';
+import type { ChargeType } from './types';
 import {
-  activeMoveInCharges, canCreditInvoice, canVoidInvoice, checkAdhocLines, checkCreditAmount, checkDueDays, draftTotal,
+  activeMoveInCharges, addChargeLine, canCreditInvoice, canVoidInvoice, chargeOptionLabel, chargesForUnit, checkAdhocLines,
+  checkCreditAmount, checkDueDays, draftTotal,
   moveInChargeAmount, moveInChargeRule, readRunPreview, readRunResult, splitRowErrors, uploadRowErrors,
 } from './rules';
 
@@ -54,6 +56,41 @@ describe('invoice actions', () => {
   it('labels every status, unknown ones raw', () => {
     expect(labelFor(INVOICE_STATUS, 'PARTIALLY_PAID').label).toBe('Part paid');
     expect(labelFor(INVOICE_STATUS, 'DRAFT')).toEqual({ label: 'DRAFT', tone: 'ad__badge--off' });
+  });
+});
+
+describe('picking property charges for a one-off invoice', () => {
+  const charge = (over: Partial<ChargeType>): ChargeType => ({
+    id: 'c1', property: { id: 'p1', code: 'P', name: 'Makini' }, name: 'Garbage', kind: 'FIXED', amount: 30000,
+    unitRate: null, unitLabel: null, unitIds: [], status: 'ACTIVE', meterCount: 0, createdAt: '', updatedAt: '', ...over,
+  });
+  const garbage = charge({});
+  const parking = charge({ id: 'c2', name: 'Parking', amount: 100000, unitIds: ['u3'] });
+  const water = charge({ id: 'c3', name: 'Water', kind: 'METERED', amount: null, unitRate: 15000, unitLabel: 'm³' });
+  const power = charge({ id: 'c4', name: 'Electricity', kind: 'VARIABLE', amount: null });
+  const old = charge({ id: 'c5', name: 'Old fee', status: 'INACTIVE' });
+
+  it('offers the active charges that apply to the unit', () => {
+    const all = [garbage, parking, water, power, old];
+    expect(chargesForUnit(all, 'u1').map((c) => c.name)).toEqual(['Garbage', 'Water', 'Electricity']);
+    expect(chargesForUnit(all, 'u3').map((c) => c.name)).toEqual(['Garbage', 'Parking', 'Water', 'Electricity']);
+  });
+
+  it('describes each charge', () => {
+    expect(chargeOptionLabel(garbage)).toBe('Garbage · KES 300.00 a month');
+    expect(chargeOptionLabel(water)).toBe('Water · KES 150.00 per m³');
+    expect(chargeOptionLabel(power)).toBe('Electricity · amount varies');
+  });
+
+  it('fills the blank row first, then adds rows; a varying charge leaves the amount to type', () => {
+    const one = addChargeLine([{ description: '', amount: '' }], garbage);
+    expect(one).toEqual([{ description: 'Garbage', amount: '300', chargeTypeId: 'c1' }]);
+    const two = addChargeLine(one, power);
+    expect(two[1]).toEqual({ description: 'Electricity', amount: '', chargeTypeId: 'c4' });
+    expect(checkAdhocLines([one[0]!, { description: 'Lost key', amount: '500' }])).toMatchObject({
+      ok: true,
+      lines: [{ description: 'Garbage', amount: 30000, chargeTypeId: 'c1' }, { description: 'Lost key', amount: 50000 }],
+    });
   });
 });
 

@@ -315,7 +315,13 @@ class Tenant {
   /// CURRENT, PAST or PROSPECT.
   final String status;
   final List<
-    ({String tenancyId, String unitId, String unitNumber, String propertyName})
+    ({
+      String tenancyId,
+      String unitId,
+      String unitNumber,
+      String propertyId,
+      String propertyName,
+    })
   >
   units;
 
@@ -338,6 +344,7 @@ class Tenant {
           tenancyId: _s(u['tenancyId']) ?? '',
           unitId: _s(u['unitId']) ?? '',
           unitNumber: _s(u['unitNumber']) ?? '',
+          propertyId: _s(u['propertyId']) ?? '',
           propertyName: _s(u['propertyName']) ?? '',
         ),
     ],

@@ -90,6 +90,13 @@ class AdhocLineDto {
 
   @IsMinorAmount()
   amount!: number;
+
+  @ApiPropertyOptional({
+    description: 'The property charge this line bills (picked from Billing → Charges)',
+  })
+  @IsOptional()
+  @IsUUID()
+  chargeTypeId?: string;
 }
 
 export class CreateAdhocInvoiceDto {

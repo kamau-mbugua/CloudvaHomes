@@ -442,6 +442,14 @@ class StaffApi {
   Future<List<Json>> chargeTypes() async =>
       _rows(await _api.get('/charge-types'));
 
+  /// A property's active charges (garbage, security…), for picking on a one-off invoice.
+  Future<List<Json>> propertyCharges(String propertyId) async => _rows(
+    await _api.get(
+      '/charge-types',
+      query: {'propertyId': propertyId, 'status': 'ACTIVE'},
+    ),
+  );
+
   Future<Json> createChargeType(Json body) async =>
       _data(await _api.post('/charge-types', body: body));
 

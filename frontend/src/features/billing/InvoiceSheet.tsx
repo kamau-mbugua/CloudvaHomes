@@ -14,19 +14,20 @@ import { useDebounced } from '../portfolio/hooks';
 import { TENANCY_STATUS, labelFor, personName } from '../portfolio/labels';
 import type { Tenancy } from '../portfolio/types';
 import { Field } from '../portfolio/ui';
-import { AFTER_INVOICE_KEYS, billingErrorMessage } from './api';
-import { MAX_ADHOC_LINES, checkAdhocLines, draftTotal, splitRowErrors } from './rules';
+import { AFTER_INVOICE_KEYS, billingErrorMessage, useChargeTypes } from './api';
+import { MAX_ADHOC_LINES, addChargeLine, chargeOptionLabel, chargesForUnit, checkAdhocLines, draftTotal, splitRowErrors } from './rules';
 import type { DraftLine } from './rules';
 import type { Invoice } from './types';
 
 /**
  * A one-off invoice (`POST /invoices`, kind ADHOC) — repairs, penalties, damages after a
- * move-out. Pick a tenancy (ended ones too), add 1–20 description/amount lines and,
- * optionally, a due date; otherwise the organisation's "due after N days" applies.
+ * move-out, or an extra/missed property charge picked from Billing → Charges. Pick a tenancy
+ * (ended ones too), add 1–20 description/amount lines and, optionally, a due date; otherwise
+ * the organisation's "due after N days" applies.
  */
 
 type PickedTenancy = Pick<Tenancy, 'id' | 'status' | 'startDate' | 'endDate' | 'tenant'> & {
-  unit: { id: string; number: string; property: { name: string } };
+  unit: { id: string; number: string; property: { id: string; name: string } };
 };
 
 const EMPTY_LINE: DraftLine = { description: '', amount: '' };
@@ -36,6 +37,7 @@ export function InvoiceSheet({ tenancy, onClose }: { tenancy?: PickedTenancy; on
   const queryClient = useQueryClient();
   const toast = useToast();
   const canSearch = useCan('tenancies:view');
+  const canSeeCharges = useCan('charges:view');
   const [picked, setPicked] = useState<PickedTenancy | null>(tenancy ?? null);
   const [search, setSearch] = useState('');
   const term = useDebounced(search.trim());
@@ -93,6 +95,10 @@ export function InvoiceSheet({ tenancy, onClose }: { tenancy?: PickedTenancy; on
     });
   };
 
+  const charges = useChargeTypes({ propertyId: picked?.unit.property.id, status: 'ACTIVE' }, canSeeCharges && Boolean(picked));
+  const pickable = chargesForUnit(charges.data ?? [], picked?.unit.id);
+  const chargeName = new Map(pickable.map((c) => [c.id, c.name]));
+
   const rows = tenancies.data?.data ?? [];
   const total = draftTotal(lines);
 
@@ -143,6 +149,19 @@ export function InvoiceSheet({ tenancy, onClose }: { tenancy?: PickedTenancy; on
 
         <div className="bl__lines" role="group" aria-label="Lines">
           <span className="fld__label">Lines</span>
+          {pickable.length > 0 ? (
+            <div className="fld">
+              <select aria-label="Add a property charge" value="" disabled={lines.length >= MAX_ADHOC_LINES && lines.every((l) => l.description.trim() || l.amount.trim())}
+                onChange={(e) => {
+                  const c = pickable.find((x) => x.id === e.target.value);
+                  if (c) setLines((all) => addChargeLine(all, c));
+                }}>
+                <option value="">Add a charge from {picked?.unit.property.name}…</option>
+                {pickable.map((c) => <option key={c.id} value={c.id}>{chargeOptionLabel(c)}</option>)}
+              </select>
+              <span className="hint">Monthly charges are added by the invoice run. Pick one here for an extra or missed charge.</span>
+            </div>
+          ) : null}
           {lines.map((line, i) => {
             const err = lineErrors[i] ?? {};
             return (
@@ -151,6 +170,9 @@ export function InvoiceSheet({ tenancy, onClose }: { tenancy?: PickedTenancy; on
                   <input aria-label={`Line ${i + 1} description`} value={line.description} placeholder="e.g. Broken window repair"
                     maxLength={200} autoComplete="off" onChange={(e) => setLine(i, { description: e.target.value })} aria-invalid={Boolean(err.description)} />
                   {err.description ? <span className="fld__err">{err.description}</span> : null}
+                  {line.chargeTypeId && chargeName.has(line.chargeTypeId) ? (
+                    <span className="hint">Charge: {chargeName.get(line.chargeTypeId)}</span>
+                  ) : null}
                 </div>
                 <div className={`fld bl__lineamt ${err.amount ? 'is-bad' : ''}`}>
                   <input aria-label={`Line ${i + 1} amount`} value={line.amount} placeholder="Amount" inputMode="decimal" autoComplete="off"

@@ -356,7 +356,62 @@ describe('Billing (e2e)', () => {
       dueDate: STARTED,
       overdue: true,
     });
-    expect(adhoc.lines[0]).toMatchObject({ kind: 'ADJUSTMENT', description: 'Replacement key' });
+    expect(adhoc.lines[0]).toMatchObject({
+      kind: 'ADJUSTMENT',
+      description: 'Replacement key',
+      chargeTypeId: null,
+    });
+
+    // Lines picked from the property's charges stay linked to the charge.
+    const picked = (
+      await post(
+        owner,
+        '/invoices',
+        {
+          tenancyId: s.t1.id,
+          lines: [
+            {
+              description: 'Garbage (missed October)',
+              amount: KES(300),
+              chargeTypeId: s.garbage.id,
+            },
+            { description: 'Lost gate card', amount: KES(500) },
+          ],
+        },
+        201,
+      )
+    ).data;
+    expect(picked.total).toBe(KES(800));
+    expect(picked.lines).toMatchObject([
+      { kind: 'CHARGE', description: 'Garbage (missed October)', chargeTypeId: s.garbage.id },
+      { kind: 'ADJUSTMENT', description: 'Lost gate card', chargeTypeId: null },
+    ]);
+    // A charge from another property can't be billed to this tenancy.
+    const other = (await post(owner, '/properties', { name: 'Other Block', code: 'OTH' }, 201))
+      .data;
+    const elsewhere = (
+      await post(
+        owner,
+        '/charge-types',
+        { propertyId: other.id, name: 'Security', kind: 'FIXED', amount: KES(500) },
+        201,
+      )
+    ).data;
+    const refused = await post(
+      owner,
+      '/invoices',
+      {
+        tenancyId: s.t1.id,
+        lines: [
+          { description: 'Lost gate card', amount: KES(500) },
+          { description: 'Security', amount: KES(500), chargeTypeId: elsewhere.id },
+        ],
+      },
+      422,
+    );
+    expect(refused.error.details).toEqual([
+      { field: 'lines.1.chargeTypeId', message: 'Pick a charge of this property' },
+    ]);
     const { invoiceIds } = (await post(owner, '/invoices/run', { date: RUN_DATE })).data;
     const monthly = (await get(owner, `/invoices/${invoiceIds[0]}`)).data;
     expect(monthly.dueDate).toBe(formatDateOnly(addDays(parseDateOnly(RUN_DATE), 14)));

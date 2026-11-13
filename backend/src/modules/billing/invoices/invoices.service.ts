@@ -247,6 +247,7 @@ export class InvoicesService {
         unitAmount: l.unitAmount,
         amount: l.amount,
         refundable: l.refundable,
+        chargeTypeId: l.chargeTypeId,
       })),
       creditNotes: i.creditNotes.map((c) => ({
         id: c.id,
@@ -266,10 +267,30 @@ export class InvoicesService {
     };
   }
 
-  /** One-off invoice with free-text lines (repairs, damages, penalties). */
+  /**
+   * One-off invoice: free-text lines (repairs, damages, penalties), or lines picked from the
+   * property's charges (an extra or missed garbage, security… charge), which stay linked to it.
+   */
   async createAdhoc(dto: CreateAdhocInvoiceDto) {
     const ctx = orgContext();
     const tenancy = await this.findTenancy(dto.tenancyId);
+    const picked = [...new Set(dto.lines.flatMap((l) => (l.chargeTypeId ? [l.chargeTypeId] : [])))];
+    if (picked.length) {
+      const valid = new Set(
+        (
+          await this.db.chargeType.findMany({
+            where: { id: { in: picked }, propertyId: tenancy.unit.propertyId, status: 'ACTIVE' },
+            select: { id: true },
+          })
+        ).map((c) => c.id),
+      );
+      const wrong = dto.lines.flatMap((l, i) =>
+        l.chargeTypeId && !valid.has(l.chargeTypeId)
+          ? [{ field: `lines.${i}.chargeTypeId`, message: 'Pick a charge of this property' }]
+          : [],
+      );
+      if (wrong.length) throw AppError.validation(wrong);
+    }
     const today = todayInNairobi();
     const id = await this.db.$transaction((tx) =>
       this.issuer.issue(tx, {
@@ -280,11 +301,12 @@ export class InvoicesService {
         issueDate: parseDateOnly(today),
         dueDate: dto.dueDate ? parseDateOnly(dto.dueDate) : undefined,
         lines: dto.lines.map((l) => ({
-          kind: 'ADJUSTMENT',
+          kind: l.chargeTypeId ? 'CHARGE' : 'ADJUSTMENT',
           description: l.description.trim(),
           quantity: '1.000',
           unitAmount: BigInt(l.amount),
           amount: BigInt(l.amount),
+          ...(l.chargeTypeId ? { chargeTypeId: l.chargeTypeId } : {}),
         })),
         createdById: ctx.userId,
       }),

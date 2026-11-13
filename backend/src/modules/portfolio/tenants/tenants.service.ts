@@ -31,7 +31,9 @@ const INCLUDE = {
     select: {
       id: true,
       status: true,
-      unit: { select: { id: true, number: true, property: { select: { name: true } } } },
+      unit: {
+        select: { id: true, number: true, property: { select: { id: true, name: true } } },
+      },
     },
     orderBy: { startDate: 'desc' },
   },
@@ -144,6 +146,7 @@ export class TenantsService {
         tenancyId: x.id,
         unitId: x.unit.id,
         unitNumber: x.unit.number,
+        propertyId: x.unit.property.id,
         propertyName: x.unit.property.name,
       })),
       createdAt: t.createdAt,

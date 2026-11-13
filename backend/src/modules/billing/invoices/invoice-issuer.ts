@@ -285,6 +285,7 @@ export class InvoiceIssuer {
             unitAmount: l.unitAmount,
             amount: l.amount,
             refundable: l.refundable,
+            chargeTypeId: l.chargeTypeId,
           })),
           creditNotes: [],
           payments: [],
