@@ -1964,6 +1964,8 @@ enum SmsLogStatus {
   SENT
   FAILED
   NO_UNITS
+  /// No SMS provider was set up: only written to the server log, never sent.
+  LOGGED
 }
 
 enum SmsLedgerKind {

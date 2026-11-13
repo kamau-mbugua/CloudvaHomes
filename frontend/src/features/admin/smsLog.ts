@@ -70,6 +70,7 @@ export const ROUTE_LABEL: Record<SmsRoute, string> = {
 export function smsStatus(s: SmsUsageStatus): { label: string; tone: 'ok' | 'bad' | 'warn' } {
   if (s === 'SENT') return { label: 'Sent', tone: 'ok' };
   if (s === 'FAILED') return { label: 'Failed', tone: 'bad' };
+  if (s === 'LOGGED') return { label: 'Not sent: no provider', tone: 'warn' };
   return { label: 'No units', tone: 'warn' };
 }
 
@@ -130,6 +131,11 @@ export function niceMax(n: number): number {
 }
 
 /** Percent of `part` in `whole` for bar widths, 0 when there is nothing. */
+/** Messages that never reached a provider: out of units or no provider set up. */
+export function notSent(r: { noUnits: number; logged: number }): number {
+  return r.noUnits + r.logged;
+}
+
 export function share(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0;
 }
@@ -183,17 +189,19 @@ export interface SmsStats {
     sent: number;
     failed: number;
     noUnits: number;
+    /** Only written to the server log: no SMS provider was set up. */
+    logged: number;
     successRate: number | null;
     unitsUsed: number;
     kodihubMessages: number;
     orgMessages: number;
   };
   money: { unitsSold: number; amountPaid: string; unitsHeld: number };
-  daily: { day: string; sent: number; failed: number; noUnits: number }[];
+  daily: { day: string; sent: number; failed: number; noUnits: number; logged: number }[];
   byProvider: (Counts & { provider: SmsProvider })[];
-  byType: (Counts & { type: string; kind: SmsKind; noUnits: number })[];
+  byType: (Counts & { type: string; kind: SmsKind; noUnits: number; logged: number })[];
   byRoute: (Counts & { route: SmsRoute })[];
-  topOrgs: (Counts & { orgId: string; name: string; noUnits: number; units: number })[];
+  topOrgs: (Counts & { orgId: string; name: string; noUnits: number; logged: number; units: number })[];
   lowBalance: { orgId: string; name: string; balance: number; lowBalanceLevel: number }[];
   failing: {
     orgId: string;

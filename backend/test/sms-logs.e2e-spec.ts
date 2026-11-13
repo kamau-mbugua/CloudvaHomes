@@ -88,6 +88,7 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
 
   describe('message text', () => {
     it('keeps the text of each SMS with its code hidden until revealed with a reason', async () => {
+      await hostPinnacle();
       await t.app
         .get(NotificationsService)
         .sendCode({ phone: PHONE, email: null }, 'login', '482913', 10);
@@ -135,6 +136,7 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
     });
 
     it('keeps organisation messages whole and has nothing to reveal', async () => {
+      await hostPinnacle();
       await sms.send({ kind: 'org', orgId, type: 'booking' }, PHONE, 'Your stay is confirmed.');
       const [row] = (await get(admin, '/platform/sms/logs')).data;
       expect(row).toMatchObject({
@@ -270,6 +272,8 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
 
   describe('dashboard', () => {
     it('counts, charts and breaks down SMS for a period', async () => {
+      // No provider yet: the server only writes this one to its log.
+      await sms.send({ kind: 'org', orgId: otherOrgId, type: 'booking' }, PHONE, 'Logged.');
       await hostPinnacle();
       await sms.send({ kind: 'org', orgId, type: 'booking' }, PHONE, 'Booking one.');
       await sms.send({ kind: 'org', orgId, type: 'booking' }, PHONE, 'Booking two.');
@@ -281,16 +285,17 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
 
       const s = (await get(admin, `/platform/sms/stats?from=${TODAY}&to=${TODAY}`)).data;
       expect(s.totals).toMatchObject({
-        messages: 5,
+        messages: 6,
         sent: 3,
         failed: 1,
         noUnits: 1,
-        successRate: 0.6,
+        logged: 1,
+        successRate: 0.5,
         unitsUsed: 2,
         kodihubMessages: 2,
-        orgMessages: 3,
+        orgMessages: 4,
       });
-      expect(s.daily).toEqual([{ day: TODAY, sent: 3, failed: 1, noUnits: 1 }]);
+      expect(s.daily).toEqual([{ day: TODAY, sent: 3, failed: 1, noUnits: 1, logged: 1 }]);
       expect(s.byProvider).toEqual(
         expect.arrayContaining([{ provider: 'HOSTPINNACLE', sent: 3, failed: 1 }]),
       );
@@ -301,6 +306,16 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
         ]),
       );
       expect(s.topOrgs[0]).toMatchObject({ orgId, name: 'Makini Homes', sent: 2, units: 2 });
+      expect(s.topOrgs[1]).toMatchObject({
+        orgId: otherOrgId,
+        sent: 0,
+        noUnits: 1,
+        logged: 1,
+        units: 0,
+      });
+      expect((await get(admin, '/platform/sms/logs?status=LOGGED')).data).toMatchObject([
+        { organization: { id: otherOrgId }, status: 'LOGGED', units: 0, provider: null },
+      ]);
       expect(s.lowBalance).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ orgId: otherOrgId, name: 'Baraka Lettings', balance: 0 }),

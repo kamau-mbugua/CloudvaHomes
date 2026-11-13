@@ -1,7 +1,8 @@
 /** Organisation SMS (docs/specs/2026-11-08-sms-platform-and-org-design.md). Money in cents, as strings. */
 
 export type SmsProvider = 'AFRICASTALKING' | 'TEXTSMS' | 'HOSTPINNACLE';
-export type SmsUsageStatus = 'SENT' | 'FAILED' | 'NO_UNITS';
+/** LOGGED: no SMS provider was set up, so the server only wrote it to its log — never sent. */
+export type SmsUsageStatus = 'SENT' | 'FAILED' | 'NO_UNITS' | 'LOGGED';
 export type SmsPurchaseState = 'PENDING' | 'PAID' | 'FAILED';
 
 export interface SmsAccountView {

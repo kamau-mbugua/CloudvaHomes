@@ -25,6 +25,7 @@ describe('smsStatus', () => {
     expect(smsStatus('SENT')).toEqual({ label: 'Sent', tone: 'ok' });
     expect(smsStatus('FAILED')).toEqual({ label: 'Failed', tone: 'bad' });
     expect(smsStatus('NO_UNITS')).toEqual({ label: 'No units', tone: 'warn' });
+    expect(smsStatus('LOGGED')).toEqual({ label: 'Not sent: no provider', tone: 'warn' });
   });
 });
 

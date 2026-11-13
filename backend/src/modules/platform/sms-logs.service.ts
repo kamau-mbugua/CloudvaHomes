@@ -168,7 +168,10 @@ export class SmsLogsService {
       await Promise.all([
         this.db.smsLog.groupBy({ by: ['status'], where, _count: { _all: true } }),
         this.db.smsLog.groupBy({ by: ['kind'], where, _count: { _all: true } }),
-        this.db.smsLog.aggregate({ where: { ...where, status: 'SENT' }, _sum: { units: true } }),
+        this.db.smsLog.aggregate({
+          where: { ...where, kind: 'ORG', status: 'SENT' },
+          _sum: { units: true },
+        }),
         this.db.$queryRaw<{ day: string; status: SmsLogStatus; n: number }[]>`
           SELECT to_char(("createdAt" + interval '3 hours')::date, 'YYYY-MM-DD') AS day,
                  "status", count(*)::int AS n
@@ -229,17 +232,15 @@ export class SmsLogsService {
     const sent = count('SENT');
     const failed = count('FAILED');
     const noUnits = count('NO_UNITS');
-    const messages = sent + failed + noUnits;
+    const logged = count('LOGGED');
+    const messages = sent + failed + noUnits + logged;
 
     const dailyMap = new Map(
-      daysBetween(from, to).map((day) => [day, { day, sent: 0, failed: 0, noUnits: 0 }]),
+      daysBetween(from, to).map((day) => [day, { day, sent: 0, failed: 0, noUnits: 0, logged: 0 }]),
     );
     for (const d of daily) {
       const row = dailyMap.get(d.day);
-      if (!row) continue;
-      if (d.status === 'SENT') row.sent += d.n;
-      else if (d.status === 'FAILED') row.failed += d.n;
-      else row.noUnits += d.n;
+      if (row) bump(row, d.status, d.n);
     }
 
     const providerMap = new Map<
@@ -256,7 +257,7 @@ export class SmsLogsService {
 
     const typeMap = new Map<
       string,
-      { type: string; kind: string; sent: number; failed: number; noUnits: number }
+      { type: string; kind: string; sent: number; failed: number; noUnits: number; logged: number }
     >();
     for (const ty of types) {
       const key = `${ty.kind}:${ty.type}`;
@@ -266,6 +267,7 @@ export class SmsLogsService {
         sent: 0,
         failed: 0,
         noUnits: 0,
+        logged: 0,
       };
       bump(row, ty.status, ty._count._all);
       typeMap.set(key, row);
@@ -282,7 +284,15 @@ export class SmsLogsService {
 
     const orgMap = new Map<
       string,
-      { orgId: string; name: string; sent: number; failed: number; noUnits: number; units: number }
+      {
+        orgId: string;
+        name: string;
+        sent: number;
+        failed: number;
+        noUnits: number;
+        logged: number;
+        units: number;
+      }
     >();
     for (const o of orgRows) {
       if (!o.orgId) continue;
@@ -292,15 +302,14 @@ export class SmsLogsService {
         sent: 0,
         failed: 0,
         noUnits: 0,
+        logged: 0,
         units: 0,
       };
       bump(row, o.status, o._count._all);
       row.units += o._sum.units ?? 0;
       orgMap.set(o.orgId, row);
     }
-    const topOrgs = [...orgMap.values()]
-      .sort((a, b) => b.sent + b.failed + b.noUnits - (a.sent + a.failed + a.noUnits))
-      .slice(0, 10);
+    const topOrgs = [...orgMap.values()].sort((a, b) => all(b) - all(a)).slice(0, 10);
 
     const names = await this.orgNames([
       ...topOrgs.map((o) => o.orgId),
@@ -320,6 +329,7 @@ export class SmsLogsService {
         sent,
         failed,
         noUnits,
+        logged,
         successRate: messages ? Math.round((sent / messages) * 1000) / 1000 : null,
         unitsUsed: units._sum.units ?? 0,
         kodihubMessages: kindCount('PLATFORM'),
@@ -358,12 +368,18 @@ export class SmsLogsService {
   }
 }
 
-function bump(
-  row: { sent: number; failed: number; noUnits: number },
-  status: SmsLogStatus,
-  n: number,
-) {
+interface StatusCounts {
+  sent: number;
+  failed: number;
+  noUnits: number;
+  logged: number;
+}
+
+function bump(row: StatusCounts, status: SmsLogStatus, n: number) {
   if (status === 'SENT') row.sent += n;
   else if (status === 'FAILED') row.failed += n;
+  else if (status === 'LOGGED') row.logged += n;
   else row.noUnits += n;
 }
+
+const all = (r: StatusCounts) => r.sent + r.failed + r.noUnits + r.logged;

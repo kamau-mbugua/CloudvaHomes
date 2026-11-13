@@ -89,6 +89,7 @@ export function AdminSmsMessages({ orgId, from: fixedFrom, to: fixedTo }: { orgI
           <option value="SENT">Sent</option>
           <option value="FAILED">Failed</option>
           <option value="NO_UNITS">No units</option>
+          <option value="LOGGED">Not sent: no provider</option>
         </select>
         <select className="ad__select" aria-label="Message type" value={type} onChange={(e) => reset(setType)(e.target.value)}>
           <option value="">All messages</option>

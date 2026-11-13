@@ -26,10 +26,10 @@ export class UpdateSmsDto {
 }
 
 export class SmsUsageQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ enum: ['SENT', 'FAILED', 'NO_UNITS'] })
+  @ApiPropertyOptional({ enum: ['SENT', 'FAILED', 'NO_UNITS', 'LOGGED'] })
   @IsOptional()
-  @IsIn(['SENT', 'FAILED', 'NO_UNITS'])
-  status?: 'SENT' | 'FAILED' | 'NO_UNITS';
+  @IsIn(['SENT', 'FAILED', 'NO_UNITS', 'LOGGED'])
+  status?: 'SENT' | 'FAILED' | 'NO_UNITS' | 'LOGGED';
   @IsOptional() @IsDateOnly({ optional: true }) from?: string;
   @IsOptional() @IsDateOnly({ optional: true }) to?: string;
 }
@@ -89,7 +89,7 @@ export class SmsReportQueryDto {
   month!: string;
 }
 
-const SMS_STATUSES = ['SENT', 'FAILED', 'NO_UNITS'] as const;
+const SMS_STATUSES = ['SENT', 'FAILED', 'NO_UNITS', 'LOGGED'] as const;
 
 /** KodiHub admin list of every SMS. Dates are Nairobi days. */
 export class SmsLogsQueryDto extends PaginationQueryDto {

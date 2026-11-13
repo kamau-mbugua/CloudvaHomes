@@ -43,7 +43,12 @@ export function bundleAmount(units: number, unitPrice: number): number {
 }
 
 export function usageStatusLabel(s: SmsUsageStatus): string {
-  return { SENT: 'Sent', FAILED: 'Failed', NO_UNITS: 'Not sent — no SMS units' }[s];
+  return {
+    SENT: 'Sent',
+    FAILED: 'Failed',
+    NO_UNITS: 'Not sent — no SMS units',
+    LOGGED: 'Not sent — no SMS provider',
+  }[s];
 }
 
 /** A purchase followed with the M-Pesa prompt hook: paid = success. */

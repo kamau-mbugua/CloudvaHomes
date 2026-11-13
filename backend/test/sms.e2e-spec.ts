@@ -39,6 +39,21 @@ describe('SMS: platform vs organisation (e2e)', () => {
   const ledger = () =>
     t.prisma.smsLedgerEntry.findMany({ where: { orgId }, orderBy: { createdAt: 'asc' } });
   const sentTo = (to: string) => outbox.filter((m) => m.channel === 'sms' && m.to === to);
+  /** KodiHub's provider, saved in platform settings (a test sender; 'test-reject' fails). */
+  const platformProvider = (apiKey = 'ok', extra: Record<string, unknown> = {}) => {
+    const data = {
+      smsProvider: 'TEXTSMS' as const,
+      textsmsPartnerId: '1',
+      textsmsSenderId: 'KODIHUB',
+      textsmsKeyEnc: Buffer.from(cipher.encrypt(apiKey, 'platform.sms.textsms')),
+      ...extra,
+    };
+    return t.prisma.platformSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, ...data },
+      update: data,
+    });
+  };
 
   beforeAll(async () => {
     t = await createTestApp();
@@ -61,6 +76,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
     await t.prisma.smsLedgerEntry.deleteMany({ where: { orgId } });
     await t.prisma.smsLog.deleteMany({});
     await t.prisma.platformSettings.deleteMany({});
+    await platformProvider();
     await setAccount({
       mode: 'PLATFORM',
       provider: null,
@@ -209,15 +225,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
   });
 
   it('refunds units when the provider rejects', async () => {
-    await t.prisma.platformSettings.create({
-      data: {
-        id: 1,
-        smsProvider: 'TEXTSMS',
-        textsmsPartnerId: '1',
-        textsmsSenderId: 'KODIHUB',
-        textsmsKeyEnc: Buffer.from(cipher.encrypt('test-reject', 'platform.sms.textsms')),
-      },
-    });
+    await platformProvider('test-reject');
     const out = await sms.send({ kind: 'org', orgId, type: 'booking' }, GUEST, 'Confirmed.');
     expect(out).toMatchObject({
       status: 'FAILED',
@@ -281,6 +289,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
   });
 
   it('never sends real SMS to the log when the chosen KodiHub provider is incomplete', async () => {
+    await t.prisma.platformSettings.deleteMany({});
     await t.prisma.platformSettings.create({
       data: {
         id: 1,
@@ -298,6 +307,38 @@ describe('SMS: platform vs organisation (e2e)', () => {
     expect(out).toMatchObject({
       status: 'FAILED',
       reason: 'The SMS provider rejected the API key',
+    });
+  });
+
+  it('records SMS only written to the log as not sent, and charges no units', async () => {
+    await t.prisma.platformSettings.deleteMany({}); // no provider at all: the server's log sender
+    const out = await sms.send(
+      { kind: 'org', orgId, type: 'booking' },
+      GUEST,
+      'Your stay is confirmed.',
+    );
+    // The caller carries on (development still works), but nothing is charged or called "sent".
+    expect(out).toMatchObject({ status: 'SENT', units: 0 });
+    expect((await account()).balance).toBe(100);
+    expect((await ledger()).map((e) => [e.kind, e.units])).toEqual([
+      ['CHARGE', -1],
+      ['REFUND', 1],
+    ]);
+    expect(await t.prisma.smsLog.findUniqueOrThrow({ where: { id: out.logId } })).toMatchObject({
+      status: 'LOGGED',
+      units: 0,
+      provider: null,
+      reason: 'No SMS provider was set up, so this was only written to the server log.',
+    });
+
+    const code = await sms.send(
+      { kind: 'platform', type: 'login_otp' },
+      GUEST,
+      'Your KodiHub sign-in code is 123456.',
+    );
+    expect(code.status).toBe('SENT');
+    expect(await t.prisma.smsLog.findUniqueOrThrow({ where: { id: code.logId } })).toMatchObject({
+      status: 'LOGGED',
     });
   });
 

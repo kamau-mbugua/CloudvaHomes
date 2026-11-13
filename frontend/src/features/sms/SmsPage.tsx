@@ -159,7 +159,7 @@ function SmsSettingsCard({ account }: { account: SmsAccountView }) {
   );
 }
 
-const STATUS_TONE: Record<SmsUsageStatus, string> = { SENT: 'ad__badge--ok', FAILED: 'ad__badge--bad', NO_UNITS: 'ad__badge--warn' };
+const STATUS_TONE: Record<SmsUsageStatus, string> = { SENT: 'ad__badge--ok', FAILED: 'ad__badge--bad', NO_UNITS: 'ad__badge--warn', LOGGED: 'ad__badge--warn' };
 
 function UsageList() {
   const [page, setPage] = useState(1);
@@ -178,6 +178,7 @@ function UsageList() {
           <option value="SENT">Sent</option>
           <option value="FAILED">Failed</option>
           <option value="NO_UNITS">Not sent — no SMS units</option>
+          <option value="LOGGED">Not sent — no SMS provider</option>
         </select>
       </div>
       {list.isPending ? <TableSkeleton rows={5} /> : list.isError ? (

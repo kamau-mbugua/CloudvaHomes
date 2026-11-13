@@ -54,7 +54,12 @@ interface Attempt {
   provider: SmsProvider | null;
   messageId: string | null;
   reason: string | null;
+  /** No provider was set up: the server only wrote the message to its log. */
+  logged?: boolean;
 }
+
+export const LOGGED_REASON =
+  'No SMS provider was set up, so this was only written to the server log.';
 
 /**
  * The only code that talks to SMS providers (docs/specs/2026-11-08-sms-platform-and-org-design.md).
@@ -92,17 +97,24 @@ export class SmsService {
   }
 
   /** The platform provider: platform settings first, then the server's own SMS config. */
-  async platformSender(): Promise<{ sender: ProviderSender; provider: SmsProvider | null }> {
+  async platformSender(): Promise<{
+    sender: ProviderSender;
+    provider: SmsProvider | null;
+    /** True when nothing real is set up and messages only go to the server log. */
+    logged: boolean;
+  }> {
     const config = await this.platformConfig();
     if (config) {
       return {
         sender: createProviderSender(config, this.env, 'platform'),
         provider: config.provider,
+        logged: false,
       };
     }
     const fallback = createSmsSender(this.env);
     return {
       provider: this.env.SMS_PROVIDER === 'africastalking' ? 'AFRICASTALKING' : null,
+      logged: this.env.SMS_PROVIDER === 'log',
       sender: {
         send: async (to, text) => {
           try {
@@ -310,7 +322,7 @@ export class SmsService {
       const balance = await this.charge(spec.orgId, units, logId);
       if (balance !== null) {
         const sent = await this.viaPlatform(to, text);
-        if (sent.ok) {
+        if (sent.ok && !sent.logged) {
           return this.finish(
             spec,
             msg,
@@ -362,7 +374,8 @@ export class SmsService {
       );
     }
     const sent = await this.viaPlatform(to, text);
-    if (!sent.ok) {
+    if (!sent.ok || sent.logged) {
+      // Not sent, or only written to the log: the organisation gets its units back.
       const after = await this.refund(spec.orgId, units, logId);
       return this.finish(
         spec,
@@ -424,8 +437,9 @@ export class SmsService {
   // ── Providers ──
 
   private async viaPlatform(to: string, text: string): Promise<Attempt> {
-    const { sender, provider } = await this.platformSender();
-    return this.attempt(sender, provider, to, text);
+    const { sender, provider, logged } = await this.platformSender();
+    const a = await this.attempt(sender, provider, to, text);
+    return a.ok && logged ? { ...a, reason: LOGGED_REASON, logged } : a;
   }
 
   private async attempt(
@@ -527,6 +541,9 @@ export class SmsService {
     logId: string = randomUUID(),
   ): Promise<SmsOutcome> {
     const status = o.noUnits ? 'NO_UNITS' : a.ok ? 'SENT' : 'FAILED';
+    // A message only written to the log is never "sent" in the record (nor charged), though the
+    // caller carries on as if it were — so sign-in and the rest still work in development.
+    const recorded = status === 'SENT' && a.logged ? 'LOGGED' : status;
     await this.prisma.smsLog.create({
       data: {
         id: logId,
@@ -534,11 +551,11 @@ export class SmsService {
         kind: spec.kind === 'org' ? 'ORG' : 'PLATFORM',
         type: spec.type,
         to: msg.to,
-        units: status === 'SENT' ? o.units : 0,
+        units: recorded === 'SENT' ? o.units : 0,
         route: o.route,
         provider: a.provider,
         providerMessageId: a.messageId,
-        status,
+        status: recorded,
         reason: a.reason,
         ...this.storedBody(msg.text, msg.secret),
       },
@@ -546,7 +563,7 @@ export class SmsService {
     return {
       status,
       route: o.route,
-      units: status === 'SENT' ? o.units : 0,
+      units: recorded === 'SENT' ? o.units : 0,
       reason: a.reason,
       logId,
       warn: o.warn,

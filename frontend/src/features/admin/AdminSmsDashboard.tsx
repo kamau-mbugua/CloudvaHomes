@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../lib/api/client';
@@ -10,6 +10,7 @@ import { keys, platformErrorMessage } from '../platform/api';
 import { PROVIDER_LABEL } from '../sms/rules';
 import {
   niceMax,
+  notSent,
   PRESET_LABEL,
   presetRange,
   rateText,
@@ -63,9 +64,19 @@ export function AdminSmsDashboard() {
               sub={`${num(s.totals.kodihubMessages)} from KodiHub · ${num(s.totals.orgMessages)} from organisations`} />
             <Stat label="Sent" value={rateText(s.totals.successRate)} sub={`${num(s.totals.sent)} accepted by the provider`} />
             <Stat label="Failed" value={num(s.totals.failed)} sub="Refused by the provider" tone={s.totals.failed ? 'bad' : undefined} />
-            <Stat label="Not sent: no units" value={num(s.totals.noUnits)} sub="Organisations out of units"
-              tone={s.totals.noUnits ? 'warn' : undefined} />
+            <Stat label="Not sent" value={num(notSent(s.totals))}
+              sub={s.totals.logged
+                ? `${num(s.totals.noUnits)} no units · ${num(s.totals.logged)} no provider`
+                : 'Organisations out of units'}
+              tone={notSent(s.totals) ? 'warn' : undefined} />
           </div>
+          {s.totals.logged ? (
+            <p className="ad__callout ad__callout--note" role="note">
+              {num(s.totals.logged)} {s.totals.logged === 1 ? 'message was' : 'messages were'} never sent: no SMS
+              provider was set up, so the server only wrote {s.totals.logged === 1 ? 'it' : 'them'} to its log.
+              {' '}No units were charged for {s.totals.logged === 1 ? 'it' : 'them'}.
+            </p>
+          ) : null}
           <div className="ad__stats">
             <Stat label="Units used" value={num(s.totals.unitsUsed)} sub="Charged to organisations" />
             <Stat label="Units sold" value={num(s.money.unitsSold)} sub="Bundles bought" />
@@ -91,7 +102,7 @@ export function AdminSmsDashboard() {
               <div className="ad__tablewrap">
                 <table className="ad__table">
                   <thead>
-                    <tr><th>Message</th><th>Sent by</th><th className="num">Sent</th><th className="num">Failed</th><th className="num">No units</th></tr>
+                    <tr><th>Message</th><th>Sent by</th><th className="num">Sent</th><th className="num">Failed</th><th className="num">Not sent</th></tr>
                   </thead>
                   <tbody>
                     {s.byType.map((t) => (
@@ -100,7 +111,7 @@ export function AdminSmsDashboard() {
                         <td>{t.kind === 'PLATFORM' ? 'KodiHub' : 'Organisations'}</td>
                         <td className="num">{num(t.sent)}</td>
                         <td className="num">{num(t.failed)}</td>
-                        <td className="num">{num(t.noUnits)}</td>
+                        <td className="num">{num(notSent(t))}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -114,14 +125,14 @@ export function AdminSmsDashboard() {
               <h3 id="smsd-orgs">Top sending organisations</h3>
               {s.topOrgs.length === 0 ? <p className="ad__muted">No organisation sent SMS.</p> : (
                 <div className="ad__tablewrap">
-                <table className="ad__table">
-                  <thead><tr><th>Organisation</th><th className="num">Sent</th><th className="num">Not sent</th><th className="num">Units</th></tr></thead>
+                <table className="ad__table smsd__compact">
+                  <thead><tr><th>Organisation</th><th className="num">Sent</th><th className="num">Failed or not sent</th><th className="num">Units</th></tr></thead>
                   <tbody>
                     {s.topOrgs.map((o) => (
                       <tr key={o.orgId}>
                         <td><Link className="ad__link" to={`/admin/organizations/${o.orgId}`}><strong>{o.name}</strong></Link></td>
                         <td className="num">{num(o.sent)}</td>
-                        <td className="num">{num(o.failed + o.noUnits)}</td>
+                        <td className="num">{num(o.failed + notSent(o))}</td>
                         <td className="num">{num(o.units)}</td>
                       </tr>
                     ))}
@@ -234,15 +245,35 @@ const SERIES = [
   { key: 'sent', label: 'Sent', cls: 'smsd__bar--sent' },
   { key: 'failed', label: 'Failed', cls: 'smsd__bar--failed' },
   { key: 'noUnits', label: 'No units', cls: 'smsd__bar--nounits' },
+  { key: 'logged', label: 'No provider', cls: 'smsd__bar--logged' },
 ] as const;
 
-/** Stacked daily bars (sent, failed, no units) on one axis, with a hover tooltip and a table view. */
+/** The element's width in CSS pixels, so the chart draws at real size (text never scales). */
+function useWidth<T extends HTMLElement>(fallback: number) {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(fallback);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([e]) => {
+      if (e) setWidth(Math.max(240, Math.round(e.contentRect.width)));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
+/**
+ * Stacked daily bars (sent, failed, no units, no provider) on one axis, with a hover tooltip and
+ * a table view.
+ */
 function DailyChart({ daily }: { daily: SmsStats['daily'] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const totals = daily.map((d) => d.sent + d.failed + d.noUnits);
+  const [plotRef, W] = useWidth<HTMLDivElement>(720);
+  const totals = daily.map((d) => d.sent + d.failed + d.noUnits + d.logged);
   const top = niceMax(Math.max(0, ...totals));
-  const W = 720;
-  const H = 200;
+  const H = 220;
   const padL = 36;
   const padB = 22;
   const plotW = W - padL;
@@ -261,8 +292,9 @@ function DailyChart({ daily }: { daily: SmsStats['daily'] }) {
       <ul className="smsd__legend">
         {SERIES.map((sr) => <li key={sr.key}><span className={`smsd__swatch ${sr.cls}`} aria-hidden="true" />{sr.label}</li>)}
       </ul>
-      <div className="smsd__plot">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="SMS per day: sent, failed and not sent for lack of units"
+      <div className="smsd__plot" ref={plotRef}>
+        <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img"
+          aria-label="SMS per day: sent, failed, not sent for lack of units and not sent for lack of a provider"
           onMouseLeave={() => setHover(null)}>
           {ticks.map((tk) => (
             <g key={tk}>
@@ -285,7 +317,7 @@ function DailyChart({ daily }: { daily: SmsStats['daily'] }) {
                 })}
                 <rect x={padL + i * slot} y={0} width={slot} height={H - padB} fill="transparent"
                   onMouseEnter={() => setHover(i)}>
-                  <title>{`${formatDay(d.day)}: ${d.sent} sent, ${d.failed} failed, ${d.noUnits} no units`}</title>
+                  <title>{`${formatDay(d.day)}: ${d.sent} sent, ${d.failed} failed, ${d.noUnits} no units, ${d.logged} no provider`}</title>
                 </rect>
                 {i % labelEvery === 0 ? (
                   <text x={padL + i * slot + slot / 2} y={H - 6} textAnchor="middle" className="smsd__axis">{d.day.slice(8)}</text>
@@ -297,17 +329,23 @@ function DailyChart({ daily }: { daily: SmsStats['daily'] }) {
         {shown ? (
           <div className="smsd__tip" role="status">
             <strong>{formatDay(shown.day)}</strong>
-            <span>{num(shown.sent)} sent · {num(shown.failed)} failed · {num(shown.noUnits)} no units</span>
+            <span>
+              {num(shown.sent)} sent · {num(shown.failed)} failed · {num(shown.noUnits)} no units
+              {shown.logged ? ` · ${num(shown.logged)} no provider` : ''}
+            </span>
           </div>
         ) : null}
       </div>
       <details className="smsd__table">
         <summary>Show as a table</summary>
         <table className="ad__table">
-          <thead><tr><th>Day</th><th className="num">Sent</th><th className="num">Failed</th><th className="num">No units</th></tr></thead>
+          <thead><tr><th>Day</th><th className="num">Sent</th><th className="num">Failed</th><th className="num">No units</th><th className="num">No provider</th></tr></thead>
           <tbody>
             {daily.map((d) => (
-              <tr key={d.day}><td>{formatDay(d.day)}</td><td className="num">{d.sent}</td><td className="num">{d.failed}</td><td className="num">{d.noUnits}</td></tr>
+              <tr key={d.day}>
+                <td>{formatDay(d.day)}</td><td className="num">{d.sent}</td><td className="num">{d.failed}</td>
+                <td className="num">{d.noUnits}</td><td className="num">{d.logged}</td>
+              </tr>
             ))}
           </tbody>
         </table>

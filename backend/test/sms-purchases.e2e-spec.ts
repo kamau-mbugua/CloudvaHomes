@@ -1,3 +1,4 @@
+import { FieldCipher } from '../src/common/crypto/field-cipher.js';
 import { todayInNairobi } from '../src/modules/billing/billing-math.js';
 import { DarajaClient, type StkQueryResult } from '../src/modules/mpesa/daraja.client.js';
 import { outbox } from '../src/modules/notifications/senders.js';
@@ -230,10 +231,22 @@ describe('Buying SMS units (e2e)', () => {
       check(await t.http().put(`/api/v1${path}`).set(auth(sess)).send(body), status);
     const patch = async (sess: Session, path: string, body: object, status = 200) =>
       check(await t.http().patch(`/api/v1${path}`).set(auth(sess)).send(body), status);
-    const send = (to: string) =>
-      t.app
+    /** Sends one booking SMS through KodiHub's provider (a test sender, saved first). */
+    const send = async (to: string) => {
+      const cipher = t.app.get(FieldCipher);
+      await t.prisma.platformSettings.update({
+        where: { id: 1 },
+        data: {
+          smsProvider: 'TEXTSMS',
+          textsmsPartnerId: '1',
+          textsmsSenderId: 'KODIHUB',
+          textsmsKeyEnc: Buffer.from(cipher.encrypt('ok', 'platform.sms.textsms')),
+        },
+      });
+      return t.app
         .get(SmsService)
         .send({ kind: 'org', orgId, type: 'booking' }, to, 'Your stay is confirmed.');
+    };
     const ownSetup = (apiKey = 'textsms-secret-key') => ({
       mode: 'OWN',
       provider: 'TEXTSMS',
