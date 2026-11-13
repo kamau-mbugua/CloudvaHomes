@@ -429,7 +429,7 @@ describe('Tenant portal & reminders (e2e)', () => {
     expect(await run(threeBefore)).toEqual({ sent: 0, due: 0, overdue: 0 }); // same day again: nothing
     const sms = outbox.filter((m) => m.to === '+254711000701').at(-1)!;
     expect(sms.text).toMatch(
-      /^Hi Tom, KES 20,000\.00 is due on \d+ \w{3} \d{4}\. Pay to paybill 600111, account T00001\. Home Org$/,
+      /^Hi Tom, KES 20,000 is due on \d+ \w{3} \d{4}\. Pay to paybill 600111, account T00001\. Home Org$/,
     );
     const overdueDay = formatDateOnly(addDays(parseDateOnly(due), 3));
     expect(await run(overdueDay)).toEqual({ sent: 1, due: 0, overdue: 1 });

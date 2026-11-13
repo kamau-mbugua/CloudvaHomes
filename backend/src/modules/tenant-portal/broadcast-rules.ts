@@ -42,3 +42,14 @@ export function smsSegments(text: string): number {
   const units = text.length; // UTF-16 code units
   return units <= 70 ? 1 : Math.ceil(units / 67);
 }
+
+/**
+ * A notice as tenants get it by SMS: "Makini Homes: <notice>", so they know who sent it (it comes
+ * from KodiHub's sender ID). Left alone when the notice already starts with the name.
+ */
+export function noticeSmsText(orgName: string, text: string): string {
+  const name = orgName.trim();
+  const body = text.trim();
+  if (!name || body.toLowerCase().startsWith(name.toLowerCase())) return body;
+  return `${name}: ${body}`;
+}

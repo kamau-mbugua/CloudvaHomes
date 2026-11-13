@@ -55,7 +55,7 @@ describe('reminder wording', () => {
       { kind: 'REMINDER_DUE', amount: 2050000n, due: '2026-11-05' },
     );
     expect(text).toBe(
-      'Hi Tom, KES 20,500.00 is due on 5 Nov 2026. Pay to paybill 522522, account T00001. Prime Agency',
+      'Hi Tom, KES 20,500 is due on 5 Nov 2026. Pay to paybill 522522, account T00001. Prime Agency',
     );
     const long = reminderText(
       {

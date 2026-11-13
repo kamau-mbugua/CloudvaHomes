@@ -112,7 +112,7 @@ describe('Lease terms and rent changes (e2e)', () => {
     ]);
     const sms = outbox.slice(outboxBefore).find((m) => m.to === '+254711000901');
     expect(sms?.text).toBe(
-      `Hi Sam, your rent for S1 changes from KES 20,000.00 to KES 30,000.00 from ${label(PERIOD)}. Lease Org`,
+      `Hi Sam, your rent for S1 changes from KES 20,000 to KES 30,000 from ${label(PERIOD)}. Lease Org`,
     );
     // Only one change per month.
     expect(

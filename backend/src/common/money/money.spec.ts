@@ -1,4 +1,4 @@
-import { percentOf, toMajorString, toMinor } from './money.js';
+import { percentOf, smsKes, toMajorString, toMinor } from './money.js';
 
 describe('toMinor', () => {
   it.each([
@@ -38,5 +38,14 @@ describe('percentOf', () => {
 
   it('rejects fractional basis points', () => {
     expect(() => percentOf(100n, 7.5)).toThrow(RangeError);
+  });
+});
+
+describe('smsKes', () => {
+  it('shows whole shillings without cents, and cents only when there are some', () => {
+    expect(smsKes(2_500_000n)).toBe('KES 25,000');
+    expect(smsKes(2_500_050n)).toBe('KES 25,000.50');
+    expect(smsKes(0n)).toBe('KES 0');
+    expect(smsKes(-30_000n)).toBe('-KES 300');
   });
 });

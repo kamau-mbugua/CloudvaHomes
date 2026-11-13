@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { broadcastRecipients, smsSegments } from './broadcast-rules.js';
+import { broadcastRecipients, noticeSmsText, smsSegments } from './broadcast-rules.js';
 
 describe('broadcastRecipients', () => {
   const row = (tenantId: string, status: 'ACTIVE' | 'NOTICE' | 'ENDED') => ({
@@ -43,5 +43,18 @@ describe('smsSegments', () => {
   it('counts GSM extension characters as two', () => {
     expect(smsSegments('€'.repeat(80))).toBe(1);
     expect(smsSegments('€'.repeat(81))).toBe(2);
+  });
+});
+
+describe('noticeSmsText', () => {
+  it('puts the organisation name in front so tenants know who sent it', () => {
+    expect(noticeSmsText('Makini Homes', ' Water off on Saturday. ')).toBe(
+      'Makini Homes: Water off on Saturday.',
+    );
+  });
+  it('leaves a notice that already starts with the name alone', () => {
+    expect(noticeSmsText('Makini Homes', 'MAKINI HOMES - water off on Saturday.')).toBe(
+      'MAKINI HOMES - water off on Saturday.',
+    );
   });
 });

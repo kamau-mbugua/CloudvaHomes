@@ -9,7 +9,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { orgContext } from '../auth/decorators.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { allowedPropertyIds, propertyScope } from '../portfolio/property-scope.js';
-import { broadcastRecipients, type Recipient } from './broadcast-rules.js';
+import { broadcastRecipients, noticeSmsText, type Recipient } from './broadcast-rules.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { CreateBroadcastDto } from './broadcasts.dto.js';
 import { MessagesService } from './messages.service.js';
@@ -77,10 +77,17 @@ export class BroadcastsService {
       withPortal: list.filter((r) => r.userId).length,
     };
     if (!text?.trim()) return counts;
-    return {
-      ...counts,
-      ...(await this.sms.bulkUnits(orgContext().orgId, text.trim(), list.length)),
-    };
+    const orgId = orgContext().orgId;
+    const sms = noticeSmsText(await this.orgName(orgId), text);
+    return { ...counts, sms, ...(await this.sms.bulkUnits(orgId, sms, list.length)) };
+  }
+
+  private async orgName(orgId: string): Promise<string> {
+    const org = await this.db.organization.findUniqueOrThrow({
+      where: { id: orgId },
+      select: { name: true },
+    });
+    return org.name;
   }
 
   async create(dto: CreateBroadcastDto) {
@@ -93,7 +100,8 @@ export class BroadcastsService {
     const since = last ? (Date.now() - last.createdAt.getTime()) / 1000 : Infinity;
     if (since < RATE_SECONDS) throw AppError.rateLimited(Math.ceil(RATE_SECONDS - since));
     const recipients = (await this.recipients(propertyIds)).length;
-    await this.sms.bulkUnits(ctx.orgId, dto.text.trim(), recipients, true);
+    const sms = noticeSmsText(await this.orgName(ctx.orgId), dto.text);
+    await this.sms.bulkUnits(ctx.orgId, sms, recipients, true);
     const row = await this.db.$transaction(async (tx) => {
       const b = await tx.broadcast.create({
         data: {
@@ -157,7 +165,7 @@ export class BroadcastsService {
         tenantId: r.tenantId,
         kind: 'BROADCAST',
         to: r.phone,
-        text: b.text,
+        text: noticeSmsText(org.name, b.text),
         broadcastId: id,
       });
       if (b.alsoEmail && r.email) {

@@ -120,7 +120,9 @@ describe('Host bookings, blocks, statuses & calendar API (e2e)', () => {
     expect(guestSmsMessages.length).toBeGreaterThanOrEqual(1);
     expect(
       guestSmsMessages.some((m) =>
-        m.text.includes('your stay at Coral Reef Villa, 1 Dec–4 Dec is confirmed. Booking B00001'),
+        m.text.includes(
+          'your stay at Coral Reef Villa, 1 Dec to 4 Dec is confirmed. Booking B00001',
+        ),
       ),
     ).toBe(true);
 

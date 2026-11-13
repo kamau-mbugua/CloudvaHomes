@@ -11,13 +11,32 @@ describe('receipt wording', () => {
 
   it('fits one SMS even with a long organisation name', () => {
     const text = paymentReceiptText({
-      amount: '1,234,567.89',
+      amount: 123_456_789n,
       number: 'RCT-2026-000012',
-      balance: 'Balance KES 1,234,567.89',
+      owed: 123_456_789n,
       organizationName: 'A Very Long Property Management Agency Name Limited of Nairobi',
     });
     expect(text.length).toBeLessThanOrEqual(160);
     expect(text.startsWith('Received KES 1,234,567.89 ref RCT-2026-000012.')).toBe(true);
+  });
+
+  it('writes amounts like every other SMS: no cents unless there are some', () => {
+    const r = (owed: bigint) =>
+      paymentReceiptText({
+        amount: 2_500_000n,
+        number: 'RCT-2026-000012',
+        owed,
+        organizationName: 'Makini Homes',
+      });
+    expect(r(120_000n)).toBe(
+      'Received KES 25,000 ref RCT-2026-000012. Balance KES 1,200. Thank you - Makini Homes',
+    );
+    expect(r(-30_050n)).toBe(
+      'Received KES 25,000 ref RCT-2026-000012. Credit KES 300.50. Thank you - Makini Homes',
+    );
+    expect(r(0n)).toBe(
+      'Received KES 25,000 ref RCT-2026-000012. Nothing owing. Thank you - Makini Homes',
+    );
   });
 
   it('records push notifications in the outbox and parses FCM service account JSON', async () => {

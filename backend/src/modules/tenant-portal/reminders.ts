@@ -1,4 +1,4 @@
-import { money } from '../../common/pdf/pdf.js';
+import { smsKes } from '../../common/money/money.js';
 import { addDays } from '../billing/billing-math.js';
 import { parseDateOnly, formatDateOnly } from '../../common/dates/date-only.js';
 
@@ -95,10 +95,10 @@ export function reminderText(
 ): string {
   const what =
     plan.kind === 'REMINDER_DUE'
-      ? `KES ${money(plan.amount)} is due on ${shortDate(plan.due)}.`
+      ? `${smsKes(plan.amount)} is due on ${shortDate(plan.due)}.`
       : plan.kind === 'REMINDER_OVERDUE'
-        ? `KES ${money(plan.amount)} is overdue (since ${shortDate(plan.since)}).`
-        : `your balance is KES ${money(plan.amount)}.`;
+        ? `${smsKes(plan.amount)} is overdue (since ${shortDate(plan.since)}).`
+        : `your balance is ${smsKes(plan.amount)}.`;
   const pay = p.pay
     ? p.pay.kind === 'MPESA_PAYBILL'
       ? ` Pay to paybill ${p.pay.shortcode}, account ${p.code}.`

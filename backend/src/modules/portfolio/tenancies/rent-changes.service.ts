@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { parseDateOnly } from '../../../common/dates/date-only.js';
+import { smsKes } from '../../../common/money/money.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { violatesUnique } from '../../../prisma/errors.js';
 import { DB, type Db } from '../../../prisma/prisma.module.js';
@@ -7,7 +8,7 @@ import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
 // Pure helpers only — portfolio has no billing module dependency.
 import { periodOf, todayInNairobi } from '../../billing/billing-math.js';
-import { formatKesMinor, NotificationsService } from '../../notifications/notifications.service.js';
+import { NotificationsService } from '../../notifications/notifications.service.js';
 import { tenancyScope } from '../property-scope.js';
 import { earliestChangePeriod, shortPeriodLabel, validateRentChange } from './rent-changes.js';
 import type { RenewTenancyDto, RentChangeDto } from './tenancies.dto.js';
@@ -217,7 +218,7 @@ export class RentChangesService {
       where: { id: t.orgId },
       select: { name: true },
     });
-    const text = `Hi ${t.tenant.firstName}, your rent for ${t.unit.number} changes from KES ${formatKesMinor(t.rentAmount)} to KES ${formatKesMinor(newRent)} from ${shortPeriodLabel(period)}. ${org.name}`;
+    const text = `Hi ${t.tenant.firstName}, your rent for ${t.unit.number} changes from ${smsKes(t.rentAmount)} to ${smsKes(newRent)} from ${shortPeriodLabel(period)}. ${org.name}`;
     try {
       await this.notifications.sendSms(
         { kind: 'org', orgId: t.orgId, type: 'rent_change' },

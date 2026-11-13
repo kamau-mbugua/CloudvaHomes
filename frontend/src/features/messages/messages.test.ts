@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { broadcastSummary, counterLabel, smsSegments } from './rules';
+import { broadcastSummary, counterLabel, noticeSmsText, smsSegments } from './rules';
 import { unitsLine } from './rules';
 
 describe('smsSegments', () => {
@@ -16,6 +16,8 @@ describe('counterLabel', () => {
     expect(counterLabel('Water off Saturday.', 23)).toBe('19 / 480 characters · 1 SMS per tenant · about 23 SMS');
     expect(counterLabel('a'.repeat(161), 23)).toBe('161 / 480 characters · 2 SMS per tenant · about 46 SMS');
     expect(counterLabel('', 23)).toBe('0 / 480 characters');
+    // The name in front counts: 150 typed + "Makini Homes: " goes over one SMS.
+    expect(counterLabel('a'.repeat(150), 10, 'Makini Homes')).toBe('150 / 480 characters · 2 SMS per tenant · about 20 SMS');
   });
 });
 
@@ -42,3 +44,10 @@ describe('SMS units before a notice goes out', () => {
   });
 });
 
+describe('noticeSmsText', () => {
+  it('puts the organisation name in front unless the notice starts with it', () => {
+    expect(noticeSmsText('Makini Homes', ' Water off Saturday. ')).toBe('Makini Homes: Water off Saturday.');
+    expect(noticeSmsText('Makini Homes', 'Makini Homes - water off.')).toBe('Makini Homes - water off.');
+    expect(noticeSmsText('', 'Water off.')).toBe('Water off.');
+  });
+});

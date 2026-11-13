@@ -17,9 +17,21 @@ export function smsSegments(text: string): number {
   return text.length <= 70 ? 1 : Math.ceil(text.length / 67);
 }
 
-export function counterLabel(text: string, recipients: number): string {
+/**
+ * A notice as tenants get it by SMS: "Makini Homes: <notice>" (it comes from KodiHub's sender
+ * ID). Left alone when it already starts with the name. Must match the server's noticeSmsText.
+ */
+export function noticeSmsText(orgName: string, text: string): string {
+  const name = orgName.trim();
+  const body = text.trim();
+  if (!name || body.toLowerCase().startsWith(name.toLowerCase())) return body;
+  return `${name}: ${body}`;
+}
+
+/** Characters typed, and the SMS each tenant gets counting the organisation name in front. */
+export function counterLabel(text: string, recipients: number, orgName = ''): string {
   const head = `${text.length} / ${MAX_BROADCAST_LENGTH} characters`;
-  const parts = smsSegments(text);
+  const parts = text.trim() ? smsSegments(noticeSmsText(orgName, text)) : 0;
   if (!parts) return head;
   return `${head} · ${parts} SMS per tenant · about ${parts * recipients} SMS`;
 }

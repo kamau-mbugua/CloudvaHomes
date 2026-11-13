@@ -32,3 +32,15 @@ export function percentOf(minor: Minor, basisPoints: number): Minor {
   const half = 5000n;
   return product >= 0n ? (product + half) / 10000n : -((-product + half) / 10000n);
 }
+
+/**
+ * An amount as SMS show it: "KES 25,000", with cents only when there are some ("KES 25,000.50").
+ * One format for every SMS, guests and tenants alike.
+ */
+export function smsKes(minor: Minor): string {
+  const neg = minor < 0n;
+  const abs = neg ? -minor : minor;
+  const whole = (abs / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const cents = abs % 100n;
+  return `${neg ? '-' : ''}KES ${whole}${cents ? `.${cents.toString().padStart(2, '0')}` : ''}`;
+}

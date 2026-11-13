@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { currentContext } from '../../common/context/request-context.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { FieldCipher } from '../../common/crypto/field-cipher.js';
+import { smsKes } from '../../common/money/money.js';
 import { ENV } from '../../config/config.module.js';
 import type { Env } from '../../config/env.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -439,13 +440,13 @@ export class NotificationsService {
   }
 
   /**
-   * Payment receipt SMS, e.g. "Received KES 25,000.00 ref RCT-2026-000012. Balance KES 1,200.00.
+   * Payment receipt SMS, e.g. "Received KES 25,000 ref RCT-2026-000012. Balance KES 1,200.
    * Thank you - Kilimani Agency". Kept to one 160-character SMS where the organisation name allows.
    */
   async sendPaymentReceipt(
     orgId: string,
     phone: string,
-    p: { amount: string; number: string; balance: string; organizationName: string },
+    p: { amount: bigint; number: string; owed: bigint; organizationName: string },
   ): Promise<void> {
     await this.dispatchSms(
       { kind: 'org', orgId, type: 'payment_receipt' },
@@ -1263,12 +1264,19 @@ export function isForbiddenSmtpHost(rawHost: string): boolean {
 }
 
 export function paymentReceiptText(p: {
-  amount: string;
+  amount: bigint;
   number: string;
-  balance: string;
+  /** What the tenant owes after this payment; negative is credit. */
+  owed: bigint;
   organizationName: string;
 }): string {
-  return `Received KES ${p.amount} ref ${p.number}. ${p.balance}. Thank you - ${p.organizationName}`.slice(
+  const standing =
+    p.owed > 0n
+      ? `Balance ${smsKes(p.owed)}`
+      : p.owed < 0n
+        ? `Credit ${smsKes(-p.owed)}`
+        : 'Nothing owing';
+  return `Received ${smsKes(p.amount)} ref ${p.number}. ${standing}. Thank you - ${p.organizationName}`.slice(
     0,
     160,
   );

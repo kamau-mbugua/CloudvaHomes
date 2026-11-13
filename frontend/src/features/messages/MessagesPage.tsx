@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { DataEnvelope, PageEnvelope } from '../../lib/api/types';
-import { useCan } from '../../lib/auth/useAuth';
+import { useCan, useSession } from '../../lib/auth/useAuth';
 import { formatDateTime } from '../../lib/dates';
 import { useToast } from '../../lib/useToast';
 import { EmptyState } from '../../components/EmptyState';
@@ -12,7 +12,7 @@ import { Sheet } from '../../components/Sheet';
 import { portfolioErrorMessage, usePropertyOptions } from '../portfolio/api';
 import { useListFilters } from '../portfolio/hooks';
 import { useSmsAccount } from '../sms/api';
-import { MAX_BROADCAST_LENGTH, broadcastSummary, counterLabel, smsSegments, unitsLine, type BroadcastCounts } from './rules';
+import { MAX_BROADCAST_LENGTH, broadcastSummary, counterLabel, noticeSmsText, smsSegments, unitsLine, type BroadcastCounts } from './rules';
 
 interface Broadcast extends BroadcastCounts {
   id: string;
@@ -109,7 +109,9 @@ function BroadcastSheet({ onClose }: { onClose: () => void }) {
   }, [picked, runPreview]);
   const counts = picked.length ? preview.data?.data : undefined;
   const smsAccount = useSmsAccount(useCan('sms:view'));
-  const units = text.trim() && counts ? unitsLine(smsSegments(text.trim()), counts.recipients, smsAccount.data ?? null) : null;
+  const orgName = useSession().activeOrganization?.name ?? '';
+  const smsText = noticeSmsText(orgName, text);
+  const units = text.trim() && counts ? unitsLine(smsSegments(smsText), counts.recipients, smsAccount.data ?? null) : null;
 
   const send = useMutation({
     mutationFn: () => api.post('/broadcasts', { propertyIds: picked, text: text.trim(), alsoEmail }),
@@ -156,9 +158,9 @@ function BroadcastSheet({ onClose }: { onClose: () => void }) {
     >
       {confirming ? (
         <>
-          <blockquote className="ms__quote">{text.trim()}</blockquote>
+          <blockquote className="ms__quote" aria-label="The SMS tenants get">{smsText}</blockquote>
           <p>
-            {counts?.recipients} tenants get an SMS ({counterLabel(text.trim(), counts?.recipients ?? 0).split(' · ').slice(1).join(' · ')}).
+            {counts?.recipients} tenants get an SMS ({counterLabel(text.trim(), counts?.recipients ?? 0, orgName).split(' · ').slice(1).join(' · ')}).
             {alsoEmail ? ` ${counts?.withEmail} also ${counts?.withEmail === 1 ? 'gets' : 'get'} an email.` : ''}{' '}
             {counts?.withPortal} {counts?.withPortal === 1 ? 'sees' : 'see'} it in the tenant app.
           </p>
@@ -185,7 +187,8 @@ function BroadcastSheet({ onClose }: { onClose: () => void }) {
             <textarea id="bc-text" className="nx-input ms__area" rows={5} value={text} maxLength={MAX_BROADCAST_LENGTH}
               placeholder="e.g. Water will be off on Saturday from 9am to noon for tank cleaning."
               onChange={(e) => setText(e.target.value)} />
-            <span className="hint">{counterLabel(text, counts?.recipients ?? 0)}</span>
+            <span className="hint">{counterLabel(text, counts?.recipients ?? 0, orgName)}</span>
+            {text.trim() && orgName ? <span className="hint">Tenants see: “{smsText}”</span> : null}
             {units ? <span className={units.short ? 'fld__err' : 'hint'}>{units.text}</span> : null}
           </label>
           <label className="fld__check">

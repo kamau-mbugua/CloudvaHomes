@@ -449,9 +449,9 @@ export class PaymentsService {
       let sentAny = false;
       try {
         await this.notifications.sendPaymentReceipt(orgId, phone, {
-          amount: money(payment.amount),
+          amount: payment.amount,
           number,
-          balance: standing,
+          owed: balance,
           organizationName: org.name,
         });
         sentAny = true;

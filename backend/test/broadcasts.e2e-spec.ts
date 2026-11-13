@@ -25,6 +25,8 @@ const check = (res: Res, status: number) => {
   return res.body;
 };
 
+const ORG_NAME = 'Notice Org';
+
 describe('Broadcasts to tenants (e2e)', () => {
   let t: TestApp;
   let owner: Session;
@@ -47,7 +49,7 @@ describe('Broadcasts to tenants (e2e)', () => {
     await createPlatformAdmin(t.prisma);
     const admin = await login(t, 'admin@example.invalid');
     ({ owner, orgId } = await onboardOrg(t, admin, {
-      name: 'Notice Org',
+      name: ORG_NAME,
       ownerEmail: 'notice-owner@example.invalid',
       ownerPhone: '+254700000061',
     }));
@@ -134,6 +136,10 @@ describe('Broadcasts to tenants (e2e)', () => {
 
     const out = outbox.slice(before);
     expect(out.filter((m) => m.channel === 'sms').map((m) => m.to)).toEqual(['+254711000701']);
+    // The SMS says who it is from (it goes out under KodiHub's sender ID).
+    expect(out.find((m) => m.channel === 'sms')?.text).toBe(
+      `${ORG_NAME}: Water off Saturday 9am to noon.`,
+    );
     expect(out.some((m) => m.channel === 'email' && m.to === 'ann@example.invalid')).toBe(true);
     expect(out.some((m) => m.to === '+254711000703')).toBe(false); // Cat is in the other property
     const annUser = await t.prisma.tenant.findUniqueOrThrow({ where: { id: x.ann.tenant.id } });
@@ -225,6 +231,7 @@ describe('Broadcasts to tenants (e2e)', () => {
         await post(owner, '/broadcasts/preview', { propertyIds: [x.a.id, x.b.id], text: LONG }, 200)
       ).data;
       expect(preview).toMatchObject({
+        sms: `${ORG_NAME}: ${LONG}`,
         recipients: 3,
         unitsPerMessage: 2,
         unitsNeeded: 6,

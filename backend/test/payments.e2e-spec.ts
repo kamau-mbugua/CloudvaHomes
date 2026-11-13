@@ -166,7 +166,7 @@ describe('Payments (e2e)', () => {
     // The SMS receipt names the receipt and the balance.
     const sms = outbox.filter((m) => m.to === '+254711000301').at(-1)!;
     expect(sms.text).toBe(
-      `Received KES 8,000.00 ref ${first.number}. Balance KES 17,000.00. Thank you - Pay Org`,
+      `Received KES 8,000 ref ${first.number}. Balance KES 17,000. Thank you - Pay Org`,
     );
     // And the detailed email receipt has the official PDF receipt attached.
     const emailReceipt = outbox

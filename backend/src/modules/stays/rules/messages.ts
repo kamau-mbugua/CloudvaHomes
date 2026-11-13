@@ -1,4 +1,5 @@
 import { parseDateOnly } from '../../../common/dates/date-only.js';
+import { smsKes } from '../../../common/money/money.js';
 
 export type GuestSmsEvent =
   | 'REQUESTED'
@@ -58,11 +59,7 @@ export function formatStayKes(val: bigint | number | string | undefined): string
   if (typeof val === 'string' && val.trim().startsWith('KES ')) {
     return val.trim();
   }
-  const minor = typeof val === 'bigint' ? val : BigInt(val);
-  const negative = minor < 0n;
-  const abs = negative ? -minor : minor;
-  const whole = (abs / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${negative ? '-' : ''}KES ${whole}`;
+  return smsKes(typeof val === 'bigint' ? val : BigInt(val));
 }
 
 export function shouldSendCheckInInfoNow(checkInIso: string, todayIso: string): boolean {
@@ -77,21 +74,23 @@ export function guestSms(event: GuestSmsEvent, d: GuestSmsData): string {
   const unit = d.unit ?? '';
   const checkIn = shortStayDate(d.checkIn);
   const checkOut = shortStayDate(d.checkOut);
+  // "to", not a dash: a long dash isn't in the plain SMS alphabet and would triple the cost.
+  const dates = `${checkIn} to ${checkOut}`;
   const code = d.code ?? '';
   const link = d.link?.trim() ?? '';
 
   switch (event) {
     case 'REQUESTED':
       return link
-        ? `${biz}: we got your request for ${unit}, ${checkIn}–${checkOut}. We'll reply within 24 hours. Booking ${code}: ${link}`
-        : `${biz}: we got your request for ${unit}, ${checkIn}–${checkOut}. We'll reply within 24 hours. Booking ${code}.`;
+        ? `${biz}: we got your request for ${unit}, ${dates}. We'll reply within 24 hours. Booking ${code}: ${link}`
+        : `${biz}: we got your request for ${unit}, ${dates}. We'll reply within 24 hours. Booking ${code}.`;
     case 'CONFIRMED':
       return link
-        ? `${biz}: your stay at ${unit}, ${checkIn}–${checkOut} is confirmed. Booking ${code}: ${link}`
-        : `${biz}: your stay at ${unit}, ${checkIn}–${checkOut} is confirmed. Booking ${code}.`;
+        ? `${biz}: your stay at ${unit}, ${dates} is confirmed. Booking ${code}: ${link}`
+        : `${biz}: your stay at ${unit}, ${dates} is confirmed. Booking ${code}.`;
     case 'HELD': {
       const amount = formatStayKes(d.amount);
-      const head = `${biz}: we are holding ${unit}, ${checkIn}–${checkOut} for you. Pay ${amount} within ${d.window ?? '15 minutes'} to confirm.`;
+      const head = `${biz}: we are holding ${unit}, ${dates} for you. Pay ${amount} within ${d.window ?? '15 minutes'} to confirm.`;
       return link ? `${head} Booking ${code}: ${link}` : `${head} Booking ${code}.`;
     }
     case 'PAY_NOW': {
@@ -106,7 +105,7 @@ export function guestSms(event: GuestSmsEvent, d: GuestSmsData): string {
       return `${biz}: we received ${amount} for booking ${code}. Still to pay: ${due}.`;
     }
     case 'DECLINED':
-      return `${biz}: sorry, ${unit} isn't available for ${checkIn}–${checkOut}.`;
+      return `${biz}: sorry, ${unit} isn't available for ${dates}.`;
     case 'EXPIRED':
       return `${biz}: your booking ${code} wasn't paid in time, so the dates were released.`;
     case 'CANCELLED': {
