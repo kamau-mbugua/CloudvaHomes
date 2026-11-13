@@ -39,6 +39,24 @@ describe('receipt wording', () => {
     );
   });
 
+  it('keeps a receipt link whole, dropping the organisation name when there is no room', () => {
+    const link = 'https://go.kodihub.co.ke/AbCdEfGhIjKl';
+    const r = (organizationName: string) =>
+      paymentReceiptText({
+        amount: 2_500_000n,
+        number: 'RCT-2026-000012',
+        owed: 120_000n,
+        organizationName,
+        link,
+      });
+    expect(r('Makini Homes')).toBe(
+      `Received KES 25,000 ref RCT-2026-000012. Balance KES 1,200. Receipt: ${link} - Makini Homes`,
+    );
+    const long = r('A Very Long Property Management Agency Name Limited of Nairobi Kenya');
+    expect(long.length).toBeLessThanOrEqual(160);
+    expect(long.endsWith(link)).toBe(true);
+  });
+
   it('records push notifications in the outbox and parses FCM service account JSON', async () => {
     const sender = new LogPushSender(false);
     const res = await sender.send({

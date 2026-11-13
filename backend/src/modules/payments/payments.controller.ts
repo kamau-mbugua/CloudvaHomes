@@ -79,6 +79,14 @@ export class PaymentsController {
     return pdf(res, `${data.payment.number}.pdf`, await renderReceiptPdf(data));
   }
 
+  /** Sends the receipt to the tenant again (SMS with a link to it; email with the PDF). */
+  @Post('payments/:id/receipt/send')
+  @HttpCode(200)
+  @RequirePermission('payments:create')
+  async sendReceipt(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.payments.resendReceipt(id));
+  }
+
   @Post('payments/:id/reverse')
   @HttpCode(200)
   @RequirePermission('payments:refund')

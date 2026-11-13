@@ -5,10 +5,12 @@ import '../../core/api/api_error.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/dates.dart';
 import '../../core/money.dart';
+import '../../core/receipts.dart';
 import '../../core/widgets/common.dart';
 import 'calendar_rules.dart';
 import 'host_api.dart';
 import 'host_models.dart';
+import '../staff/staff_widgets.dart';
 import 'payment_sheet.dart';
 
 final hostBookingDetailProvider = FutureProvider.autoDispose
@@ -458,15 +460,57 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
                       for (final p in b.payments)
                         ListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text('${p.kind} · ${p.method}'),
-                          subtitle: Text(
-                            p.reference ??
-                                (p.paidAt.length >= 10
-                                    ? p.paidAt.substring(0, 10)
-                                    : p.paidAt),
+                          title: Text(
+                            [
+                              if (p.number.isNotEmpty) p.number,
+                              p.voidedAt != null
+                                  ? 'Voided'
+                                  : p.kind == 'REFUND'
+                                  ? 'Refund'
+                                  : 'Payment',
+                            ].join(' · '),
                           ),
-                          trailing: Text(
-                            '${p.kind == 'REFUND' ? '-' : ''}${formatKes(p.amountCents)}',
+                          subtitle: Text(
+                            [
+                              channelKindLabel[p.method] ?? p.method,
+                              if (p.paidAt.length >= 10)
+                                formatDay(p.paidAt.substring(0, 10)),
+                              if (p.reference != null) p.reference!,
+                            ].join(' · '),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${p.kind == 'REFUND' ? '-' : ''}${formatKes(p.amountCents)}',
+                              ),
+                              if (p.hasReceipt)
+                                IconButton(
+                                  tooltip: 'Receipt ${p.number}',
+                                  icon: const Icon(Icons.receipt_long_outlined),
+                                  onPressed: () => showReceiptActions(
+                                    context,
+                                    ref,
+                                    ReceiptRef.stay(
+                                      bookingId: b.id,
+                                      paymentId: p.id,
+                                      number: p.number,
+                                      guestName: b.guestName,
+                                      phone: b.guestPhone,
+                                      email: b.guestEmail,
+                                      hasPhone: b.guestPhone.isNotEmpty
+                                          ? true
+                                          : null,
+                                      hasEmail:
+                                          b.guestEmail != null &&
+                                              b.guestEmail!.isNotEmpty
+                                          ? true
+                                          : null,
+                                    ),
+                                    canSend: canPayCreate,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                   ],

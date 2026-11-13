@@ -310,4 +310,94 @@ describe('Stays — guest emails, receipts and listing locations (e2e)', () => {
       void orgId;
     });
   });
+
+  describe('receipts: list, preview, download and send again', () => {
+    it('lists stay receipts, serves the PDF, and re-sends it by SMS link and email', async () => {
+      const l = await listing();
+      const b = await booking(l.id, addDays(todayInNairobi(), 20));
+      await post(host, `/host/bookings/${b.id}/payments`, {
+        method: 'CASH',
+        amount: KES(2750),
+        reference: 'CASH-1',
+      });
+      const pay = await t.prisma.stayPayment.findFirstOrThrow({ where: { bookingId: b.id } });
+
+      // Money → Receipts finds it by booking code, receipt number or guest name.
+      for (const q of [b.code, pay.number, 'achieng']) {
+        const list = await get(host, `/host/stay-payments?q=${encodeURIComponent(q)}`);
+        expect(list.data.map((r: { id: string }) => r.id)).toEqual([pay.id]);
+      }
+      const row = (await get(host, '/host/stay-payments')).data[0];
+      expect(row).toMatchObject({
+        number: pay.number,
+        kind: 'PAYMENT',
+        amount: KES(2750),
+        booking: { code: b.code, listingTitle: 'Cozy 1BR with balcony' },
+        guest: { name: GUEST.name, hasEmail: true, hasPhone: true },
+      });
+
+      // Preview / download: the PDF itself.
+      const pdf = await req('get', host, `/host/bookings/${b.id}/payments/${pay.id}/receipt`)
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(pdf.status).toBe(200);
+      expect(pdf.headers['content-type']).toBe('application/pdf');
+      expect(pdf.headers['content-disposition']).toContain(`${pay.number}.pdf`);
+      expect((pdf.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+
+      // Send again: one SMS with the receipt's short link, one email with only this receipt.
+      outbox.length = 0;
+      const sent = await post(
+        host,
+        `/host/bookings/${b.id}/payments/${pay.id}/receipt/send`,
+        {},
+        200,
+      );
+      expect(sent.data).toEqual({ sms: true, email: true });
+      const [sms] = texts();
+      expect(sms).toMatch(
+        new RegExp(
+          `^Makini Homes: receipt ${pay.number} for KES 2,750 \\(booking ${b.code}\\)\\. View: https://go\\.kodihub\\.co\\.ke/[0-9A-Za-z]{12}$`,
+        ),
+      );
+      expect(sms!.length).toBeLessThanOrEqual(160);
+      expect(
+        mails()
+          .at(-1)!
+          .attachments?.map((a) => a.filename),
+      ).toEqual([`${pay.number}.pdf`]);
+
+      // The link opens the receipt without signing in; a changed link does not.
+      const target = new URL(await followShortLink(t, sms!));
+      expect(target.pathname).toBe(`/api/v1/public/receipts/stay/${pay.id}`);
+      const open = await t.http().get(`${target.pathname}${target.search}`);
+      expect(open.status).toBe(200);
+      expect(open.headers['content-type']).toBe('application/pdf');
+      const forged = new URLSearchParams(target.search);
+      forged.set('s', `${forged.get('s')!.slice(0, -1)}A`);
+      await t.http().get(`${target.pathname}?${forged.toString()}`).expect(404);
+      const expired = new URLSearchParams(target.search);
+      expired.set('e', '1700000000');
+      await t.http().get(`${target.pathname}?${expired.toString()}`).expect(404);
+
+      // A refund has no receipt to send.
+      await post(host, `/host/bookings/${b.id}/refunds`, { method: 'CASH', amount: KES(500) });
+      const refund = await t.prisma.stayPayment.findFirstOrThrow({
+        where: { bookingId: b.id, kind: 'REFUND' },
+      });
+      const no = await post(
+        host,
+        `/host/bookings/${b.id}/payments/${refund.id}/receipt/send`,
+        {},
+        409,
+      );
+      expect(no.error.code).toBe('NO_RECEIPT');
+      const refunds = await get(host, '/host/stay-payments?kind=REFUND');
+      expect(refunds.data.map((r: { id: string }) => r.id)).toEqual([refund.id]);
+    });
+  });
 });

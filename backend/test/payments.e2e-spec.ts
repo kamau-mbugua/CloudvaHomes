@@ -507,6 +507,44 @@ describe('Payments (e2e)', () => {
     ).toBe('%PDF-');
   });
 
+  it('sends a receipt again: SMS with a link that opens the PDF, and email with the PDF', async () => {
+    const x = await tenantWithInvoices();
+    const paid = (
+      await pay(owner, { tenantId: x.tenantId, channelId: x.cash.id, amount: KES(8000) })
+    ).data;
+    outbox.length = 0;
+
+    const sent = await post(owner, `/payments/${paid.id}/receipt/send`, {}, 200);
+    expect(sent.data).toEqual({ sms: true, email: true });
+    const sms = outbox.filter((m) => m.to === '+254711000301').at(-1)!;
+    expect(sms.text).toMatch(
+      new RegExp(
+        `^Received KES 8,000 ref ${paid.number}\\. Balance KES 17,000\\. Receipt: \\S+ - Pay Org$`,
+      ),
+    );
+    expect(sms.text.length).toBeLessThanOrEqual(160);
+    const email = outbox.find((m) => m.channel === 'email');
+    expect(email && 'attachments' in email ? email.attachments?.[0]?.filename : null).toBe(
+      `${paid.number}.pdf`,
+    );
+    // Re-sending doesn't ping staff or the tenant app again.
+    expect(outbox.filter((m) => m.channel === 'push')).toHaveLength(0);
+
+    // The link (a short link to a signed receipt URL) opens the PDF without signing in.
+    const code = /\/([0-9A-Za-z]{12,16})\s/.exec(`${sms.text.split('Receipt: ')[1]} `)?.[1];
+    const hop = await t.http().get(`/api/v1/s/${code}`).expect(302);
+    const target = new URL(hop.headers.location as string);
+    expect(target.pathname).toBe(`/api/v1/public/receipts/rent/${paid.id}`);
+    const open = await t.http().get(`${target.pathname}${target.search}`);
+    expect(open.status).toBe(200);
+    expect(open.headers['content-type']).toBe('application/pdf');
+    // The same link can't open another receipt.
+    const other = (
+      await pay(owner, { tenantId: x.tenantId, channelId: x.cash.id, amount: KES(1000) })
+    ).data;
+    await t.http().get(`/api/v1/public/receipts/rent/${other.id}${target.search}`).expect(404);
+  });
+
   it('concurrent payments for one tenant never over-allocate', async () => {
     const x = await tenantWithInvoices(); // owes 25,000
     const results = await Promise.all(

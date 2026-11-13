@@ -2,8 +2,11 @@ import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { currentContext } from '../../../common/context/request-context.js';
 import { parseDateOnly } from '../../../common/dates/date-only.js';
 import { AppError } from '../../../common/errors/app-error.js';
+import { toSkipTake } from '../../../common/http/pagination.js';
+import { paginated } from '../../../common/http/response.js';
 import type {
   PaymentMethod,
+  Prisma,
   StayPayment,
   StayPaymentKind,
 } from '../../../generated/prisma/client.js';
@@ -24,6 +27,7 @@ import type {
   BookingMpesaPromptDto,
   CreateStayPaymentDto,
   CreateStayRefundDto,
+  ListStayReceiptsQueryDto,
   VoidStayPaymentDto,
 } from './stay-payments.dto.js';
 import type { WrapperType } from '../../../common/di/wrapper-type.js';
@@ -533,5 +537,116 @@ export class StayPaymentsService {
       amount,
       phone,
     });
+  }
+
+  /** Money → Receipts for short stays: payments and refunds, newest first, searchable. */
+  async listReceipts(q: ListStayReceiptsQueryDto) {
+    const { orgId, permissions } = orgContext();
+    await assertHostOrg(this.db, orgId);
+    const term = q.q?.trim();
+    const until = q.to ? new Date(parseDateOnly(q.to).getTime() + 86_400_000) : null;
+    const where: Prisma.StayPaymentWhereInput = {
+      booking: { property: propertyScope() },
+      ...(q.kind ? { kind: q.kind } : {}),
+      ...(q.method ? { method: q.method } : {}),
+      ...(q.from || until
+        ? {
+            receivedAt: {
+              ...(q.from ? { gte: parseDateOnly(q.from) } : {}),
+              ...(until ? { lt: until } : {}),
+            },
+          }
+        : {}),
+      ...(term
+        ? {
+            OR: [
+              { number: { contains: term, mode: 'insensitive' } },
+              { reference: { contains: term, mode: 'insensitive' } },
+              { booking: { code: { contains: term, mode: 'insensitive' } } },
+              { booking: { guest: { name: { contains: term, mode: 'insensitive' } } } },
+              { booking: { guest: { phone: { contains: term.replace(/\s/g, '') } } } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.db.stayPayment.findMany({
+        where,
+        include: {
+          booking: {
+            select: {
+              id: true,
+              code: true,
+              listing: { select: { title: true } },
+              guest: { select: { name: true, phone: true, email: true } },
+            },
+          },
+        },
+        orderBy: [{ receivedAt: 'desc' }, { createdAt: 'desc' }],
+        ...toSkipTake(q),
+      }),
+      this.db.stayPayment.count({ where }),
+    ]);
+    const seeContacts = permissions.has('guests:view');
+    return paginated(
+      rows.map((p) => ({
+        id: p.id,
+        number: p.number,
+        kind: p.kind,
+        method: p.method,
+        amount: p.amount.toString(),
+        reference: p.reference,
+        receivedAt: p.receivedAt.toISOString(),
+        voidedAt: p.voidedAt ? p.voidedAt.toISOString() : null,
+        booking: {
+          id: p.booking.id,
+          code: p.booking.code,
+          listingTitle: p.booking.listing.title,
+        },
+        guest: p.booking.guest
+          ? {
+              name: p.booking.guest.name,
+              phone: seeContacts ? p.booking.guest.phone : null,
+              email: seeContacts ? p.booking.guest.email : null,
+              hasPhone: Boolean(p.booking.guest.phone),
+              hasEmail: Boolean(p.booking.guest.email),
+            }
+          : null,
+      })),
+      total,
+      q,
+    );
+  }
+
+  /** The receipt PDF for one payment on a booking the caller can see. */
+  async receiptPdf(bookingId: string, paymentId: string) {
+    await this.assertReceipt(bookingId, paymentId);
+    return this.notices.receiptPdf(paymentId);
+  }
+
+  /** Sends one receipt to the guest again: SMS with its link, and email with the PDF. */
+  async sendReceipt(bookingId: string, paymentId: string) {
+    const p = await this.assertReceipt(bookingId, paymentId);
+    const result = await this.notices.sendReceipt(paymentId);
+    await this.audit.record({
+      action: 'stay_payment.receipt_sent',
+      entity: 'stay_payment',
+      entityId: p.id,
+      after: { number: p.number, sms: result.sms, email: result.email },
+    });
+    return result;
+  }
+
+  private async assertReceipt(bookingId: string, paymentId: string): Promise<StayPayment> {
+    const { orgId } = orgContext();
+    await assertHostOrg(this.db, orgId);
+    const p = await this.db.stayPayment.findFirst({
+      where: { id: paymentId, bookingId, booking: { property: propertyScope() } },
+    });
+    if (!p) throw AppError.notFound('Payment');
+    if (p.kind !== 'PAYMENT' || p.voidedAt) {
+      throw AppError.conflict('Only a payment that stands has a receipt.', 'NO_RECEIPT');
+    }
+    return p;
   }
 }

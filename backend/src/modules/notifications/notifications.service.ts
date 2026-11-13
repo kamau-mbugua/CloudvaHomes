@@ -454,7 +454,14 @@ export class NotificationsService {
   async sendPaymentReceipt(
     orgId: string,
     phone: string,
-    p: { amount: bigint; number: string; owed: bigint; organizationName: string },
+    p: {
+      amount: bigint;
+      number: string;
+      owed: bigint;
+      organizationName: string;
+      /** A link to the receipt (sent when staff send a receipt again). */
+      link?: string;
+    },
   ): Promise<void> {
     await this.dispatchSms(
       { kind: 'org', orgId, type: 'payment_receipt' },
@@ -1305,6 +1312,8 @@ export function paymentReceiptText(p: {
   /** What the tenant owes after this payment; negative is credit. */
   owed: bigint;
   organizationName: string;
+  /** A link to the receipt; kept whole, the organisation name goes if there is no room. */
+  link?: string;
 }): string {
   const standing =
     p.owed > 0n
@@ -1312,6 +1321,11 @@ export function paymentReceiptText(p: {
       : p.owed < 0n
         ? `Credit ${smsKes(-p.owed)}`
         : 'Nothing owing';
+  if (p.link) {
+    const withLink = `Received ${smsKes(p.amount)} ref ${p.number}. ${standing}. Receipt: ${p.link}`;
+    const signed = `${withLink} - ${p.organizationName}`;
+    return signed.length <= 160 ? signed : withLink;
+  }
   return `Received ${smsKes(p.amount)} ref ${p.number}. ${standing}. Thank you - ${p.organizationName}`.slice(
     0,
     160,

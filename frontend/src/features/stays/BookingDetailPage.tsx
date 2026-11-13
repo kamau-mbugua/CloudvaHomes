@@ -8,6 +8,9 @@ import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { CardSkeleton } from '../../components/Loading';
 import { Breadcrumbs, Fact } from '../portfolio/ui';
+import { PAYMENT_METHOD } from '../payments/labels';
+import { ReceiptActions } from '../receipts/ReceiptActions';
+import { stayReceiptRef } from '../receipts/receipts';
 import { staysErrorMessage, staysKeys } from './api';
 import {
   balanceStat,
@@ -369,6 +372,7 @@ export function BookingDetailPage() {
                     <th>Reference</th>
                     <th>Date</th>
                     <th className="num">Amount</th>
+                    <th className="num">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -392,12 +396,28 @@ export function BookingDetailPage() {
                               : 'Payment'}
                         </span>
                       </td>
-                      <td>{p.method}</td>
+                      <td>{PAYMENT_METHOD[p.method]?.label ?? p.method}</td>
                       <td className="code">{p.reference ?? '—'}</td>
                       <td className="num">{p.receivedAt.slice(0, 10)}</td>
                       <td className="num">
                         {p.kind === 'REFUND' ? '-' : ''}
                         {formatKES(Number(p.amount))}
+                      </td>
+                      <td className="num">
+                        {p.kind === 'PAYMENT' && !p.voidedAt ? (
+                          <ReceiptActions
+                            canSend={canPay}
+                            receipt={stayReceiptRef(b.id, p, {
+                              name: b.guest?.name ?? 'Guest',
+                              phone: b.guest?.phone,
+                              email: b.guest?.email,
+                              hasPhone: b.guest?.phone ? true : undefined,
+                              hasEmail: b.guest?.email ? true : undefined,
+                            })}
+                          />
+                        ) : (
+                          <span className="nx-muted">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

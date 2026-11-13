@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { SortHeader, type TableSort } from '../../components/SortHeader';
 import { formatDateTime, formatDay } from '../../lib/dates';
@@ -30,11 +31,14 @@ export function PaymentsTable({
   rows,
   showTenant = true,
   sort,
+  actions,
 }: {
   rows: Payment[];
   showTenant?: boolean;
   /** Present on the payments list: the Received and Amount headers sort it. */
   sort?: TableSort;
+  /** Present on Money → Receipts: buttons for each row (receipt preview, send, download). */
+  actions?: (p: Payment) => ReactNode;
 }) {
   return (
     <div className="ad__tablewrap">
@@ -48,6 +52,7 @@ export function PaymentsTable({
             <th>Reference</th>
             {sort ? <SortHeader field="amount" label="Amount" sort={sort} className="num" /> : <th className="num">Amount</th>}
             <th className="num">Credit left</th>
+            {actions ? <th className="num">Actions</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -71,6 +76,7 @@ export function PaymentsTable({
                 <td className="num">{p.reference ?? <span className="nx-muted">—</span>}</td>
                 <td className="num"><SignedAmount minor={p.amount} struck={Boolean(p.reversedBy)} /></td>
                 <td className="num">{p.unallocated > 0 ? formatKES(p.unallocated) : <span className="nx-muted">—</span>}</td>
+                {actions ? <td className="num">{actions(p)}</td> : null}
               </tr>
             );
           })}

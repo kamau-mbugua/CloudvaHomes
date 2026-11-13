@@ -16,6 +16,7 @@ import { DB, type Db, type Tx } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
 import { orgContext } from '../auth/decorators.js';
 import { todayInNairobi } from '../billing/billing-math.js';
+import { ReceiptLinksService } from '../notifications/receipt-links.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { nextCode } from '../portfolio/codes.js';
 import { tenantScope } from '../portfolio/property-scope.js';
@@ -51,6 +52,8 @@ const DETAIL_INCLUDE = {
 type ListRow = Prisma.PaymentGetPayload<{ include: typeof LIST_INCLUDE }>;
 type DetailRow = Prisma.PaymentGetPayload<{ include: typeof DETAIL_INCLUDE }>;
 
+const anySent = (r: { sms: boolean; email: boolean }) => r.sms || r.email;
+
 /** Receipt numbers: RCT-2026-000012 per organisation per year. */
 export function receiptNumber(tx: Tx, orgId: string, date: string) {
   const year = date.slice(0, 4);
@@ -82,6 +85,7 @@ export class PaymentsService {
     private readonly channels: ChannelsService,
     private readonly tenants: TenantsService,
     private readonly notifications: NotificationsService,
+    private readonly receiptLinks: ReceiptLinksService,
   ) {}
 
   private async names(ids: (string | null)[]) {
@@ -352,7 +356,9 @@ export class PaymentsService {
 
     const result = await this.get(id);
     const receiptSent =
-      dto.notifyTenant === false ? false : await this.sendReceipt(id, tenant.phone, result.number);
+      dto.notifyTenant === false
+        ? false
+        : anySent(await this.sendReceipt(id, tenant.phone, result.number));
     return { ...result, receiptSent, replayed: false };
   }
 
@@ -437,24 +443,49 @@ export class PaymentsService {
   /** Receipt notification (SMS + detailed email with PDF receipt attached) after commit. */
   async notifyReceipt(paymentId: string): Promise<boolean> {
     const p = await this.find(paymentId);
-    return this.sendReceipt(paymentId, p.tenant.phone, p.number);
+    return anySent(await this.sendReceipt(paymentId, p.tenant.phone, p.number));
+  }
+
+  /**
+   * A staff member sending a receipt to the tenant again: SMS with a link to the receipt, and
+   * email with the PDF when the tenant has an email. Says what went out.
+   */
+  async resendReceipt(id: string): Promise<{ sms: boolean; email: boolean }> {
+    const p = await this.find(id);
+    if (p.reversesId || p.reversedBy) {
+      throw AppError.conflict('A reversed payment has no receipt to send.', 'NO_RECEIPT');
+    }
+    const result = await this.sendReceipt(id, p.tenant.phone, p.number, { resend: true });
+    await this.audit.record({
+      action: 'payment.receipt_sent',
+      entity: 'payment',
+      entityId: id,
+      after: { number: p.number, sms: result.sms, email: result.email },
+    });
+    return result;
   }
 
   /** After commit, best effort: sends SMS receipt + detailed email receipt with PDF attached. */
-  private async sendReceipt(id: string, phone: string, number: string): Promise<boolean> {
+  private async sendReceipt(
+    id: string,
+    phone: string,
+    number: string,
+    opts: { resend?: boolean } = {},
+  ): Promise<{ sms: boolean; email: boolean }> {
+    const sent = { sms: false, email: false };
     try {
       const receiptData = await this.forReceipt(id);
       const { payment, org, orgId, balance } = receiptData;
       const standing = balanceText(balance);
-      let sentAny = false;
       try {
         await this.notifications.sendPaymentReceipt(orgId, phone, {
           amount: payment.amount,
           number,
           owed: balance,
           organizationName: org.name,
+          ...(opts.resend ? { link: await this.receiptLinks.shortUrl('rent', id, orgId) } : {}),
         });
-        sentAny = true;
+        sent.sms = true;
       } catch (e) {
         this.log.warn({ err: e, paymentId: id }, 'Payment receipt SMS failed');
       }
@@ -463,7 +494,7 @@ export class PaymentsService {
         where: { id: payment.tenant.id },
         select: { email: true, userId: true, orgId: true },
       });
-      if (tenantRow?.userId) {
+      if (tenantRow?.userId && !opts.resend) {
         await this.notifications.notifyUser({
           userId: tenantRow.userId,
           orgId: tenantRow.orgId,
@@ -474,7 +505,7 @@ export class PaymentsService {
           actionUrl: '/tenant/payments',
         });
       }
-      if (tenantRow?.orgId) {
+      if (tenantRow?.orgId && !opts.resend) {
         await this.notifications.notifyOrgStaff(tenantRow.orgId, {
           kind: 'PAYMENT_RECEIVED',
           title: `Payment received · KES ${money(payment.amount)}`,
@@ -512,15 +543,15 @@ export class PaymentsService {
               pdfBuffer,
             },
           );
-          sentAny = true;
+          sent.email = true;
         } catch (e) {
           this.log.warn({ err: e, paymentId: id }, 'Payment receipt email failed');
         }
       }
-      return sentAny;
+      return sent;
     } catch (e) {
       this.log.warn({ err: e, paymentId: id }, 'Payment receipt notification failed');
-      return false;
+      return sent;
     }
   }
 

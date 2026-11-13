@@ -11,6 +11,7 @@ import 'calendar_screen.dart';
 import 'cleaning_screen.dart';
 import 'guests_screen.dart';
 import 'host_more_screen.dart';
+import 'host_receipts_screen.dart';
 import 'host_reports_screen.dart';
 import 'host_shell.dart';
 import 'listing_editor_screen.dart';
@@ -97,6 +98,10 @@ List<RouteBase> hostRoutes() => [
     builder: (_, _) => const ExpenseFormScreen(),
   ),
   GoRoute(path: '/host/reports', builder: (_, _) => const HostReportsScreen()),
+  GoRoute(
+    path: '/host/receipts',
+    builder: (_, _) => const HostReceiptsScreen(),
+  ),
   GoRoute(
     path: '/host/maintenance',
     builder: (_, _) => const StaffMaintenanceScreen(),

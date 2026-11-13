@@ -497,31 +497,84 @@ class HostBookingLine {
 class HostPayment {
   const HostPayment({
     required this.id,
+    this.number = '',
     required this.kind,
     required this.method,
     required this.amountCents,
     this.reference,
     this.note,
     required this.paidAt,
+    this.voidedAt,
   });
 
   final String id;
+
+  /// The receipt number, e.g. SRC-2026-000006.
+  final String number;
   final String kind; // PAYMENT | REFUND
   final String method;
   final int amountCents;
   final String? reference;
   final String? note;
   final String paidAt;
+  final String? voidedAt;
+
+  /// A payment that stands has a receipt to preview, send and download.
+  bool get hasReceipt => kind == 'PAYMENT' && voidedAt == null;
 
   factory HostPayment.fromJson(Map<String, dynamic> j) => HostPayment(
     id: (j['id'] as String?) ?? '',
+    number: (j['number'] as String?) ?? '',
     kind: (j['kind'] as String?) ?? 'PAYMENT',
     method: (j['method'] as String?) ?? 'CASH',
     amountCents: hostMinorToInt(j['amount']),
     reference: j['reference'] as String?,
     note: j['note'] as String?,
-    paidAt: (j['paidAt'] as String?) ?? '',
+    // The API calls it receivedAt; older builds read paidAt.
+    paidAt: (j['receivedAt'] as String?) ?? (j['paidAt'] as String?) ?? '',
+    voidedAt: j['voidedAt'] as String?,
   );
+}
+
+/// A row of Money → Receipts for short stays (`GET /host/stay-payments`).
+class HostStayReceipt {
+  const HostStayReceipt({
+    required this.payment,
+    required this.bookingId,
+    required this.bookingCode,
+    required this.listingTitle,
+    this.guestName,
+    this.guestPhone,
+    this.guestEmail,
+    this.guestHasPhone = false,
+    this.guestHasEmail = false,
+  });
+
+  final HostPayment payment;
+  final String bookingId;
+  final String bookingCode;
+  final String listingTitle;
+  final String? guestName;
+  final String? guestPhone;
+  final String? guestEmail;
+  final bool guestHasPhone;
+  final bool guestHasEmail;
+
+  factory HostStayReceipt.fromJson(Map<String, dynamic> j) {
+    final booking = (j['booking'] as Map<String, dynamic>?) ?? const {};
+    final guest = j['guest'] as Map<String, dynamic>?;
+    return HostStayReceipt(
+      payment: HostPayment.fromJson(j),
+      bookingId: (booking['id'] as String?) ?? '',
+      bookingCode: (booking['code'] as String?) ?? '',
+      listingTitle: (booking['listingTitle'] as String?) ?? '',
+      guestName: guest?['name'] as String?,
+      guestPhone: guest?['phone'] as String?,
+      guestEmail: guest?['email'] as String?,
+      guestHasPhone: guest?['hasPhone'] == true,
+      guestHasEmail: guest?['hasEmail'] == true,
+    );
+  }
 }
 
 class HostBooking {

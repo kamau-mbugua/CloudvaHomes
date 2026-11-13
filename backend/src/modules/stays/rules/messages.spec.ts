@@ -1,5 +1,5 @@
 import { isGsm7, smsSegments } from '../../tenant-portal/broadcast-rules.js';
-import { guestSms } from './messages.js';
+import { guestSms, stayReceiptSms } from './messages.js';
 
 describe('stays/rules/messages — guestSms', () => {
   const base = {
@@ -143,5 +143,32 @@ describe('stays/rules/messages — guestSms', () => {
       'Diani Stays: welcome on 12 Dec! Check-in from 14:00. Collect keys from the guard. Map: https://maps.google.com/?q=-1.292066,36.787194',
     );
     expect(smsSegments(text)).toBe(1);
+  });
+});
+
+describe('stayReceiptSms', () => {
+  const link = 'https://go.kodihub.co.ke/AbCdEfGhIjKl';
+  it('names the receipt, amount and booking, with the link', () => {
+    expect(
+      stayReceiptSms({
+        biz: 'Makini Homes',
+        number: 'SRC-2026-000006',
+        amount: 1_400_000n,
+        code: 'B00007',
+        link,
+      }),
+    ).toBe(`Makini Homes: receipt SRC-2026-000006 for KES 14,000 (booking B00007). View: ${link}`);
+  });
+
+  it('stays within one SMS for a long business name, keeping the link whole', () => {
+    const text = stayReceiptSms({
+      biz: 'The Very Long Named Serviced Apartments and Holiday Homes of Kilimani',
+      number: 'SRC-2026-000006',
+      amount: 123_456_700n,
+      code: 'B00007',
+      link,
+    });
+    expect(text.length).toBeLessThanOrEqual(160);
+    expect(text.endsWith(link)).toBe(true);
   });
 });

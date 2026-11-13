@@ -134,3 +134,20 @@ export function guestSms(event: GuestSmsEvent, d: GuestSmsData): string {
     }
   }
 }
+
+/**
+ * A host re-sending one receipt to the guest: the receipt's link, always within one SMS
+ * (the business name is shortened if it would push the message past 160 characters).
+ */
+export function stayReceiptSms(d: {
+  biz: string;
+  number: string;
+  amount: bigint;
+  code: string;
+  link: string;
+}): string {
+  const rest = `: receipt ${d.number} for ${smsKes(d.amount)} (booking ${d.code}). View: ${d.link}`;
+  const room = 160 - rest.length;
+  const biz = d.biz.length > room ? `${d.biz.slice(0, Math.max(0, room - 1)).trimEnd()}.` : d.biz;
+  return `${biz}${rest}`;
+}

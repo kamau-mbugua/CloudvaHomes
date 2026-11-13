@@ -246,16 +246,18 @@ void main() {
     expect(find.textContaining('KES 6,500.00'), findsWidgets);
   });
 
-  Future<void> pumpDetail(
+  Future<FakeAdapter> pumpDetail(
     WidgetTester tester,
     Map<String, Object?> booking, {
     Set<String> extraPermissions = const {},
+    Map<String, Handler> handlers = const {},
   }) async {
     phoneSize(tester);
     // A fresh scope each time, so a different sign-in takes effect.
     await tester.pumpWidget(const SizedBox());
     final adapter = FakeAdapter({
       'GET /host/bookings/b1': (_) => {'data': booking},
+      ...handlers,
     });
     await tester.pumpWidget(
       ProviderScope(
@@ -279,10 +281,75 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return adapter;
   }
 
   String day(int n) =>
       toDay(DateTime.parse('${todayIso()}T00:00:00Z').add(Duration(days: n)));
+
+  testWidgets('a payment row opens its receipt actions and sends it', (
+    tester,
+  ) async {
+    const send = '/host/bookings/b1/payments/p1/receipt/send';
+    final adapter = await pumpDetail(
+      tester,
+      {
+        ..._bookingJson(status: 'CONFIRMED', includeMoney: true),
+        'payments': [
+          {
+            'id': 'p1',
+            'number': 'SRC-2026-000006',
+            'kind': 'PAYMENT',
+            'method': 'CASH',
+            'amount': '1400000',
+            'reference': null,
+            'receivedAt': '2026-11-13T09:00:00.000Z',
+            'voidedAt': null,
+          },
+          {
+            'id': 'p2',
+            'number': 'SRC-2026-000007',
+            'kind': 'REFUND',
+            'method': 'CASH',
+            'amount': '50000',
+            'reference': null,
+            'receivedAt': '2026-11-13T10:00:00.000Z',
+            'voidedAt': null,
+          },
+        ],
+      },
+      handlers: {
+        'POST $send': (_) => {
+          'data': {'sms': true, 'email': false},
+        },
+      },
+    );
+
+    await tester.scrollUntilVisible(
+      find.textContaining('SRC-2026-000006'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    // The payment shows its number, method and day; only the payment has a receipt.
+    expect(find.text('SRC-2026-000006 · Payment'), findsOneWidget);
+    expect(find.textContaining('Cash · 13 Nov 2026'), findsWidgets);
+    expect(find.byTooltip('Receipt SRC-2026-000006'), findsOneWidget);
+    expect(find.byTooltip('Receipt SRC-2026-000007'), findsNothing);
+
+    await tester.ensureVisible(find.byTooltip('Receipt SRC-2026-000006'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Receipt SRC-2026-000006'));
+    await tester.pumpAndSettle();
+    expect(find.text('Preview'), findsOneWidget);
+    expect(find.text('Download or share'), findsOneWidget);
+    await tester.tap(find.textContaining('Send to '));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('with a link to the receipt.'), findsOneWidget);
+    await tester.tap(find.text('Send receipt'));
+    await tester.pumpAndSettle();
+    expect(adapter.sent('POST', send), hasLength(1));
+    expect(find.text('Receipt SRC-2026-000006 sent by SMS.'), findsOneWidget);
+  });
 
   testWidgets('Check-in and no-show appear only from the check-in day', (
     tester,

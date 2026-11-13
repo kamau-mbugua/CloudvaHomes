@@ -260,6 +260,22 @@ class HostApi {
     return _page(res, HostBooking.fromJson);
   }
 
+  /// Money → Receipts: stay payments and refunds, newest first.
+  Future<PageResult<HostStayReceipt>> stayReceipts({
+    int page = 1,
+    String? q,
+  }) async {
+    final res = await _api.get(
+      '/host/stay-payments',
+      query: {
+        'page': page,
+        'pageSize': 25,
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+      },
+    );
+    return _page(res, HostStayReceipt.fromJson);
+  }
+
   Future<HostBooking> booking(String id) async {
     final res = await _api.get('/host/bookings/$id');
     return HostBooking.fromJson(res['data'] as Map<String, dynamic>);

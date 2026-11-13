@@ -22,3 +22,19 @@ Future<void> openApiPdf(ApiClient api, String path, String filename) async {
     );
   }
 }
+
+/// Downloads a PDF from the API and opens the share sheet, so it can be saved to Files or sent
+/// on (WhatsApp, email…). The copy lives in the temporary folder, like [openApiPdf].
+Future<void> shareApiPdf(ApiClient api, String path, String filename) async {
+  final bytes = await api.bytes(path);
+  final dir = await getTemporaryDirectory();
+  final safe = filename.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  final file = File('${dir.path}/$safe');
+  await file.writeAsBytes(bytes, flush: true);
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile(file.path, mimeType: 'application/pdf')],
+      title: filename,
+    ),
+  );
+}

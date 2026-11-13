@@ -34,6 +34,13 @@ class HostMoreScreen extends ConsumerWidget {
               subtitle: 'Guest directory, stay history and notes',
               onTap: () => context.push('/host/guests'),
             ),
+          if (can(ref, 'stay-payments:view'))
+            (
+              icon: Icons.receipt_long_outlined,
+              title: 'Receipts',
+              subtitle: 'Every guest receipt: preview, send again, download',
+              onTap: () => context.push('/host/receipts'),
+            ),
           if (can(ref, 'expenses:view'))
             (
               icon: Icons.receipt_outlined,

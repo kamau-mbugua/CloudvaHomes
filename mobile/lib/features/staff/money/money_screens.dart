@@ -8,6 +8,7 @@ import '../../../core/dates.dart';
 import '../../../core/files.dart';
 import '../../../core/money.dart';
 import '../../../core/providers.dart';
+import '../../../core/receipts.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
@@ -54,6 +55,14 @@ class MoneyScreen extends ConsumerWidget {
 }
 
 // ───────────────────────────────────────────── payments
+
+/// The receipt behind a rent payment, for Preview / Send / Download.
+ReceiptRef _rentReceipt(Payment p) => ReceiptRef.rent(
+  paymentId: p.id,
+  number: p.number,
+  tenantName: p.tenant.name,
+  phone: p.tenant.phone,
+);
 
 class _PaymentsList extends ConsumerStatefulWidget {
   const _PaymentsList();
@@ -113,7 +122,16 @@ class _PaymentsListState extends ConsumerState<_PaymentsList> {
                   ? const StatusChip('Reversal', tone: Tone.bad)
                   : p.reversedByNumber != null
                   ? const StatusChip('Reversed')
-                  : null,
+                  : IconButton(
+                      tooltip: 'Receipt ${p.number}',
+                      icon: const Icon(Icons.receipt_long_outlined),
+                      onPressed: () => showReceiptActions(
+                        context,
+                        ref,
+                        _rentReceipt(p),
+                        canSend: can(ref, 'payments:create'),
+                      ),
+                    ),
               onTap: () => context.push('/staff/money/payments/${p.id}'),
             ),
           ),
@@ -145,7 +163,18 @@ class _PaymentDetailScreenState extends ConsumerState<PaymentDetailScreen> {
         title: Text(p?.number ?? 'Payment'),
         subtitle: p?.tenant.name,
         actions: [
-          if (p != null)
+          if (p != null && !p.isReversal && p.reversedByNumber == null)
+            IconButton(
+              tooltip: 'Receipt ${p.number}',
+              icon: const Icon(Icons.receipt_long_outlined),
+              onPressed: () => showReceiptActions(
+                context,
+                ref,
+                _rentReceipt(p),
+                canSend: can(ref, 'payments:create'),
+              ),
+            )
+          else if (p != null)
             IconButton(
               tooltip: 'Receipt PDF',
               icon: const Icon(Icons.picture_as_pdf_outlined),

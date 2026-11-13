@@ -16,13 +16,14 @@ const DAY_MS = 86_400_000;
 export const SHORT_CODE_PATTERN = /^[0-9A-Za-z]{8,16}$/;
 
 /**
- * Code lengths: links that open something private (a booking page, an invitation) get 12
+ * Code lengths: links that open something private (a booking page, an invitation, a receipt) get 12
  * characters (~71 bits, beyond guessing even at scale); map links point at a pin that is public
  * anyway, so 8 is enough. Longer is tried only if a shorter code is already taken.
  */
 const LENGTHS: Record<ShortLinkKind, number[]> = {
   booking: [12, 13, 14, 15, 16],
   invitation: [12, 13, 14, 15, 16],
+  receipt: [12, 13, 14, 15, 16],
   map: [8, 9, 10, 11, 12],
 };
 
@@ -51,7 +52,7 @@ export function rateKeyFor(ip: string): string {
     .join(':')}::/64`;
 }
 
-export type ShortLinkKind = 'booking' | 'map' | 'invitation';
+export type ShortLinkKind = 'booking' | 'map' | 'invitation' | 'receipt';
 
 const sha256 = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
 

@@ -41,6 +41,8 @@ const InvoiceRunPage = lazy(() => import('./features/billing/InvoiceRunPage').th
 const MeterReadingsPage = lazy(() => import('./features/billing/MeterReadingsPage').then((m) => ({ default: m.MeterReadingsPage })));
 const ChargesPage = lazy(() => import('./features/billing/ChargesPage').then((m) => ({ default: m.ChargesPage })));
 const PaymentsPage = lazy(() => import('./features/payments/PaymentsPage').then((m) => ({ default: m.PaymentsPage })));
+const RentReceiptsPage = lazy(() => import('./features/receipts/ReceiptsPages').then((m) => ({ default: m.RentReceiptsPage })));
+const StayReceiptsPage = lazy(() => import('./features/receipts/ReceiptsPages').then((m) => ({ default: m.StayReceiptsPage })));
 const PaymentDetailPage = lazy(() => import('./features/payments/PaymentDetailPage').then((m) => ({ default: m.PaymentDetailPage })));
 const PaymentChannelsPage = lazy(() => import('./features/payments/PaymentChannelsPage').then((m) => ({ default: m.PaymentChannelsPage })));
 const ReconciliationPage = lazy(() => import('./features/mpesa/ReconciliationPage').then((m) => ({ default: m.ReconciliationPage })));
@@ -160,6 +162,8 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; tit
   charges: { element: <ChargesPage /> },
   payments: { element: <PaymentsPage />, children: [{ path: ':paymentId', title: 'Payment details', element: <PaymentDetailPage /> }] },
   'payment-channels': { element: <PaymentChannelsPage /> },
+  receipts: { element: <RentReceiptsPage /> },
+  'stay-receipts': { element: <StayReceiptsPage /> },
   reconciliation: { element: <ReconciliationPage />, children: [{ path: ':inboundId', title: 'Transaction details', element: <InboundDetailPage /> }] },
   expenses: { element: <ExpensesPage /> },
   reports: { element: <ReportsOrHostReportsPage /> },

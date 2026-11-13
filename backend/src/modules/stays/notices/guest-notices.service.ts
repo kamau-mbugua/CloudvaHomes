@@ -2,23 +2,31 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { withoutOrgScope } from '../../../common/context/request-context.js';
 import { FieldCipher } from '../../../common/crypto/field-cipher.js';
 import { formatDateOnly } from '../../../common/dates/date-only.js';
+import { AppError } from '../../../common/errors/app-error.js';
 import { smsKes } from '../../../common/money/money.js';
 import {
   readOrgDocumentInstructions,
   readSystemDocumentInstructions,
 } from '../../../common/pdf/pdf.js';
+import type { StayPayment } from '../../../generated/prisma/client.js';
 import { ENV } from '../../../config/config.module.js';
 import type { Env } from '../../../config/env.js';
 import { DB, type Db } from '../../../prisma/prisma.module.js';
 import type { GuestEmailTemplateKey } from '../../notifications/guest-email-templates.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
+import { ReceiptLinksService } from '../../notifications/receipt-links.service.js';
 import { ShortLinksService } from '../../notifications/short-links.service.js';
 import type { EmailAttachment } from '../../notifications/senders.js';
 import { bookingLinkToken, bookingLinkUrl, hashAccessToken } from '../bookings/booking-link.js';
 import { renderStayReceiptPdf, STAY_METHOD_LABEL } from '../payments/stay-receipt-pdf.js';
 import { owedOn } from '../rules/balance.js';
 import { locationOf, mapLink, shortMapLink } from '../rules/location.js';
-import { guestSms, type GuestSmsData, type GuestSmsEvent } from '../rules/messages.js';
+import {
+  guestSms,
+  stayReceiptSms,
+  type GuestSmsData,
+  type GuestSmsEvent,
+} from '../rules/messages.js';
 
 /** What a call site knows that the booking row doesn't (the rest is read from the booking). */
 export interface GuestNoticeExtra {
@@ -32,6 +40,17 @@ export interface GuestNoticeExtra {
   paymentId?: string;
   /** PAYMENT: this payment confirmed the booking. */
   confirmed?: boolean;
+  /**
+   * PAYMENT: a host re-sending this one receipt; the SMS carries the receipt's link and only
+   * this receipt is attached to the email.
+   */
+  receiptOnly?: boolean;
+}
+
+/** What actually went out. */
+export interface GuestNoticeResult {
+  sms: boolean;
+  email: boolean;
 }
 
 const TEMPLATE: Record<GuestSmsEvent, GuestEmailTemplateKey> = {
@@ -82,6 +101,7 @@ export class GuestNoticesService {
     @Inject(DB) private readonly db: Db,
     private readonly notifications: NotificationsService,
     private readonly shortLinks: ShortLinksService,
+    private readonly receiptLinks: ReceiptLinksService,
     private readonly cipher: FieldCipher,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -110,7 +130,112 @@ export class GuestNoticesService {
     }
   }
 
-  private async send(event: GuestSmsEvent, bookingId: string, extra: GuestNoticeExtra) {
+  /**
+   * A host re-sending one stay receipt: SMS with the receipt's link, and (when the guest gave an
+   * email) the receipt email with the PDF. Says what went out; never throws for a failed message.
+   */
+  async sendReceipt(paymentId: string): Promise<GuestNoticeResult> {
+    const p = await withoutOrgScope(() =>
+      this.db.stayPayment.findUnique({ where: { id: paymentId } }),
+    );
+    if (!p || p.kind !== 'PAYMENT' || p.voidedAt) throw AppError.notFound('Receipt');
+    return this.send('PAYMENT', p.bookingId, {
+      paymentId: p.id,
+      amount: p.amount,
+      receiptOnly: true,
+    });
+  }
+
+  /** The receipt PDF for one stay payment (callers check the caller may see it). */
+  async receiptPdf(
+    paymentId: string,
+  ): Promise<{ number: string; filename: string; content: Buffer }> {
+    const p = await withoutOrgScope(() =>
+      this.db.stayPayment.findUnique({
+        where: { id: paymentId },
+        include: { booking: { include: { guest: true, listing: { select: { title: true } } } } },
+      }),
+    );
+    if (!p || p.kind !== 'PAYMENT' || p.voidedAt) throw AppError.notFound('Receipt');
+    const b = p.booking;
+    const [site, org, payments] = await withoutOrgScope(() =>
+      Promise.all([
+        this.db.hostSite.findUnique({ where: { orgId: b.orgId } }),
+        this.db.organization.findUniqueOrThrow({
+          where: { id: b.orgId },
+          select: { name: true, phone: true, email: true, kraPin: true, settings: true },
+        }),
+        this.db.stayPayment.findMany({
+          where: { bookingId: b.id, kind: 'PAYMENT', voidedAt: null },
+          orderBy: { receivedAt: 'asc' },
+        }),
+      ]),
+    );
+    const content = await this.renderReceipt({
+      payment: p,
+      payments,
+      booking: b,
+      guest: { name: b.guest?.name ?? 'Guest', phone: b.guest?.phone ?? '' },
+      listingTitle: b.listing.title,
+      biz: site?.businessName || org.name,
+      phone: site?.contactPhone ?? org.phone,
+      org,
+    });
+    return { number: p.number, filename: `${p.number}.pdf`, content };
+  }
+
+  /** One receipt PDF: what was paid up to and including this payment, and what was left. */
+  private async renderReceipt(r: {
+    payment: StayPayment;
+    payments: StayPayment[];
+    booking: { code: string; checkIn: Date; checkOut: Date; total: bigint };
+    guest: { name: string; phone: string };
+    listingTitle: string;
+    biz: string;
+    phone: string | null;
+    org: { email: string | null; kraPin: string | null; settings: unknown };
+  }): Promise<Buffer> {
+    const settings = await withoutOrgScope(() =>
+      this.db.platformSettings.findUnique({ where: { id: 1 }, select: { emailTemplates: true } }),
+    );
+    const p = r.payment;
+    const b = r.booking;
+    const paidUpTo = r.payments
+      .filter((q) => q.receivedAt.getTime() <= p.receivedAt.getTime())
+      .reduce((n, q) => n + q.amount, 0n);
+    const nights = Math.max(1, Math.round((b.checkOut.getTime() - b.checkIn.getTime()) / DAY_MS));
+    return renderStayReceiptPdf({
+      org: { name: r.biz, phone: r.phone ?? '', email: r.org.email ?? '', kraPin: r.org.kraPin },
+      payment: {
+        number: p.number,
+        method: p.method,
+        amount: p.amount,
+        reference: p.reference,
+        receivedAt: nairobiDateTime(p.receivedAt),
+      },
+      guest: r.guest,
+      booking: {
+        code: b.code,
+        listingTitle: r.listingTitle,
+        checkIn: longStayDate(b.checkIn),
+        checkOut: longStayDate(b.checkOut),
+        nights,
+        total: b.total,
+        paid: paidUpTo,
+        owed: b.total > paidUpTo ? b.total - paidUpTo : 0n,
+      },
+      instructions: {
+        org: readOrgDocumentInstructions(r.org.settings).receiptInstructions,
+        system: readSystemDocumentInstructions(settings?.emailTemplates).receiptInstructions,
+      },
+    });
+  }
+
+  private async send(
+    event: GuestSmsEvent,
+    bookingId: string,
+    extra: GuestNoticeExtra,
+  ): Promise<GuestNoticeResult> {
     const b = await withoutOrgScope(() =>
       this.db.booking.findUnique({
         where: { id: bookingId },
@@ -129,7 +254,7 @@ export class GuestNoticesService {
         },
       }),
     );
-    if (!b?.guest) return;
+    if (!b?.guest) return { sms: false, email: false };
     const [site, org] = await withoutOrgScope(() =>
       Promise.all([
         this.db.hostSite.findUnique({ where: { orgId: b.orgId } }),
@@ -150,6 +275,7 @@ export class GuestNoticesService {
     const checkOutTime = site?.checkOutTime ?? '10:00';
     const instructions = b.listing.checkInInstructions?.trim() ?? '';
 
+    let sms = false;
     if (b.guest.phone) {
       // SMS carry short links (go.kodihub.co.ke/…) so they stay within one unit; emails keep
       // the full ones.
@@ -171,16 +297,32 @@ export class GuestNoticesService {
         mapLink: location ? await short(shortMapLink(location), 'map') : '',
         confirmed: extra.confirmed,
       };
-      await this.notifications
+      const receipt =
+        extra.receiptOnly && extra.paymentId
+          ? await withoutOrgScope(() =>
+              this.db.stayPayment.findUnique({ where: { id: extra.paymentId } }),
+            )
+          : null;
+      const text = receipt
+        ? stayReceiptSms({
+            biz,
+            number: receipt.number,
+            amount: receipt.amount,
+            code: b.code,
+            link: await this.receiptLinks.shortUrl('stay', receipt.id, b.orgId),
+          })
+        : guestSms(event, data);
+      sms = await this.notifications
         .sendSms(
           { kind: 'org', orgId: b.orgId, type: event === 'PAYMENT' ? 'stay_payment' : 'booking' },
           b.guest.phone,
-          guestSms(event, data),
+          text,
         )
-        .catch(() => undefined);
+        .then(() => true)
+        .catch(() => false);
     }
 
-    if (!b.guest.email) return;
+    if (!b.guest.email) return { sms, email: false };
 
     const nights = Math.max(1, Math.round((b.checkOut.getTime() - b.checkIn.getTime()) / DAY_MS));
     const phone = site?.contactPhone ?? org.phone;
@@ -255,58 +397,26 @@ export class GuestNoticesService {
       }
       // One receipt per payment email; every receipt once fully paid, and on confirmation.
       const attach =
-        event === 'PAYMENT' && owed > 0n
+        event === 'PAYMENT' && (owed > 0n || extra.receiptOnly)
           ? payments.filter((p) => p.id === extra.paymentId)
           : payments;
       if (attach.length) {
-        const header = {
-          name: biz,
-          phone: phone ?? '',
-          email: org.email ?? '',
-          kraPin: org.kraPin,
-        };
-        const settings = await withoutOrgScope(() =>
-          this.db.platformSettings.findUnique({
-            where: { id: 1 },
-            select: { emailTemplates: true },
-          }),
-        );
-        const instr = {
-          org: readOrgDocumentInstructions(org.settings).receiptInstructions,
-          system: readSystemDocumentInstructions(settings?.emailTemplates).receiptInstructions,
-        };
+        const guest = { name: b.guest.name, phone: b.guest.phone };
         attachments = await Promise.all(
-          attach.map(async (p) => {
-            const paidUpTo = payments
-              .filter((q) => q.receivedAt.getTime() <= p.receivedAt.getTime())
-              .reduce((n, q) => n + q.amount, 0n);
-            return {
-              filename: `${p.number}.pdf`,
-              contentType: 'application/pdf',
-              content: await renderStayReceiptPdf({
-                org: header,
-                payment: {
-                  number: p.number,
-                  method: p.method,
-                  amount: p.amount,
-                  reference: p.reference,
-                  receivedAt: nairobiDateTime(p.receivedAt),
-                },
-                guest: { name: b.guest!.name, phone: b.guest!.phone },
-                booking: {
-                  code: b.code,
-                  listingTitle: b.listing.title,
-                  checkIn: longStayDate(b.checkIn),
-                  checkOut: longStayDate(b.checkOut),
-                  nights,
-                  total: b.total,
-                  paid: paidUpTo,
-                  owed: b.total > paidUpTo ? b.total - paidUpTo : 0n,
-                },
-                instructions: instr,
-              }),
-            };
-          }),
+          attach.map(async (p) => ({
+            filename: `${p.number}.pdf`,
+            contentType: 'application/pdf',
+            content: await this.renderReceipt({
+              payment: p,
+              payments,
+              booking: b,
+              guest,
+              listingTitle: b.listing.title,
+              biz,
+              phone,
+              org,
+            }),
+          })),
         );
         const numbers = attach.map((p) => p.number);
         vars.receiptsLine =
@@ -316,14 +426,20 @@ export class GuestNoticesService {
       }
     }
 
-    await this.notifications.sendGuestEmail({
-      to: b.guest.email,
-      template: TEMPLATE[event],
-      vars,
-      hostName: biz,
-      hostEmail: org.email,
-      attachments,
-    });
+    try {
+      await this.notifications.sendGuestEmail({
+        to: b.guest.email,
+        template: TEMPLATE[event],
+        vars,
+        hostName: biz,
+        hostEmail: org.email,
+        attachments,
+      });
+      return { sms, email: true };
+    } catch (err) {
+      this.log.warn({ err, bookingId, event }, 'Guest email failed');
+      return { sms, email: false };
+    }
   }
 
   /** How to pay: the booking page, and the host's M-Pesa paybill or till when it has one. */

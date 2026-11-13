@@ -17,6 +17,8 @@ import { splitFormError } from '../portfolio/formErrors';
 import { useForm } from '../portfolio/hooks';
 import { personName } from '../portfolio/labels';
 import { Breadcrumbs, Fact, Field } from '../portfolio/ui';
+import { ReceiptActions } from '../receipts/ReceiptActions';
+import { rentReceiptRef } from '../receipts/receipts';
 import { AFTER_PAYMENT_KEYS, downloadReceiptPdf, keys, paymentsErrorMessage } from './api';
 import { canReverse, isReversal, methodText, unwrap } from './rules';
 import type { PaymentDetail } from './types';
@@ -33,6 +35,7 @@ export function PaymentDetailPage() {
   const { paymentId = '' } = useParams();
   const toast = useToast();
   const canRefund = useCan('payments:refund');
+  const canSend = useCan('payments:create');
   const canSeeTenants = useCan('tenants:view');
   const canSeeInvoices = useCan('invoices:view');
   const canSeeInbound = useCan('reconciliation:view');
@@ -91,7 +94,11 @@ export function PaymentDetailPage() {
           </p>
         </div>
         <div className="sl__headactions">
-          <button type="button" className="nx-btn" onClick={download} disabled={downloading}>{downloading ? 'Preparing…' : 'Download receipt'}</button>
+          {reversal || p.reversedBy ? (
+            <button type="button" className="nx-btn" onClick={download} disabled={downloading}>{downloading ? 'Preparing…' : 'Download receipt'}</button>
+          ) : (
+            <ReceiptActions receipt={rentReceiptRef(p)} canSend={canSend} size="md" />
+          )}
           {canRefund && canReverse(p) ? (
             <button type="button" className="nx-btn nx-btn--danger" onClick={() => setReversing(true)}>Reverse</button>
           ) : null}

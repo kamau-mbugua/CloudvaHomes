@@ -1,4 +1,6 @@
 import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsDateOnly } from '../../../common/dates/date-only.js';
+import { PaginationQueryDto } from '../../../common/http/pagination.js';
 import type { PaymentMethod } from '../../../generated/prisma/client.js';
 
 export const STAY_PAYMENT_METHODS: readonly PaymentMethod[] = [
@@ -71,4 +73,28 @@ export class BookingMpesaPromptDto {
   @IsString()
   @MaxLength(32)
   phone?: string;
+}
+
+/** Money → Receipts for short stays: every stay payment and refund, newest first. */
+export class ListStayReceiptsQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  q?: string;
+
+  @IsOptional()
+  @IsIn(['PAYMENT', 'REFUND'])
+  kind?: 'PAYMENT' | 'REFUND';
+
+  @IsOptional()
+  @IsIn(STAY_PAYMENT_METHODS)
+  method?: PaymentMethod;
+
+  @IsOptional()
+  @IsDateOnly({ optional: true })
+  from?: string;
+
+  @IsOptional()
+  @IsDateOnly({ optional: true })
+  to?: string;
 }

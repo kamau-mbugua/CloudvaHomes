@@ -13,7 +13,10 @@ import { StaysJobsController } from './jobs/stays-jobs.controller.js';
 import { ListingsController } from './listings/listings.controller.js';
 import { ListingsService } from './listings/listings.service.js';
 import { GuestNoticesService } from './notices/guest-notices.service.js';
-import { StayPaymentsController } from './payments/stay-payments.controller.js';
+import {
+  StayPaymentsController,
+  StayReceiptsController,
+} from './payments/stay-payments.controller.js';
 import { StayPaymentsService } from './payments/stay-payments.service.js';
 import { PublicSiteController } from './public/public-site.controller.js';
 import { PublicSiteService } from './public/public-site.service.js';
@@ -29,6 +32,7 @@ import { HostSiteService } from './site/host-site.service.js';
     ListingsController,
     BookingsController,
     StayPaymentsController,
+    StayReceiptsController,
     PublicSiteController,
     StaysJobsController,
     HostReportsController,
@@ -50,6 +54,7 @@ import { HostSiteService } from './site/host-site.service.js';
     JobsGuard,
   ],
   exports: [
+    GuestNoticesService,
     HostSiteService,
     ListingsService,
     BookingsService,
