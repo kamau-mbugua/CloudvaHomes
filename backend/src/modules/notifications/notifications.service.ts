@@ -26,6 +26,7 @@ import { smsWarningCopy } from './sms/sms-copy.js';
 import {
   type OrgSmsSpec,
   SmsNotSentError,
+  type SmsSecret,
   type SmsSpec,
   type SmsWarning,
 } from './sms/sms-types.js';
@@ -240,7 +241,12 @@ export class NotificationsService {
     const smsText = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
     const tasks: Promise<void>[] = [];
     if (to.phone) {
-      tasks.push(this.dispatchSms({ kind: 'platform', type: smsType }, to.phone, smsText));
+      tasks.push(
+        this.dispatchSms({ kind: 'platform', type: smsType }, to.phone, smsText, {
+          value: code,
+          label: 'Code',
+        }),
+      );
     }
     if (to.email) {
       const emailAddr = to.email;
@@ -277,6 +283,7 @@ export class NotificationsService {
         { kind: 'org', orgId, type: 'booking_otp' },
         phone,
         `Your ${bizName} booking code is ${code}. It expires in ${minutes} minutes.`,
+        { value: code, label: 'Code' },
       );
     } catch (e) {
       // A guest sees a plain message, not a server error (e.g. the host's own SMS account is failing).
@@ -369,6 +376,7 @@ export class NotificationsService {
           { kind: 'platform', type: 'invitation' },
           to.phone,
           `${by} to ${p.organizationName} on KodiHub. Accept: ${link}`,
+          { value: link, label: 'Invitation link' },
         ),
       );
     }
@@ -716,6 +724,9 @@ export class NotificationsService {
           { kind: 'platform', type: 'operator_welcome' },
           to.phone,
           smsText.slice(0, 160),
+          p.temporaryPassword
+            ? { value: p.temporaryPassword, label: 'Temporary password' }
+            : undefined,
         ),
       );
     }
@@ -755,12 +766,17 @@ export class NotificationsService {
   }
 
   /** Every SMS goes through SmsService, which picks the route (spec §2–3). */
-  private async dispatchSms(spec: SmsSpec, phone: string, text: string): Promise<void> {
+  private async dispatchSms(
+    spec: SmsSpec,
+    phone: string,
+    text: string,
+    secret?: SmsSecret,
+  ): Promise<void> {
     if (!this.smsRouter) {
       await this.sms.send(phone, text); // constructed outside Nest (unit tests)
       return;
     }
-    const outcome = await this.smsRouter.send(spec, phone, text);
+    const outcome = await this.smsRouter.send(spec, phone, text, secret);
     if (outcome.warn && spec.kind === 'org') {
       await this.warnOwners(spec.orgId, outcome.warn, outcome);
     }

@@ -1,11 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -86,4 +87,45 @@ export class SmsReportQueryDto {
   @Type(() => String)
   @Matches(/^\d{4}-(0[1-9]|1[0-2])$/, { message: 'month must look like 2026-11' })
   month!: string;
+}
+
+const SMS_STATUSES = ['SENT', 'FAILED', 'NO_UNITS'] as const;
+
+/** KodiHub admin list of every SMS. Dates are Nairobi days. */
+export class SmsLogsQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() orgId?: string;
+  @ApiPropertyOptional({ enum: ['PLATFORM', 'ORG'], description: 'PLATFORM = KodiHub’s own' })
+  @IsOptional()
+  @IsIn(['PLATFORM', 'ORG'])
+  kind?: 'PLATFORM' | 'ORG';
+  @ApiPropertyOptional({ enum: SMS_STATUSES })
+  @IsOptional()
+  @IsIn(SMS_STATUSES)
+  status?: (typeof SMS_STATUSES)[number];
+  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(/^[a-z_]{1,40}$/) type?: string;
+  @ApiPropertyOptional({ enum: SMS_PROVIDERS })
+  @IsOptional()
+  @IsIn(SMS_PROVIDERS)
+  provider?: (typeof SMS_PROVIDERS)[number];
+  @ApiPropertyOptional({ description: 'Phone number, any format' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  q?: string;
+  @IsOptional() @IsDateOnly({ optional: true }) from?: string;
+  @IsOptional() @IsDateOnly({ optional: true }) to?: string;
+}
+
+export class SmsStatsQueryDto {
+  @IsOptional() @IsDateOnly({ optional: true }) from?: string;
+  @IsOptional() @IsDateOnly({ optional: true }) to?: string;
+}
+
+export class RevealSmsSecretDto {
+  @ApiProperty({ minLength: 10, maxLength: 500 })
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MinLength(10, { message: 'Say why you need to see it (at least 10 characters)' })
+  @MaxLength(500)
+  reason!: string;
 }

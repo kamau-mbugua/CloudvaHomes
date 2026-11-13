@@ -77,3 +77,48 @@
 }
 .sms__bundle:has(input:checked) { border-color: var(--primary); background: var(--secondary); }
 .sms__test { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 16px; }
+
+/* ── Admin SMS: provider test result and the Overview → SMS dashboard ── */
+.sms__result { margin: 8px 0 0; padding: 10px 12px; border-radius: var(--radius); font-size: 13.5px; }
+.sms__result--ok { background: var(--success-soft); color: var(--success); }
+.sms__result--bad { background: var(--destructive-soft); color: var(--destructive-text, var(--destructive)); }
+
+.smsd { display: grid; gap: 16px; }
+.smsd .ad__stats { margin: 0; }
+.smsd__stat--bad { color: var(--destructive-text, var(--destructive)); }
+.smsd__stat--warn { color: var(--warning); }
+.smsd__card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg, 12px);
+  padding: 16px; min-width: 0;
+}
+.smsd__card h3 { margin: 0 0 10px; font-size: 15px; }
+.smsd__grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.smsd__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.smsd__list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13.5px; }
+.smsd__list .ad__sub { display: block; }
+
+.smsd__bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.smsd__bars li { display: grid; grid-template-columns: minmax(90px, 30%) 1fr auto; align-items: center; gap: 10px; font-size: 13.5px; }
+.smsd__bartrack { display: flex; gap: 2px; height: 10px; }
+.smsd__bar { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.smsd__barvalue { text-align: right; white-space: nowrap; }
+.smsd__barvalue .ad__sub { display: block; }
+
+/* Status series: sent / failed / no units — always with a legend and labels, never colour alone. */
+.smsd__bar--sent { background: var(--success); fill: var(--success); }
+.smsd__bar--failed { background: var(--destructive); fill: var(--destructive); }
+.smsd__bar--nounits { background: var(--warning); fill: var(--warning); }
+
+.smsd__legend { list-style: none; display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 8px; padding: 0; font-size: 12.5px; color: var(--text-muted); }
+.smsd__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.smsd__swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.smsd__plot { position: relative; }
+.smsd__plot svg { width: 100%; height: auto; display: block; }
+.smsd__gridline { stroke: var(--border); stroke-width: 1; }
+.smsd__axis { fill: var(--text-muted); font-size: 11px; }
+.smsd__tip {
+  position: absolute; top: 0; right: 0; display: grid; gap: 2px; padding: 6px 10px; font-size: 12.5px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.smsd__table { margin-top: 10px; font-size: 13px; }
+.smsd__table summary { cursor: pointer; color: var(--text-muted); }

@@ -2016,9 +2016,15 @@ model SmsLog {
   providerMessageId String?
   status            SmsLogStatus
   reason            String?
+  /// What was sent, encrypted, with any code, link or password blanked out.
+  bodyEnc           Bytes?
+  /// That code, link or password, encrypted apart; a superadmin reveals it with a reason.
+  secretEnc         Bytes?
+  secretLabel       String?
   createdAt         DateTime     @default(now())
 
   @@index([orgId, createdAt])
+  @@index([createdAt])
   @@map("sms_logs")
 }
 

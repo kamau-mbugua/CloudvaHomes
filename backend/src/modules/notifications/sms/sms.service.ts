@@ -5,7 +5,11 @@ import { AppError } from '../../../common/errors/app-error.js';
 import { parseDateOnly } from '../../../common/dates/date-only.js';
 import { ENV } from '../../../config/config.module.js';
 import type { Env } from '../../../config/env.js';
-import type { SmsAccount, SmsProvider } from '../../../generated/prisma/client.js';
+import type {
+  PlatformSettings,
+  SmsAccount,
+  SmsProvider,
+} from '../../../generated/prisma/client.js';
 import { PrismaService } from '../../../prisma/prisma.service.js';
 import { todayInNairobi } from '../../billing/billing-math.js';
 import { smsSegments } from '../../tenant-portal/broadcast-rules.js';
@@ -16,6 +20,7 @@ import type {
   SmsOutcome,
   SmsProviderConfig,
   SmsRouteName,
+  SmsSecret,
   SmsSpec,
   SmsWarning,
 } from './sms-types.js';
@@ -27,6 +32,22 @@ export const HOSTPINNACLE_PASSWORD_CONTEXT = 'platform.sms.hostpinnacle.password
 /** Bound to the organisation so a stored key can't be copied to another organisation's row. */
 export const orgKeyContext = (orgId: string) => `sms.org.apikey:${orgId}`;
 export const orgPasswordContext = (orgId: string) => `sms.org.password:${orgId}`;
+export const SMS_LOG_BODY_CONTEXT = 'sms-log:body';
+export const SMS_LOG_SECRET_CONTEXT = 'sms-log:secret';
+/** What a code, link or password looks like in a logged SMS. */
+export const SMS_HIDDEN_SECRET = '••••••';
+
+export const PROVIDER_NAME: Record<SmsProvider, string> = {
+  AFRICASTALKING: 'Africa’s Talking',
+  TEXTSMS: 'TextSMS Kenya',
+  HOSTPINNACLE: 'HostPinnacle',
+};
+
+interface Msg {
+  to: string;
+  text: string;
+  secret?: SmsSecret;
+}
 
 interface Attempt {
   ok: boolean;
@@ -51,11 +72,13 @@ export class SmsService {
     private readonly cipher: FieldCipher,
   ) {}
 
-  async send(spec: SmsSpec, to: string, text: string): Promise<SmsOutcome> {
+  /** `secret` (a code, link or password in `text`) is blanked out of the logged text. */
+  async send(spec: SmsSpec, to: string, text: string, secret?: SmsSecret): Promise<SmsOutcome> {
     const units = Math.max(1, smsSegments(text));
+    const msg: Msg = { to, text, secret };
     if (spec.kind === 'platform') {
       const sent = await this.viaPlatform(to, text);
-      return this.finish(spec, to, sent, {
+      return this.finish(spec, msg, sent, {
         route: 'PLATFORM',
         units: 0,
         warn: null,
@@ -64,8 +87,8 @@ export class SmsService {
     }
     const account = await this.account(spec.orgId);
     return account.mode === 'OWN'
-      ? this.sendOwn(spec, account, to, text, units)
-      : this.sendPlatformPaid(spec, account, to, text, units);
+      ? this.sendOwn(spec, account, msg, units)
+      : this.sendPlatformPaid(spec, account, msg, units);
   }
 
   /** The platform provider: platform settings first, then the server's own SMS config. */
@@ -153,12 +176,13 @@ export class SmsService {
   async sendTest(orgId: string, to: string): Promise<{ sent: boolean; reason: string | null }> {
     const account = await this.account(orgId);
     const config = this.orgConfig(account);
+    const text = 'KodiHub test message: your SMS account works.';
     const attempt: Attempt = config
       ? await this.attempt(
           createProviderSender(config, this.env, `org:${orgId}`),
           config.provider,
           to,
-          'KodiHub test message: your SMS account works.',
+          text,
         )
       : {
           ok: false,
@@ -177,9 +201,63 @@ export class SmsService {
         providerMessageId: attempt.messageId,
         status: attempt.ok ? 'SENT' : 'FAILED',
         reason: attempt.reason,
+        ...this.storedBody(text),
       },
     });
     return { sent: attempt.ok, reason: attempt.reason };
+  }
+
+  /**
+   * Admin check of KodiHub's own provider: one real SMS through the provider chosen in platform
+   * settings, as saved — never another provider or the server's fallback, so a "sent" proves
+   * that provider works.
+   */
+  async sendPlatformTest(to: string): Promise<{
+    sent: boolean;
+    provider: SmsProvider | null;
+    messageId: string | null;
+    reason: string | null;
+  }> {
+    const s = await this.prisma.platformSettings.findUnique({ where: { id: 1 } });
+    const provider = s?.smsProvider ?? null;
+    const config = s ? this.platformConfigs(s)[s.smsProvider]() : null;
+    const text = provider
+      ? `KodiHub test message: SMS through ${PROVIDER_NAME[provider]} works.`
+      : 'KodiHub test message.';
+    const attempt: Attempt = config
+      ? await this.attempt(
+          createProviderSender(config, this.env, 'platform'),
+          config.provider,
+          to,
+          text,
+        )
+      : {
+          ok: false,
+          provider,
+          messageId: null,
+          reason: provider
+            ? `${PROVIDER_NAME[provider]} is not fully set up. Save all its details first.`
+            : 'Choose and save KodiHub’s SMS provider first.',
+        };
+    await this.prisma.smsLog.create({
+      data: {
+        kind: 'PLATFORM',
+        type: 'sms_test',
+        to,
+        route: 'PLATFORM',
+        provider: attempt.provider,
+        providerMessageId: attempt.messageId,
+        status: attempt.ok ? 'SENT' : 'FAILED',
+        reason: attempt.reason,
+        ...this.storedBody(text),
+      },
+    });
+    return {
+      sent: attempt.ok,
+      provider: attempt.provider,
+      messageId: attempt.messageId,
+      reason: attempt.reason,
+    };
   }
 
   // ── Routes ──
@@ -187,10 +265,10 @@ export class SmsService {
   private async sendOwn(
     spec: OrgSmsSpec,
     account: SmsAccount,
-    to: string,
-    text: string,
+    msg: Msg,
     units: number,
   ): Promise<SmsOutcome> {
+    const { to, text } = msg;
     const config = this.orgConfig(account);
     let own: Attempt = {
       ok: false,
@@ -213,7 +291,7 @@ export class SmsService {
           data: { failingSince: null, lastFailReason: null },
         });
       }
-      return this.finish(spec, to, own, {
+      return this.finish(spec, msg, own, {
         route: 'ORG_PROVIDER',
         units: 0,
         warn: null,
@@ -235,7 +313,7 @@ export class SmsService {
         if (sent.ok) {
           return this.finish(
             spec,
-            to,
+            msg,
             sent,
             { route: 'PLATFORM_FALLBACK', units, warn, balance },
             logId,
@@ -244,23 +322,23 @@ export class SmsService {
         const after = await this.refund(spec.orgId, units, logId);
         return this.finish(
           spec,
-          to,
+          msg,
           sent,
           { route: 'PLATFORM_FALLBACK', units: 0, warn, balance: after },
           logId,
         );
       }
     }
-    return this.finish(spec, to, own, { route: 'ORG_PROVIDER', units: 0, warn, balance: null });
+    return this.finish(spec, msg, own, { route: 'ORG_PROVIDER', units: 0, warn, balance: null });
   }
 
   private async sendPlatformPaid(
     spec: OrgSmsSpec,
     account: SmsAccount,
-    to: string,
-    text: string,
+    msg: Msg,
     units: number,
   ): Promise<SmsOutcome> {
+    const { to, text } = msg;
     const logId = randomUUID();
     const balance = await this.charge(spec.orgId, units, logId);
     if (balance === null) {
@@ -268,7 +346,7 @@ export class SmsService {
       if (spec.type === 'booking_otp') {
         // A guest's booking code never blocks a booking: KodiHub pays for it (spec call 9).
         const sent = await this.viaPlatform(to, text);
-        return this.finish(spec, to, sent, {
+        return this.finish(spec, msg, sent, {
           route: 'PLATFORM_FREE',
           units: 0,
           warn,
@@ -277,7 +355,7 @@ export class SmsService {
       }
       return this.finish(
         spec,
-        to,
+        msg,
         { ok: false, provider: null, messageId: null, reason: null },
         { route: null, units: 0, warn, balance: account.balance, noUnits: true },
         logId,
@@ -288,7 +366,7 @@ export class SmsService {
       const after = await this.refund(spec.orgId, units, logId);
       return this.finish(
         spec,
-        to,
+        msg,
         sent,
         { route: 'PLATFORM', units: 0, warn: null, balance: after },
         logId,
@@ -298,7 +376,7 @@ export class SmsService {
       balance < account.lowBalanceLevel && (await this.claimWarning(spec.orgId, 'LOW'))
         ? 'LOW'
         : null;
-    return this.finish(spec, to, sent, { route: 'PLATFORM', units, warn, balance }, logId);
+    return this.finish(spec, msg, sent, { route: 'PLATFORM', units, warn, balance }, logId);
   }
 
   // ── Units ──
@@ -376,7 +454,25 @@ export class SmsService {
   private async platformConfig(): Promise<SmsProviderConfig | null> {
     const s = await this.prisma.platformSettings.findUnique({ where: { id: 1 } });
     if (!s) return null;
-    const configs: Record<SmsProvider, () => SmsProviderConfig | null> = {
+    const configs = this.platformConfigs(s);
+    const order: SmsProvider[] = [
+      s.smsProvider,
+      ...(['AFRICASTALKING', 'TEXTSMS', 'HOSTPINNACLE'] as const).filter(
+        (p) => p !== s.smsProvider,
+      ),
+    ];
+    for (const p of order) {
+      const config = configs[p]();
+      if (config) return config;
+    }
+    return null;
+  }
+
+  /** Each provider's saved details from platform settings, or null when incomplete. */
+  private platformConfigs(
+    s: PlatformSettings,
+  ): Record<SmsProvider, () => SmsProviderConfig | null> {
+    return {
       TEXTSMS: () =>
         s.textsmsPartnerId && s.textsmsKeyEnc
           ? {
@@ -413,24 +509,13 @@ export class SmsService {
             }
           : null,
     };
-    const order: SmsProvider[] = [
-      s.smsProvider,
-      ...(['AFRICASTALKING', 'TEXTSMS', 'HOSTPINNACLE'] as const).filter(
-        (p) => p !== s.smsProvider,
-      ),
-    ];
-    for (const p of order) {
-      const config = configs[p]();
-      if (config) return config;
-    }
-    return null;
   }
 
   // ── Records ──
 
   private async finish(
     spec: SmsSpec,
-    to: string,
+    msg: Msg,
     a: Attempt,
     o: {
       route: SmsRouteName | null;
@@ -448,13 +533,14 @@ export class SmsService {
         orgId: spec.kind === 'org' ? spec.orgId : null,
         kind: spec.kind === 'org' ? 'ORG' : 'PLATFORM',
         type: spec.type,
-        to,
+        to: msg.to,
         units: status === 'SENT' ? o.units : 0,
         route: o.route,
         provider: a.provider,
         providerMessageId: a.messageId,
         status,
         reason: a.reason,
+        ...this.storedBody(msg.text, msg.secret),
       },
     });
     return {
@@ -466,5 +552,32 @@ export class SmsService {
       warn: o.warn,
       balance: o.balance,
     };
+  }
+
+  /** The text to keep in the log: encrypted, with the secret blanked out and kept apart. */
+  private storedBody(
+    text: string,
+    secret?: SmsSecret,
+  ): {
+    bodyEnc?: Uint8Array<ArrayBuffer>;
+    secretEnc?: Uint8Array<ArrayBuffer>;
+    secretLabel?: string;
+  } {
+    try {
+      const value = secret?.value;
+      const hidden = value ? text.split(value).join(SMS_HIDDEN_SECRET) : text;
+      return {
+        bodyEnc: this.cipher.encrypt(hidden, SMS_LOG_BODY_CONTEXT),
+        ...(value
+          ? {
+              secretEnc: this.cipher.encrypt(value, SMS_LOG_SECRET_CONTEXT),
+              secretLabel: secret.label,
+            }
+          : {}),
+      };
+    } catch (err) {
+      this.log.warn({ err }, 'Could not encrypt the SMS text for the log');
+      return {};
+    }
   }
 }

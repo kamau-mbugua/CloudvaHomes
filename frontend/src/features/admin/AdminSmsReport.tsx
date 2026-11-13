@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
-import { todayInNairobi } from '../../lib/dates';
+import { formatDay, todayInNairobi } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { EmptyState } from '../../components/EmptyState';
+import { Sheet } from '../../components/Sheet';
 import { unwrapList } from '../payments/rules';
 import { keys, platformErrorMessage } from '../platform/api';
+import { AdminSmsMessages } from './AdminSmsMessages';
+import { monthRange } from './smsLog';
 
 interface SmsReportRow {
   orgId: string;
@@ -16,9 +19,34 @@ interface SmsReportRow {
   unitsFree: number;
 }
 
-/** Admin → Reports → SMS: units sold, paid for and used per organisation in a month. */
+/**
+ * Admin → Reports → SMS. "By organisation": units sold, paid for and used per organisation in
+ * a month; a row opens that organisation's messages for the month. "All messages": every SMS
+ * on KodiHub, its own included.
+ */
 export function AdminSmsReport() {
-  const [month, setMonth] = useState(todayInNairobi().slice(0, 7));
+  const [view, setView] = useState<'orgs' | 'all'>('orgs');
+  return (
+    <>
+      <div className="pf__tabsrow">
+        <div className="pf__tabs" role="tablist" aria-label="SMS report views">
+          <button type="button" role="tab" aria-selected={view === 'orgs'} className="pf__tab" onClick={() => setView('orgs')}>
+            By organisation
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'all'} className="pf__tab" onClick={() => setView('all')}>
+            All messages
+          </button>
+        </div>
+      </div>
+      {view === 'orgs' ? <ByOrganisation /> : <AdminSmsMessages />}
+    </>
+  );
+}
+
+function ByOrganisation() {
+  const today = todayInNairobi();
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [opened, setOpened] = useState<SmsReportRow | null>(null);
   const report = useQuery({
     queryKey: [...keys.reports, 'sms', month],
     queryFn: () => api.get<unknown>('/platform/reports/sms', { month }).then((b) => unwrapList<SmsReportRow>(b)),
@@ -34,12 +62,20 @@ export function AdminSmsReport() {
     }),
     { bought: 0, paid: 0, used: 0, free: 0 },
   );
+  const period = monthRange(month, today);
   return (
     <>
+      {opened ? (
+        <Sheet title={`${opened.name}: SMS`} wide onClose={() => setOpened(null)}
+          footer={<button type="button" className="nx-btn nx-btn--primary" onClick={() => setOpened(null)}>Done</button>}>
+          <p className="ad__muted">Messages from {formatDay(period.from)} to {formatDay(period.to)}.</p>
+          <AdminSmsMessages orgId={opened.orgId} from={period.from} to={period.to} />
+        </Sheet>
+      ) : null}
       <div className="ad__filters">
         <label className="ad__muted">
           Month{' '}
-          <input type="month" className="ad__select" value={month} max={todayInNairobi().slice(0, 7)}
+          <input type="month" className="ad__select" value={month} max={today.slice(0, 7)}
             onChange={(e) => e.target.value && setMonth(e.target.value)} />
         </label>
       </div>
@@ -56,6 +92,7 @@ export function AdminSmsReport() {
                 <th className="num">Paid</th>
                 <th className="num">Units used</th>
                 <th className="num">Free guest codes</th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -66,6 +103,14 @@ export function AdminSmsReport() {
                   <td className="num">{formatKES(Number(r.amountPaid))}</td>
                   <td className="num">{r.unitsUsed.toLocaleString('en-KE')}</td>
                   <td className="num">{r.unitsFree.toLocaleString('en-KE')}</td>
+                  <td className="ad__rowactions">
+                    <div>
+                      <button type="button" className="nx-btn nx-btn--sm" onClick={() => setOpened(r)}
+                        aria-label={`View the SMS ${r.name} sent this month`}>
+                        Messages
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -76,6 +121,7 @@ export function AdminSmsReport() {
                 <th className="num">{formatKES(total.paid)}</th>
                 <th className="num">{total.used.toLocaleString('en-KE')}</th>
                 <th className="num">{total.free.toLocaleString('en-KE')}</th>
+                <th />
               </tr>
             </tfoot>
           </table>

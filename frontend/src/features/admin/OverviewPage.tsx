@@ -4,22 +4,23 @@ import { formatKES } from '../../lib/money';
 import { formatPeriod } from '../../lib/periods';
 import { platformErrorMessage, usePlatformStats } from '../platform/api';
 import { ORG_STATUS } from '../platform/labels';
+import { AdminSmsDashboard } from './AdminSmsDashboard';
 import type { OrgStatus } from '../platform/types';
 
 /**
  * Admin → Overview (`/admin`): organisations by status (each opens the filtered list),
  * units let across KodiHub, last month's billing, what is outstanding and what came in this
- * month (`GET /platform/stats`).
+ * month (`GET /platform/stats`), and the SMS dashboard.
  */
 
 const STATUSES: OrgStatus[] = ['TRIAL', 'ACTIVE', 'GRACE', 'SUSPENDED', 'CLOSED'];
-type OverviewTab = 'money' | 'organizations';
+type OverviewTab = 'money' | 'organizations' | 'sms';
 
 export function OverviewPage() {
   const stats = usePlatformStats();
   const [params, setParams] = useSearchParams();
   const rawTab = params.get('tab');
-  const tab: OverviewTab = rawTab === 'organizations' ? 'organizations' : 'money';
+  const tab: OverviewTab = rawTab === 'organizations' || rawTab === 'sms' ? rawTab : 'money';
 
   const setTab = (next: OverviewTab) => {
     setParams(
@@ -59,6 +60,15 @@ export function OverviewPage() {
           >
             Organisations
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'sms'}
+            className="pf__tab"
+            onClick={() => setTab('sms')}
+          >
+            SMS
+          </button>
         </div>
       </div>
 
@@ -88,6 +98,8 @@ export function OverviewPage() {
             <Link className="nx-btn nx-btn--sm" to="/admin/invoices">Open invoices</Link>
           </div>
         </>
+      ) : tab === 'sms' ? (
+        <AdminSmsDashboard />
       ) : (
         <div className="ad__stats">
           {STATUSES.map((status) => (

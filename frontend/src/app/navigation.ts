@@ -330,7 +330,7 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     id: 'admin-overview',
     label: 'Overview',
-    entry: { label: 'Overview', to: '/admin', phase: '8', hint: 'Organisations, units billed and money owed to KodiHub', exact: true },
+    entry: { label: 'Overview', to: '/admin', phase: '8', hint: 'Organisations, units billed, money owed to KodiHub and SMS', exact: true },
     children: [],
   },
   {
@@ -368,7 +368,7 @@ export const ADMIN_NAV: NavGroup[] = [
       { label: 'Reconciliation', to: '/admin/reports/reconciliation', phase: '11', hint: 'Unallocated payment credits and M-Pesa STK requests' },
       { label: 'Price vs plan', to: '/admin/reports/price-variance', phase: '11', hint: 'Custom organisation pricing compared against standard plan rates' },
       { label: 'Salesperson performance', to: '/admin/reports/salespeople', phase: '11', hint: 'Book size, MRR, collections and overdue balance per salesperson' },
-      { label: 'SMS', to: '/admin/reports/sms', phase: 'sms', hint: 'SMS units sold, paid for and used per organisation each month' },
+      { label: 'SMS', to: '/admin/reports/sms', phase: 'sms', hint: 'SMS units per organisation each month, and every SMS sent with its status' },
       { label: 'Audit log', to: '/admin/reports/audit', phase: '11', hint: 'Platform-wide audit trail of administrative and organisation actions' },
     ],
   },

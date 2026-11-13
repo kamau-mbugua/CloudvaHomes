@@ -88,7 +88,7 @@ const REPORT_META: Record<AdminReportKey, { title: string; subtitle: string; use
   },
   sms: {
     title: 'SMS',
-    subtitle: 'SMS units sold, paid for and used per organisation in a month.',
+    subtitle: 'SMS units sold, paid for and used per organisation in a month, and every SMS sent on KodiHub with its status.',
     usesDateRange: false,
   },
   audit: {

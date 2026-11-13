@@ -11,6 +11,7 @@ import { PlatformPayService } from './platform-pay.service.js';
 import { PlatformReportsService } from './platform-reports.service.js';
 import { SmsController } from './sms.controller.js';
 import { SmsAdminController } from './sms-admin.controller.js';
+import { SmsLogsService } from './sms-logs.service.js';
 import { SmsSettingsService } from './sms-settings.service.js';
 import { SmsPurchasesService } from './sms-purchases.service.js';
 import {
@@ -35,6 +36,7 @@ import {
   providers: [
     SmsPurchasesService,
     SmsSettingsService,
+    SmsLogsService,
     PlatformBillingService,
     PlatformAdminService,
     PlatformPayService,

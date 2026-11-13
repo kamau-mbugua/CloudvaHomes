@@ -13,6 +13,8 @@ import { unwrap } from '../payments/rules';
 import { Fact, Field } from '../portfolio/ui';
 import { keys, platformErrorMessage } from '../platform/api';
 import { PROVIDER_LABEL, smsModeLabel, usageStatusLabel } from '../sms/rules';
+import { SmsLogSheet } from './SmsLogSheet';
+import { smsTypeLabel } from './smsLog';
 import type { SmsAccountView, SmsProvider, SmsTopUpRow, SmsUsageRow } from '../sms/types';
 import { adjustProblem } from './smsAdmin';
 
@@ -247,6 +249,7 @@ function AdjustCard({ orgId, base, balance }: { orgId: string; base: string; bal
 function AdminLists({ base, orgId }: { base: string; orgId: string }) {
   const [list, setList] = useState<'usage' | 'top-ups'>('usage');
   const [page, setPage] = useState(1);
+  const [opened, setOpened] = useState<string | null>(null);
   const query = useQuery({
     queryKey: [...keys.organizations, orgId, 'sms', list, page],
     queryFn: () => api.get<PageEnvelope<SmsUsageRow | SmsTopUpRow>>(`${base}/${list}`, { page, pageSize: 25 }),
@@ -254,6 +257,7 @@ function AdminLists({ base, orgId }: { base: string; orgId: string }) {
   });
   return (
     <section className="fm__section">
+      {opened ? <SmsLogSheet id={opened} onClose={() => setOpened(null)} /> : null}
       <div className="pf__tabs" role="tablist" aria-label="SMS lists">
         <button type="button" role="tab" aria-selected={list === 'usage'} className="pf__tab" onClick={() => { setList('usage'); setPage(1); }}>Messages sent</button>
         <button type="button" role="tab" aria-selected={list === 'top-ups'} className="pf__tab" onClick={() => { setList('top-ups'); setPage(1); }}>Top-ups</button>
@@ -267,16 +271,20 @@ function AdminLists({ base, orgId }: { base: string; orgId: string }) {
           <table className="ad__table">
             <thead>
               {list === 'usage'
-                ? <tr><th>When</th><th>To</th><th>Message</th><th className="num">Units</th><th>Status</th></tr>
+                ? <tr><th>When</th><th>To</th><th>Message</th><th className="num">Units</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr>
                 : <tr><th>When</th><th className="num">Units</th><th className="num">Paid</th><th>How</th><th className="num">Balance after</th></tr>}
             </thead>
             <tbody>
               {list === 'usage'
                 ? (query.data.data as SmsUsageRow[]).map((r) => (
                   <tr key={r.id}>
-                    <td>{formatDateTime(r.at)}</td><td className="num">{r.to}</td><td>{r.type.replace(/_/g, ' ')}</td>
+                    <td>{formatDateTime(r.at)}</td><td className="num">{r.to}</td><td>{smsTypeLabel(r.type)}</td>
                     <td className="num">{r.units}</td>
                     <td>{usageStatusLabel(r.status)}{r.reason ? <span className="ad__sub">{r.reason}</span> : null}</td>
+                    <td className="ad__rowactions"><div>
+                      <button type="button" className="nx-btn nx-btn--sm" onClick={() => setOpened(r.id)}
+                        aria-label={`Open the ${smsTypeLabel(r.type).toLowerCase()} SMS to ${r.to}`}>Open</button>
+                    </div></td>
                   </tr>
                 ))
                 : (query.data.data as SmsTopUpRow[]).map((r) => (

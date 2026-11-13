@@ -45,6 +45,12 @@ export type OrgSmsType =
 export type OrgSmsSpec = { kind: 'org'; orgId: string; type: OrgSmsType };
 export type SmsSpec = { kind: 'platform'; type: PlatformSmsType } | OrgSmsSpec;
 
+/** A code, link or password inside an SMS, kept out of the logged text (shown on reveal). */
+export interface SmsSecret {
+  value: string;
+  label: string;
+}
+
 export type SmsWarning = 'LOW' | 'EMPTY' | 'FAILING';
 export type SmsRouteName = 'PLATFORM' | 'ORG_PROVIDER' | 'PLATFORM_FALLBACK' | 'PLATFORM_FREE';
 

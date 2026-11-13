@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import { formatKES, parseAmount } from '../../lib/money';
+import { unwrap } from '../payments/rules';
 import { useToast } from '../../lib/useToast';
 import { Field } from '../portfolio/ui';
 import { keys, platformErrorMessage } from '../platform/api';
@@ -10,6 +11,7 @@ import type { PlatformSettings } from '../platform/types';
 import { PROVIDER_LABEL } from '../sms/rules';
 import type { SmsProvider } from '../sms/types';
 import { parseBundles } from './smsAdmin';
+import type { SmsTestResult } from './smsLog';
 
 /**
  * Admin → Settings → SMS: which provider sends KodiHub's own SMS (login codes and
@@ -89,6 +91,7 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
     saved ? 'Saved — enter a new key to replace it.' : 'Stored encrypted and never shown again.';
 
   return (
+    <>
     <form className="fm__section" onSubmit={submit} noValidate autoComplete="off">
       <h2>SMS</h2>
       <p>
@@ -115,7 +118,7 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
           <Field id="at-sender" label="Sender ID" optional hint="e.g. KODIHUB">
             <input id="at-sender" value={atSender} onChange={(e) => setAtSender(e.target.value)} />
           </Field>
-          <Field id="at-key" label="API key" optional wide hint={keyHint(sms?.apiKeySet)}>
+          <Field id="at-key" label="API key" wide hint={keyHint(sms?.apiKeySet)}>
             <input id="at-key" type="password" autoComplete="new-password" value={atKey} onChange={(e) => setAtKey(e.target.value)} />
           </Field>
         </div>
@@ -127,7 +130,7 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
           <Field id="ts-sender" label="Sender ID (shortcode)">
             <input id="ts-sender" value={tsSender} onChange={(e) => setTsSender(e.target.value)} />
           </Field>
-          <Field id="ts-key" label="API key" optional wide hint={keyHint(sms?.textsms?.apiKeySet)}>
+          <Field id="ts-key" label="API key" wide hint={keyHint(sms?.textsms?.apiKeySet)}>
             <input id="ts-key" type="password" autoComplete="new-password" value={tsKey} onChange={(e) => setTsKey(e.target.value)} />
           </Field>
         </div>
@@ -139,10 +142,10 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
           <Field id="hp-sender" label="Sender ID">
             <input id="hp-sender" value={hpSender} onChange={(e) => setHpSender(e.target.value)} />
           </Field>
-          <Field id="hp-password" label="Password" optional hint={sms?.hostpinnacle?.passwordSet ? 'Saved — enter a new one to replace it.' : 'Stored encrypted and never shown again.'}>
+          <Field id="hp-password" label="Password" hint={sms?.hostpinnacle?.passwordSet ? 'Saved — enter a new one to replace it.' : 'Stored encrypted and never shown again.'}>
             <input id="hp-password" type="password" autoComplete="new-password" value={hpPassword} onChange={(e) => setHpPassword(e.target.value)} />
           </Field>
-          <Field id="hp-key" label="API key" optional hint={keyHint(sms?.hostpinnacle?.apiKeySet)}>
+          <Field id="hp-key" label="API key" hint={keyHint(sms?.hostpinnacle?.apiKeySet)}>
             <input id="hp-key" type="password" autoComplete="new-password" value={hpKey} onChange={(e) => setHpKey(e.target.value)} />
           </Field>
         </div>
@@ -168,6 +171,69 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
       <div className="pg-actions">
         <button type="submit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
           {save.isPending ? 'Saving…' : 'Save SMS settings'}
+        </button>
+      </div>
+    </form>
+    <TestSms saved={sms?.provider ?? null} chosen={provider} />
+    </>
+  );
+}
+
+/**
+ * One real SMS through KodiHub's saved provider — only that provider, never a fallback — so
+ * "sent" proves it works. The result shows the provider's own words when it refuses.
+ */
+function TestSms({ saved, chosen }: { saved: SmsProvider | null; chosen: SmsProvider }) {
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const test = useMutation({
+    mutationFn: async (body: { phone: string }) =>
+      unwrap<SmsTestResult>(await api.post<unknown>('/platform/sms/test', body)),
+    onError: (e) => {
+      const byField = e instanceof ApiError && e.status === 422 ? e.fieldErrors : {};
+      setError(byField.phone ?? platformErrorMessage(e));
+    },
+  });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    test.reset();
+    if (phone.replace(/\D/g, '').length < 9) {
+      setError('Enter a phone number, e.g. 0722 000 111');
+      return;
+    }
+    setError(null);
+    test.mutate({ phone: phone.trim() });
+  };
+  const r = test.data;
+  return (
+    <form className="fm__section" onSubmit={submit} noValidate aria-labelledby="sms-test-h">
+      <h2 id="sms-test-h">Send a test SMS</h2>
+      <p>
+        Sends one real message through {saved ? PROVIDER_LABEL[saved] : 'the saved provider'}, using the saved details.
+        {saved && saved !== chosen ? ` Save first to test ${PROVIDER_LABEL[chosen]} instead.` : ' Save any changes first.'}
+      </p>
+      <div className="fm__grid">
+        <Field id="sms-test-phone" label="Phone number" error={error ?? undefined}>
+          <input id="sms-test-phone" type="tel" inputMode="tel" autoComplete="off" placeholder="0722 000 111"
+            value={phone} aria-invalid={Boolean(error)} onChange={(e) => setPhone(e.target.value)} />
+        </Field>
+      </div>
+      {r ? (
+        r.sent ? (
+          <p className="sms__result sms__result--ok" role="status">
+            Sent through {r.provider ? PROVIDER_LABEL[r.provider] : 'the provider'}
+            {r.messageId ? ` (message ID ${r.messageId})` : ''}. Check the phone; it is also listed under Reports → SMS → All
+            messages.
+          </p>
+        ) : (
+          <p className="sms__result sms__result--bad" role="alert">
+            Not sent: {r.reason ?? 'the provider refused it'}
+          </p>
+        )
+      ) : null}
+      <div className="pg-actions">
+        <button type="submit" className="nx-btn" disabled={test.isPending}>
+          {test.isPending ? 'Sending…' : 'Send test SMS'}
         </button>
       </div>
     </form>
