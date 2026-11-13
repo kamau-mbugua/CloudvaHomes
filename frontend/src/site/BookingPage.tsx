@@ -240,12 +240,19 @@ export function BookingPage() {
             </section>
           )}
 
-          {(booking.address || booking.checkInInstructions) && (
+          {(booking.address || booking.checkInInstructions || booking.mapUrl) && (
             <section className="site-card-section">
               <h2>Arrival & check-in details</h2>
               {booking.address && (
                 <p>
                   <strong>Location:</strong> {booking.address}
+                </p>
+              )}
+              {booking.mapUrl && (
+                <p>
+                  <a href={booking.mapUrl} target="_blank" rel="noreferrer">
+                    Open in Google Maps for directions
+                  </a>
                 </p>
               )}
               {booking.checkInInstructions && (

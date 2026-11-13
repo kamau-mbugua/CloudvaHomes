@@ -59,6 +59,18 @@ export function lastCode(to: string): string {
   throw new Error(`No code sent to ${to}`);
 }
 
+/**
+ * Follows a KodiHub short link (go.<site domain>/<code>, as SMS carry them) through the API's
+ * redirect and returns where it leads. Throws when the text has no short link.
+ */
+export async function followShortLink(t: TestApp, text: string): Promise<string> {
+  const code = /https?:\/\/go\.[^/\s]+\/([0-9A-Za-z]{8,16})\b/.exec(text)?.[1];
+  if (!code) throw new Error(`No short link in: ${text}`);
+  const res = await t.http().get(`/api/v1/s/${code}`);
+  if (res.status !== 302) throw new Error(`Short link ${code} gave ${res.status}`);
+  return res.headers.location as string;
+}
+
 /** Latest invitation token sent to `to`. */
 export function lastInviteToken(to: string): string {
   for (let i = outbox.length - 1; i >= 0; i--) {

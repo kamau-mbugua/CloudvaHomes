@@ -304,7 +304,7 @@ describe('Stays — Payments, refunds, M-Pesa prompts and booking matching (e2e)
         (m) =>
           m.channel === 'sms' &&
           m.to === '+254722111222' &&
-          m.text.includes('we received KES 5,000 for booking B00001. Still to pay: KES 0.'),
+          m.text.includes('we received KES 5,000 for booking B00001. Fully paid, thank you.'),
       ),
     ).toBe(true);
 

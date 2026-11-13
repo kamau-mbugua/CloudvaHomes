@@ -1576,6 +1576,8 @@ model PlatformSettings {
   smtpFromName            String?
   smtpAllowlist           String?
   emailTemplates          Json           @default("{}")
+  /// Google Maps browser key (Maps JavaScript + Places API). Public by nature; domain-locked.
+  googleMapsKey           String?
   // ── SMS Africa's Talking (phase 11) ──
   atUsername              String?
   atSenderId              String?
@@ -1776,6 +1778,11 @@ model Listing {
   minNights           Int      @default(1)
   checkInInstructions String?
   area                String?
+  /// Where it is, picked on a map (Google Places): all four set together, or none.
+  address             String?
+  lat                 Float?
+  lng                 Float?
+  placeId             String?
   rulesOverride       Json?
   published           Boolean  @default(false)
   createdAt           DateTime @default(now())
@@ -2065,4 +2072,25 @@ model SmsPurchase {
 
   @@index([orgId, createdAt])
   @@map("sms_purchases")
+}
+
+/// KodiHub's own short links for SMS (go.kodihub.co.ke/<code>). Code and target are kept as a
+/// hash and ciphertext only.
+model ShortLink {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  /// sha256 of the code in the link.
+  codeHash      String    @unique
+  /// sha256 of the full link, to reuse one code per target.
+  targetHash    String
+  targetEnc     Bytes
+  /// What it points at: booking, map, invitation…
+  kind          String
+  orgId         String?   @db.Uuid
+  expiresAt     DateTime
+  clicks        Int       @default(0)
+  lastClickedAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([targetHash])
+  @@map("short_links")
 }

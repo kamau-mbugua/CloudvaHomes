@@ -13,7 +13,7 @@ describe('stays/rules/messages — guestSms', () => {
 
   it('formats REQUESTED', () => {
     expect(guestSms('REQUESTED', base)).toBe(
-      "Diani Stays: we got your request for Coral Reef Villa, 12 Dec to 15 Dec. We'll reply within 24 hours. Booking B00001: https://diani.kodihub.co.ke/b/tok123",
+      "Diani Stays: we got your request for Coral Reef Villa, 12 Dec to 15 Dec. We'll reply in 24 hours. Booking B00001: https://diani.kodihub.co.ke/b/tok123",
     );
   });
 
@@ -39,10 +39,10 @@ describe('stays/rules/messages — guestSms', () => {
 
   it('formats HELD (instant booking) with the real hold window, not the 12-hour request window', () => {
     expect(guestSms('HELD', { ...base, amount: 650000n, window: '15 minutes' })).toBe(
-      'Diani Stays: we are holding Coral Reef Villa, 12 Dec to 15 Dec for you. Pay KES 6,500 within 15 minutes to confirm. Booking B00001: https://diani.kodihub.co.ke/b/tok123',
+      'Diani Stays: booking B00001 (12 Dec to 15 Dec) is held for you. Pay KES 6,500 within 15 minutes to confirm: https://diani.kodihub.co.ke/b/tok123',
     );
     expect(guestSms('HELD', { ...base, amount: 650000n, window: '2 hours', link: '' })).toBe(
-      'Diani Stays: we are holding Coral Reef Villa, 12 Dec to 15 Dec for you. Pay KES 6,500 within 2 hours to confirm. Booking B00001.',
+      'Diani Stays: booking B00001 (12 Dec to 15 Dec) is held for you. Pay KES 6,500 within 2 hours to confirm.',
     );
   });
 
@@ -122,7 +122,26 @@ describe('stays/rules/messages — guestSms', () => {
 
   it('shows cents only when an amount has them', () => {
     expect(guestSms('PAYMENT', { ...base, amount: 400050n, due: 0n })).toBe(
-      'Diani Stays: we received KES 4,000.50 for booking B00001. Still to pay: KES 0.',
+      'Diani Stays: we received KES 4,000.50 for booking B00001. Fully paid, thank you.',
     );
+  });
+
+  it('says when a payment confirmed the stay', () => {
+    expect(guestSms('PAYMENT', { ...base, amount: 275000n, due: 275000n, confirmed: true })).toBe(
+      'Diani Stays: we received KES 2,750 for booking B00001. Your stay is confirmed. Still to pay: KES 2,750.',
+    );
+  });
+
+  it('adds a short map link to the check-in details', () => {
+    const text = guestSms('CHECKIN_INFO', {
+      ...base,
+      time: '14:00',
+      instructions: 'Collect keys from the guard.',
+      mapLink: 'https://maps.google.com/?q=-1.292066,36.787194',
+    });
+    expect(text).toBe(
+      'Diani Stays: welcome on 12 Dec! Check-in from 14:00. Collect keys from the guard. Map: https://maps.google.com/?q=-1.292066,36.787194',
+    );
+    expect(smsSegments(text)).toBe(1);
   });
 });

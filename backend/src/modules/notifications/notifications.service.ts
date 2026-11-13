@@ -13,15 +13,18 @@ import {
   renderBrandedEmailHtml,
   resolveEmailTemplate,
 } from './email-templates.js';
+import type { GuestEmailTemplateKey } from './guest-email-templates.js';
 import {
   createEmailSender,
   createPushSender,
   createSmsSender,
+  type EmailAttachment,
   type EmailMessage,
   type EmailSender,
   type PushSender,
   type SmsSender,
 } from './senders.js';
+import { ShortLinksService } from './short-links.service.js';
 import { AT_KEY_CONTEXT, SmsService } from './sms/sms.service.js';
 import { smsWarningCopy } from './sms/sms-copy.js';
 import {
@@ -207,6 +210,7 @@ export class NotificationsService {
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly cipher?: FieldCipher,
     @Optional() private readonly smsRouter?: SmsService,
+    @Optional() private readonly shortLinks?: ShortLinksService,
   ) {
     this.sms = createSmsSender(env);
     this.email = createEmailSender(env);
@@ -372,12 +376,16 @@ export class NotificationsService {
       }
     }
     if (to.phone) {
+      // A short link keeps the SMS to one unit; it lasts as long as the invitation (7 days).
+      const smsLink = this.shortLinks
+        ? await this.shortLinks.shortenOrKeep(link, { kind: 'invitation', days: 8 })
+        : link;
       tasks.push(
         this.dispatchSms(
           { kind: 'platform', type: 'invitation' },
           to.phone,
-          `${by} to ${p.organizationName} on KodiHub. Accept: ${link}`,
-          { value: link, label: 'Invitation link' },
+          `${by} to ${p.organizationName} on KodiHub. Accept: ${smsLink}`,
+          { value: smsLink, label: 'Invitation link' },
         ),
       );
     }
@@ -662,6 +670,33 @@ export class NotificationsService {
     );
   }
 
+  /**
+   * An email to a short-stay guest from one of the guest templates, in the host's name (replies
+   * go to the host). Throws when it could not be sent; it is logged either way.
+   */
+  async sendGuestEmail(p: {
+    to: string;
+    template: GuestEmailTemplateKey;
+    vars: Record<string, string>;
+    hostName: string;
+    hostEmail: string | null;
+    attachments?: EmailAttachment[];
+  }): Promise<void> {
+    const rendered = await this.renderSystemEmailTemplate(p.template, p.vars);
+    await this.dispatchEmail(
+      {
+        to: p.to,
+        subject: rendered.subject,
+        // Lines left empty by missing details collapse, so the email never shows gaps.
+        text: rendered.text.replace(/\n{3,}/g, '\n\n'),
+        fromName: `${p.hostName} via KodiHub`,
+        ...(p.hostEmail ? { replyTo: p.hostEmail } : {}),
+        ...(p.attachments?.length ? { attachments: p.attachments } : {}),
+      },
+      p.template,
+    );
+  }
+
   /** An organisation's SMS to its tenant/guest (callers log it). Throws SmsNotSentError unless sent. */
   async sendSms(spec: OrgSmsSpec, phone: string, text: string): Promise<void> {
     await this.dispatchSms(spec, phone, text);
@@ -884,7 +919,7 @@ export class NotificationsService {
         });
         const parsedFrom = parseFromAddress(settings.smtpFromEmail || this.env.EMAIL_FROM);
         const fromAddr = parsedFrom.email || this.env.EMAIL_FROM;
-        const fromName = settings.smtpFromName || parsedFrom.name;
+        const fromName = m.fromName || settings.smtpFromName || parsedFrom.name;
         const from = fromName ? `"${fromName}" <${fromAddr}>` : fromAddr;
         const html =
           m.html ??
@@ -900,6 +935,7 @@ export class NotificationsService {
           text: m.text,
           html,
           ...(m.attachments?.length ? { attachments: m.attachments } : {}),
+          ...(m.replyTo ? { replyTo: m.replyTo } : {}),
         });
       } else {
         await this.email.send(m);

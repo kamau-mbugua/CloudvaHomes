@@ -279,6 +279,17 @@ export class PlatformSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(1_000_000) smsMinUnits?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(100_000) smsFreeUnits?: number;
 
+  // ── Google Maps (listing locations) ──
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Browser key for Maps JavaScript + Places API; lock it to KodiHub domains',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,80}$/, { message: 'That does not look like a Google API key' })
+  googleMapsKey?: string | null;
+
   // ── Signup, Mobile App & Maintenance (phase 11) ──
   @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPublicSignup?: boolean;
   @ApiPropertyOptional()

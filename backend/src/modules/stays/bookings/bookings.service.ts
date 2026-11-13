@@ -5,23 +5,21 @@ import {
   withoutOrgScope,
 } from '../../../common/context/request-context.js';
 import { formatDateOnly, parseDateOnly } from '../../../common/dates/date-only.js';
-import { FieldCipher } from '../../../common/crypto/field-cipher.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { toSkipTake } from '../../../common/http/pagination.js';
 import { paginated } from '../../../common/http/response.js';
-import { ENV } from '../../../config/config.module.js';
-import type { Env } from '../../../config/env.js';
 import { type BookingStatus, type Guest, Prisma } from '../../../generated/prisma/client.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
 import { normalizePhone } from '../../auth/identifiers.js';
+import { GuestNoticesService } from '../notices/guest-notices.service.js';
 import { NotificationsService } from '../../notifications/notifications.service.js';
 import { nextCode } from '../../portfolio/codes.js';
 import { propertyScope } from '../../portfolio/property-scope.js';
 import { assertHostOrg } from '../host-org.js';
 import { parseWholeShillings } from '../listings/listings.service.js';
-import { guestSms, shouldSendCheckInInfoNow } from '../rules/messages.js';
+import { shouldSendCheckInInfoNow } from '../rules/messages.js';
 import { quoteStay, type Quote, type QuoteLine } from '../rules/pricing.js';
 import { BLOCKING, canMove } from '../rules/status.js';
 import {
@@ -32,7 +30,6 @@ import {
   refundFor,
   type StayRules,
 } from '../rules/terms.js';
-import { bookingLinkToken, bookingLinkUrl, hashAccessToken } from './booking-link.js';
 import { nairobiToday, viewBooking, type RawBookingForView } from './booking-view.js';
 import type {
   CalendarQueryDto,
@@ -73,93 +70,14 @@ export class BookingsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
-    private readonly cipher: FieldCipher,
-    @Inject(ENV) private readonly env: Env,
+    private readonly notices: GuestNoticesService,
   ) {}
 
-  /**
-   * The guest's booking-page link, for bookings made on the host's site (they carry a link
-   * token). Empty for host-made bookings, which have no guest page.
-   */
-  async guestLink(booking: { id: string; orgId: string }): Promise<string> {
-    const row = await this.db.booking.findUnique({
-      where: { id: booking.id },
-      select: { accessTokenHash: true },
-    });
-    const token = bookingLinkToken(this.cipher, booking.id);
-    if (!row?.accessTokenHash || row.accessTokenHash !== hashAccessToken(token)) return '';
-    const site = await this.db.hostSite.findUnique({
-      where: { orgId: booking.orgId },
-      select: { slug: true },
-    });
-    return site?.slug ? bookingLinkUrl(site.slug, this.env.SITE_DOMAIN, token) : '';
-  }
-
-  private async bizName(orgId: string): Promise<string> {
-    const site = await this.db.hostSite.findUnique({
-      where: { orgId },
-      select: { businessName: true },
-    });
-    if (site?.businessName) return site.businessName;
-    const org = await this.db.organization.findUnique({
-      where: { id: orgId },
-      select: { name: true },
-    });
-    return org?.name ?? 'KodiHub';
-  }
-
-  private async notifyConfirmedAfterCommit(
-    orgId: string,
-    booking: RawBookingForView,
-    checkInInstructions?: string | null,
-    link?: string | null,
-  ): Promise<void> {
-    const biz = await this.bizName(orgId);
-    const today = nairobiToday();
-    const checkInIso = formatDateOnly(booking.checkIn);
-    const checkOutIso = formatDateOnly(booking.checkOut);
-    if (booking.guest?.phone) {
-      await this.notifications
-        .sendSms(
-          { kind: 'org', orgId: orgId, type: 'booking' },
-          booking.guest.phone,
-          guestSms('CONFIRMED', {
-            biz,
-            unit: booking.listing.title,
-            checkIn: checkInIso,
-            checkOut: checkOutIso,
-            code: booking.code,
-            link: link ?? '',
-          }),
-        )
-        .catch(() => undefined);
-
-      if (shouldSendCheckInInfoNow(checkInIso, today)) {
-        const site = await this.db.hostSite.findUnique({
-          where: { orgId },
-          select: { checkInTime: true },
-        });
-        const instructions = checkInInstructions?.trim() ?? '';
-        await this.notifications
-          .sendSms(
-            { kind: 'org', orgId: orgId, type: 'booking' },
-            booking.guest.phone,
-            guestSms('CHECKIN_INFO', {
-              biz,
-              checkIn: checkInIso,
-              time: site?.checkInTime ?? '14:00',
-              instructions,
-            }),
-          )
-          .catch(() => undefined);
-        await this.db.booking
-          .update({
-            where: { id: booking.id },
-            data: { infoSentAt: new Date() },
-          })
-          .catch(() => undefined);
-      }
-    }
+  /** Tells the guest the booking is confirmed, and sends check-in details now if it is soon. */
+  private async notifyConfirmedAfterCommit(booking: RawBookingForView): Promise<void> {
+    if (!booking.guest) return;
+    await this.notices.tell('CONFIRMED', booking.id);
+    await this.sendCheckInInfoIfSoon(booking.id);
   }
 
   /**
@@ -170,35 +88,16 @@ export class BookingsService {
   async sendCheckInInfoIfSoon(bookingId: string): Promise<void> {
     const b = await this.db.booking.findUnique({
       where: { id: bookingId },
-      include: {
-        guest: { select: { phone: true } },
-        listing: { select: { checkInInstructions: true } },
-      },
+      select: { id: true, status: true, infoSentAt: true, checkIn: true, guestId: true },
     });
-    if (!b || b.status !== 'CONFIRMED' || b.infoSentAt || !b.guest?.phone) return;
-    const checkIn = formatDateOnly(b.checkIn);
-    if (!shouldSendCheckInInfoNow(checkIn, nairobiToday())) return;
+    if (!b || b.status !== 'CONFIRMED' || b.infoSentAt || !b.guestId) return;
+    if (!shouldSendCheckInInfoNow(formatDateOnly(b.checkIn), nairobiToday())) return;
     const claimed = await this.db.booking.updateMany({
       where: { id: b.id, infoSentAt: null },
       data: { infoSentAt: new Date() },
     });
     if (claimed.count === 0) return;
-    const site = await this.db.hostSite.findUnique({
-      where: { orgId: b.orgId },
-      select: { checkInTime: true },
-    });
-    await this.notifications
-      .sendSms(
-        { kind: 'org', orgId: b.orgId, type: 'booking' },
-        b.guest.phone,
-        guestSms('CHECKIN_INFO', {
-          biz: await this.bizName(b.orgId),
-          checkIn,
-          time: site?.checkInTime ?? '14:00',
-          instructions: b.listing.checkInInstructions?.trim() ?? '',
-        }),
-      )
-      .catch(() => undefined);
+    await this.notices.tell('CHECKIN_INFO', b.id);
   }
 
   private callerPermissions(): ReadonlySet<string> {
@@ -485,7 +384,7 @@ export class BookingsService {
       return row;
     });
 
-    await this.notifyConfirmedAfterCommit(ctx.orgId, created, listing.checkInInstructions);
+    await this.notifyConfirmedAfterCommit(created);
     await this.notifications.notifyOrgStaff(ctx.orgId, {
       kind: 'STAY_NEW',
       title: `New booking ${created.code}`,
@@ -649,33 +548,10 @@ export class BookingsService {
       extra: { holdExpiresAt, requestExpiresAt: null },
     });
 
-    const biz = await this.bizName(ctx.orgId);
-    if (updated.guest?.phone) {
-      const link = await this.guestLink({ id: updated.id, orgId: ctx.orgId });
-      if (nextStatus === 'HELD') {
-        await this.notifications
-          .sendSms(
-            { kind: 'org', orgId: ctx.orgId, type: 'booking' },
-            updated.guest.phone,
-            guestSms('PAY_NOW', {
-              biz,
-              amount: updated.dueNow,
-              link,
-            }),
-          )
-          .catch(() => undefined);
-      } else {
-        const listing = await this.db.listing.findUnique({
-          where: { id: updated.listingId },
-          select: { checkInInstructions: true },
-        });
-        await this.notifyConfirmedAfterCommit(
-          ctx.orgId,
-          updated,
-          listing?.checkInInstructions,
-          link,
-        );
-      }
+    if (nextStatus === 'HELD') {
+      await this.notices.tell('PAY_NOW', updated.id, { amount: updated.dueNow });
+    } else {
+      await this.notifyConfirmedAfterCommit(updated);
     }
 
     return viewBooking(updated, { permissions: this.callerPermissions() }, nairobiToday());
@@ -701,21 +577,7 @@ export class BookingsService {
       },
     });
 
-    if (updated.guest?.phone) {
-      const biz = await this.bizName(ctx.orgId);
-      await this.notifications
-        .sendSms(
-          { kind: 'org', orgId: ctx.orgId, type: 'booking' },
-          updated.guest.phone,
-          guestSms('DECLINED', {
-            biz,
-            unit: updated.listing.title,
-            checkIn: formatDateOnly(updated.checkIn),
-            checkOut: formatDateOnly(updated.checkOut),
-          }),
-        )
-        .catch(() => undefined);
-    }
+    await this.notices.tell('DECLINED', updated.id);
 
     return viewBooking(updated, { permissions: this.callerPermissions() }, nairobiToday());
   }
@@ -836,20 +698,7 @@ export class BookingsService {
         ? parseWholeShillings(dto.refund, 'refund', { allowZero: true })
         : suggested;
 
-    if (updated.guest?.phone) {
-      const biz = await this.bizName(ctx.orgId);
-      await this.notifications
-        .sendSms(
-          { kind: 'org', orgId: ctx.orgId, type: 'booking' },
-          updated.guest.phone,
-          guestSms('CANCELLED', {
-            biz,
-            code: updated.code,
-            refund: refundAmount,
-          }),
-        )
-        .catch(() => undefined);
-    }
+    await this.notices.tell('CANCELLED', updated.id, { refund: refundAmount });
 
     await this.notifications.notifyOrgStaff(ctx.orgId, {
       kind: 'STAY_CANCELLED',
@@ -1019,19 +868,7 @@ export class BookingsService {
           requests++;
         }
 
-        if (b.guest?.phone) {
-          const biz = await this.bizName(b.orgId);
-          await this.notifications
-            .sendSms(
-              { kind: 'org', orgId: b.orgId, type: 'booking' },
-              b.guest.phone,
-              guestSms('EXPIRED', {
-                biz,
-                code: b.code,
-              }),
-            )
-            .catch(() => undefined);
-        }
+        await this.notices.tell('EXPIRED', b.id);
       });
     }
 
@@ -1051,7 +888,6 @@ export class BookingsService {
   }> {
     const todayDate = parseDateOnly(today);
     const tomorrowDate = new Date(todayDate.getTime() + 86_400_000);
-    const tomorrowIso = formatDateOnly(tomorrowDate);
     const now = new Date();
     const sixHoursFromNow = new Date(now.getTime() + 6 * 3600_000);
 
@@ -1092,19 +928,7 @@ export class BookingsService {
       if (owed <= 0n || !b.guest?.phone) continue;
 
       await runWithContext(emptyContext({ orgId: b.orgId }), async () => {
-        const biz = await this.bizName(b.orgId);
-        await this.notifications
-          .sendSms(
-            { kind: 'org', orgId: b.orgId, type: 'booking' },
-            b.guest!.phone,
-            guestSms('BALANCE_DUE', {
-              biz,
-              due: owed,
-              checkIn: formatDateOnly(b.checkIn),
-              link: await this.guestLink(b),
-            }),
-          )
-          .catch(() => undefined);
+        await this.notices.tell('BALANCE_DUE', b.id, { amount: owed });
         balanceDueCount++;
       });
     }
@@ -1118,24 +942,7 @@ export class BookingsService {
           data: { infoSentAt: new Date() },
         });
         if (claimed.count === 0) return;
-
-        const biz = await this.bizName(b.orgId);
-        const site = await this.db.hostSite.findUnique({
-          where: { orgId: b.orgId },
-          select: { checkInTime: true },
-        });
-        await this.notifications
-          .sendSms(
-            { kind: 'org', orgId: b.orgId, type: 'booking' },
-            b.guest!.phone,
-            guestSms('CHECKIN_INFO', {
-              biz,
-              checkIn: tomorrowIso,
-              time: site?.checkInTime ?? '14:00',
-              instructions: b.listing.checkInInstructions?.trim() ?? '',
-            }),
-          )
-          .catch(() => undefined);
+        await this.notices.tell('CHECKIN_INFO', b.id);
         checkInInfoCount++;
       });
     }

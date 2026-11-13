@@ -338,10 +338,13 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
 
     // List system email templates
     const templates = (await get(admin, '/platform/email/templates')).data;
-    expect(templates.length).toBe(15); // 12 + SMS low / empty / failing warnings
+    expect(templates.length).toBe(25); // 12 + SMS low / empty / failing + 10 guest emails
     const templateKeys = templates.map((tpl: any) => tpl.key);
     expect(templateKeys).toEqual(
       expect.arrayContaining([
+        'guest_booking_confirmed',
+        'guest_payment_received',
+        'guest_checkin_info',
         'tenant_welcome',
         'tenant_added_to_org',
         'tenant_unit_assigned',

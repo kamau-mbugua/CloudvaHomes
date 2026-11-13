@@ -1,3 +1,5 @@
+import { GUEST_EMAIL_TEMPLATE_KEYS, GUEST_EMAIL_TEMPLATES } from './guest-email-templates.js';
+
 export const EMAIL_TEMPLATE_KEYS = [
   'owner_welcome',
   'staff_invitation',
@@ -14,6 +16,7 @@ export const EMAIL_TEMPLATE_KEYS = [
   'sms_low',
   'sms_empty',
   'sms_failing',
+  ...GUEST_EMAIL_TEMPLATE_KEYS,
 ] as const;
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number];
@@ -28,7 +31,11 @@ export interface EmailTemplateDefinition {
   key: EmailTemplateKey;
   name: string;
   category:
-    'Onboarding & Invitations' | 'Platform Billing' | 'Security & Access' | 'Tenant Communications';
+    | 'Onboarding & Invitations'
+    | 'Platform Billing'
+    | 'Security & Access'
+    | 'Tenant Communications'
+    | 'Guest Communications';
   description: string;
   defaultSubject: string;
   defaultBody: string;
@@ -714,6 +721,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       },
     ],
   },
+  ...GUEST_EMAIL_TEMPLATES,
 };
 
 export function isEmailTemplateKey(key: string): key is EmailTemplateKey {

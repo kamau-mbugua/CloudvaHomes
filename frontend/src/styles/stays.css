@@ -356,3 +356,17 @@
   }
 }
 
+
+/* Listing editor: location on the map */
+.loc__search gmp-place-autocomplete { display: block; width: 100%; }
+.loc__hint { margin: 0 0 8px; font-size: 13px; color: var(--text-muted); }
+.loc__error { margin: 6px 0 0; font-size: 13px; color: var(--destructive-text, var(--destructive)); }
+.loc__chosen { display: grid; gap: 8px; margin-top: 10px; }
+.loc__label { font-size: 12.5px; font-weight: 500; color: var(--text-secondary); }
+.loc__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13px; color: var(--text-muted); }
+.loc__meta a { color: var(--primary); }
+.loc__map { width: 100%; height: 220px; border: 1px solid var(--border); border-radius: var(--radius, 8px); }
+.loc__paste { margin-top: 10px; display: grid; gap: 8px; }
+.loc__paste[open] { gap: 8px; }
+.loc__paste summary { cursor: pointer; font-size: 13px; color: var(--text-muted); }
+.loc__paste > * + * { margin-top: 8px; }

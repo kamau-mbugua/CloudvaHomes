@@ -15,6 +15,10 @@ export interface EmailMessage {
   text: string;
   html?: string;
   attachments?: EmailAttachment[];
+  /** Sender name shown instead of KodiHub's, e.g. "Makini Homes via KodiHub" (same address). */
+  fromName?: string;
+  /** Where replies go, e.g. the host's own email. */
+  replyTo?: string;
 }
 
 export interface PushMessage {

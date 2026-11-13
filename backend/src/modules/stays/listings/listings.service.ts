@@ -13,7 +13,9 @@ import { MAX_MINOR } from '../../portfolio/money.dto.js';
 import { propertyScope } from '../../portfolio/property-scope.js';
 import { assertHostOrg } from '../host-org.js';
 import { rulesProblem, type StayRules } from '../rules/terms.js';
+import { locationView } from '../rules/location.js';
 import type {
+  ListingLocationDto,
   CreateListingDto,
   ListListingsQueryDto,
   ReorderPhotosDto,
@@ -69,6 +71,17 @@ function toPhotoView(p: {
   };
 }
 
+/** The four location columns from the editor's choice (null clears them). */
+function locationData(loc: ListingLocationDto | null | undefined) {
+  if (!loc) return { address: null, lat: null, lng: null, placeId: null };
+  return {
+    address: loc.address.trim(),
+    lat: loc.lat,
+    lng: loc.lng,
+    placeId: loc.placeId?.trim() || null,
+  };
+}
+
 export function toListingView(l: ListingRow) {
   const photos = l.photos.map(toPhotoView);
   const cover = photos[0] ?? null;
@@ -81,6 +94,7 @@ export function toListingView(l: ListingRow) {
     title: l.title,
     description: l.description,
     area: l.area,
+    location: locationView(l),
     bedrooms: l.bedrooms,
     bathrooms: l.bathrooms,
     maxGuests: l.maxGuests,
@@ -124,6 +138,14 @@ export class ListingsService {
     });
     if (!row) throw AppError.notFound('Listing');
     return row;
+  }
+
+  async mapsConfig(): Promise<{ key: string | null }> {
+    const s = await this.db.platformSettings.findUnique({
+      where: { id: 1 },
+      select: { googleMapsKey: true },
+    });
+    return { key: s?.googleMapsKey ?? null };
   }
 
   async list(q: ListListingsQueryDto) {
@@ -212,6 +234,7 @@ export class ListingsService {
             title: dto.title.trim(),
             description: dto.description?.trim() || null,
             area: dto.area?.trim() || null,
+            ...locationData(dto.location),
             bedrooms: dto.bedrooms ?? 1,
             bathrooms: dto.bathrooms ?? 1,
             maxGuests: dto.maxGuests ?? 2,
@@ -293,6 +316,7 @@ export class ListingsService {
               ? { description: dto.description?.trim() || null }
               : {}),
             ...(dto.area !== undefined ? { area: dto.area?.trim() || null } : {}),
+            ...(dto.location !== undefined ? locationData(dto.location) : {}),
             ...(dto.bedrooms !== undefined ? { bedrooms: dto.bedrooms } : {}),
             ...(dto.bathrooms !== undefined ? { bathrooms: dto.bathrooms } : {}),
             ...(dto.maxGuests !== undefined ? { maxGuests: dto.maxGuests } : {}),

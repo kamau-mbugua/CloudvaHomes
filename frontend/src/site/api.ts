@@ -70,6 +70,10 @@ export interface PublicListingDetail {
   title: string;
   description: string | null;
   area: string | null;
+  /** The exact pin the host picked, with its Google Maps link. */
+  location: { address: string; lat: number; lng: number; placeId: string | null; mapUrl: string } | null;
+  /** Google Maps browser key for the embedded map (null: show the link only). */
+  mapsKey: string | null;
   bedrooms: number;
   bathrooms: number;
   maxGuests: number;
@@ -134,6 +138,8 @@ export interface PublicBookingDetail {
   holdExpiresAt: string | null;
   checkInInstructions: string | null;
   address: string | null;
+  /** Google Maps link to the place, when the host pinned it. */
+  mapUrl: string | null;
   paybill: { number: string; accountRef: string } | null;
   canPayInApp: boolean;
   contact: {

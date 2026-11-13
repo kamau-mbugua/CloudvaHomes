@@ -36,6 +36,7 @@ type SettingsTab =
   | 'security'
   | 'locks'
   | 'sms'
+  | 'maps'
   | 'app';
 
 /**
@@ -59,6 +60,7 @@ export function AdminSettingsPage() {
     rawTab === 'security' ||
     rawTab === 'locks' ||
     rawTab === 'sms' ||
+    rawTab === 'maps' ||
     rawTab === 'app'
       ? rawTab
       : 'billing';
@@ -94,6 +96,9 @@ export function AdminSettingsPage() {
           <button type="button" role="tab" aria-selected={tab === 'sms'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'sms' })}>
             SMS
           </button>
+          <button type="button" role="tab" aria-selected={tab === 'maps'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'maps' })}>
+            Google Maps
+          </button>
           <button type="button" role="tab" aria-selected={tab === 'app'} className="pf__tab" onClick={() => filters.setFilter({ tab: 'app' })}>
             App & Maintenance
           </button>
@@ -116,6 +121,8 @@ export function AdminSettingsPage() {
           <SecurityTwoFactorForm key={`${s.requireAdminTwoFactor}-${s.adminTwoFactorChannel}`} settings={s} />
         ) : tab === 'locks' ? (
           <SecurityLocksSection />
+        ) : tab === 'maps' ? (
+          <GoogleMapsForm key={s.googleMapsKey ?? 'maps'} settings={s} />
         ) : tab === 'sms' ? (
           <AdminSmsSettings key={`${s.sms?.username ?? ''}-${s.sms?.senderId ?? ''}-${s.sms?.apiKey}`} settings={s} />
         ) : (
@@ -484,6 +491,45 @@ function SecurityLocksSection() {
         </div>
       )}
     </section>
+  );
+}
+
+/** The Google Maps browser key hosts use to pin listings, and guests' maps load with. */
+function GoogleMapsForm({ settings }: { settings: PlatformSettings }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [key, setKey] = useState(settings.googleMapsKey ?? '');
+  const save = useMutation({
+    mutationFn: (googleMapsKey: string | null) => api.put<unknown>('/platform/settings', { googleMapsKey }),
+    onSuccess: async () => {
+      toast.saved('Google Maps key saved.');
+      await queryClient.invalidateQueries({ queryKey: keys.platform });
+    },
+    onError: (error) => toast.failed(platformErrorMessage(error)),
+  });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    save.mutate(key.trim() || null);
+  };
+  return (
+    <form className="fm__section" onSubmit={submit} noValidate>
+      <h2>Google Maps</h2>
+      <p>
+        Hosts search for their listing’s address on a map, and guests see the exact pin and get a Google Maps link.
+        Without a key, hosts can still paste a Google Maps link or coordinates.
+      </p>
+      <div className="fm__grid">
+        <Field id="gm-key" label="Browser API key" optional wide
+          hint="In Google Cloud, enable the Maps JavaScript API, Places API (New) and Maps Embed API, then restrict the key to websites: *.kodihub.co.ke/*. Browsers receive this key, so the website restriction is what protects it.">
+          <input id="gm-key" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} placeholder="AIza…" />
+        </Field>
+      </div>
+      <div className="pg-actions">
+        <button type="submit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
+          {save.isPending ? 'Saving…' : 'Save Google Maps key'}
+        </button>
+      </div>
+    </form>
   );
 }
 

@@ -46,6 +46,9 @@ const envSchema = z
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     // Public URL of the web app, used in invitation links.
     APP_URL: z.url().default('http://localhost:5173'),
+    // Where SMS short links point. Default: https://go.{SITE_DOMAIN} (the API's /api/v1/s/
+    // route when SITE_DOMAIN is localhost).
+    SHORT_LINK_BASE: z.url().optional(),
     // Base domain for short-stay host booking sites ({slug}.{SITE_DOMAIN}).
     SITE_DOMAIN: z.string().min(1).default('localhost'),
     // Optional internal URL for the web SPA index.html (used by /public/site-html for OpenGraph tags).

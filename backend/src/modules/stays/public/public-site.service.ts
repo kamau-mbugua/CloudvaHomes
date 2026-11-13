@@ -23,7 +23,9 @@ import { nextCode } from '../../portfolio/codes.js';
 import { BOOKING_INCLUDE, BookingsService } from '../bookings/bookings.service.js';
 import { bookingLinkToken, bookingLinkUrl, hashAccessToken } from '../bookings/booking-link.js';
 import { nairobiToday } from '../bookings/booking-view.js';
-import { formatStayKes, guestSms } from '../rules/messages.js';
+import { GuestNoticesService } from '../notices/guest-notices.service.js';
+import { formatStayKes } from '../rules/messages.js';
+import { locationView } from '../rules/location.js';
 import { quoteStay } from '../rules/pricing.js';
 import { BLOCKING } from '../rules/status.js';
 import {
@@ -86,6 +88,7 @@ export class PublicSiteService {
     @Inject(forwardRef(() => DarajaConfigService))
     private readonly darajaConfig: WrapperType<DarajaConfigService>,
     private readonly cipher: FieldCipher,
+    private readonly notices: GuestNoticesService,
   ) {}
 
   private siteRulesFromRow(raw: unknown): StayRules {
@@ -127,6 +130,14 @@ export class PublicSiteService {
 
       throw new AppError(404, 'SITE_NOT_FOUND', 'Site not found');
     });
+  }
+
+  private async mapsKey(): Promise<string | null> {
+    const s = await this.prisma.platformSettings.findUnique({
+      where: { id: 1 },
+      select: { googleMapsKey: true },
+    });
+    return s?.googleMapsKey ?? null;
   }
 
   private async requireSite(slug: string) {
@@ -203,6 +214,9 @@ export class PublicSiteService {
         title: listing.title,
         description: listing.description,
         area: listing.area,
+        // The exact pin is public (the host chose to show it), with the Maps key for the embed.
+        location: locationView(listing),
+        mapsKey: await this.mapsKey(),
         bedrooms: listing.bedrooms,
         bathrooms: listing.bathrooms,
         maxGuests: listing.maxGuests,
@@ -499,8 +513,6 @@ export class PublicSiteService {
     const darajaChannel = await this.findDarajaChannel(site.orgId);
     const hasDaraja = darajaChannel !== null;
 
-    const biz = site.businessName || site.organization.name;
-
     return runWithContext(emptyContext({ orgId: site.orgId }), async () => {
       const now = new Date();
       const created = await this.db.$transaction(async (tx) => {
@@ -590,37 +602,12 @@ export class PublicSiteService {
             })
             .catch(() => undefined);
         }
-        await this.notifications
-          .sendSms(
-            { kind: 'org', orgId: site.orgId, type: 'booking' },
-            phone,
-            guestSms('HELD', {
-              biz,
-              unit: listing.title,
-              checkIn: dto.checkIn,
-              checkOut: dto.checkOut,
-              code: created.code,
-              amount: due,
-              window: hasDaraja ? '15 minutes' : '2 hours',
-              link,
-            }),
-          )
-          .catch(() => undefined);
+        await this.notices.tell('HELD', created.id, {
+          amount: due,
+          window: hasDaraja ? '15 minutes' : '2 hours',
+        });
       } else if (created.status === 'CONFIRMED') {
-        await this.notifications
-          .sendSms(
-            { kind: 'org', orgId: site.orgId, type: 'booking' },
-            phone,
-            guestSms('CONFIRMED', {
-              biz,
-              unit: listing.title,
-              checkIn: dto.checkIn,
-              checkOut: dto.checkOut,
-              code: created.code,
-              link,
-            }),
-          )
-          .catch(() => undefined);
+        await this.notices.tell('CONFIRMED', created.id);
         await this.notifications
           .notifyOrgStaff(site.orgId, {
             kind: 'STAY_NEW',
@@ -631,20 +618,7 @@ export class PublicSiteService {
           .catch(() => undefined);
         await this.bookings.sendCheckInInfoIfSoon(created.id);
       } else if (created.status === 'REQUESTED') {
-        await this.notifications
-          .sendSms(
-            { kind: 'org', orgId: site.orgId, type: 'booking' },
-            phone,
-            guestSms('REQUESTED', {
-              biz,
-              unit: listing.title,
-              checkIn: dto.checkIn,
-              checkOut: dto.checkOut,
-              code: created.code,
-              link,
-            }),
-          )
-          .catch(() => undefined);
+        await this.notices.tell('REQUESTED', created.id);
         await this.notifications
           .notifyOrgStaff(site.orgId, {
             kind: 'STAY_REQUEST',
@@ -688,6 +662,10 @@ export class PublicSiteService {
               title: true,
               area: true,
               checkInInstructions: true,
+              address: true,
+              lat: true,
+              lng: true,
+              placeId: true,
             },
           },
         },
@@ -738,7 +716,9 @@ export class PublicSiteService {
       const netPaid = booking.amountPaid - booking.amountRefunded;
       const owed = booking.total > netPaid ? booking.total - netPaid : 0n;
       const showArrivalInfo = booking.status === 'CONFIRMED' || booking.status === 'CHECKED_IN';
-      const addressText = booking.property.location ?? booking.listing.area ?? null;
+      const location = locationView(booking.listing);
+      const addressText =
+        location?.address ?? booking.property.location ?? booking.listing.area ?? null;
 
       return {
         code: booking.code,
@@ -766,6 +746,8 @@ export class PublicSiteService {
         holdExpiresAt: booking.holdExpiresAt ? booking.holdExpiresAt.toISOString() : null,
         checkInInstructions: showArrivalInfo ? (booking.listing.checkInInstructions ?? null) : null,
         address: showArrivalInfo ? addressText : null,
+        // The pin is public on the listing page too, so the booking always carries the map link.
+        mapUrl: location?.mapUrl ?? null,
         paybill: paybillChannel?.shortcode
           ? { number: paybillChannel.shortcode, accountRef: booking.code }
           : null,
@@ -870,26 +852,7 @@ export class PublicSiteService {
         actor: 'GUEST',
       });
 
-      const site = await this.db.hostSite.findUnique({
-        where: { orgId: booking.orgId },
-        select: { businessName: true },
-      });
-      const biz = site?.businessName ?? 'KodiHub';
-
-      await this.notifications
-        .sendSms(
-          { kind: 'org', orgId: booking.orgId, type: 'booking' },
-          phone,
-          guestSms('CANCELLED', {
-            biz,
-            unit: updated.listing.title,
-            checkIn: checkInIso,
-            checkOut: checkOutIso,
-            code: updated.code,
-            refund,
-          }),
-        )
-        .catch(() => undefined);
+      await this.notices.tell('CANCELLED', updated.id, { refund });
 
       await this.notifications
         .notifyOrgStaff(booking.orgId, {

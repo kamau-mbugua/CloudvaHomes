@@ -15,9 +15,10 @@ import { NotificationsService } from '../../notifications/notifications.service.
 import { nextCode } from '../../portfolio/codes.js';
 import { propertyScope } from '../../portfolio/property-scope.js';
 import { BookingsService, isOverlapConstraintError } from '../bookings/bookings.service.js';
+import { GuestNoticesService } from '../notices/guest-notices.service.js';
 import { assertHostOrg } from '../host-org.js';
 import { parseWholeShillings } from '../listings/listings.service.js';
-import { formatStayKes, guestSms } from '../rules/messages.js';
+import { formatStayKes } from '../rules/messages.js';
 import type {
   BookingMpesaPromptDto,
   CreateStayPaymentDto,
@@ -84,6 +85,7 @@ export class StayPaymentsService {
     @Inject(forwardRef(() => StkService))
     private readonly stk: WrapperType<StkService>,
     private readonly bookings: BookingsService,
+    private readonly notices: GuestNoticesService,
   ) {}
 
   /**
@@ -133,7 +135,7 @@ export class StayPaymentsService {
         where: { id: booking.id },
         data: { amountPaid: { increment: p.amount } },
       });
-      await this.afterPayment(tx, booking.id);
+      await this.afterPayment(tx, booking.id, created.id);
     } else {
       await tx.booking.update({
         where: { id: booking.id },
@@ -153,7 +155,7 @@ export class StayPaymentsService {
    * - Money on a CANCELLED, DECLINED or other EXPIRED booking (e.g. a request the host never
    *   answered) never brings it back: note it and tell staff to refund the guest.
    */
-  async afterPayment(tx: Tx, bookingId: string): Promise<void> {
+  async afterPayment(tx: Tx, bookingId: string, paymentId?: string): Promise<void> {
     const booking = await tx.booking.findUniqueOrThrow({
       where: { id: bookingId },
     });
@@ -166,6 +168,18 @@ export class StayPaymentsService {
           holdExpiresAt: null,
         },
       });
+      // Which payment confirmed it: the guest is told so with that payment's receipt.
+      await this.audit.record(
+        {
+          orgId: booking.orgId,
+          action: 'stay_booking.confirmed_by_payment',
+          entity: 'booking',
+          entityId: booking.id,
+          before: { status: 'HELD' },
+          after: { status: 'CONFIRMED', paymentId: paymentId ?? null },
+        },
+        tx,
+      );
       return;
     }
 
@@ -331,35 +345,18 @@ export class StayPaymentsService {
     if (!payment || payment.kind !== 'PAYMENT') return;
 
     const booking = payment.booking;
-    const site = await this.db.hostSite.findUnique({
-      where: { orgId: booking.orgId },
-      select: { businessName: true },
+    const confirmedBy = await this.db.auditLog.findFirst({
+      where: { action: 'stay_booking.confirmed_by_payment', entityId: booking.id },
+      orderBy: { createdAt: 'desc' },
+      select: { after: true },
     });
-    const org = site?.businessName
-      ? null
-      : await this.db.organization.findUnique({
-          where: { id: booking.orgId },
-          select: { name: true },
-        });
-    const biz = site?.businessName ?? org?.name ?? 'KodiHub';
-
-    const netPaid = booking.amountPaid - booking.amountRefunded;
-    const due = booking.total > netPaid ? booking.total - netPaid : 0n;
-
-    if (booking.guest?.phone) {
-      await this.notifications
-        .sendSms(
-          { kind: 'org', orgId: booking.orgId, type: 'stay_payment' },
-          booking.guest.phone,
-          guestSms('PAYMENT', {
-            biz,
-            amount: payment.amount,
-            code: booking.code,
-            due,
-          }),
-        )
-        .catch(() => undefined);
-    }
+    const confirmed =
+      (confirmedBy?.after as { paymentId?: string | null } | null)?.paymentId === payment.id;
+    await this.notices.tell('PAYMENT', booking.id, {
+      amount: payment.amount,
+      paymentId: payment.id,
+      confirmed,
+    });
 
     await this.notifications.notifyOrgStaff(booking.orgId, {
       kind: 'STAY_PAYMENT',

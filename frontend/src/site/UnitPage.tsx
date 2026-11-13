@@ -9,6 +9,7 @@ import {
 } from './api';
 import { formatMinorKES, payLabel } from './booking';
 import { DatePicker } from './DatePicker';
+import { embedUrl } from '../features/stays/location';
 
 interface UnitPageProps {
   site: PublicSiteData;
@@ -189,6 +190,27 @@ export function UnitPage({ site }: UnitPageProps) {
               }}
             />
           </section>
+
+          {listing.location && (
+            <section className="site-unit__block">
+              <h2>Where you’ll stay</h2>
+              <p>{listing.location.address}</p>
+              {listing.mapsKey ? (
+                <iframe
+                  className="site-map"
+                  title={`Map: ${listing.title}`}
+                  src={embedUrl(listing.mapsKey, listing.location)}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              ) : null}
+              <p>
+                <a href={listing.location.mapUrl} target="_blank" rel="noreferrer">
+                  Open in Google Maps
+                </a>
+              </p>
+            </section>
+          )}
 
           <section className="site-unit__block">
             <h2>Booking & cancellation terms</h2>

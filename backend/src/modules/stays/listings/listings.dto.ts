@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -34,6 +35,36 @@ export class ListListingsQueryDto extends PaginationQueryDto {
   @Transform(({ value }) => (value === undefined ? undefined : value === true || value === 'true'))
   @IsBoolean()
   published?: boolean;
+}
+
+/** Where the listing is: picked from Google Places (or a pasted map link) in the editor. */
+export class ListingLocationDto {
+  @ApiProperty({ example: 'Makini Court, Argwings Kodhek Rd, Nairobi' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(300)
+  address!: string;
+
+  @ApiProperty({ example: -1.2920659 })
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-90)
+  @Max(90)
+  lat!: number;
+
+  @ApiProperty({ example: 36.787194 })
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-180)
+  @Max(180)
+  lng!: number;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Google place ID, when picked from search' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(300)
+  placeId?: string | null;
 }
 
 export class CreateListingDto {
@@ -66,6 +97,13 @@ export class CreateListingDto {
   @IsString()
   @MaxLength(160)
   area?: string | null;
+
+  @ApiPropertyOptional({ type: ListingLocationDto, nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @ValidateNested()
+  @Type(() => ListingLocationDto)
+  location?: ListingLocationDto | null;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
@@ -180,6 +218,13 @@ export class UpdateListingDto {
   @IsString()
   @MaxLength(160)
   area?: string | null;
+
+  @ApiPropertyOptional({ type: ListingLocationDto, nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @ValidateNested()
+  @Type(() => ListingLocationDto)
+  location?: ListingLocationDto | null;
 
   @ApiPropertyOptional()
   @IsOptional()

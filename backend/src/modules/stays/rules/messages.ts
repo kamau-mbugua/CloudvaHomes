@@ -27,6 +27,10 @@ export interface GuestSmsData {
   instructions?: string;
   /** How long an instant booking's hold lasts, in words ("15 minutes", "2 hours"). */
   window?: string;
+  /** A short Google Maps link to the place (check-in details only). */
+  mapLink?: string;
+  /** PAYMENT: this payment confirmed the booking. */
+  confirmed?: boolean;
 }
 
 const MONTHS = [
@@ -82,16 +86,17 @@ export function guestSms(event: GuestSmsEvent, d: GuestSmsData): string {
   switch (event) {
     case 'REQUESTED':
       return link
-        ? `${biz}: we got your request for ${unit}, ${dates}. We'll reply within 24 hours. Booking ${code}: ${link}`
-        : `${biz}: we got your request for ${unit}, ${dates}. We'll reply within 24 hours. Booking ${code}.`;
+        ? `${biz}: we got your request for ${unit}, ${dates}. We'll reply in 24 hours. Booking ${code}: ${link}`
+        : `${biz}: we got your request for ${unit}, ${dates}. We'll reply in 24 hours. Booking ${code}.`;
     case 'CONFIRMED':
       return link
         ? `${biz}: your stay at ${unit}, ${dates} is confirmed. Booking ${code}: ${link}`
         : `${biz}: your stay at ${unit}, ${dates} is confirmed. Booking ${code}.`;
     case 'HELD': {
       const amount = formatStayKes(d.amount);
-      const head = `${biz}: we are holding ${unit}, ${dates} for you. Pay ${amount} within ${d.window ?? '15 minutes'} to confirm.`;
-      return link ? `${head} Booking ${code}: ${link}` : `${head} Booking ${code}.`;
+      // Sent the moment the guest books, so the place's name is left out to keep one SMS.
+      const head = `${biz}: booking ${code} (${dates}) is held for you. Pay ${amount} within ${d.window ?? '15 minutes'} to confirm`;
+      return link ? `${head}: ${link}` : `${head}.`;
     }
     case 'PAY_NOW': {
       const amount = formatStayKes(d.amount);
@@ -101,8 +106,11 @@ export function guestSms(event: GuestSmsEvent, d: GuestSmsData): string {
     }
     case 'PAYMENT': {
       const amount = formatStayKes(d.amount);
-      const due = formatStayKes(d.due);
-      return `${biz}: we received ${amount} for booking ${code}. Still to pay: ${due}.`;
+      const owed = typeof d.due === 'bigint' ? d.due : BigInt(d.due ?? 0);
+      const confirmed = d.confirmed ? ' Your stay is confirmed.' : '';
+      return owed > 0n
+        ? `${biz}: we received ${amount} for booking ${code}.${confirmed} Still to pay: ${formatStayKes(owed)}.`
+        : `${biz}: we received ${amount} for booking ${code}.${confirmed} Fully paid, thank you.`;
     }
     case 'DECLINED':
       return `${biz}: sorry, ${unit} isn't available for ${dates}.`;
@@ -118,7 +126,11 @@ export function guestSms(event: GuestSmsEvent, d: GuestSmsData): string {
         ? `${biz}: ${due} is due for your stay on ${checkIn}. Pay here: ${link}`
         : `${biz}: ${due} is due for your stay on ${checkIn}.`;
     }
-    case 'CHECKIN_INFO':
-      return `${biz}: welcome on ${checkIn}! Check-in from ${d.time ?? '14:00'}. ${d.instructions ?? ''}`.trim();
+    case 'CHECKIN_INFO': {
+      const map = d.mapLink ? ` Map: ${d.mapLink}` : '';
+      return `${biz}: welcome on ${checkIn}! Check-in from ${d.time ?? '14:00'}. ${d.instructions?.trim() ?? ''}`
+        .trim()
+        .concat(map);
+    }
   }
 }

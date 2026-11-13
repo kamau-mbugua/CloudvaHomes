@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Get,
   HttpCode,
   Param,
@@ -14,7 +15,11 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ok } from '../../../common/http/response.js';
+import { ENV } from '../../../config/config.module.js';
+import type { Env } from '../../../config/env.js';
 import { Public } from '../../auth/decorators.js';
+import { sendShortLink } from '../../notifications/short-links.controller.js';
+import { isShortLinkHost, ShortLinksService } from '../../notifications/short-links.service.js';
 import { UploadsService } from '../../files/uploads.service.js';
 import {
   PublicAvailabilityQueryDto,
@@ -40,6 +45,8 @@ export class PublicSiteController {
   constructor(
     private readonly publicSite: PublicSiteService,
     private readonly uploads: UploadsService,
+    private readonly shortLinks: ShortLinksService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   @Get('sites/:slug')
@@ -141,8 +148,15 @@ export class PublicSiteController {
   async getSiteHtml(
     @Query('host') host: string | undefined,
     @Query('path') path: string | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
+    // go.kodihub.co.ke/<code>: an SMS short link, not a booking site.
+    if (isShortLinkHost(host ?? '', this.env)) {
+      const code = (path ?? '/').replace(/^\/+/, '').split(/[?#/]/)[0] ?? '';
+      await sendShortLink(this.shortLinks, code, clientIp(req), res);
+      return;
+    }
     const html = await this.publicSite.renderSiteHtml(host ?? '', path ?? '/');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Content-Security-Policy', siteCsp(html));

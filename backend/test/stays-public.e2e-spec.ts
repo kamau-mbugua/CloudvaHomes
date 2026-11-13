@@ -1,7 +1,9 @@
 import sharp from 'sharp';
 import { DarajaClient, type StkQueryResult } from '../src/modules/mpesa/daraja.client.js';
 import { outbox } from '../src/modules/notifications/senders.js';
+import { smsSegments } from '../src/modules/tenant-portal/broadcast-rules.js';
 import {
+  followShortLink,
   auth,
   createPlatformAdmin,
   createTestApp,
@@ -514,7 +516,10 @@ describe('Stays — Public booking site API (e2e)', () => {
     const instantText = smsTo(instantPhone).at(-1)!;
     expect(instantText).toContain('within 15 minutes');
     expect(instantText).not.toContain('12 hours');
-    expect(instantText).toContain(instant.link);
+    // The SMS carries a short link (one SMS unit) that leads to the booking page.
+    expect(instantText).toMatch(/to confirm: https:\/\/go\.kodihub\.co\.ke\/[0-9A-Za-z]{12}$/);
+    expect(await followShortLink(t, instantText)).toBe(instant.link);
+    expect(smsSegments(instantText)).toBe(1);
 
     // Request mode: the request text carries the booking code.
     await patch(host, '/host/site', {
@@ -523,14 +528,18 @@ describe('Stays — Public booking site API (e2e)', () => {
     const reqPhone = '+254711000402';
     const req = await bookOnSite(listing.id, reqPhone, '2027-02-10', '2027-02-12');
     expect(req.status).toBe('REQUESTED');
-    expect(smsTo(reqPhone).at(-1)).toContain(`Booking ${req.code}: ${req.link}`);
+    const reqText = smsTo(reqPhone).at(-1)!;
+    expect(reqText).toContain(`Booking ${req.code}: https://go.kodihub.co.ke/`);
+    expect(await followShortLink(t, reqText)).toBe(req.link);
 
     // Host accepts: the guest must get a link they can actually pay from.
     const row = await t.prisma.booking.findFirstOrThrow({ where: { code: req.code } });
     await post(host, `/host/bookings/${row.id}/accept`, {});
     const payNow = smsTo(reqPhone).at(-1)!;
     expect(payNow).toContain('your request is accepted');
-    const link = /https:\/\/cozy-homes\.kodihub\.co\.ke\/b\/([A-Za-z0-9_-]+)/.exec(payNow);
+    const link = /https:\/\/cozy-homes\.kodihub\.co\.ke\/b\/([A-Za-z0-9_-]+)/.exec(
+      await followShortLink(t, payNow),
+    );
     expect(link).not.toBeNull();
     const page = check(await t.http().get(`/api/v1/public/bookings/${link![1]}`), 200).data;
     expect(page.code).toBe(req.code);

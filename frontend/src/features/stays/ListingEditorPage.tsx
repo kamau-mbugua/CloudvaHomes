@@ -18,6 +18,8 @@ import {
 } from './api';
 import { formatKES } from '../../lib/money';
 import { fromMinor, toMinorString } from './money';
+import { LocationPicker } from './LocationPicker';
+import type { StayLocation } from './location';
 import { PhotoManager } from './PhotoManager';
 import { RulesFields } from './RulesFields';
 import { SpecialPricesSheet } from './SpecialPricesSheet';
@@ -46,6 +48,16 @@ function ListingEditorForm({
   const [unitNumber, setUnitNumber] = useState(existing?.unit.number ?? '');
   const [title, setTitle] = useState(existing?.title ?? '');
   const [area, setArea] = useState(existing?.area ?? '');
+  const [location, setLocation] = useState<StayLocation | null>(() =>
+    existing?.location
+      ? {
+          address: existing.location.address,
+          lat: existing.location.lat,
+          lng: existing.location.lng,
+          placeId: existing.location.placeId,
+        }
+      : null,
+  );
   const [description, setDescription] = useState(existing?.description ?? '');
   const [bedrooms, setBedrooms] = useState(existing?.bedrooms ?? 1);
   const [bathrooms, setBathrooms] = useState(existing?.bathrooms ?? 1);
@@ -144,11 +156,17 @@ function ListingEditorForm({
       }
     }
 
+    if (location && location.address.trim().length < 3) {
+      setLocalError('Add the address guests see for the location, or remove the location.');
+      return;
+    }
+
     const payload: Record<string, unknown> = {
       ...(isNew ? { propertyId } : {}),
       unitNumber: unitNumber.trim(),
       title: title.trim(),
       area: area.trim() || null,
+      location: location ? { ...location, address: location.address.trim() } : null,
       description: description.trim() || null,
       bedrooms,
       bathrooms,
@@ -240,6 +258,8 @@ function ListingEditorForm({
             onChange={(e) => setArea(e.target.value)}
           />
         </div>
+
+        <LocationPicker value={location} onChange={setLocation} disabled={!canEdit} />
 
         <div className="au__field">
           <div className="au__labelrow">

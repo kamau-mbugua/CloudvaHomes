@@ -256,6 +256,8 @@ export interface LandingPageContent {
 }
 
 export interface PlatformSettings {
+  /** Google Maps browser key (Maps JavaScript + Places): listing locations and maps. */
+  googleMapsKey?: string | null;
   /** Phase 13: MRI rate, basis points. */
   mriRateBps?: number;
   dueDays: number;

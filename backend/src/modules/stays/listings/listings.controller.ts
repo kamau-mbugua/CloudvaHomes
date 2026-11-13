@@ -45,6 +45,13 @@ export class ListingsController {
     return ok(await this.listings.create(dto));
   }
 
+  /** The Google Maps browser key for the location search in the listing editor (null = unset). */
+  @Get('maps')
+  @RequirePermission('listings:view')
+  async maps() {
+    return ok(await this.listings.mapsConfig());
+  }
+
   @Get(':id')
   @RequirePermission('listings:view')
   async get(@Param('id', ParseUUIDPipe) id: string) {

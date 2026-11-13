@@ -495,6 +495,9 @@ export function footer(doc: PDFKit.PDFDocument, centerNote?: string, reference?:
   const right = doc.page.width - 50;
   const width = right - left;
   const footerLineY = doc.page.height - 58;
+  // The footer sits inside the bottom margin; without lifting it, PDFKit starts new blank pages.
+  const bottomMargin = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
 
   doc.save();
   doc
@@ -535,4 +538,5 @@ export function footer(doc: PDFKit.PDFDocument, centerNote?: string, reference?:
       align: 'right',
       lineBreak: false,
     });
+  doc.page.margins.bottom = bottomMargin;
 }

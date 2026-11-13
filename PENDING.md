@@ -2,6 +2,26 @@
 
 Small changes agreed but not done yet. Newest first.
 
+## Google Maps key
+
+- **Keep the Maps key on the server.** Today the key saved in Admin → Settings → Google Maps
+  goes to every browser: the listing editor's search (Maps JavaScript + Places) and the embedded
+  map on public listing pages (Maps Embed). Anyone can copy it from the page, and the key is
+  shared with other projects. Encrypting it in the database alone doesn't help while browsers
+  need it.
+  - Wanted: host map search goes through our server (signed-in hosts only, rate-limited, with
+    Google's session tokens); public pages show a map image fetched by our server (Maps Static)
+    plus "Open in Google Maps"; the key is stored encrypted like the SMS keys and shown only as
+    "key saved".
+  - Use a KodiHub-only key, restricted to the server's IP and to Places API (New) + Maps Static
+    API. The Maps JavaScript and Embed APIs are then no longer needed.
+  - Where: `frontend/src/features/stays/LocationPicker.tsx`, `frontend/src/lib/googleMaps.ts`,
+    `frontend/src/site/UnitPage.tsx`; `GET /host/listings/maps` and `mapsKey` in
+    `backend/src/modules/stays/public/public-site.service.ts`; `googleMapsKey` in platform
+    settings.
+  - Until then: restrict the browser key in Google Cloud to KodiHub's websites (check that
+    `*.dev.kodihub.co.ke` addresses are covered) and to those APIs, and set a budget alert.
+
 ## SMS (platform vs organisation)
 
 - HostPinnacle: do one real "Send test SMS" (Admin → Organisation → SMS) with an account that has

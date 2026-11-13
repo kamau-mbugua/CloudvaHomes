@@ -130,6 +130,7 @@ export class PlatformPayService {
       maintenanceMode: s.maintenanceMode,
       maintenanceMessage: s.maintenanceMessage,
       mriRateBps: s.mriRateBps,
+      googleMapsKey: s.googleMapsKey,
       invoiceInstructions: sysInstructions.invoiceInstructions,
       receiptInstructions: sysInstructions.receiptInstructions,
       landingPage: readLandingPageContent(s.emailTemplates),
@@ -356,6 +357,9 @@ export class PlatformPayService {
           ? { maintenanceMessage: dto.maintenanceMessage?.trim() || null }
           : {}),
         ...(dto.mriRateBps !== undefined ? { mriRateBps: dto.mriRateBps } : {}),
+        ...(dto.googleMapsKey !== undefined
+          ? { googleMapsKey: dto.googleMapsKey?.trim() || null }
+          : {}),
       };
       if (dto.clearAtApiKey) {
         data.atApiKeyEnc = null;

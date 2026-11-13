@@ -1,3 +1,4 @@
+import type { StayLocation } from './location';
 export type PaymentTerms =
   | { kind: 'FULL_UPFRONT' }
   | { kind: 'DEPOSIT'; depositPercent: number; balanceDueDaysBefore: number }
@@ -104,6 +105,8 @@ export interface Listing {
   title: string;
   description: string | null;
   area: string | null;
+  /** Picked on the map; guests see the exact pin. */
+  location: (StayLocation & { mapUrl: string }) | null;
   bedrooms: number;
   bathrooms: number;
   maxGuests: number;
