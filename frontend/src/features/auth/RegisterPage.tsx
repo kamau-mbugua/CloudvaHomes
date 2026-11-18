@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
@@ -20,7 +20,12 @@ export function RegisterPage() {
   const config = useAppConfig();
 
   const [organizationName, setOrganizationName] = useState('');
-  const [organizationKind, setOrganizationKind] = useState<OrgKind>('LANDLORD');
+  const [searchParams] = useSearchParams();
+  // The landing page links here with ?kind=host or ?kind=agency to preselect the business type.
+  const [organizationKind, setOrganizationKind] = useState<OrgKind>(() => {
+    const k = searchParams.get('kind')?.toUpperCase();
+    return k === 'HOST' || k === 'AGENCY' ? k : 'LANDLORD';
+  });
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');

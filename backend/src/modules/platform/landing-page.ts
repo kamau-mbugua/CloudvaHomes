@@ -58,6 +58,8 @@ export interface LandingPageContent {
   appStoreUrl: string | null;
   agenciesTitle: string;
   agenciesSubtitle: string;
+  hostsTitle: string;
+  hostsSubtitle: string;
   pricingBadge: string;
   pricingTitle: string;
   pricingSubtitle: string;
@@ -78,15 +80,15 @@ export interface LandingPageContent {
 export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
   topBarText: 'New organisations start with a free trial. Vacant units are never billed.',
   brandName: 'KodiHub',
-  pageTitle: 'KodiHub: rent and M-Pesa management for Kenyan landlords',
+  pageTitle: 'KodiHub: rent, M-Pesa and short-stay management in Kenya',
   metaDescription:
-    'KodiHub runs monthly rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, and pays landlords their net remittance. Built for Kenyan landlords and letting agencies.',
+    'Rent invoicing, M-Pesa and bank reconciliation, landlord payouts and short-stay bookings in one place. For Kenyan landlords, letting agencies and BNB hosts.',
   signInLabel: 'Sign in',
   registerLabel: 'Start free trial',
-  heroBadge: 'Rent management software for Kenya',
+  heroBadge: 'Property software for Kenya',
   heroTitle: 'Collect rent on M-Pesa. Let the books reconcile themselves.',
   heroSubtitle:
-    'KodiHub runs monthly rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, and pays landlords their net remittance. Built for Kenyan landlords and letting agencies.',
+    'KodiHub runs rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, pays landlords their net remittance and takes short-stay bookings. Built for Kenyan landlords, letting agencies and hosts.',
   heroPrimaryCta: 'Start your free trial',
   heroSecondaryCta: 'See how it works',
   heroStatsTitle: 'Sample portfolio · October',
@@ -146,7 +148,7 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
       tag: 'Communications',
       title: 'Branded PDF invoices, receipts and reminders',
       description:
-        'Every invoice and payment sends an SMS and an email with an official PDF attached. Reminders go out before rent is due.',
+        'Invoices, receipts and reminders go out by SMS and email with an official PDF. Send SMS under your own sender ID, or buy SMS units from KodiHub.',
     },
     {
       tag: 'Maintenance',
@@ -184,7 +186,7 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
       kicker: 'For tenants',
       title: 'Pay rent in two taps',
       description:
-        'Sign in with a one-time code by SMS or email, check the balance, trigger an M-Pesa prompt, download receipts and raise repair requests.',
+        'Sign in with a one-time code, see every home they rent in one place, even from different landlords, pay by M-Pesa prompt, download receipts and raise repairs.',
       badges: ['No password needed', 'Android and iOS'],
     },
     {
@@ -203,15 +205,18 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
   agenciesTitle: 'Manage for many landlords. Remit to each one, on time.',
   agenciesSubtitle:
     'Set a management agreement per landlord with commission and remittance day. KodiHub builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.',
+  hostsTitle: 'Run your BNB like a business. Your own booking site included.',
+  hostsSubtitle:
+    'Guests pick dates, see your photos and pay you by M-Pesa on your own page at yourname.kodihub.co.ke. You run the calendar, cleaning, money and profit from the same app as your rentals.',
   pricingBadge: 'Free trial included',
-  pricingTitle: 'Pay only for occupied units. Vacant units are free.',
+  pricingTitle: 'Pay only for units that earn. Empty units are free.',
   pricingSubtitle:
-    'One simple rate, whether you own a single block or manage for fifty landlords. Every plan includes:',
+    'One simple rate per occupied unit, or per published listing for short-stay hosts. Every plan includes:',
   pricingNote: 'Create your organisation',
   defaultSliderUnits: 25,
   fallbackRatePerUnit: 10_000,
   fallbackMinimumMonthly: 150_000,
-  faqTitle: 'Questions landlords ask us',
+  faqTitle: 'Questions landlords and hosts ask us',
   faqs: [
     {
       question: 'Which payment methods can tenants use?',
@@ -234,6 +239,16 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
         'Yes. Agencies set up management agreements per landlord, earn commission automatically, deduct approved expenses and remit the net to each owner, who gets a read-only portal.',
     },
     {
+      question: 'Can I run short-stay BNB units on KodiHub?',
+      answer:
+        'Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihub.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps.',
+    },
+    {
+      question: 'How are short-stay hosts billed?',
+      answer:
+        'At the same rate, counted per published listing each month. Listings you unpublish cost nothing. Guest payments go straight to your own Paybill or Till, and KodiHub never holds them.',
+    },
+    {
       question: 'Can caretakers use it from their phone?',
       answer:
         'Yes. The Android and iOS app lets caretakers capture meter readings with photos, update unit status and handle move-ins and move-outs, without access to money settings.',
@@ -251,7 +266,7 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
   contactPhone: null,
   footerCopyright: 'KodiHub Property Management. All rights reserved.',
   footerTagline:
-    'Rent, utilities, M-Pesa and landlord payouts in one place. Built in Nairobi for landlords and letting agencies across Kenya.',
+    'Rent, short stays, M-Pesa and landlord payouts in one place. Built in Nairobi for landlords, letting agencies and hosts across Kenya.',
 };
 
 function cleanStr(val: unknown, fallback: string): string {
@@ -262,6 +277,12 @@ function cleanNullStr(val: unknown, fallback: string | null): string | null {
   if (val === null) return null;
   if (typeof val === 'string') return val.trim() || null;
   return fallback;
+}
+
+/** Store links end up in an href on the public site, so only https:// URLs are kept. */
+function cleanHttpsUrl(val: unknown, fallback: string | null): string | null {
+  const v = cleanNullStr(val, fallback);
+  return v && /^https:\/\/\S+$/i.test(v) ? v : null;
 }
 
 function cleanInt(val: unknown, fallback: number, min: number, max: number): number {
@@ -404,10 +425,12 @@ export function readLandingPageContent(rawEmailTemplates: unknown): LandingPageC
         : d.portals.map((x) => ({ ...x, badges: x.badges ? [...x.badges] : undefined })),
     mobileTitle: cleanStr(raw.mobileTitle, d.mobileTitle),
     mobileSubtitle: cleanStr(raw.mobileSubtitle, d.mobileSubtitle),
-    googlePlayUrl: cleanNullStr(raw.googlePlayUrl, d.googlePlayUrl),
-    appStoreUrl: cleanNullStr(raw.appStoreUrl, d.appStoreUrl),
+    googlePlayUrl: cleanHttpsUrl(raw.googlePlayUrl, d.googlePlayUrl),
+    appStoreUrl: cleanHttpsUrl(raw.appStoreUrl, d.appStoreUrl),
     agenciesTitle: cleanStr(raw.agenciesTitle, d.agenciesTitle),
     agenciesSubtitle: cleanStr(raw.agenciesSubtitle, d.agenciesSubtitle),
+    hostsTitle: cleanStr(raw.hostsTitle, d.hostsTitle),
+    hostsSubtitle: cleanStr(raw.hostsSubtitle, d.hostsSubtitle),
     pricingBadge: cleanStr(raw.pricingBadge, d.pricingBadge),
     pricingTitle: cleanStr(raw.pricingTitle, d.pricingTitle),
     pricingSubtitle: cleanStr(raw.pricingSubtitle, d.pricingSubtitle),

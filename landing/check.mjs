@@ -65,6 +65,18 @@ const REQUIRED_IDS = [
   'agencies',
   'agencies-title',
   'agencies-subtitle',
+  'hosts',
+  'hosts-title',
+  'hosts-subtitle',
+  'hosts-register',
+  'kh-mode-rent',
+  'kh-mode-stays',
+  'kh-units-noun',
+  'og-title',
+  'og-description',
+  'tw-title',
+  'tw-description',
+  'ld-faq',
   'pricing',
   'pricing-badge',
   'pricing-title',
@@ -110,11 +122,33 @@ for (const match of html.matchAll(/\bhref="#([^"]+)"/g)) {
   }
 }
 
-// 3. Syntax-check all inline <script> blocks
-const scriptBlocks = Array.from(
-  html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi),
-  (m) => m[1],
+// 3. Syntax-check all inline JavaScript blocks; JSON-LD blocks must be valid JSON
+const allScripts = Array.from(
+  html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi),
+  (m) => ({ attrs: m[1], code: m[2] }),
 );
+const scriptBlocks = [];
+allScripts.forEach(({ attrs, code }, idx) => {
+  const type = /\btype="([^"]+)"/i.exec(attrs)?.[1]?.toLowerCase();
+  if (type === 'application/ld+json') {
+    try {
+      JSON.parse(code);
+    } catch (err) {
+      errors.push(`Invalid JSON-LD in <script> block #${idx + 1}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return;
+  }
+  if (!type || type === 'text/javascript' || type === 'module') scriptBlocks.push(code);
+});
+
+// 4. Files the page and search engines rely on
+for (const f of ['fonts/LufgaRegular.woff', 'fonts/LufgaSemiBold.woff', 'robots.txt', 'sitemap.xml', 'og-image.png', 'favicon.svg']) {
+  try {
+    readFileSync(join(dir, f));
+  } catch {
+    errors.push(`Missing landing file: ${f}`);
+  }
+}
 
 if (scriptBlocks.length === 0) {
   errors.push('Expected at least one inline <script> block in index.html');

@@ -238,6 +238,8 @@ export interface LandingPageContent {
   appStoreUrl?: string | null;
   agenciesTitle?: string;
   agenciesSubtitle?: string;
+  hostsTitle?: string;
+  hostsSubtitle?: string;
   pricingBadge: string;
   pricingTitle: string;
   pricingSubtitle: string;

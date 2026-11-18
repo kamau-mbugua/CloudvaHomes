@@ -698,6 +698,9 @@ export class UpdateLandingPageDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) agenciesTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) agenciesSubtitle?: string;
 
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) hostsTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(400) hostsSubtitle?: string;
+
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(120) pricingBadge?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(160) pricingTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(500) pricingSubtitle?: string;
