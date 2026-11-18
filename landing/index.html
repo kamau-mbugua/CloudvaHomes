@@ -35,7 +35,7 @@
       }
     })();
   </script>
-  <script type="application/ld+json">
+  <script id="ld-org" type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@graph": [
@@ -1106,8 +1106,8 @@
         <h2 id="faq-title" style="margin: 0; font-size: clamp(28px, 3vw, 42px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 600; color: #002b4d">
           Questions landlords and hosts ask us
         </h2>
-        <p style="margin: 0; font-size: 16px; color: #52647e">
-          Something else on your mind? Write to <a id="faq-email" href="mailto:hello@kodihub.co.ke" style="color: #4d6b10; font-weight: 600">hello@kodihub.co.ke</a>.
+        <p id="faq-contact" style="margin: 0; font-size: 16px; color: #52647e">
+          Something else on your mind? <span id="faq-contact-verb">Write to</span> <a id="faq-email" href="mailto:hello@kodihub.co.ke" style="color: #4d6b10; font-weight: 600">hello@kodihub.co.ke</a>.
         </p>
       </div>
       <div id="faq-list" class="kh-faq" style="flex: 2 1 560px; min-width: 0; display: flex; flex-direction: column; border-top: 1px solid rgba(10, 37, 64, 0.12)">
@@ -1506,6 +1506,63 @@
       });
     }
 
+    // Puts the admin's contact email and phone everywhere the page shows them, and hides
+    // contact links that have nothing to point at once the admin clears a value.
+    function applyContact(email, phone) {
+      email = typeof email === 'string' ? email.trim() : '';
+      phone = typeof phone === 'string' ? phone.trim() : '';
+      var tel = phone ? 'tel:' + phone.replace(/\s+/g, '') : '';
+      function show(el, on) { if (el) el.style.display = on ? '' : 'none'; }
+
+      var footerEmail = document.getElementById('footer-email');
+      if (footerEmail && email) {
+        footerEmail.href = 'mailto:' + email;
+        footerEmail.textContent = email;
+      }
+      show(footerEmail, !!email);
+
+      var footerPhone = document.getElementById('footer-phone');
+      if (footerPhone && phone) {
+        footerPhone.href = tel;
+        footerPhone.textContent = phone;
+      }
+      show(footerPhone, !!phone);
+
+      // FAQ line: email first, then phone, else hidden.
+      var faqLine = document.getElementById('faq-contact');
+      var faqLink = document.getElementById('faq-email');
+      if (faqLink && (email || phone)) {
+        faqLink.href = email ? 'mailto:' + email : tel;
+        faqLink.textContent = email || phone;
+        setText('faq-contact-verb', email ? 'Write to' : 'Call us on');
+      }
+      show(faqLine, !!(email || phone));
+
+      // "Talk to us": email first, then phone, else hidden.
+      var talk = document.getElementById('cta-talk');
+      if (talk && (email || phone)) {
+        talk.href = email ? 'mailto:' + email : tel;
+        talk.textContent = email ? 'Talk to us' : 'Call us';
+      }
+      show(talk, !!(email || phone));
+
+      // Organisation structured data follows the same values.
+      var ld = document.getElementById('ld-org');
+      if (ld) {
+        try {
+          var data = JSON.parse(ld.textContent);
+          (data['@graph'] || []).forEach(function (node) {
+            if (node['@type'] !== 'Organization') return;
+            if (email) node.email = email; else delete node.email;
+            if (phone) node.telephone = phone; else delete node.telephone;
+          });
+          ld.textContent = JSON.stringify(data);
+        } catch (e) {
+          // Leave the static data as it is.
+        }
+      }
+    }
+
     function renderLanding(payload) {
       if (!payload) return;
       var c = payload.content || {};
@@ -1635,36 +1692,7 @@
       setText('footer-copyright', c.footerCopyright);
       setText('footer-tagline', c.footerTagline);
 
-      var emailLink = document.getElementById('footer-email');
-      var faqEmail = document.getElementById('faq-email');
-      var ctaTalk = document.getElementById('cta-talk');
-      if (c.contactEmail) {
-        if (emailLink) {
-          emailLink.href = 'mailto:' + c.contactEmail;
-          emailLink.textContent = c.contactEmail;
-          emailLink.style.display = '';
-        }
-        if (faqEmail) {
-          faqEmail.href = 'mailto:' + c.contactEmail;
-          faqEmail.textContent = c.contactEmail;
-        }
-        if (ctaTalk) {
-          ctaTalk.href = 'mailto:' + c.contactEmail;
-        }
-      } else if (emailLink) {
-        emailLink.style.display = 'none';
-      }
-
-      var phoneLink = document.getElementById('footer-phone');
-      if (phoneLink) {
-        if (c.contactPhone) {
-          phoneLink.href = 'tel:' + c.contactPhone.replace(/\s+/g, '');
-          phoneLink.textContent = c.contactPhone;
-          phoneLink.style.display = '';
-        } else {
-          phoneLink.style.display = 'none';
-        }
-      }
+      applyContact(c.contactEmail, c.contactPhone);
 
       applyLinks(payload.appUrl, payload.allowPublicSignup);
     }
