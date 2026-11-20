@@ -96,7 +96,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'inviteLink',
         description: 'One-time link to set password and activate the account',
-        sample: 'https://app.kodihub.co.ke/invite/sample-token-123',
+        sample: 'https://app.kodihq.co.ke/invite/sample-token-123',
       },
       {
         key: 'signInIdentifier',
@@ -176,7 +176,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'inviteLink',
         description: 'Invitation acceptance URL',
-        sample: 'https://app.kodihub.co.ke/invite/sample-token-456',
+        sample: 'https://app.kodihq.co.ke/invite/sample-token-456',
       },
     ],
   },
@@ -229,7 +229,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
         key: 'paymentInstructions',
         description: 'Complete M-Pesa Paybill & portal payment instructions',
         sample:
-          'Pay via M-Pesa Paybill 4098123, Account H00042, or in KodiHub under Settings -> Plan & billing (https://app.kodihub.co.ke/settings/billing).',
+          'Pay via M-Pesa Paybill 4098123, Account H00042, or in KodiHub under Settings -> Plan & billing (https://app.kodihq.co.ke/settings/billing).',
       },
     ],
   },
@@ -271,7 +271,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'portalLink',
         description: 'Link to the landlord owner portal',
-        sample: 'https://app.kodihub.co.ke/owner',
+        sample: 'https://app.kodihq.co.ke/owner',
       },
     ],
   },
@@ -337,12 +337,12 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'setPasswordLink',
         description: 'Direct link for the tenant to set or reset their account password',
-        sample: 'https://app.kodihub.co.ke/forgot-password?identifier=grace%40example.com',
+        sample: 'https://app.kodihq.co.ke/forgot-password?identifier=grace%40example.com',
       },
       {
         key: 'portalLink',
         description: 'URL to the KodiHub Tenant Portal',
-        sample: 'https://app.kodihub.co.ke/tenant',
+        sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
   },
@@ -376,7 +376,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'portalLink',
         description: 'URL to the KodiHub Tenant Portal',
-        sample: 'https://app.kodihub.co.ke/tenant',
+        sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
   },
@@ -448,7 +448,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'portalLink',
         description: 'URL to the KodiHub Tenant Portal',
-        sample: 'https://app.kodihub.co.ke/tenant',
+        sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
   },
@@ -525,7 +525,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'portalLink',
         description: 'URL to the KodiHub Tenant Portal',
-        sample: 'https://app.kodihub.co.ke/tenant',
+        sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
   },
@@ -606,7 +606,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'portalLink',
         description: 'URL to the KodiHub Tenant Portal',
-        sample: 'https://app.kodihub.co.ke/tenant',
+        sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
   },
@@ -660,7 +660,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       {
         key: 'portalLink',
         description: 'URL to the KodiHub Tenant Portal',
-        sample: 'https://app.kodihub.co.ke/tenant',
+        sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
   },

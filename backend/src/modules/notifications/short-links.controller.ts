@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 import { Public } from '../auth/decorators.js';
 import { SHORT_LINK_GONE_HTML, ShortLinksService } from './short-links.service.js';
 
-/** `GET /api/v1/s/:code` — a short link's redirect (go.kodihub.co.ke/<code> lands here too). */
+/** `GET /api/v1/s/:code` — a short link's redirect (go.kodihq.co.ke/<code> lands here too). */
 @ApiTags('Short links')
 @Public()
 @Controller('s')

@@ -10,10 +10,10 @@ IDE run configurations (**Hodi Dev**, **Hodi Prod**, **Hodi Local (iOS)**, **Hod
 ```bash
 flutter pub get
 
-# Dev flavor (https://dapi.kodihub.co.ke/api/v1)
+# Dev flavor (https://dapi.kodihq.co.ke/api/v1)
 flutter run --flavor dev -t lib/main_dev.dart
 
-# Prod flavor (https://api.kodihub.co.ke/api/v1)
+# Prod flavor (https://api.kodihq.co.ke/api/v1)
 flutter run --flavor prod -t lib/main_prod.dart
 
 # iOS simulator against the local API (backend: npm run start:dev on :8080)

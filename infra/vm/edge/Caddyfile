@@ -1,6 +1,8 @@
 # Hosts come from /opt/hodi/edge/edge.env:
-#   prod : APP_HOST=app.kodihub.co.ke  API_HOST=api.kodihub.co.ke   LANDING_HOST=kodihub.co.ke
-#   dev  : APP_HOST=dev.kodihub.co.ke  API_HOST=dapi.kodihub.co.ke  LANDING_HOST=landing.kodihub.co.ke
+#   prod : APP_HOST=app.kodihq.co.ke  API_HOST=api.kodihq.co.ke   LANDING_HOST=kodihq.co.ke
+#   dev  : APP_HOST=dev.kodihq.co.ke  API_HOST=dapi.kodihq.co.ke  LANDING_HOST=landing.kodihq.co.ke
+# The same names on kodihub.co.ke (the address until November 2026) still answer: scripts/lib.sh
+# writes their blocks to sites/legacy.caddy on every deploy.
 # Let's Encrypt account e-mail (expiry notices) is optional; to add one, put
 #   { email you@yourdomain }
 # at the top of this file.
@@ -43,7 +45,7 @@
 	}
 }
 
-# Web application (app.kodihub.co.ke on prod, dev.kodihub.co.ke on dev)
+# Web application (app.kodihq.co.ke on prod, dev.kodihq.co.ke on dev)
 {$APP_HOST} {
 	import security
 	import api_guard
@@ -56,7 +58,7 @@
 	}
 }
 
-# Dedicated API host (api.kodihub.co.ke on prod, dapi.kodihub.co.ke on dev)
+# Dedicated API host (api.kodihq.co.ke on prod, dapi.kodihq.co.ke on dev)
 {$API_HOST} {
 	import security
 	import api_guard
@@ -66,7 +68,7 @@
 	}
 }
 
-# Marketing landing page (kodihub.co.ke on prod, landing.kodihub.co.ke on dev)
+# Marketing landing page (kodihq.co.ke on prod, landing.kodihq.co.ke on dev)
 {$LANDING_HOST} {
 	import security
 
@@ -83,5 +85,6 @@
 	}
 }
 
-# Per-VM extras (production: www redirect; host booking sites, see hosts.caddy).
+# Per-VM extras (production: www redirect; host booking sites, see hosts.caddy; old names after
+# a domain move, see scripts/lib.sh).
 import sites/*.caddy

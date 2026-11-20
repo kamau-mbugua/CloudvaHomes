@@ -67,7 +67,7 @@ function base62(bytes: Buffer): string {
 }
 
 /**
- * Where short links live: `go.{SITE_DOMAIN}` (go.kodihub.co.ke on prod, go.dev.kodihub.co.ke on
+ * Where short links live: `go.{SITE_DOMAIN}` (go.kodihq.co.ke on prod, go.dev.kodihq.co.ke on
  * dev), or the API's own `/api/v1/s/` route when running locally. SHORT_LINK_BASE overrides it.
  */
 export function shortLinkBase(env: Env): string {

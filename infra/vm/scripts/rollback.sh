@@ -27,8 +27,15 @@ if [ "$RESTORE_DB" = 1 ]; then
   BACKUP="$(ls -t "$ROOT/backups/$ENV"/pre-deploy-*.sql.gz 2>/dev/null | head -1 || true)"
   [ -n "$BACKUP" ] || fail "No pre-deploy backup found in $ROOT/backups/$ENV."
 fi
+# A release goes back onto the domain it ran on (lib.sh): one from before the move to
+# kodihq.co.ke doesn't know booking sites on the new name.
+HOSTS_NOW="$(known_domain "$(get_env "$ROOT/edge/edge.env" APP_HOST)")"
+HOSTS_TO="${BASE_DOMAIN:-$(release_domain "$PREVIOUS")}"
 echo "Roll back $ENV: $CURRENT → $PREVIOUS"
 [ -n "$BACKUP" ] && echo "AND restore the database from $BACKUP (everything written since is lost)"
+if [ -n "$HOSTS_NOW" ] && [ "$HOSTS_TO" != "$HOSTS_NOW" ] && [ -n "$(known_domain "$HOSTS_TO")" ]; then
+  echo "AND put the hosts back on $HOSTS_TO, where $PREVIOUS ran ($HOSTS_NOW names will forward there)"
+fi
 if [ "$YES" != 1 ]; then
   read -r -p "Type $ENV to continue: " answer
   [ "$answer" = "$ENV" ] || fail "Cancelled."
@@ -40,6 +47,9 @@ if [ -d "$ROOT/infra.prev" ]; then
   mv "$ROOT/infra.rollback" "$ROOT/infra.prev"
 fi
 export RELEASE="$PREVIOUS"
+# Its hosts first, so the API starts with the right URLs; edge_up below points the proxy there.
+export BASE_DOMAIN="$HOSTS_TO"
+settle_hosts || warn "Could not put the hosts of $PREVIOUS back; carrying on with the rollback."
 maintenance_on
 trap maintenance_off EXIT
 

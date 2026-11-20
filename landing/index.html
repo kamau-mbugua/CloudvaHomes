@@ -9,27 +9,29 @@
     name="description"
     content="Rent invoicing, M-Pesa and bank reconciliation, landlord payouts and short-stay bookings in one place. For Kenyan landlords, letting agencies and BNB hosts."
   />
-  <link rel="canonical" href="https://kodihub.co.ke/" />
+  <link rel="canonical" href="https://kodihq.co.ke/" />
   <meta name="robots" content="index, follow" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="KodiHub" />
   <meta property="og:locale" content="en_KE" />
-  <meta property="og:url" content="https://kodihub.co.ke/" />
+  <meta property="og:url" content="https://kodihq.co.ke/" />
   <meta id="og-title" property="og:title" content="KodiHub: rent, M-Pesa and short-stay management in Kenya" />
   <meta id="og-description" property="og:description" content="Rent invoicing, M-Pesa and bank reconciliation, landlord payouts and short-stay bookings in one place. For Kenyan landlords, letting agencies and BNB hosts." />
-  <meta property="og:image" content="https://kodihub.co.ke/og-image.png" />
+  <meta property="og:image" content="https://kodihq.co.ke/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="KodiHub: rent, M-Pesa and short stays, reconciled." />
   <meta name="twitter:card" content="summary_large_image" />
   <meta id="tw-title" name="twitter:title" content="KodiHub: rent, M-Pesa and short-stay management in Kenya" />
   <meta id="tw-description" name="twitter:description" content="Rent invoicing, M-Pesa and bank reconciliation, landlord payouts and short-stay bookings in one place. For Kenyan landlords, letting agencies and BNB hosts." />
-  <meta name="twitter:image" content="https://kodihub.co.ke/og-image.png" />
+  <meta name="twitter:image" content="https://kodihq.co.ke/og-image.png" />
   <script>
     // Only the production apex is indexed; dev and preview hosts stay out of search results.
+    // kodihub.co.ke was the address until November 2026 and forwards here; a server that has
+    // not moved yet still serves this page on it.
     (function () {
       var h = location.hostname.replace(/^www\./, '');
-      if (h !== 'kodihub.co.ke') {
+      if (h !== 'kodihq.co.ke' && h !== 'kodihub.co.ke') {
         var m = document.querySelector('meta[name="robots"]');
         if (m) m.setAttribute('content', 'noindex, nofollow');
       }
@@ -41,11 +43,11 @@
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://kodihub.co.ke/#org",
+      "@id": "https://kodihq.co.ke/#org",
       "name": "KodiHub",
-      "url": "https://kodihub.co.ke/",
-      "logo": "https://kodihub.co.ke/favicon.svg",
-      "email": "hello@kodihub.co.ke",
+      "url": "https://kodihq.co.ke/",
+      "logo": "https://kodihq.co.ke/favicon.svg",
+      "email": "hello@kodihq.co.ke",
       "areaServed": "KE",
       "parentOrganization": {
         "@type": "Organization",
@@ -54,12 +56,12 @@
     },
     {
       "@type": "WebSite",
-      "@id": "https://kodihub.co.ke/#website",
-      "url": "https://kodihub.co.ke/",
+      "@id": "https://kodihq.co.ke/#website",
+      "url": "https://kodihq.co.ke/",
       "name": "KodiHub",
       "inLanguage": "en-KE",
       "publisher": {
-        "@id": "https://kodihub.co.ke/#org"
+        "@id": "https://kodihq.co.ke/#org"
       }
     },
     {
@@ -68,10 +70,10 @@
       "applicationCategory": "BusinessApplication",
       "applicationSubCategory": "Property management software",
       "operatingSystem": "Web, Android, iOS",
-      "url": "https://kodihub.co.ke/",
+      "url": "https://kodihq.co.ke/",
       "description": "Rent invoicing, M-Pesa and bank reconciliation, landlord payouts and short-stay bookings in one place. For Kenyan landlords, letting agencies and BNB hosts.",
       "publisher": {
-        "@id": "https://kodihub.co.ke/#org"
+        "@id": "https://kodihq.co.ke/#org"
       },
       "offers": {
         "@type": "Offer",
@@ -125,7 +127,7 @@
       "name": "Can I run short-stay BNB units on KodiHub?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihub.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps."
+        "text": "Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihq.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps."
       }
     },
     {
@@ -990,7 +992,7 @@
             Run your BNB like a business. Your own booking site included.
           </h2>
           <p id="hosts-subtitle" style="margin: 0; font-size: 17px; color: #52647e">
-            Guests pick dates, see your photos and pay you by M-Pesa on your own page at yourname.kodihub.co.ke. You run the calendar, cleaning, money and profit from the same app as your rentals.
+            Guests pick dates, see your photos and pay you by M-Pesa on your own page at yourname.kodihq.co.ke. You run the calendar, cleaning, money and profit from the same app as your rentals.
           </p>
           <ul style="list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column">
             <li style="display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(10, 37, 64, 0.1)"><svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" style="flex: none; margin-top: 4px"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="#4d6b10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span><strong style="color: #0a2540">Your own booking site.</strong> <span style="color: #52647e">Your name and photos first, and guests need no app or account to book.</span></span></li>
@@ -1009,7 +1011,7 @@
           <div style="background: #ffffff; border-radius: 20px; box-shadow: 0 20px 60px -24px rgba(10, 37, 64, 0.18); border: 1px solid rgba(10, 37, 64, 0.06); overflow: hidden; max-width: 420px; width: 100%; margin: 0 auto">
             <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #f1efe9; border-bottom: 1px solid rgba(10, 37, 64, 0.06)">
               <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="#1f7a4f" stroke-width="2.2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="#1f7a4f" stroke-width="2.2"></path></svg>
-              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #1f3a5c">amani-stays.kodihub.co.ke</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #1f3a5c">amani-stays.kodihq.co.ke</span>
             </div>
             <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
               <div style="display: flex; align-items: center; gap: 10px">
@@ -1107,7 +1109,7 @@
           Questions landlords and hosts ask us
         </h2>
         <p id="faq-contact" style="margin: 0; font-size: 16px; color: #52647e">
-          Something else on your mind? <span id="faq-contact-verb">Write to</span> <a id="faq-email" href="mailto:hello@kodihub.co.ke" style="color: #4d6b10; font-weight: 600">hello@kodihub.co.ke</a>.
+          Something else on your mind? <span id="faq-contact-verb">Write to</span> <a id="faq-email" href="mailto:hello@kodihq.co.ke" style="color: #4d6b10; font-weight: 600">hello@kodihq.co.ke</a>.
         </p>
       </div>
       <div id="faq-list" class="kh-faq" style="flex: 2 1 560px; min-width: 0; display: flex; flex-direction: column; border-top: 1px solid rgba(10, 37, 64, 0.12)">
@@ -1144,7 +1146,7 @@
             Can I run short-stay BNB units on KodiHub?
             <span class="kh-plus" aria-hidden="true" style="font-size: 24px; font-weight: 400; color: #4d6b10; transition: transform .15s">+</span>
           </summary>
-          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihub.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps.</p>
+          <p style="margin: 0 0 22px; font-size: 15px; color: #52647e; max-width: 680px">Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihq.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps.</p>
         </details>
         <details style="border-bottom: 1px solid rgba(10, 37, 64, 0.12)">
           <summary style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-size: 18px; font-weight: 600; color: #0a2540; min-height: 44px">
@@ -1183,7 +1185,7 @@
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 12px">
           <a id="cta-register" href="/register" class="kh-btn kh-btn-primary kh-btn-lg">Start your free trial</a>
-          <a id="cta-talk" href="mailto:hello@kodihub.co.ke" class="kh-btn kh-btn-outline kh-btn-lg">Talk to us</a>
+          <a id="cta-talk" href="mailto:hello@kodihq.co.ke" class="kh-btn kh-btn-outline kh-btn-lg">Talk to us</a>
         </div>
       </div>
     </section>
@@ -1228,7 +1230,7 @@
         <span class="kh-kicker" style="color: #84bd00">Account</span>
         <a id="footer-signin" href="/login" style="color: #d7e0ec; text-decoration: none">Sign in</a>
         <a id="footer-register" href="/register" style="color: #d7e0ec; text-decoration: none">Create account</a>
-        <a id="footer-email" href="mailto:hello@kodihub.co.ke" style="color: #d7e0ec; text-decoration: none">hello@kodihub.co.ke</a>
+        <a id="footer-email" href="mailto:hello@kodihq.co.ke" style="color: #d7e0ec; text-decoration: none">hello@kodihq.co.ke</a>
         <a id="footer-phone" href="tel:" style="color: #d7e0ec; text-decoration: none; display: none"></a>
       </nav>
     </div>
@@ -1244,19 +1246,22 @@
   (function () {
     var host = location.hostname.replace(/^www\./, '');
     var isLocal = host === 'localhost' || host === '127.0.0.1';
-    var isDevLanding = host === 'landing.kodihub.co.ke' || host.startsWith('dev.');
+    // The app and API sit on the same domain as this page: kodihq.co.ke, or kodihub.co.ke (the
+    // address until November 2026) on a server that has not moved yet.
+    var base = /(^|\.)kodihub\.co\.ke$/.test(host) ? 'kodihub.co.ke' : 'kodihq.co.ke';
+    var isDevLanding = host === 'landing.' + base || host.startsWith('dev.');
     var fallbackAppOrigin = isLocal
       ? 'http://localhost:5173'
       : isDevLanding
-        ? 'https://dev.kodihub.co.ke'
+        ? 'https://dev.' + base
         : (host && !host.startsWith('app.'))
           ? 'https://app.' + host
           : '';
     var fallbackApiOrigin = isLocal
       ? 'http://localhost:8080'
       : isDevLanding
-        ? 'https://dapi.kodihub.co.ke'
-        : (host === 'kodihub.co.ke' ? 'https://api.kodihub.co.ke' : '');
+        ? 'https://dapi.' + base
+        : (host === base ? 'https://api.' + base : '');
 
     var ratePerUnitShillings = 100;
     var pricingMode = 'rent';

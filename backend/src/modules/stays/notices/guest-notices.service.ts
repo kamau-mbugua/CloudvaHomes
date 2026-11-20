@@ -277,7 +277,7 @@ export class GuestNoticesService {
 
     let sms = false;
     if (b.guest.phone) {
-      // SMS carry short links (go.kodihub.co.ke/…) so they stay within one unit; emails keep
+      // SMS carry short links (go.kodihq.co.ke/…) so they stay within one unit; emails keep
       // the full ones.
       const short = (url: string, kind: 'booking' | 'map') =>
         this.shortLinks.shortenOrKeep(url, { kind, orgId: b.orgId });

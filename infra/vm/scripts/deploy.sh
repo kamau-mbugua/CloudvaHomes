@@ -33,7 +33,8 @@ mv "$ROOT/infra.new" "$ROOT/infra"
 
 if [ "$LANDING_ONLY" = "true" ] && [ -n "$PREVIOUS" ]; then
   export RELEASE="$PREVIOUS"
-  edge_up
+  # The API isn't restarted here, so the hosts stay where they are (see lib.sh).
+  KEEP_HOSTS=1 edge_up
   if [ -d "$ROOT/landing-releases/$SHA" ]; then
     cur="$(readlink "$ROOT/landing-releases/current" 2>/dev/null || true)"
     [ -n "$cur" ] && [ "$cur" != "$SHA" ] && echo "$cur" > "$ROOT/releases/landing-previous"
@@ -86,8 +87,16 @@ if ! wait_healthy; then
   stack logs --tail 40 api || true
   if [ -n "$PREVIOUS" ]; then
     warn "Putting $PREVIOUS back (the database stays migrated; see rollback.sh --restore-db)."
+    # If this deploy moved the hosts to another domain, the release going back gets the hosts it
+    # ran on (lib.sh), before it starts; the edge proxy follows once its bundle is back.
+    moved_from="$(known_domain "${APP_HOST:-}")"
+    export BASE_DOMAIN="$(release_domain "$PREVIOUS")"
+    ( settle_hosts ) || warn "Could not put the hosts of $PREVIOUS back."
     RELEASE="$PREVIOUS" stack up -d api web cron
     rm -rf "$ROOT/infra"; mv "$ROOT/infra.prev" "$ROOT/infra"
+    if [ -n "$moved_from" ] && [ "$moved_from" != "$BASE_DOMAIN" ]; then
+      ( edge_up ) || warn "Could not point the edge proxy back at the hosts of $PREVIOUS."
+    fi
   fi
   fail "Deploy of $SHA failed."
 fi
@@ -98,6 +107,7 @@ trap - EXIT
 [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$SHA" ] && echo "$PREVIOUS" > "$ROOT/releases/previous"
 echo "$SHA" > "$ROOT/releases/current"
 echo "$(date -Iseconds) $SHA" >> "$ROOT/releases/history"
+record_release_domain "$SHA"
 
 # ── 9. Publish the landing site (prod & dev) — atomic symlink swap ────────────
 if [ -d "$ROOT/landing-releases/$SHA" ]; then

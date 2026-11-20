@@ -43,7 +43,7 @@ type SettingsTab =
  * Admin → Settings (`/admin/settings`):
  * - Billing rules: due days, grace days, default plan, KodiHub's paybill.
  * - Document instructions: system-wide footer/notice instructions for invoices and receipts.
- * - Landing page: environment-specific marketing site content (`kodihub.co.ke` in prod, `landing.kodihub.co.ke` in dev).
+ * - Landing page: environment-specific marketing site content (`kodihq.co.ke` in prod, `landing.kodihq.co.ke` in dev).
  * - M-Pesa (Daraja): KodiHub's Daraja keys & callback URLs.
  * - Admin 2FA: require 2FA for platform operators & channel (Email/SMS).
  * - Rate-limit locks: active OTP & login rate-limit lockouts.
@@ -520,7 +520,7 @@ function GoogleMapsForm({ settings }: { settings: PlatformSettings }) {
       </p>
       <div className="fm__grid">
         <Field id="gm-key" label="Browser API key" optional wide
-          hint="In Google Cloud, enable the Maps JavaScript API, Places API (New) and Maps Embed API, then restrict the key to websites: *.kodihub.co.ke/*. Browsers receive this key, so the website restriction is what protects it.">
+          hint="In Google Cloud, enable the Maps JavaScript API, Places API (New) and Maps Embed API, then restrict the key to websites: *.kodihq.co.ke/*. Browsers receive this key, so the website restriction is what protects it.">
           <input id="gm-key" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} placeholder="AIza…" />
         </Field>
       </div>
@@ -844,7 +844,7 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
     'Set a management agreement per landlord with commission and remittance day. KodiHub builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.',
   hostsTitle: 'Run your BNB like a business. Your own booking site included.',
   hostsSubtitle:
-    'Guests pick dates, see your photos and pay you by M-Pesa on your own page at yourname.kodihub.co.ke. You run the calendar, cleaning, money and profit from the same app as your rentals.',
+    'Guests pick dates, see your photos and pay you by M-Pesa on your own page at yourname.kodihq.co.ke. You run the calendar, cleaning, money and profit from the same app as your rentals.',
   pricingBadge: 'Free trial included',
   pricingTitle: 'Pay only for units that earn. Empty units are free.',
   pricingSubtitle:
@@ -878,7 +878,7 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
     {
       question: 'Can I run short-stay BNB units on KodiHub?',
       answer:
-        'Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihub.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps.',
+        'Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihq.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps.',
     },
     {
       question: 'How are short-stay hosts billed?',
@@ -899,7 +899,7 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
   ctaTitle: "Close this month's books before the 5th.",
   ctaSubtitle:
     'Set up your first property in an afternoon. Your tenants get receipts the moment they pay.',
-  contactEmail: 'hello@kodihub.co.ke',
+  contactEmail: 'hello@kodihq.co.ke',
   contactPhone: null,
   footerCopyright: 'KodiHub Property Management. All rights reserved.',
   footerTagline:
@@ -984,7 +984,7 @@ function LandingPageForm({ settings }: { settings: PlatformSettings }) {
       <h2>Landing page content</h2>
       <p>
         Controls the public marketing site for this environment (
-        <strong>kodihub.co.ke</strong> in production, <strong>landing.kodihub.co.ke</strong> in
+        <strong>kodihq.co.ke</strong> in production, <strong>landing.kodihq.co.ke</strong> in
         development). Changes take effect immediately on the landing page.
       </p>
 

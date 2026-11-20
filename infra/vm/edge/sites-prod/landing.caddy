@@ -1,4 +1,4 @@
-# Production: redirect www.kodihub.co.ke to the canonical apex landing page.
+# Production: redirect www.kodihq.co.ke to the canonical apex landing page.
 www.{$LANDING_HOST} {
 	import security
 	redir https://{$LANDING_HOST}{uri} permanent

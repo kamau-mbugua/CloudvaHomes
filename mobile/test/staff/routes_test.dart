@@ -11,6 +11,15 @@ import 'helpers.dart';
 void main() {
   test('webOrigin strips /api/v1 and maps API hosts to web origins', () {
     expect(
+      webOrigin('https://dapi.kodihq.co.ke/api/v1'),
+      'https://dev.kodihq.co.ke',
+    );
+    expect(
+      webOrigin('https://api.kodihq.co.ke/api/v1'),
+      'https://app.kodihq.co.ke',
+    );
+    // The address until November 2026 keeps its own web names.
+    expect(
       webOrigin('https://dapi.kodihub.co.ke/api/v1'),
       'https://dev.kodihub.co.ke',
     );

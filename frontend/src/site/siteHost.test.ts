@@ -32,4 +32,21 @@ describe('site/siteHost — siteSlugFromHost', () => {
     expect(siteSlugFromHost('a.b.dev.kodihub.co.ke')).toBeNull();
     expect(siteSlugFromHost('cozy.kodihub.co.ke.evil.com')).toBeNull();
   });
+
+  it('recognises host sites on kodihq.co.ke, the address since November 2026', () => {
+    expect(siteSlugFromHost('review-stays.kodihq.co.ke')).toBe('review-stays');
+    expect(siteSlugFromHost('review-stays.dev.kodihq.co.ke')).toBe('review-stays');
+    expect(siteSlugFromHost('cozy-homes.kodihq.co.ke', 'kodihq.co.ke')).toBe('cozy-homes');
+    // The app's own addresses never turn into a guest site.
+    expect(siteSlugFromHost('kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('www.kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('app.kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('api.kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('dev.kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('dapi.kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('landing.kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('a.b.dev.kodihq.co.ke')).toBeNull();
+    expect(siteSlugFromHost('cozy.kodihq.co.ke.evil.com')).toBeNull();
+    expect(siteSlugFromHost('cozy.notkodihq.co.ke')).toBeNull();
+  });
 });

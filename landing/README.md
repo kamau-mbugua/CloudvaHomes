@@ -1,8 +1,8 @@
 # Hodi / KodiHub — Marketing Landing Page (`landing/`)
 
 Public marketing landing page served at:
-- **Production**: `https://kodihub.co.ke` *(and `https://www.kodihub.co.ke` → 308 redirect)*
-- **Development**: `https://landing.kodihub.co.ke`
+- **Production**: `https://kodihq.co.ke` *(and `https://www.kodihq.co.ke` → 308 redirect)*
+- **Development**: `https://landing.kodihq.co.ke`
 
 ## Architecture & Superadmin Content Control
 
@@ -10,7 +10,7 @@ All text, hero copy, announcements, statistics, feature cards, pricing copy, and
 
 1. **Public Content API**: [`GET /api/v1/public/landing`](../backend/src/modules/platform/platform.controller.ts) returns the active `LandingPageContent` and default subscription plan pricing for that environment.
 2. **Superadmin Editor**: Platform admins edit the landing page live in the web app under **Platform → Settings → Landing page** (`/admin/settings?tab=landing`), backed by `GET / PUT /api/v1/platform/landing`.
-3. **Frontend (`index.html`)**: Fetches `/api/v1/public/landing` (proxied by Caddy on the landing host, with fallback to `https://api.kodihub.co.ke` on prod and `https://dapi.kodihub.co.ke` on dev) and renders the environment's superadmin-configured content.
+3. **Frontend (`index.html`)**: Fetches `/api/v1/public/landing` (proxied by Caddy on the landing host, with fallback to `https://api.kodihq.co.ke` on prod and `https://dapi.kodihq.co.ke` on dev) and renders the environment's superadmin-configured content.
 
 ## Local Preview
 

@@ -38,7 +38,7 @@ const COMMON: EmailTemplateVariable[] = [
   v(
     'bookingLinkLine',
     'The guest’s booking page link, as a line (empty for host-made bookings)',
-    'Your booking page: https://makini.kodihub.co.ke/b/…',
+    'Your booking page: https://makini.kodihq.co.ke/b/…',
   ),
   v(
     'hostContactLine',
@@ -68,7 +68,7 @@ const AMOUNT = v('amount', 'The amount (to pay, or received)', 'KES 2,750');
 const PAY_LINES = v(
   'payLines',
   'How to pay: the booking page and the host’s M-Pesa paybill, as lines',
-  'Pay on your booking page: https://makini.kodihub.co.ke/b/…\nM-Pesa paybill: 600111, account B00006',
+  'Pay on your booking page: https://makini.kodihq.co.ke/b/…\nM-Pesa paybill: 600111, account B00006',
 );
 const GETTING_THERE = v(
   'gettingThere',

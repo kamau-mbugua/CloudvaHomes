@@ -8,7 +8,7 @@ and reporting for Kenyan landlords and letting agencies.
 | `backend/` | API | NestJS 12, Prisma 7, PostgreSQL 16 |
 | `frontend/` | Web app — org staff, tenants, landlords, platform admin | React 19, Vite, TanStack Query; UltimatePOS design |
 | `mobile/` | Flutter app (Android & iOS) | Flutter |
-| `landing/` | Public marketing site (`kodihub.co.ke` / `landing.kodihub.co.ke`), content controlled by each environment's superadmin | HTML/CSS/JS + `/api/v1/public/landing` |
+| `landing/` | Public marketing site (`kodihq.co.ke` / `landing.kodihq.co.ke`), content controlled by each environment's superadmin | HTML/CSS/JS + `/api/v1/public/landing` |
 | `infra/` | GCP setup and local Docker helpers | Cloud Run, Cloud SQL, Firebase Hosting |
 | `docs/` | Design specs, plans, legacy API reference | — |
 

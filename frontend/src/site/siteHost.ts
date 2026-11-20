@@ -20,9 +20,16 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
  * Base domains whose one-label subdomains are host booking sites, most specific first. Checked
  * in the browser at runtime: the deployed web image is built once (no build settings) and
  * serves dev and prod, so the domain can't be baked in. `VITE_SITE_DOMAIN`, when set, is tried
- * first (e.g. a preview domain).
+ * first (e.g. a preview domain). kodihub.co.ke was the address until November 2026: a server
+ * that has not moved yet, or was rolled back, still serves booking sites on it.
  */
-export const SITE_DOMAINS: readonly string[] = ['dev.kodihub.co.ke', 'kodihub.co.ke', 'localhost'];
+export const SITE_DOMAINS: readonly string[] = [
+  'dev.kodihq.co.ke',
+  'kodihq.co.ke',
+  'dev.kodihub.co.ke',
+  'kodihub.co.ke',
+  'localhost',
+];
 
 function cleanDomain(d: string): string {
   return d.trim().toLowerCase().replace(/:\d+$/, '').replace(/^\.+/, '');

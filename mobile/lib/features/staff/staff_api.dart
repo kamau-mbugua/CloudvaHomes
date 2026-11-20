@@ -539,17 +539,23 @@ final staffApiProvider = Provider(
   (ref) => StaffApi(ref.watch(apiClientProvider)),
 );
 
-/// The web app's origin: maps `dapi.kodihub.co.ke` -> `dev.kodihub.co.ke` and
-/// `api.kodihub.co.ke` -> `app.kodihub.co.ke`, or strips `/api/v1` for custom origins.
+/// The web app's origin: maps `dapi.kodihq.co.ke` -> `dev.kodihq.co.ke` and
+/// `api.kodihq.co.ke` -> `app.kodihq.co.ke`, or strips `/api/v1` for custom origins.
+/// The same names on kodihub.co.ke (the address until November 2026) still
+/// answer, so an API URL on that domain keeps its own web names.
 String webOrigin([String? apiUrl]) {
   final raw = apiUrl ?? AppConfig.apiUrl;
   final trimmed = raw.replaceFirst(RegExp(r'/+$'), '');
   final origin = trimmed.endsWith('/api/v1')
       ? trimmed.substring(0, trimmed.length - '/api/v1'.length)
       : trimmed;
-  if (origin == 'https://dapi.kodihub.co.ke') return AppConfig.devWebUrl;
-  if (origin == 'https://api.kodihub.co.ke') return AppConfig.prodWebUrl;
-  return origin;
+  return switch (origin) {
+    'https://dapi.kodihq.co.ke' => AppConfig.devWebUrl,
+    'https://api.kodihq.co.ke' => AppConfig.prodWebUrl,
+    'https://dapi.kodihub.co.ke' => 'https://dev.kodihub.co.ke',
+    'https://api.kodihub.co.ke' => 'https://app.kodihub.co.ke',
+    _ => origin,
+  };
 }
 
 /// "2026-10" in Nairobi (UTC+3, no daylight saving), the month the server bills.

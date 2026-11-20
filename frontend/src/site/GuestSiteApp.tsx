@@ -88,7 +88,7 @@ export default function GuestSiteApp({ slug }: GuestSiteAppProps) {
             </ul>
             <p className="site-not-found__host">
               Run short stays?{' '}
-              <a href="https://kodihub.co.ke" rel="noreferrer">
+              <a href="https://kodihq.co.ke" rel="noreferrer">
                 Get your own booking site with KodiHub
               </a>
             </p>

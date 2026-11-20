@@ -1,4 +1,4 @@
-# Host short-stay booking sites: {slug}.kodihub.co.ke on prod, {slug}.dev.kodihub.co.ke on dev.
+# Host short-stay booking sites: {slug}.kodihq.co.ke on prod, {slug}.dev.kodihq.co.ke on dev.
 # One wildcard certificate per environment, issued over DNS-01 through Cloudflare (custom build,
 # see Dockerfile). scripts/lib.sh edge_up copies this file into sites/ only when CF_API_TOKEN is
 # set in /opt/hodi/edge/edge.env: without a token the Cloudflare module would stop the whole edge

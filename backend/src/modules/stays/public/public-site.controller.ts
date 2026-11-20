@@ -151,7 +151,7 @@ export class PublicSiteController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    // go.kodihub.co.ke/<code>: an SMS short link, not a booking site.
+    // go.kodihq.co.ke/<code>: an SMS short link, not a booking site.
     if (isShortLinkHost(host ?? '', this.env)) {
       const code = (path ?? '/').replace(/^\/+/, '').split(/[?#/]/)[0] ?? '';
       await sendShortLink(this.shortLinks, code, clientIp(req), res);

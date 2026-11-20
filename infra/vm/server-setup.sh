@@ -1,28 +1,30 @@
 #!/usr/bin/env bash
 # One-time setup of a Hodi server (run as root on the VM). One environment per VM:
 #
-#   sudo bash server-setup.sh prod [app.kodihub.co.ke] [api.kodihub.co.ke]  [kodihub.co.ke]         < deploy-key.pub
-#   sudo bash server-setup.sh dev  [dev.kodihub.co.ke] [dapi.kodihub.co.ke] [landing.kodihub.co.ke] < deploy-key.pub
+#   sudo bash server-setup.sh prod [app.kodihq.co.ke] [api.kodihq.co.ke]  [kodihq.co.ke]         < deploy-key.pub
+#   sudo bash server-setup.sh dev  [dev.kodihq.co.ke] [dapi.kodihq.co.ke] [landing.kodihq.co.ke] < deploy-key.pub
 #
 # - Docker + Compose, 2 GB swap (skipped if present)
 # - user `deploy`: SSH with the given public key only (GitHub Actions), in the docker group
 # - /opt/hodi owned by deploy; secrets generated HERE and never leave the server
-# Safe to re-run: existing secrets are kept; the key and host domains are updated.
+# Safe to re-run: existing secrets are kept and the key is updated. The hosts change only when
+# they are given here; without them a server keeps the ones it has.
 set -euo pipefail
 ENV="${1:?usage: server-setup.sh dev|prod [app-host] [api-host] [landing-host] < key.pub}"
 [[ "$ENV" =~ ^(dev|prod)$ ]] || { echo "env must be dev or prod"; exit 1; }
 
 if [ "$ENV" = prod ]; then
-  APP_HOST="${2:-app.kodihub.co.ke}"
-  API_HOST="${3:-api.kodihub.co.ke}"
-  LANDING_HOST="${4:-kodihub.co.ke}"
-  SITE_DOMAIN="${5:-kodihub.co.ke}"
+  APP_HOST="${2:-app.kodihq.co.ke}"
+  API_HOST="${3:-api.kodihq.co.ke}"
+  LANDING_HOST="${4:-kodihq.co.ke}"
+  SITE_DOMAIN="${5:-kodihq.co.ke}"
 else
-  APP_HOST="${2:-dev.kodihub.co.ke}"
-  API_HOST="${3:-dapi.kodihub.co.ke}"
-  LANDING_HOST="${4:-landing.kodihub.co.ke}"
-  SITE_DOMAIN="${5:-dev.kodihub.co.ke}"
+  APP_HOST="${2:-dev.kodihq.co.ke}"
+  API_HOST="${3:-dapi.kodihq.co.ke}"
+  LANDING_HOST="${4:-landing.kodihq.co.ke}"
+  SITE_DOMAIN="${5:-dev.kodihq.co.ke}"
 fi
+HOSTS_GIVEN=$([ "$#" -gt 1 ] && echo 1 || echo 0)
 
 PUBKEY="$(cat)"
 [[ "$PUBKEY" == ssh-* ]] || { echo "Pipe the deploy public key on stdin"; exit 1; }
@@ -62,13 +64,21 @@ chown -R deploy:deploy "$ROOT"
 chmod 755 "$ROOT" "$ROOT/landing-releases" "$ROOT/maintenance"
 docker network inspect hodi-edge >/dev/null 2>&1 || docker network create hodi-edge >/dev/null
 
-cat > "$ROOT/edge/edge.env" <<EDGE
+if [ -f "$ROOT/edge/edge.env" ] && [ "$HOSTS_GIVEN" = 0 ]; then
+  # A re-run without hosts keeps what this server has: its hosts, the Cloudflare token and the
+  # old names that still answer after a domain move (LEGACY_*, see scripts/lib.sh).
+  # shellcheck disable=SC1091
+  source "$ROOT/edge/edge.env"
+  echo "$ENV: keeping the hosts in $ROOT/edge/edge.env"
+else
+  cat > "$ROOT/edge/edge.env" <<EDGE
 APP_HOST=$APP_HOST
 API_HOST=$API_HOST
 LANDING_HOST=$LANDING_HOST
 SITE_DOMAIN=$SITE_DOMAIN
 APP_STACK=hodi-$ENV
 EDGE
+fi
 
 # ── secrets (generated once) ─────────────────────────────────────────────────
 dir="$ROOT/envs/$ENV"

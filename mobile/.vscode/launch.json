@@ -10,7 +10,7 @@
         "--flavor",
         "dev",
         "--dart-define=FLAVOR=dev",
-        "--dart-define=API_URL=https://dapi.kodihub.co.ke/api/v1"
+        "--dart-define=API_URL=https://dapi.kodihq.co.ke/api/v1"
       ]
     },
     {
@@ -22,7 +22,7 @@
         "--flavor",
         "prod",
         "--dart-define=FLAVOR=prod",
-        "--dart-define=API_URL=https://api.kodihub.co.ke/api/v1"
+        "--dart-define=API_URL=https://api.kodihq.co.ke/api/v1"
       ]
     },
     {
