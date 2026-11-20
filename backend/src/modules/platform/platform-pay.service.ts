@@ -45,7 +45,7 @@ import type { BillingPayDto, PlatformSettingsDto, UpdateLandingPageDto } from '.
 
 const SECRETS_CONTEXT = 'platform.daraja.secrets';
 
-/** KodiHub's own Daraja app: organisations pay their KodiHub bill by STK push or to the paybill. */
+/** KodiHQ's own Daraja app: organisations pay their KodiHQ bill by STK push or to the paybill. */
 @Injectable()
 export class PlatformPayService {
   private readonly log = new Logger(PlatformPayService.name);
@@ -260,7 +260,7 @@ export class PlatformPayService {
     const text = (v: string | null | undefined) =>
       v === undefined ? undefined : v?.trim() || null;
     if (dto.smsProvider !== undefined && dto.smsProvider !== before.smsProvider) {
-      // Never let KodiHub's SMS (sign-in codes included) switch to a provider it can't use.
+      // Never let KodiHQ's SMS (sign-in codes included) switch to a provider it can't use.
       const has = (next: string | null | undefined, saved: unknown) =>
         next === undefined ? Boolean(saved) : Boolean(next?.trim());
       const complete = {
@@ -425,7 +425,7 @@ export class PlatformPayService {
     });
   }
 
-  /** Daraja target + STK fields, or null when KodiHub's M-Pesa isn't set up. */
+  /** Daraja target + STK fields, or null when KodiHQ's M-Pesa isn't set up. */
   private stkSetup(s: PlatformSettings) {
     const creds = this.credentials(s);
     if (!creds?.passkey || !s.darajaEnv || !s.paybill || !s.callbackToken) return null;
@@ -444,7 +444,7 @@ export class PlatformPayService {
     return this.stkSetup(s) !== null;
   }
 
-  // ── Organisation pays KodiHub ──
+  // ── Organisation pays KodiHQ ──
 
   private viewStk(r: PlatformStkRequest) {
     return {
@@ -487,13 +487,13 @@ export class PlatformPayService {
       amount,
       idempotencyKey,
       purpose: 'INVOICE',
-      accountReference: org.billingRef ?? 'KODIHUB',
-      description: 'KodiHub bill',
+      accountReference: org.billingRef ?? 'KODIHQ',
+      description: 'KodiHQ bill',
     });
     return this.viewStk(request);
   }
 
-  /** An SMS bundle: M-Pesa prompt to KodiHub's paybill, account "SMS<billing ref>" (spec §5). */
+  /** An SMS bundle: M-Pesa prompt to KodiHQ's paybill, account "SMS<billing ref>" (spec §5). */
   async buySms(dto: { units: number; phone?: string }, idempotencyKey?: string) {
     const ctx = orgContext();
     if (idempotencyKey) {
@@ -533,7 +533,7 @@ export class PlatformPayService {
         idempotencyKey,
         purpose: 'SMS',
         accountReference: `SMS${org.billingRef ?? ''}`,
-        description: 'KodiHub SMS',
+        description: 'KodiHQ SMS',
       });
     } catch (e) {
       await this.db.smsPurchase.update({ where: { id: purchase.id }, data: { state: 'FAILED' } });
@@ -557,7 +557,7 @@ export class PlatformPayService {
     return phone;
   }
 
-  /** Sends an M-Pesa prompt to KodiHub's paybill and records the request. */
+  /** Sends an M-Pesa prompt to KodiHQ's paybill and records the request. */
   private async pushStk(p: {
     orgId: string;
     userId: string;
@@ -713,7 +713,7 @@ export class PlatformPayService {
     });
   }
 
-  /** Paybill payment to KodiHub: the account number is the organisation's billing ref. */
+  /** Paybill payment to KodiHQ: the account number is the organisation's billing ref. */
   handleC2b(c: C2bConfirmation, body: unknown) {
     return withoutOrgScope(async () => {
       const ref = normalizeAccountRef(c.accountRef);
@@ -729,10 +729,10 @@ export class PlatformPayService {
           })
         : null;
       if (!org) {
-        // Unmatched money to KodiHub's paybill: a platform admin records it by hand.
+        // Unmatched money to KodiHQ's paybill: a platform admin records it by hand.
         this.log.warn(
           { receipt: c.receipt },
-          'KodiHub paybill payment with an unknown account number',
+          'KodiHQ paybill payment with an unknown account number',
         );
         return;
       }

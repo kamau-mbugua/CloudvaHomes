@@ -27,7 +27,7 @@ const LENGTHS: Record<ShortLinkKind, number[]> = {
   map: [8, 9, 10, 11, 12],
 };
 
-/** Wrong guesses allowed across all of KodiHub per minute; right links are never limited. */
+/** Wrong guesses allowed across all of KodiHQ per minute; right links are never limited. */
 const GLOBAL_MISSES_PER_MINUTE = 600;
 
 /**
@@ -85,9 +85,9 @@ export function isShortLinkHost(host: string, env: Env): boolean {
 }
 
 /**
- * KodiHub's own short links, so SMS stay within one unit. A code is derived from the target with
+ * KodiHQ's own short links, so SMS stay within one unit. A code is derived from the target with
  * a server secret: the same link always gets the same code, and nobody can guess one. Codes and
- * targets are stored only as a hash and ciphertext. Only KodiHub's own and Google Maps addresses
+ * targets are stored only as a hash and ciphertext. Only KodiHQ's own and Google Maps addresses
  * can be shortened, so this is never an open redirect.
  */
 @Injectable()
@@ -106,7 +106,7 @@ export class ShortLinksService {
     target: string,
     opts: { kind: ShortLinkKind; orgId?: string | null; days?: number },
   ): Promise<string> {
-    if (!this.allowed(target)) throw new Error('Only KodiHub and Google Maps links are shortened');
+    if (!this.allowed(target)) throw new Error('Only KodiHQ and Google Maps links are shortened');
     const expiresAt = new Date(Date.now() + (opts.days ?? 365) * DAY_MS);
     const targetHash = sha256(target);
     const digest = Buffer.from(this.cipher.blindIndex(target, CODE_CONTEXT), 'base64url');
@@ -190,7 +190,7 @@ export class ShortLinksService {
     });
   }
 
-  /** KodiHub's own addresses (app, API, booking sites) and Google Maps only. */
+  /** KodiHQ's own addresses (app, API, booking sites) and Google Maps only. */
   private allowed(target: string): boolean {
     let url: URL;
     try {

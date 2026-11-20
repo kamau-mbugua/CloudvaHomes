@@ -16,7 +16,7 @@ import type { SmsPurchase } from './types';
 
 /**
  * "Buy SMS" (`POST /sms/buy`): pick a bundle or type a number of units, then an M-Pesa prompt
- * to KodiHub's paybill, followed until paid (`GET /sms/buy/:id`). Units are added when M-Pesa
+ * to KodiHQ's paybill, followed until paid (`GET /sms/buy/:id`). Units are added when M-Pesa
  * confirms. Same Idempotency-Key while the input is unchanged, so a retry never prompts twice.
  */
 export function BuySmsSheet({ ownPhone, onClose }: { ownPhone: string | null; onClose: () => void }) {

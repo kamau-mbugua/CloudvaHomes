@@ -26,7 +26,7 @@ import { AdminOrgSms } from './AdminOrgSms';
  * Admin → an organisation (`/admin/organizations/:id`): its status, billing account, owner
  * and let units; its billing terms — plan, its own price and minimum (empty = the plan's,
  * shown "Custom" when set), trial end and "no suspension until"; close or reopen; and its
- * KodiHub invoices (void) and payments ("Record payment"). Every change is audited.
+ * KodiHQ invoices (void) and payments ("Record payment"). Every change is audited.
  */
 export function OrganizationDetailPage() {
   const { organizationId = '' } = useParams();
@@ -115,7 +115,7 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
       </div>
 
       <dl className="pf__facts adm__facts">
-        <Fact label="Owes KodiHub"><span className={`num ${org.balance > 0 ? 'ad__owed' : ''}`}>{formatKES(org.balance ?? 0)}</span></Fact>
+        <Fact label="Owes KodiHQ"><span className={`num ${org.balance > 0 ? 'ad__owed' : ''}`}>{formatKES(org.balance ?? 0)}</span></Fact>
         {typeof org.credit === 'number' && org.credit > 0 ? <Fact label="Credit"><span className="num">{formatKES(org.credit)}</span></Fact> : null}
         <Fact label="Units let now"><span className="num">{org.occupiedUnits ?? '—'}</span></Fact>
         <Fact label="A month now comes to">
@@ -153,7 +153,7 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
             className="pf__tab"
             onClick={() => selectTab('invoices')}
           >
-            KodiHub invoices
+            KodiHQ invoices
           </button>
           <button
             type="button"
@@ -326,7 +326,7 @@ function OrgInvoices({ orgId, superAdmin }: { orgId: string; superAdmin: boolean
 
   return (
     <section className="ad__section" aria-labelledby="oi-title">
-      <div className="pf__sectionhead"><h2 id="oi-title">KodiHub invoices</h2></div>
+      <div className="pf__sectionhead"><h2 id="oi-title">KodiHQ invoices</h2></div>
       {list.isError ? <p className="ad__error" role="alert">{platformErrorMessage(list.error)}</p> : null}
       {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap"><EmptyState title="No invoices yet" detail="Months in the trial aren’t billed. Run a month from Invoices." /></div>

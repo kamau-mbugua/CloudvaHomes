@@ -18,7 +18,7 @@ export function smsSegments(text: string): number {
 }
 
 /**
- * A notice as tenants get it by SMS: "Makini Homes: <notice>" (it comes from KodiHub's sender
+ * A notice as tenants get it by SMS: "Makini Homes: <notice>" (it comes from KodiHQ's sender
  * ID). Left alone when it already starts with the name. Must match the server's noticeSmsText.
  */
 export function noticeSmsText(orgName: string, text: string): string {
@@ -56,7 +56,7 @@ export function broadcastSummary(b: BroadcastCounts): string {
 }
 
 /**
- * The SMS-units line under a notice: units needed vs the organisation's KodiHub balance.
+ * The SMS-units line under a notice: units needed vs the organisation's KodiHQ balance.
  * `short` means the balance can't cover it (the server would refuse with SMS_UNITS_LOW).
  */
 export function unitsLine(

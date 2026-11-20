@@ -103,7 +103,7 @@ const sharedStepUp = singleFlight(async (cause: ApiError) => {
 
 export const NETWORK_ERROR = 'NETWORK_ERROR';
 
-/** `403 ORG_SUSPENDED` (phase 8): staff changes are refused until the KodiHub bill is paid. */
+/** `403 ORG_SUSPENDED` (phase 8): staff changes are refused until the KodiHQ bill is paid. */
 export const ORG_SUSPENDED = 'ORG_SUSPENDED';
 
 /**
@@ -112,7 +112,7 @@ export const ORG_SUSPENDED = 'ORG_SUSPENDED';
  * the error's message — shows it without knowing the code.
  */
 export const ORG_SUSPENDED_MESSAGE =
-  'Your organisation is read-only until its KodiHub bill is paid, so this change wasn’t saved. '
+  'Your organisation is read-only until its KodiHQ bill is paid, so this change wasn’t saved. '
   + 'Tenants can still pay rent, and rent payments can still be recorded. '
   + 'Pay the bill under Settings → Plan & billing.';
 

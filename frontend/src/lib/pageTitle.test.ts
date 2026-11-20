@@ -3,8 +3,8 @@ import { composeTitle, createTitleStack } from './pageTitle';
 
 describe('composeTitle', () => {
   it('prefers the page’s own title over the menu title', () => {
-    expect(composeTitle('Achieng Otieno', 'Tenants')).toBe('Achieng Otieno · KodiHub');
-    expect(composeTitle(null, 'Tenants')).toBe('Tenants · KodiHub');
+    expect(composeTitle('Achieng Otieno', 'Tenants')).toBe('Achieng Otieno · KodiHQ');
+    expect(composeTitle(null, 'Tenants')).toBe('Tenants · KodiHQ');
   });
 });
 

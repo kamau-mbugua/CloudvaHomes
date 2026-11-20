@@ -243,7 +243,7 @@ export class NotificationsService {
         'admin-2fa': 'admin_2fa',
       } as const
     )[purpose];
-    const smsText = `Your KodiHub ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
+    const smsText = `Your KodiHQ ${what} is ${code}. It expires in ${minutes} minutes. Don't share it with anyone.`;
     const tasks: Promise<void>[] = [];
     if (to.phone) {
       tasks.push(
@@ -384,7 +384,7 @@ export class NotificationsService {
         this.dispatchSms(
           { kind: 'platform', type: 'invitation' },
           to.phone,
-          `${by} to ${p.organizationName} on KodiHub. Accept: ${smsLink}`,
+          `${by} to ${p.organizationName} on KodiHQ. Accept: ${smsLink}`,
           { value: smsLink, label: 'Invitation link' },
         ),
       );
@@ -401,15 +401,15 @@ export class NotificationsService {
     }
   }
 
-  /** Monthly KodiHub platform invoice notification to the organisation owner. */
+  /** Monthly KodiHQ platform invoice notification to the organisation owner. */
   async sendPlatformInvoiceIssued(to: Recipient, p: PlatformInvoiceEmailPayload): Promise<void> {
     if (!to.email) return;
     const appUrl = this.env.APP_URL.replace(/\/$/, '');
     const greeting = p.ownerFirstName ? `Hi ${p.ownerFirstName},` : `Hello ${p.organizationName},`;
     const payInstructions =
       p.paybill && p.billingRef
-        ? `Pay via M-Pesa Paybill ${p.paybill}, Account ${p.billingRef}, or in KodiHub under Settings -> Plan & billing (${appUrl}/settings/billing).`
-        : `Pay in KodiHub under Settings -> Plan & billing (${appUrl}/settings/billing).`;
+        ? `Pay via M-Pesa Paybill ${p.paybill}, Account ${p.billingRef}, or in KodiHQ under Settings -> Plan & billing (${appUrl}/settings/billing).`
+        : `Pay in KodiHQ under Settings -> Plan & billing (${appUrl}/settings/billing).`;
     const rendered = await this.renderSystemEmailTemplate('platform_invoice', {
       greeting,
       organizationName: p.organizationName,
@@ -500,7 +500,7 @@ export class NotificationsService {
   }
 
   /**
-   * Sent ONLY when a brand-new tenant/user who did not previously exist on KodiHub is created.
+   * Sent ONLY when a brand-new tenant/user who did not previously exist on KodiHQ is created.
    */
   async sendTenantWelcome(
     to: Recipient,
@@ -532,7 +532,7 @@ export class NotificationsService {
   }
 
   /**
-   * Sent when an already-existing user/tenant on KodiHub is added to a new organisation
+   * Sent when an already-existing user/tenant on KodiHQ is added to a new organisation
    * without an immediate house/unit assignment.
    */
   async sendTenantAddedToOrg(
@@ -696,7 +696,7 @@ export class NotificationsService {
         subject: rendered.subject,
         // Lines left empty by missing details collapse, so the email never shows gaps.
         text: rendered.text.replace(/\n{3,}/g, '\n\n'),
-        fromName: `${p.hostName} via KodiHub`,
+        fromName: `${p.hostName} via KodiHQ`,
         ...(p.hostEmail ? { replyTo: p.hostEmail } : {}),
         ...(p.attachments?.length ? { attachments: p.attachments } : {}),
       },
@@ -733,21 +733,21 @@ export class NotificationsService {
     const loginUrl = `${this.env.APP_URL.replace(/\/$/, '')}/login`;
     const roleLabel = p.role === 'SUPERADMIN' ? 'Superadmin' : 'Salesperson';
     const signInId = [to.email, to.phone].filter(Boolean).join(' or ');
-    const subject = `Your KodiHub ${roleLabel} account`;
+    const subject = `Your KodiHQ ${roleLabel} account`;
     const emailBody = p.temporaryPassword
       ? `Hi ${p.firstName},\n\n` +
-        `You have been added to KodiHub as a ${roleLabel}.\n\n` +
+        `You have been added to KodiHQ as a ${roleLabel}.\n\n` +
         `--- Sign-in Details ---\n` +
         `Sign in at: ${loginUrl}\n` +
         `Email / Phone: ${signInId}\n` +
         `Temporary password: ${p.temporaryPassword}\n\n` +
         `For your security, you will be prompted to change this temporary password as soon as you sign in.`
       : `Hi ${p.firstName},\n\n` +
-        `Your KodiHub account (${signInId}) has been granted ${roleLabel} access.\n\n` +
+        `Your KodiHQ account (${signInId}) has been granted ${roleLabel} access.\n\n` +
         `Sign in with your existing password at: ${loginUrl}`;
     const smsText = p.temporaryPassword
-      ? `KodiHub ${roleLabel}: sign in at ${loginUrl} with ${to.email ?? to.phone} and temp password ${p.temporaryPassword} (change on first login).`
-      : `Your KodiHub account now has ${roleLabel} access. Sign in at ${loginUrl}`;
+      ? `KodiHQ ${roleLabel}: sign in at ${loginUrl} with ${to.email ?? to.phone} and temp password ${p.temporaryPassword} (change on first login).`
+      : `Your KodiHQ account now has ${roleLabel} access. Sign in at ${loginUrl}`;
 
     const tasks: Promise<void>[] = [];
     if (to.email) {
@@ -933,7 +933,7 @@ export class NotificationsService {
           renderBrandedEmailHtml({
             subject: m.subject,
             text: m.text,
-            brandName: fromName || 'KodiHub',
+            brandName: fromName || 'KodiHQ',
           });
         await transport.sendMail({
           from,
@@ -1213,7 +1213,7 @@ export class NotificationsService {
 
   async sendTestNotification(userId: string) {
     if (!this.prisma) return { sent: false, devicesTargeted: 0 };
-    const title = 'KodiHub notification check';
+    const title = 'KodiHQ notification check';
     const body = 'Your in-app and push notifications are active and working.';
     const created = await this.prisma.userNotification.create({
       data: {

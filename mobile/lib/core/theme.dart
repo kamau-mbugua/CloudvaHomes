@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// KodiHub C2.1 "Ledger roof, refined" palette (§02 Colour & §06 Mobile).
+/// KodiHQ C2.1 "Ledger roof, refined" palette (§02 Colour & §06 Mobile).
 abstract final class HodiColors {
   static const navy = Color(0xFF002B4D);
   static const navyDeep = Color(0xFF0A1F36);

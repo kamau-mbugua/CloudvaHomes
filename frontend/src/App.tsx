@@ -241,7 +241,7 @@ export default function App() {
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
 
-              {/* The platform admin area: KodiHub's own staff, its own shell (phase 8 & phase 11). */}
+              {/* The platform admin area: KodiHQ's own staff, its own shell (phase 8 & phase 11). */}
               <Route path="/admin" element={<RequireAdmin><AdminShell /></RequireAdmin>}>
                 <Route index element={<AdminOverviewPage />} />
                 <Route path="organizations" element={<WithRouteDrawer><AdminOrganizationsPage /></WithRouteDrawer>}>

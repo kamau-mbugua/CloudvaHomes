@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { adjustProblem, parseBundles } from './smsAdmin';
 
-describe('KodiHub admin SMS forms', () => {
+describe('KodiHQ admin SMS forms', () => {
   it('checks a units adjustment before sending it', () => {
     expect(adjustProblem(-200, 150, 'Correction')).toBe('This would take the balance below zero (150 units left).');
     expect(adjustProblem(10, 150, '')).toBe('Give a reason');

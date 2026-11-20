@@ -28,7 +28,7 @@ import { activeMoveInCharges } from '../billing/rules';
  * Opened from a vacant unit (unit fixed), from a tenant (tenant fixed) or from the
  * tenancies list (both picked here). Rent starts as the unit's rent; the billing day
  * follows the start date (capped at 28) until someone changes it by hand. The opening
- * deposit is for tenants who already paid one before KodiHub.
+ * deposit is for tenants who already paid one before KodiHQ.
  *
  * When the unit's property has active move-in charges, "Issue move-in invoice" (on by
  * default) bills them in the same step, each charge shown with what it comes to for the
@@ -328,7 +328,7 @@ export function MoveInSheet({
               inputMode="decimal" autoComplete="off" aria-invalid={Boolean(errors.rentAmount)} />
           </Field>
           <Field id="mi-depositHeld" label="Deposit already held" error={errors.depositHeld} optional
-            hint="Only for a deposit paid before KodiHub. Leave blank for a new let.">
+            hint="Only for a deposit paid before KodiHQ. Leave blank for a new let.">
             <input id="mi-depositHeld" value={values.depositHeld} onChange={(e) => set('depositHeld', e.target.value)}
               inputMode="decimal" autoComplete="off" aria-invalid={Boolean(errors.depositHeld)} />
           </Field>

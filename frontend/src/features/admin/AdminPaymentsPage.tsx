@@ -10,7 +10,7 @@ import type { PlatformPayment } from '../platform/types';
 import { PlatformPaymentsTable } from '../platform/ui';
 
 /**
- * Admin → Payments (`/admin/payments`): every payment received by KodiHub across organisations
+ * Admin → Payments (`/admin/payments`): every payment received by KodiHQ across organisations
  * (M-Pesa STK, C2B paybill, or manually recorded bank/cheque/M-Pesa transfers).
  */
 export function AdminPaymentsPage() {
@@ -40,7 +40,7 @@ export function AdminPaymentsPage() {
       {list.isPending ? <TableSkeleton /> : rows.length === 0 && !list.isError ? (
         <div className="ad__tablewrap">
           <EmptyState
-            title="No KodiHub payments yet"
+            title="No KodiHQ payments yet"
             detail="Payments appear here when organisations pay via M-Pesa or when you record a payment on an organisation’s page."
           />
         </div>

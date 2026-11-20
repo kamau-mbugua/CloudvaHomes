@@ -224,13 +224,13 @@ describe('Reconciliation for hosts', () => {
   });
 
   it('explains an unmatched payment in booking terms', () => {
-    expect(hostUnmatchedText('WRONG')).toBe('KodiHub couldn’t tell which booking this is — the account reference “WRONG” isn’t a booking number.');
-    expect(hostUnmatchedText(null)).toBe('KodiHub couldn’t tell which booking this is — there was no account reference.');
+    expect(hostUnmatchedText('WRONG')).toBe('KodiHQ couldn’t tell which booking this is — the account reference “WRONG” isn’t a booking number.');
+    expect(hostUnmatchedText(null)).toBe('KodiHQ couldn’t tell which booking this is — there was no account reference.');
   });
 
   it('describes an empty list for hosts and for landlords', () => {
-    expect(reconciliationEmptyText('HOST')).toBe('Every M-Pesa and bank payment KodiHub has been told about found its booking. Payments it can’t place wait here — for example a wrong booking number.');
-    expect(reconciliationEmptyText('LANDLORD')).toBe('Every M-Pesa payment KodiHub has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number.');
+    expect(reconciliationEmptyText('HOST')).toBe('Every M-Pesa and bank payment KodiHQ has been told about found its booking. Payments it can’t place wait here — for example a wrong booking number.');
+    expect(reconciliationEmptyText('LANDLORD')).toBe('Every M-Pesa payment KodiHQ has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number.');
   });
 });
 

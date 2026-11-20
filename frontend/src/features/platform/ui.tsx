@@ -47,7 +47,7 @@ export function CopyRow({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * KodiHub invoices as a table. The organisation's page passes `actions` (PDF, details); the
+ * KodiHQ invoices as a table. The organisation's page passes `actions` (PDF, details); the
  * admin area adds the organisation column and its void action.
  */
 export function HodiInvoicesTable({ rows, showOrg = false, actions }: {

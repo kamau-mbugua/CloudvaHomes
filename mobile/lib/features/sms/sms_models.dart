@@ -174,7 +174,7 @@ class SmsPurchase {
 }
 
 String smsModeLabel(SmsAccount a) {
-  if (!a.own) return 'KodiHub sends your SMS';
+  if (!a.own) return 'KodiHQ sends your SMS';
   final parts = [
     if (a.senderId != null) 'sender ID ${a.senderId}',
     if (a.provider != null) smsProviderLabel[a.provider] ?? a.provider!,

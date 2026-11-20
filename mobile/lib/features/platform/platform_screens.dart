@@ -221,7 +221,7 @@ class PlatformShell extends ConsumerWidget {
       drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         loading: session.isLoading,
-        title: const Text('KodiHub Platform'),
+        title: const Text('KodiHQ Platform'),
         subtitle: role,
         actions: const [NotificationButton(), AccountButton()],
       ),

@@ -79,8 +79,8 @@ export interface LandingPageContent {
 
 export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
   topBarText: 'New organisations start with a free trial. Vacant units are never billed.',
-  brandName: 'KodiHub',
-  pageTitle: 'KodiHub: rent, M-Pesa and short-stay management in Kenya',
+  brandName: 'KodiHQ',
+  pageTitle: 'KodiHQ: rent, M-Pesa and short-stay management in Kenya',
   metaDescription:
     'Rent invoicing, M-Pesa and bank reconciliation, landlord payouts and short-stay bookings in one place. For Kenyan landlords, letting agencies and BNB hosts.',
   signInLabel: 'Sign in',
@@ -88,7 +88,7 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
   heroBadge: 'Property software for Kenya',
   heroTitle: 'Collect rent on M-Pesa. Let the books reconcile themselves.',
   heroSubtitle:
-    'KodiHub runs rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, pays landlords their net remittance and takes short-stay bookings. Built for Kenyan landlords, letting agencies and hosts.',
+    'KodiHQ runs rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, pays landlords their net remittance and takes short-stay bookings. Built for Kenyan landlords, letting agencies and hosts.',
   heroPrimaryCta: 'Start your free trial',
   heroSecondaryCta: 'See how it works',
   heroStatsTitle: 'Sample portfolio · October',
@@ -148,7 +148,7 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
       tag: 'Communications',
       title: 'Branded PDF invoices, receipts and reminders',
       description:
-        'Invoices, receipts and reminders go out by SMS and email with an official PDF. Send SMS under your own sender ID, or buy SMS units from KodiHub.',
+        'Invoices, receipts and reminders go out by SMS and email with an official PDF. Send SMS under your own sender ID, or buy SMS units from KodiHQ.',
     },
     {
       tag: 'Maintenance',
@@ -204,7 +204,7 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
   appStoreUrl: null,
   agenciesTitle: 'Manage for many landlords. Remit to each one, on time.',
   agenciesSubtitle:
-    'Set a management agreement per landlord with commission and remittance day. KodiHub builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.',
+    'Set a management agreement per landlord with commission and remittance day. KodiHQ builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.',
   hostsTitle: 'Run your BNB like a business. Your own booking site included.',
   hostsSubtitle:
     'Guests pick dates, see your photos and pay you by M-Pesa on your own page at yourname.kodihq.co.ke. You run the calendar, cleaning, money and profit from the same app as your rentals.',
@@ -231,22 +231,22 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
     {
       question: 'How does automatic M-Pesa matching work?',
       answer:
-        "When a payment arrives, KodiHub reads the account reference and the payer's phone number, finds the tenant and clears their oldest unpaid invoice first. Payments it cannot place go to a review queue.",
+        "When a payment arrives, KodiHQ reads the account reference and the payer's phone number, finds the tenant and clears their oldest unpaid invoice first. Payments it cannot place go to a review queue.",
     },
     {
-      question: 'Is KodiHub suitable for letting agencies?',
+      question: 'Is KodiHQ suitable for letting agencies?',
       answer:
         'Yes. Agencies set up management agreements per landlord, earn commission automatically, deduct approved expenses and remit the net to each owner, who gets a read-only portal.',
     },
     {
-      question: 'Can I run short-stay BNB units on KodiHub?',
+      question: 'Can I run short-stay BNB units on KodiHQ?',
       answer:
         'Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihq.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps.',
     },
     {
       question: 'How are short-stay hosts billed?',
       answer:
-        'At the same rate, counted per published listing each month. Listings you unpublish cost nothing. Guest payments go straight to your own Paybill or Till, and KodiHub never holds them.',
+        'At the same rate, counted per published listing each month. Listings you unpublish cost nothing. Guest payments go straight to your own Paybill or Till, and KodiHQ never holds them.',
     },
     {
       question: 'Can caretakers use it from their phone?',
@@ -264,7 +264,7 @@ export const DEFAULT_LANDING_PAGE_CONTENT: LandingPageContent = {
     'Set up your first property in an afternoon. Your tenants get receipts the moment they pay.',
   contactEmail: 'hello@kodihq.co.ke',
   contactPhone: null,
-  footerCopyright: 'KodiHub Property Management. All rights reserved.',
+  footerCopyright: 'KodiHQ Property Management. All rights reserved.',
   footerTagline:
     'Rent, short stays, M-Pesa and landlord payouts in one place. Built in Nairobi for landlords, letting agencies and hosts across Kenya.',
 };

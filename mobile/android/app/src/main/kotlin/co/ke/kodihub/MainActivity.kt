@@ -94,7 +94,7 @@ class MainActivity : FlutterActivity() {
                 ?: return
             val channel = NotificationChannel(
                 "kodihub_default",
-                "KodiHub Alerts",
+                "KodiHQ Alerts",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Rent reminders, payment receipts, invoices, and maintenance updates"

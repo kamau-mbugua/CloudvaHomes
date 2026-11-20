@@ -29,8 +29,10 @@ android {
     }
 
     defaultConfig {
-        // KodiHub's own id (owner decision 2026-11-04): releases go to a new store listing;
-        // the legacy Hodi app (com.qnex.hodi) is not updated in place.
+        // The app's own id, chosen when the product was called KodiHub (owner decision
+        // 2026-11-04): releases go to a new store listing; the legacy Hodi app (com.qnex.hodi)
+        // is not updated in place. The id stays now that the name is KodiHQ: another id would
+        // be another app in the stores.
         applicationId = "co.ke.kodihub"
         minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
@@ -46,11 +48,11 @@ android {
             isDefault = true
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            resValue("string", "app_name", "KodiHub Dev")
+            resValue("string", "app_name", "KodiHQ Dev")
         }
         create("prod") {
             dimension = "env"
-            resValue("string", "app_name", "KodiHub")
+            resValue("string", "app_name", "KodiHQ")
         }
     }
 

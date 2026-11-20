@@ -93,7 +93,7 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// JetBrains Mono uppercase kicker label (`.k` in KodiHub Mobile Redesign).
+/// JetBrains Mono uppercase kicker label (`.k` in KodiHQ Mobile Redesign).
 class Kicker extends StatelessWidget {
   const Kicker(
     this.text, {
@@ -121,7 +121,7 @@ class Kicker extends StatelessWidget {
   );
 }
 
-/// Monospace unit / reference code badge (`.code` in KodiHub Mobile Redesign).
+/// Monospace unit / reference code badge (`.code` in KodiHQ Mobile Redesign).
 class UnitBadge extends StatelessWidget {
   const UnitBadge(
     this.code, {
@@ -1154,7 +1154,7 @@ class CopyRow extends StatelessWidget {
   );
 }
 
-/// A small coloured label (status pill, `.pill` in KodiHub Mobile Redesign).
+/// A small coloured label (status pill, `.pill` in KodiHQ Mobile Redesign).
 class StatusChip extends StatelessWidget {
   const StatusChip(this.label, {super.key, this.tone = Tone.neutral});
   final String label;
@@ -1239,7 +1239,7 @@ class ErrorBox extends StatelessWidget {
   }
 }
 
-/// C2.1 segmented pill switcher (`.seg` in KodiHub Mobile Redesign) used on
+/// C2.1 segmented pill switcher (`.seg` in KodiHQ Mobile Redesign) used on
 /// detail screens and multi-view tabs so dense data is organized into tabs
 /// instead of long vertical stacks.
 class KodiHubSegmentedTabs extends StatelessWidget {

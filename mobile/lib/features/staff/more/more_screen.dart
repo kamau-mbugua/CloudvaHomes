@@ -97,7 +97,7 @@ class MoreScreen extends ConsumerWidget {
         _MoreItem(
           icon: Icons.workspace_premium_outlined,
           title: 'Plan & billing',
-          subtitle: 'Your KodiHub plan and bill',
+          subtitle: 'Your KodiHQ plan and bill',
           onTap: () => context.push('/staff/billing'),
         ),
       if (can(ref, 'sms:view'))

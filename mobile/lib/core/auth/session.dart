@@ -35,7 +35,7 @@ class Session {
   bool get isOwner => ownerOf.isNotEmpty;
   bool get isPlatformAdmin => user.isPlatformAdmin;
 
-  /// Any KodiHub operator — a superadmin or a salesperson. They can open the platform
+  /// Any KodiHQ operator — a superadmin or a salesperson. They can open the platform
   /// workspace, even when they also own or work in an organisation of their own.
   bool get isPlatformOperator =>
       user.isPlatformAdmin || user.platformRole != null;

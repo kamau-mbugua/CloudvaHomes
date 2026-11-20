@@ -55,7 +55,7 @@ export function configureApp(app: NestExpressApplication): void {
 
 export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
-    .setTitle('KodiHub API')
+    .setTitle('KodiHQ API')
     .setDescription(
       'Rental-management platform API. Money values are integer minor units (cents); ' +
         'errors use `{ error: { code, message, details }, requestId }`.',

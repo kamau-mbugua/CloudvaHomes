@@ -23,7 +23,7 @@ export function maskPhone(to: string): string {
   return to.length > 8 ? `${to.slice(0, 5)}****${to.slice(-3)}` : '****';
 }
 
-/** Organisation SMS page and the KodiHub admin's SMS controls (spec §3, §6). */
+/** Organisation SMS page and the KodiHQ admin's SMS controls (spec §3, §6). */
 @Injectable()
 export class SmsSettingsService {
   constructor(
@@ -150,7 +150,7 @@ export class SmsSettingsService {
     );
   }
 
-  // ── KodiHub admin ──
+  // ── KodiHQ admin ──
 
   async adminView(orgId: string) {
     await this.requireOrg(orgId);
@@ -256,7 +256,7 @@ export class SmsSettingsService {
     return { balance };
   }
 
-  /** Units sold, paid for and used per organisation in a month (KodiHub admin report). */
+  /** Units sold, paid for and used per organisation in a month (KodiHQ admin report). */
   async report(month: string) {
     const from = parseDateOnly(`${month}-01`);
     const to = parseDateOnly(

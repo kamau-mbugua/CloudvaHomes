@@ -254,14 +254,14 @@ export class TenanciesService {
           tx,
         );
         if (created.depositHeld > 0n) {
-          // Opening entry of the deposit ledger (phase 4): held before KodiHub.
+          // Opening entry of the deposit ledger (phase 4): held before KodiHQ.
           await tx.depositTransaction.create({
             data: {
               orgId: ctx.orgId,
               tenancyId: created.id,
               kind: 'OPENING',
               amount: created.depositHeld,
-              note: 'Deposit held before KodiHub',
+              note: 'Deposit held before KodiHQ',
               createdById: ctx.userId,
             },
           });
@@ -327,7 +327,7 @@ export class TenanciesService {
       ]);
 
       if (!tenantRecord) return;
-      const orgName = org?.name ?? 'KodiHub';
+      const orgName = org?.name ?? 'KodiHQ';
 
       if (tenantRecord.userId) {
         await this.notifications.notifyUser({
@@ -343,7 +343,7 @@ export class TenanciesService {
 
       if (!tenantRecord.email) return;
 
-      // 1. Send Welcome Email ONLY if this tenant/user did not previously exist on KodiHub
+      // 1. Send Welcome Email ONLY if this tenant/user did not previously exist on KodiHQ
       if (wasBrandNewPerson) {
         await this.notifications.sendTenantWelcome(
           { email: tenantRecord.email, phone: tenantRecord.phone },

@@ -129,7 +129,7 @@ export function InboundDetailPage() {
             </p>
           ) : (
           <p>
-            KodiHub couldn’t tell whose payment this is
+            KodiHQ couldn’t tell whose payment this is
             {t.accountRef ? <> — the account reference “<span className="num">{t.accountRef}</span>” isn’t a tenant code, invoice or unit</> : ' — there was no account reference'}.
             {canUpdate ? ' Assign it to the tenant who paid, or ignore it if it isn’t rent.' : ''}
           </p>
@@ -165,7 +165,7 @@ export function InboundDetailPage() {
             <Fact label="Payer’s phone">{t.payerPhone ? <span className="num">{t.payerPhone}</span> : null}</Fact>
             <Fact label="Account reference">{t.accountRef ? <span className="num">{t.accountRef}</span> : null}</Fact>
             <Fact label="Into">{t.channel.name}</Fact>
-            <Fact label="KodiHub was told">{formatDateTime(t.createdAt)}</Fact>
+            <Fact label="KodiHQ was told">{formatDateTime(t.createdAt)}</Fact>
           </dl>
         </section>
       ) : null}

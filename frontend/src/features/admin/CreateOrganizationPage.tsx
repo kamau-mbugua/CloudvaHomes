@@ -148,7 +148,7 @@ export function CreateOrganizationPage() {
         {tab === 'org' ? (
           <>
             <h2>Organisation details</h2>
-            <p>Create a Landlord, Property Agency or short-stay Host account on KodiHub. Its billing reference (e.g. H00001) and built-in roles are set up automatically.</p>
+            <p>Create a Landlord, Property Agency or short-stay Host account on KodiHQ. Its billing reference (e.g. H00001) and built-in roles are set up automatically.</p>
 
             <div className="fm__grid">
               <Field id="co-name" label="Organisation name" error={errors.name}>
@@ -177,7 +177,7 @@ export function CreateOrganizationPage() {
               </Field>
 
               {superAdmin ? (
-                <Field id="co-plan" label="Initial plan" optional error={errors.planId} hint="Leave on default to use KodiHub’s default plan and trial.">
+                <Field id="co-plan" label="Initial plan" optional error={errors.planId} hint="Leave on default to use KodiHQ’s default plan and trial.">
                   <select id="co-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={plans.isPending}>
                     <option value="">Default plan</option>
                     {activePlans.map((p) => (

@@ -48,7 +48,7 @@ export interface BillingSummary {
   trialEndsAt: string | null;
   noSuspendUntil: string | null;
   billingRef: string;
-  /** What is owed on KodiHub invoices now. */
+  /** What is owed on KodiHQ invoices now. */
   balance: number;
   /** Paid in advance, used by the next invoice. */
   credit: number;
@@ -265,7 +265,7 @@ export interface PlatformSettings {
   dueDays: number;
   suspendAfterDays: number;
   defaultPlanId: string | null;
-  /** KodiHub's paybill shortcode. */
+  /** KodiHQ's paybill shortcode. */
   paybill: string | null;
   daraja: {
     configured: boolean;

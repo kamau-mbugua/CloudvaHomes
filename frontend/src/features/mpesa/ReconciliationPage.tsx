@@ -20,7 +20,7 @@ import { bookingRefText, isMpesaKind, reconciliationEmptyText } from './rules';
 import type { InboundTransaction, MatchStatus } from './types';
 
 /**
- * Reconciliation (`/app/reconciliation`): every M-Pesa transaction Safaricom told KodiHub
+ * Reconciliation (`/app/reconciliation`): every M-Pesa transaction Safaricom told KodiHQ
  * about (`GET /inbound-transactions`), newest first, in three tabs — Unmatched (waiting
  * for someone to say whose money it is), Matched (recorded as a payment) and Ignored.
  * Filters (channel, source, received dates, search) live in the address. A row opens the

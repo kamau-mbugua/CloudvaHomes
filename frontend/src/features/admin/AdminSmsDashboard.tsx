@@ -24,7 +24,7 @@ import {
 const num = (n: number) => n.toLocaleString('en-KE');
 
 /**
- * Admin → Overview → SMS: how KodiHub's SMS did over a period — volume and success, a daily
+ * Admin → Overview → SMS: how KodiHQ's SMS did over a period — volume and success, a daily
  * chart, where messages went (provider, route, type), money from units, and the organisations
  * that need a look (running out of units, own account failing). `GET /platform/sms/stats`.
  */
@@ -61,7 +61,7 @@ export function AdminSmsDashboard() {
         <>
           <div className="ad__stats">
             <Stat label="Messages" value={num(s.totals.messages)}
-              sub={`${num(s.totals.kodihubMessages)} from KodiHub · ${num(s.totals.orgMessages)} from organisations`} />
+              sub={`${num(s.totals.kodihubMessages)} from KodiHQ · ${num(s.totals.orgMessages)} from organisations`} />
             <Stat label="Sent" value={rateText(s.totals.successRate)} sub={`${num(s.totals.sent)} accepted by the provider`} />
             <Stat label="Failed" value={num(s.totals.failed)} sub="Refused by the provider" tone={s.totals.failed ? 'bad' : undefined} />
             <Stat label="Not sent" value={num(notSent(s.totals))}
@@ -108,7 +108,7 @@ export function AdminSmsDashboard() {
                     {s.byType.map((t) => (
                       <tr key={`${t.kind}:${t.type}`}>
                         <td>{smsTypeLabel(t.type)}</td>
-                        <td>{t.kind === 'PLATFORM' ? 'KodiHub' : 'Organisations'}</td>
+                        <td>{t.kind === 'PLATFORM' ? 'KodiHQ' : 'Organisations'}</td>
                         <td className="num">{num(t.sent)}</td>
                         <td className="num">{num(t.failed)}</td>
                         <td className="num">{num(notSent(t))}</td>

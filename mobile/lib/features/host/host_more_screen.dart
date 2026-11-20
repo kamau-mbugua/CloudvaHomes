@@ -77,7 +77,7 @@ class HostMoreScreen extends ConsumerWidget {
             (
               icon: Icons.workspace_premium_outlined,
               title: 'Plan & billing',
-              subtitle: 'Your KodiHub plan and monthly bill',
+              subtitle: 'Your KodiHQ plan and monthly bill',
               onTap: () => context.push('/host/billing'),
             ),
           if (can(ref, 'sms:view'))

@@ -7,7 +7,7 @@ describe('SMS unit prices', () => {
     expect(bundleAmount(333, 80n)).toBe(26700n); // 266.40 → KES 267
   });
 
-  it('uses the organisation price when KodiHub set one', () => {
+  it('uses the organisation price when KodiHQ set one', () => {
     expect(effectiveUnitPrice({ unitPrice: null }, { smsUnitPrice: 80n })).toBe(80n);
     expect(effectiveUnitPrice({ unitPrice: 65n }, { smsUnitPrice: 80n })).toBe(65n);
   });

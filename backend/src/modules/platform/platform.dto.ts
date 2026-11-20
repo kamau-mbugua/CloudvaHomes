@@ -170,7 +170,7 @@ export class PlatformSettingsDto {
   @ValidateIf((_, v) => v !== null)
   @IsUUID()
   defaultPlanId?: string | null;
-  @ApiPropertyOptional({ nullable: true, description: 'KodiHub’s paybill' })
+  @ApiPropertyOptional({ nullable: true, description: 'KodiHQ’s paybill' })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @Matches(/^\d{5,7}$/, { message: 'paybill must be 5–7 digits' })
@@ -282,7 +282,7 @@ export class PlatformSettingsDto {
   // ── Google Maps (listing locations) ──
   @ApiPropertyOptional({
     nullable: true,
-    description: 'Browser key for Maps JavaScript + Places API; lock it to KodiHub domains',
+    description: 'Browser key for Maps JavaScript + Places API; lock it to KodiHQ domains',
   })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)

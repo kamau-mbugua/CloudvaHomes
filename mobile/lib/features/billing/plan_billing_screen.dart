@@ -37,7 +37,7 @@ class PlanBillingScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               CurvedHeroCard(
-                label: 'Owed to KodiHub',
+                label: 'Owed to KodiHQ',
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -131,7 +131,7 @@ class PlanBillingScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 12),
               SectionCard(
-                title: 'KodiHub invoices',
+                title: 'KodiHQ invoices',
                 children: [
                   AsyncBody(
                     value: invoices,

@@ -136,7 +136,7 @@ describe('Broadcasts to tenants (e2e)', () => {
 
     const out = outbox.slice(before);
     expect(out.filter((m) => m.channel === 'sms').map((m) => m.to)).toEqual(['+254711000701']);
-    // The SMS says who it is from (it goes out under KodiHub's sender ID).
+    // The SMS says who it is from (it goes out under KodiHQ's sender ID).
     expect(out.find((m) => m.channel === 'sms')?.text).toBe(
       `${ORG_NAME}: Water off Saturday 9am to noon.`,
     );

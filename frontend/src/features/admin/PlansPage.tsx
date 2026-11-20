@@ -15,7 +15,7 @@ import type { PlanBody, PlanDraft } from '../platform/rules';
 import type { Plan } from '../platform/types';
 
 /**
- * Admin → Plans (`/admin/plans`): KodiHub's prices. A plan is a price per let unit a month, a
+ * Admin → Plans (`/admin/plans`): KodiHQ's prices. A plan is a price per let unit a month, a
  * monthly minimum and free trial days; one is the default for new organisations. Add,
  * edit, make default, delete (only when no organisation is on it — `409 PLAN_IN_USE`).
  * Inactive plans stay on their organisations but aren't offered for new ones.
@@ -93,7 +93,7 @@ export function PlansPage() {
                       {!plan.isDefault ? (
                         <ConfirmDelete what={`the “${plan.name}” plan`} busy={remove.isPending} onConfirm={() => remove.mutate(plan)}
                           consequence={plan.organizationCount > 0
-                            ? `${plan.organizationCount} ${plan.organizationCount === 1 ? 'organisation is' : 'organisations are'} on it, so KodiHub will refuse. Move them first, or mark the plan inactive.`
+                            ? `${plan.organizationCount} ${plan.organizationCount === 1 ? 'organisation is' : 'organisations are'} on it, so KodiHQ will refuse. Move them first, or mark the plan inactive.`
                             : 'No organisation is on it. This cannot be undone.'} />
                       ) : null}
                     </div>

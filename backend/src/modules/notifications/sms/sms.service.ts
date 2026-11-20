@@ -63,8 +63,8 @@ export const LOGGED_REASON =
 
 /**
  * The only code that talks to SMS providers (docs/specs/2026-11-08-sms-platform-and-org-design.md).
- * Platform messages: KodiHub's provider, never units. Organisation messages: the organisation's
- * own provider (mode OWN) or KodiHub's provider paid in prepaid units (mode PLATFORM).
+ * Platform messages: KodiHQ's provider, never units. Organisation messages: the organisation's
+ * own provider (mode OWN) or KodiHQ's provider paid in prepaid units (mode PLATFORM).
  * Never throws for provider or unit problems: the outcome says what happened.
  */
 @Injectable()
@@ -188,7 +188,7 @@ export class SmsService {
   async sendTest(orgId: string, to: string): Promise<{ sent: boolean; reason: string | null }> {
     const account = await this.account(orgId);
     const config = this.orgConfig(account);
-    const text = 'KodiHub test message: your SMS account works.';
+    const text = 'KodiHQ test message: your SMS account works.';
     const attempt: Attempt = config
       ? await this.attempt(
           createProviderSender(config, this.env, `org:${orgId}`),
@@ -220,7 +220,7 @@ export class SmsService {
   }
 
   /**
-   * Admin check of KodiHub's own provider: one real SMS through the provider chosen in platform
+   * Admin check of KodiHQ's own provider: one real SMS through the provider chosen in platform
    * settings, as saved — never another provider or the server's fallback, so a "sent" proves
    * that provider works.
    */
@@ -234,8 +234,8 @@ export class SmsService {
     const provider = s?.smsProvider ?? null;
     const config = s ? this.platformConfigs(s)[s.smsProvider]() : null;
     const text = provider
-      ? `KodiHub test message: SMS through ${PROVIDER_NAME[provider]} works.`
-      : 'KodiHub test message.';
+      ? `KodiHQ test message: SMS through ${PROVIDER_NAME[provider]} works.`
+      : 'KodiHQ test message.';
     const attempt: Attempt = config
       ? await this.attempt(
           createProviderSender(config, this.env, 'platform'),
@@ -249,7 +249,7 @@ export class SmsService {
           messageId: null,
           reason: provider
             ? `${PROVIDER_NAME[provider]} is not fully set up. Save all its details first.`
-            : 'Choose and save KodiHub’s SMS provider first.',
+            : 'Choose and save KodiHQ’s SMS provider first.',
         };
     await this.prisma.smsLog.create({
       data: {
@@ -356,7 +356,7 @@ export class SmsService {
     if (balance === null) {
       const warn = (await this.claimWarning(spec.orgId, 'EMPTY')) ? 'EMPTY' : null;
       if (spec.type === 'booking_otp') {
-        // A guest's booking code never blocks a booking: KodiHub pays for it (spec call 9).
+        // A guest's booking code never blocks a booking: KodiHQ pays for it (spec call 9).
         const sent = await this.viaPlatform(to, text);
         return this.finish(spec, msg, sent, {
           route: 'PLATFORM_FREE',
@@ -461,7 +461,7 @@ export class SmsService {
   }
 
   /**
-   * KodiHub's provider: the one chosen in platform settings when its details are complete,
+   * KodiHQ's provider: the one chosen in platform settings when its details are complete,
    * otherwise any other complete one. Only with none at all does the server's own SMS config
    * apply — so a half-filled choice never sends real messages to the log sender.
    */

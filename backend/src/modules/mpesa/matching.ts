@@ -1,6 +1,6 @@
 import { normalizeAccountRef } from './daraja.js';
 
-/** What an account reference could mean, in the order KodiHub tries them (pure, no I/O). */
+/** What an account reference could mean, in the order KodiHQ tries them (pure, no I/O). */
 export type RefGuess =
   | { kind: 'booking'; code: string }
   | { kind: 'tenant'; code: string }

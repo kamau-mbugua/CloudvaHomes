@@ -260,6 +260,16 @@ EOF
       cur="$(get_env "$api_env" CORS_ORIGINS)"; want="$(cors_origins "$cur")"
       if [ -n "$cur" ] && [ "$cur" != "$want" ]; then set_env "$api_env" CORS_ORIGINS "$want"; fi
     fi
+
+    # The product is KodiHQ since November 2026: the sender name people see on e-mails follows.
+    # Only the name server-setup.sh wrote is changed. The address stays, and so does a name set
+    # by hand. The API reads the file when it next starts.
+    if grep -qE "^EMAIL_FROM=[\"']?KodiHub <" "$api_env"; then
+      sed -E "s/^(EMAIL_FROM=[\"']?)KodiHub </\\1KodiHQ </" "$api_env" > "$api_env.tmp"
+      chmod 600 "$api_env.tmp"
+      mv "$api_env.tmp" "$api_env"
+      log "EMAIL_FROM: sender name KodiHub → KodiHQ (same address)"
+    fi
   fi
   return 0
 }

@@ -35,20 +35,20 @@ function platformStatusBadge(status: string): StatusBadgeOptions {
   return { label: 'Issued · Payment due', tone: 'neutral' };
 }
 
-/** KodiHub's monthly platform subscription invoice to an organisation. */
+/** KodiHQ's monthly platform subscription invoice to an organisation. */
 export function renderPlatformInvoicePdf({
   invoice: i,
   org,
   paybill,
   systemInstructions,
 }: PlatformInvoicePdf) {
-  const { doc, bytes, left, right } = a4(i.number, 'KodiHub');
+  const { doc, bytes, left, right } = a4(i.number, 'KodiHQ');
   const width = right - left;
 
   const yAfterHeader = header(
     doc,
     {
-      name: 'KodiHub',
+      name: 'KodiHQ',
       phone: '',
       email: '',
       kraPin: null,
@@ -166,7 +166,7 @@ export function renderPlatformInvoicePdf({
     .fontSize(9)
     .fillColor(PDF_BRAND.ink)
     .text(
-      `KodiHub for ${i.period}: ${i.occupiedUnits} let units x KES ${money(i.rate)}`,
+      `KodiHQ for ${i.period}: ${i.occupiedUnits} let units x KES ${money(i.rate)}`,
       cols.desc,
       rowTextY,
       { width: 255 },
@@ -276,11 +276,11 @@ export function renderPlatformInvoicePdf({
       : [];
 
   drawInstructionsAndSignoff(doc, afterSummaryY, {
-    orgName: 'KodiHub',
+    orgName: 'KodiHQ',
     extraTitle: 'How to pay',
     extraLines: payLines,
     systemInstructions: systemInstructions ?? DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS,
-    signoffLeft: 'Issued by KodiHub Billing',
+    signoffLeft: 'Issued by KodiHQ Billing',
     signoffCenter: org.billingRef ? `Account Ref: ${org.billingRef}` : undefined,
     signoffRight: `Invoice: ${i.number}`,
   });

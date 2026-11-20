@@ -18,8 +18,8 @@ import type { PlatformInvoice } from '../platform/types';
 /** Sheets the admin organisation page and the admin invoices list share. */
 
 /**
- * "Record payment" (`POST /platform/payments`): money an organisation paid KodiHub by bank
- * transfer, cheque or otherwise. KodiHub pays its oldest invoices first and keeps any excess
+ * "Record payment" (`POST /platform/payments`): money an organisation paid KodiHQ by bank
+ * transfer, cheque or otherwise. KodiHQ pays its oldest invoices first and keeps any excess
  * as credit; a payment that clears what is overdue lifts a suspension.
  */
 export function RecordHodiPaymentSheet({ org, onClose }: {
@@ -83,7 +83,7 @@ export function RecordHodiPaymentSheet({ org, onClose }: {
     >
       <form id="hodi-record" className="sheet-form" onSubmit={submit} noValidate>
         <p className="ad__muted">
-          For money that reached KodiHub outside M-Pesa matching, e.g. a bank transfer quoting <span className="num">{org.billingRef}</span>.
+          For money that reached KodiHQ outside M-Pesa matching, e.g. a bank transfer quoting <span className="num">{org.billingRef}</span>.
           It pays the oldest invoices first; anything extra is held as credit.
           {typeof org.balance === 'number' && org.balance > 0 ? ` ${org.name} owes ${formatKES(org.balance)}.` : ''}
         </p>

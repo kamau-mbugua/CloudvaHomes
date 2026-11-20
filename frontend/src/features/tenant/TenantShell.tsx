@@ -35,7 +35,7 @@ export function TenantShell() {
   const page = TENANT_MENU.find((m) => (m.end ? pathname === m.to : pathname.startsWith(m.to)))?.label ?? 'Dashboard';
 
   useEffect(() => {
-    document.title = `${page} · KodiHub`;
+    document.title = `${page} · KodiHQ`;
   }, [page]);
 
   useEffect(() => {

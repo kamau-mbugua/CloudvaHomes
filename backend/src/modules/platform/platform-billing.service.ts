@@ -27,7 +27,7 @@ import type { ListPlatformInvoicesDto, ListPlatformPaymentsDto } from './platfor
 import { renderPlatformInvoicePdf } from './platform-pdf.js';
 
 /**
- * KodiHub billing organisations (design §5.4). Platform data spans organisations, so this uses
+ * KodiHQ billing organisations (design §5.4). Platform data spans organisations, so this uses
  * the unscoped client and filters by orgId explicitly everywhere.
  */
 @Injectable()
@@ -154,7 +154,7 @@ export class PlatformBillingService {
     if (this.notifications) {
       await this.notifications.notifyOrgStaff(orgId, {
         kind: 'PLATFORM_INVOICE_ISSUED',
-        title: `KodiHub bill ${created.inv.number}`,
+        title: `KodiHQ bill ${created.inv.number}`,
         body: `KES ${money(created.inv.total)} for ${created.inv.period} (due ${formatDateOnly(created.inv.dueDate)}).`,
         actionUrl: '/settings/billing',
       });
@@ -568,7 +568,7 @@ export class PlatformBillingService {
     return this.toPayment(p);
   }
 
-  /** What an organisation owes KodiHub now. */
+  /** What an organisation owes KodiHQ now. */
   async balance(orgId: string) {
     const today = todayInNairobi();
     const open = await this.prisma.platformInvoice.findMany({

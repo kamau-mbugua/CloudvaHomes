@@ -57,7 +57,7 @@ export function PortalShell({
   const [theme, setTheme] = useTheme();
 
   useEffect(() => {
-    document.title = `${accountName || label} · KodiHub`;
+    document.title = `${accountName || label} · KodiHQ`;
   }, [accountName, label]);
 
   const nextTheme = theme === 'dark' ? 'light' : 'dark';

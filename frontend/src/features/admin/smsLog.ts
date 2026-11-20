@@ -1,4 +1,4 @@
-/** Labels and date rules for KodiHub admin's SMS list, message sheet and dashboard. */
+/** Labels and date rules for KodiHQ admin's SMS list, message sheet and dashboard. */
 
 import type { SmsProvider, SmsUsageStatus } from '../sms/types';
 
@@ -28,7 +28,7 @@ export const SMS_TYPE_LABEL: Record<string, string> = {
   tenant_notice: 'Tenant notice',
 };
 
-/** Types KodiHub sends about people's accounts, then organisations' own (filter order). */
+/** Types KodiHQ sends about people's accounts, then organisations' own (filter order). */
 export const PLATFORM_TYPES = [
   'login_otp',
   'password_reset',
@@ -61,10 +61,10 @@ export function smsTypeLabel(type: string): string {
 }
 
 export const ROUTE_LABEL: Record<SmsRoute, string> = {
-  PLATFORM: 'KodiHub’s provider',
+  PLATFORM: 'KodiHQ’s provider',
   ORG_PROVIDER: 'Organisation’s own account',
-  PLATFORM_FALLBACK: 'KodiHub, as fallback',
-  PLATFORM_FREE: 'KodiHub, free guest code',
+  PLATFORM_FALLBACK: 'KodiHQ, as fallback',
+  PLATFORM_FREE: 'KodiHQ, free guest code',
 };
 
 export function smsStatus(s: SmsUsageStatus): { label: string; tone: 'ok' | 'bad' | 'warn' } {
@@ -164,7 +164,7 @@ export interface SmsLogDetail extends Omit<SmsLogRow, 'canOpen' | 'hasSecret'> {
   /** The full number. */
   to: string;
   providerMessageId: string | null;
-  /** Null for messages sent before KodiHub kept SMS text. */
+  /** Null for messages sent before KodiHQ kept SMS text. */
   text: string | null;
   secret: { label: string; hidden: true } | null;
 }

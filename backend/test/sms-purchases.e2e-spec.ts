@@ -154,7 +154,7 @@ describe('Buying SMS units (e2e)', () => {
     expect(p).toMatchObject({ units: 500, amount: '40000', state: 'PENDING' });
     expect(fake.pushes[0]).toMatchObject({
       accountReference: smsRef,
-      description: 'KodiHub SMS',
+      description: 'KodiHQ SMS',
       amountKes: 400,
     });
   });
@@ -231,7 +231,7 @@ describe('Buying SMS units (e2e)', () => {
       check(await t.http().put(`/api/v1${path}`).set(auth(sess)).send(body), status);
     const patch = async (sess: Session, path: string, body: object, status = 200) =>
       check(await t.http().patch(`/api/v1${path}`).set(auth(sess)).send(body), status);
-    /** Sends one booking SMS through KodiHub's provider (a test sender, saved first). */
+    /** Sends one booking SMS through KodiHQ's provider (a test sender, saved first). */
     const send = async (to: string) => {
       const cipher = t.app.get(FieldCipher);
       await t.prisma.platformSettings.update({
@@ -299,7 +299,7 @@ describe('Buying SMS units (e2e)', () => {
       });
     });
 
-    it('only KodiHub admin can switch an organisation to its own SMS', async () => {
+    it('only KodiHQ admin can switch an organisation to its own SMS', async () => {
       await put(owner, `/platform/organizations/${orgId}/sms`, ownSetup(), 403);
       const view = (await put(admin, `/platform/organizations/${orgId}/sms`, ownSetup())).data;
       expect(view).toMatchObject({
@@ -391,7 +391,7 @@ describe('Buying SMS units (e2e)', () => {
       ]);
     });
 
-    it('lets KodiHub admin choose its provider and prices', async () => {
+    it('lets KodiHQ admin choose its provider and prices', async () => {
       // The form always sends the provider in use (Africa's Talking by default, even with nothing
       // saved in the database): that never blocks a price change.
       await t

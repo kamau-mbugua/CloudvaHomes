@@ -474,7 +474,7 @@ export function MetersCsvImportSheet({
     <CsvImportSheet
       title="Import meters & readings CSV"
       subtitle="Onboard unit meters and/or monthly meter readings in one CSV. Any meter that does not exist yet on a unit is created automatically before saving its reading."
-      sampleFilename="kodihub-meters-readings-template.csv"
+      sampleFilename="kodihq-meters-readings-template.csv"
       sampleHeaders={SAMPLE_HEADERS}
       sampleRows={buildSampleRows(activePeriod)}
       columns={COLUMNS}

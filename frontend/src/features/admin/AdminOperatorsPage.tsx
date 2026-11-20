@@ -17,7 +17,7 @@ import { OrgStatusBadge } from '../platform/ui';
 type RoleFilter = 'ALL' | 'SUPERADMIN' | 'SALESPERSON';
 
 /**
- * Admin → Admins & Salespeople (`/admin/admins`): manages KodiHub's internal staff —
+ * Admin → Admins & Salespeople (`/admin/admins`): manages KodiHQ's internal staff —
  * Superadmins (full platform access) and Salespeople (scoped to their onboarded/assigned
  * book of organisations). Also assigns unassigned organisations to an operator's book.
  */
@@ -80,7 +80,7 @@ export function AdminOperatorsPage() {
         <TableSkeleton />
       ) : rows.length === 0 ? (
         <div className="ad__tablewrap">
-          <EmptyState title="No operators in this view" detail="Add a Superadmin or Salesperson to manage KodiHub." />
+          <EmptyState title="No operators in this view" detail="Add a Superadmin or Salesperson to manage KodiHQ." />
         </div>
       ) : (
         <div className="ad__tablewrap">

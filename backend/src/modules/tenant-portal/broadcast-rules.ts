@@ -45,7 +45,7 @@ export function smsSegments(text: string): number {
 
 /**
  * A notice as tenants get it by SMS: "Makini Homes: <notice>", so they know who sent it (it comes
- * from KodiHub's sender ID). Left alone when the notice already starts with the name.
+ * from KodiHQ's sender ID). Left alone when the notice already starts with the name.
  */
 export function noticeSmsText(orgName: string, text: string): string {
   const name = orgName.trim();

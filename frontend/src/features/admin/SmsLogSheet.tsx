@@ -11,7 +11,7 @@ import { RevealSecret } from './RevealSecret';
 import { ROUTE_LABEL, smsStatus, smsTypeLabel, type SmsLogDetail } from './smsLog';
 
 /**
- * One SMS as KodiHub sent it: who to, through which provider, the result and the text. A code,
+ * One SMS as KodiHQ sent it: who to, through which provider, the result and the text. A code,
  * invitation link or temporary password in it stays hidden until a superadmin gives a reason.
  */
 export function SmsLogSheet({ id, onClose }: { id: string; onClose: () => void }) {
@@ -38,7 +38,7 @@ export function SmsLogSheet({ id, onClose }: { id: string; onClose: () => void }
             <dl className="pf__facts">
               <Fact label="To"><span className="num">{sms.to}</span></Fact>
               <Fact label="When">{formatDateTime(sms.at)}</Fact>
-              <Fact label="From">{sms.organization ? sms.organization.name : 'KodiHub'}</Fact>
+              <Fact label="From">{sms.organization ? sms.organization.name : 'KodiHQ'}</Fact>
               <Fact label="Status">
                 <span className={`ad__badge ad__badge--${status.tone}`}>{status.label}</span>
                 {sms.reason ? <span className="ad__sub ad__owed">{sms.reason}</span> : null}
@@ -54,7 +54,7 @@ export function SmsLogSheet({ id, onClose }: { id: string; onClose: () => void }
             </dl>
             {sms.text === null ? (
               <p className="ad__sub">
-                This SMS was sent before KodiHub kept what messages said, so only the details above were recorded.
+                This SMS was sent before KodiHQ kept what messages said, so only the details above were recorded.
               </p>
             ) : (
               <pre className="ad__emailbody" aria-label="SMS text">{sms.text}</pre>

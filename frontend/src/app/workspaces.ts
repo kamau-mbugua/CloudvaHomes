@@ -160,7 +160,7 @@ export function currentWorkspace(
   if (here === 'staff') {
     const org = session.activeOrganization;
     const membership = session.organizations.find((m) => m.id === org?.id);
-    const name = org?.name ?? 'KodiHub';
+    const name = org?.name ?? 'KodiHQ';
     const detail = membership
       ? `${orgKindLabel(membership.kind)} · ${membership.roleName}`
       : org
@@ -198,7 +198,7 @@ export function currentWorkspace(
     return { badge: initials(name), name, detail };
   }
 
-  const name = 'KodiHub admin';
+  const name = 'KodiHQ admin';
   const detail =
     session.user.isPlatformAdmin || session.user.platformRole === 'SUPERADMIN'
       ? 'Platform admin'

@@ -40,10 +40,10 @@ export const PDF_BRAND = {
 } as const;
 
 export const DEFAULT_SYSTEM_INVOICE_INSTRUCTIONS =
-  'Always quote your unique Tenant Account Reference when paying via M-Pesa Paybill, Buy Goods Till, or Bank Transfer so your payment is reconciled automatically. This is an official computer-generated invoice issued via KodiHub and is valid without a physical signature.';
+  'Always quote your unique Tenant Account Reference when paying via M-Pesa Paybill, Buy Goods Till, or Bank Transfer so your payment is reconciled automatically. This is an official computer-generated invoice issued via KodiHQ and is valid without a physical signature.';
 
 export const DEFAULT_SYSTEM_RECEIPT_INSTRUCTIONS =
-  'This is an official computer-generated receipt issued via KodiHub and is valid without a physical signature or stamp. Please retain this receipt for your records. Cheques and bank transfers are subject to bank clearing.';
+  'This is an official computer-generated receipt issued via KodiHQ and is valid without a physical signature or stamp. Please retain this receipt for your records. Cheques and bank transfers are subject to bank clearing.';
 
 export interface DocumentInstructions {
   invoiceInstructions: string | null;
@@ -140,7 +140,7 @@ export function a4(title: string, author: string) {
     info: {
       Title: title,
       Author: author,
-      Creator: 'KodiHub Property & Rental Management',
+      Creator: 'KodiHQ Property & Rental Management',
     },
   });
   const chunks: Buffer[] = [];
@@ -522,7 +522,7 @@ export function footer(doc: PDFKit.PDFDocument, centerNote?: string, reference?:
       lineBreak: false,
     });
 
-  const coBrandText = 'Powered by kodihub';
+  const coBrandText = 'Powered by kodiHQ';
   doc.font('Helvetica').fontSize(7.5);
   const textWidth = doc.widthOfString(coBrandText);
   const markSize = 10;

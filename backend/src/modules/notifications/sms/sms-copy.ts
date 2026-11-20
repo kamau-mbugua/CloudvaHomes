@@ -22,7 +22,7 @@ export function smsWarningCopy(
       return {
         kind: 'sms_failing',
         title: 'Your SMS account isn’t sending',
-        body: `${(d.reason ?? 'Your SMS provider refused the message').replace(/\.?$/, '.')} Messages to your tenants and guests are failing. Check your SMS account, or buy KodiHub SMS units.`,
+        body: `${(d.reason ?? 'Your SMS provider refused the message').replace(/\.?$/, '.')} Messages to your tenants and guests are failing. Check your SMS account, or buy KodiHQ SMS units.`,
       };
   }
 }

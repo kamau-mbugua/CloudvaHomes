@@ -66,10 +66,10 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     category: 'Onboarding & Invitations',
     description:
       'Sent to the organisation owner when a new organisation is created by platform staff, including login link, trial window, and billing reference.',
-    defaultSubject: 'Welcome to KodiHub — Set up {{organizationName}}',
+    defaultSubject: 'Welcome to KodiHQ — Set up {{organizationName}}',
     defaultBody:
       'Hi {{firstName}},\n\n' +
-      '{{inviterLine}} to join {{organizationName}} on KodiHub.\n\n' +
+      '{{inviterLine}} to join {{organizationName}} on KodiHQ.\n\n' +
       'Accept the invitation: {{inviteLink}}\n\n' +
       'The link expires in 7 days.\n\n' +
       '--- Login & Account Setup ---\n' +
@@ -91,7 +91,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
         key: 'inviterLine',
         description:
           'Who invited the user (e.g. "Jane Doe invited you" or "You have been invited")',
-        sample: 'KodiHub Platform Admin invited you',
+        sample: 'KodiHQ Platform Admin invited you',
       },
       {
         key: 'inviteLink',
@@ -155,10 +155,10 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     category: 'Onboarding & Invitations',
     description:
       'Sent when an organisation owner or manager invites a property manager, accountant, or caretaker to join their team.',
-    defaultSubject: 'Join {{organizationName}} on KodiHub',
+    defaultSubject: 'Join {{organizationName}} on KodiHQ',
     defaultBody:
       'Hi {{firstName}},\n\n' +
-      '{{inviterLine}} to join {{organizationName}} on KodiHub.\n\n' +
+      '{{inviterLine}} to join {{organizationName}} on KodiHQ.\n\n' +
       'Accept the invitation: {{inviteLink}}\n\n' +
       'The link expires in 7 days.',
     variables: [
@@ -185,11 +185,11 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     name: 'Monthly Subscription Invoice Issued',
     category: 'Platform Billing',
     description:
-      'Sent to the organisation owner when a monthly KodiHub platform invoice is generated after their free trial (with the PDF invoice attached).',
-    defaultSubject: 'KodiHub Invoice {{invoiceNumber}} ({{period}}) — {{organizationName}}',
+      'Sent to the organisation owner when a monthly KodiHQ platform invoice is generated after their free trial (with the PDF invoice attached).',
+    defaultSubject: 'KodiHQ Invoice {{invoiceNumber}} ({{period}}) — {{organizationName}}',
     defaultBody:
       '{{greeting}}\n\n' +
-      'Your KodiHub subscription invoice {{invoiceNumber}} for {{organizationName}} (period {{period}}) has been issued. A copy of the PDF invoice is attached to this email.\n\n' +
+      'Your KodiHQ subscription invoice {{invoiceNumber}} for {{organizationName}} (period {{period}}) has been issued. A copy of the PDF invoice is attached to this email.\n\n' +
       '--- Invoice Summary ---\n' +
       'Invoice number: {{invoiceNumber}}\n' +
       'Billing period: {{period}}\n' +
@@ -229,7 +229,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
         key: 'paymentInstructions',
         description: 'Complete M-Pesa Paybill & portal payment instructions',
         sample:
-          'Pay via M-Pesa Paybill 4098123, Account H00042, or in KodiHub under Settings -> Plan & billing (https://app.kodihq.co.ke/settings/billing).',
+          'Pay via M-Pesa Paybill 4098123, Account H00042, or in KodiHQ under Settings -> Plan & billing (https://app.kodihq.co.ke/settings/billing).',
       },
     ],
   },
@@ -239,9 +239,9 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     category: 'Security & Access',
     description:
       'Sent for sign-in codes, password resets, step-up confirmation, and superadmin 2FA verification.',
-    defaultSubject: 'Your KodiHub {{codeType}}',
+    defaultSubject: 'Your KodiHQ {{codeType}}',
     defaultBody:
-      "Your KodiHub {{codeType}} is {{code}}. It expires in {{minutes}} minutes. Don't share it with anyone.",
+      "Your KodiHQ {{codeType}} is {{code}}. It expires in {{minutes}} minutes. Don't share it with anyone.",
     variables: [
       {
         key: 'codeType',
@@ -261,7 +261,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       'Sent when a property manager grants a property owner (landlord) read-only access to their property statements.',
     defaultSubject: 'Your statements from {{organizationName}}',
     defaultBody:
-      '{{organizationName}} has given you access to your property statements on KodiHub: {{portalLink}} - sign in with a code sent to this phone or email.',
+      '{{organizationName}} has given you access to your property statements on KodiHQ: {{portalLink}} - sign in with a code sent to this phone or email.',
     variables: [
       {
         key: 'organizationName',
@@ -300,14 +300,14 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
   },
   tenant_welcome: {
     key: 'tenant_welcome',
-    name: 'Tenant Welcome to KodiHub',
+    name: 'Tenant Welcome to KodiHQ',
     category: 'Tenant Communications',
     description:
-      'Sent only when a brand-new tenant (who does not yet exist on KodiHub) is registered by an organisation or imported via CSV.',
-    defaultSubject: 'Welcome to {{organizationName}} on KodiHub',
+      'Sent only when a brand-new tenant (who does not yet exist on KodiHQ) is registered by an organisation or imported via CSV.',
+    defaultSubject: 'Welcome to {{organizationName}} on KodiHQ',
     defaultBody:
       'Hi {{firstName}},\n\n' +
-      'Welcome to KodiHub! {{organizationName}} has created your tenant profile.\n\n' +
+      'Welcome to KodiHQ! {{organizationName}} has created your tenant profile.\n\n' +
       '--- Your Tenant Account ---\n' +
       'Organisation: {{organizationName}}\n' +
       'Tenant account code: {{tenantCode}}\n' +
@@ -341,7 +341,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       },
       {
         key: 'portalLink',
-        description: 'URL to the KodiHub Tenant Portal',
+        description: 'URL to the KodiHQ Tenant Portal',
         sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
@@ -351,11 +351,11 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     name: 'Existing User Added as Tenant',
     category: 'Tenant Communications',
     description:
-      'Sent when a tenant who already exists on KodiHub is added to a new organisation without an immediate unit assignment.',
-    defaultSubject: 'You have been added to {{organizationName}} on KodiHub',
+      'Sent when a tenant who already exists on KodiHQ is added to a new organisation without an immediate unit assignment.',
+    defaultSubject: 'You have been added to {{organizationName}} on KodiHQ',
     defaultBody:
       'Hi {{firstName}},\n\n' +
-      'You have been added as a tenant under {{organizationName}} on KodiHub.\n\n' +
+      'You have been added as a tenant under {{organizationName}} on KodiHQ.\n\n' +
       '--- Account Details ---\n' +
       'Organisation: {{organizationName}}\n' +
       'Tenant account code: {{tenantCode}}\n' +
@@ -375,7 +375,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       },
       {
         key: 'portalLink',
-        description: 'URL to the KodiHub Tenant Portal',
+        description: 'URL to the KodiHQ Tenant Portal',
         sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
@@ -447,7 +447,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       },
       {
         key: 'portalLink',
-        description: 'URL to the KodiHub Tenant Portal',
+        description: 'URL to the KodiHQ Tenant Portal',
         sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
@@ -524,7 +524,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       },
       {
         key: 'portalLink',
-        description: 'URL to the KodiHub Tenant Portal',
+        description: 'URL to the KodiHQ Tenant Portal',
         sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
@@ -605,7 +605,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       },
       {
         key: 'portalLink',
-        description: 'URL to the KodiHub Tenant Portal',
+        description: 'URL to the KodiHQ Tenant Portal',
         sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
@@ -659,7 +659,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       },
       {
         key: 'portalLink',
-        description: 'URL to the KodiHub Tenant Portal',
+        description: 'URL to the KodiHQ Tenant Portal',
         sample: 'https://app.kodihq.co.ke/tenant',
       },
     ],
@@ -669,10 +669,10 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     name: 'SMS Units Running Low',
     category: 'Platform Billing',
     description:
-      'Sent to organisation owners on KodiHub SMS when their prepaid SMS units drop below their low-balance level.',
+      'Sent to organisation owners on KodiHQ SMS when their prepaid SMS units drop below their low-balance level.',
     defaultSubject: 'SMS units running low',
     defaultBody:
-      '{{organizationName}}: {{balance}} SMS units left. Buy more in KodiHub (Settings → SMS) so messages to your tenants and guests keep going.',
+      '{{organizationName}}: {{balance}} SMS units left. Buy more in KodiHQ (Settings → SMS) so messages to your tenants and guests keep going.',
     variables: [
       { key: 'organizationName', description: 'Organisation name', sample: 'Makini Homes' },
       { key: 'balance', description: 'SMS units left', sample: '49' },
@@ -688,10 +688,10 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
     name: 'Out of SMS Units',
     category: 'Platform Billing',
     description:
-      'Sent to organisation owners on KodiHub SMS when a message to a tenant or guest was not sent for lack of units.',
+      'Sent to organisation owners on KodiHQ SMS when a message to a tenant or guest was not sent for lack of units.',
     defaultSubject: 'Out of SMS units',
     defaultBody:
-      '{{organizationName}}: messages to your tenants and guests are not being sent because you have no SMS units left. Buy SMS units in KodiHub (Settings → SMS) to start again.',
+      '{{organizationName}}: messages to your tenants and guests are not being sent because you have no SMS units left. Buy SMS units in KodiHQ (Settings → SMS) to start again.',
     variables: [
       { key: 'organizationName', description: 'Organisation name', sample: 'Makini Homes' },
       { key: 'balance', description: 'SMS units left', sample: '49' },
@@ -710,7 +710,7 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailTemplateKey, EmailTemplateDefi
       'Sent to organisation owners using their own SMS provider when it refuses messages.',
     defaultSubject: 'Your SMS account isn’t sending',
     defaultBody:
-      '{{organizationName}}: your SMS provider refused a message ({{reason}}). Messages to your tenants and guests are failing. Check your SMS account, or buy KodiHub SMS units (Settings → SMS).',
+      '{{organizationName}}: your SMS provider refused a message ({{reason}}). Messages to your tenants and guests are failing. Check your SMS account, or buy KodiHQ SMS units (Settings → SMS).',
     variables: [
       { key: 'organizationName', description: 'Organisation name', sample: 'Makini Homes' },
       { key: 'balance', description: 'SMS units left', sample: '49' },
@@ -807,18 +807,21 @@ function linkifyHtml(escapedText: string): string {
 }
 
 /**
- * Wraps a plain-text email body into a clean, responsive KodiHub HTML email layout.
+ * Wraps a plain-text email body into a clean, responsive KodiHQ HTML email layout.
  */
 export function renderBrandedEmailHtml(opts: {
   subject: string;
   text: string;
   brandName?: string;
 }): string {
-  const rawBrand = opts.brandName?.trim() || 'KodiHub';
+  const givenBrand = opts.brandName?.trim() || 'KodiHQ';
+  // The platform's own name gets the two-tone wordmark. A sender name saved before the rename
+  // (KodiHub, until November 2026) is shown as the current one.
+  const isDefaultBrand = ['kodihq', 'kodihub'].includes(givenBrand.toLowerCase());
+  const rawBrand = isDefaultBrand ? 'KodiHQ' : givenBrand;
   const brand = escapeHtml(rawBrand);
-  const isDefaultBrand = rawBrand.toLowerCase() === 'kodihub';
   const brandHtml = isDefaultBrand
-    ? '<span style="font-size:19px;font-weight:700;letter-spacing:-0.03em;color:#ffffff;">kodi<span style="color:#84BD00;">hub</span></span>'
+    ? '<span style="font-size:19px;font-weight:700;letter-spacing:-0.03em;color:#ffffff;">kodi<span style="color:#84BD00;">HQ</span></span>'
     : `<span style="font-size:18px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;">${brand}</span>`;
   const subject = escapeHtml(opts.subject);
   const lines = opts.text.replace(/\r\n/g, '\n').split('\n');

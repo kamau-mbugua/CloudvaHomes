@@ -21,7 +21,7 @@ class ApiError implements Exception {
 
   /// Same wording as the web app, whatever the server said.
   static const orgSuspendedMessage =
-      'Your organisation is read-only until its KodiHub bill is paid, so this change wasn’t saved. '
+      'Your organisation is read-only until its KodiHQ bill is paid, so this change wasn’t saved. '
       'Tenants can still pay rent, and rent payments can still be recorded. '
       'Pay the bill under More → Plan & billing.';
 
@@ -70,7 +70,7 @@ class ApiError implements Exception {
       status: status,
       code: 'HTTP_$status',
       message: status >= 500
-          ? 'KodiHub is having trouble right now. Please try again in a moment.'
+          ? 'KodiHQ is having trouble right now. Please try again in a moment.'
           : 'Something went wrong (HTTP $status). Please try again.',
       requestId: requestId,
     );
@@ -80,7 +80,7 @@ class ApiError implements Exception {
     status: 0,
     code: networkError,
     message:
-        'Can’t reach KodiHub. Check your internet connection and try again.',
+        'Can’t reach KodiHQ. Check your internet connection and try again.',
   );
 
   @override

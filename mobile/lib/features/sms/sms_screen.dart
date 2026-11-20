@@ -11,9 +11,9 @@ import 'buy_sms_sheet.dart';
 import 'sms_api.dart';
 import 'sms_models.dart';
 
-/// Settings → SMS: how messages to tenants and guests are sent, KodiHub SMS units (balance,
-/// Buy SMS), the warning level and — on an own SMS account — the KodiHub fallback switch,
-/// plus recent messages and top-ups. Sign-in codes are sent by KodiHub and never use units.
+/// Settings → SMS: how messages to tenants and guests are sent, KodiHQ SMS units (balance,
+/// Buy SMS), the warning level and — on an own SMS account — the KodiHQ fallback switch,
+/// plus recent messages and top-ups. Sign-in codes are sent by KodiHQ and never use units.
 class SmsScreen extends ConsumerWidget {
   const SmsScreen({super.key});
 
@@ -87,7 +87,7 @@ class _SmsBody extends ConsumerWidget {
               const SizedBox(height: 8),
               const Text(
                 'One unit is one SMS of up to 160 characters (70 with emoji). Sign-in and security codes are '
-                'sent by KodiHub and never use your units.',
+                'sent by KodiHQ and never use your units.',
               ),
             ],
           ),
@@ -158,7 +158,7 @@ class _SmsBody extends ConsumerWidget {
                       ),
                       subtitle: Text(
                         '${formatTimestamp(t.at)} · '
-                        '${t.kind == 'PURCHASE' ? 'M-Pesa${t.mpesaReceipt != null ? ' ${t.mpesaReceipt}' : ''}' : t.reason ?? 'Added by KodiHub'}',
+                        '${t.kind == 'PURCHASE' ? 'M-Pesa${t.mpesaReceipt != null ? ' ${t.mpesaReceipt}' : ''}' : t.reason ?? 'Added by KodiHQ'}',
                       ),
                       trailing: Text('${t.balanceAfter}'),
                     ),
@@ -236,7 +236,7 @@ class _WarningsCardState extends ConsumerState<_WarningsCard> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text(
-            'If my SMS account fails, send through KodiHub using my units',
+            'If my SMS account fails, send through KodiHQ using my units',
           ),
           value: _fallback,
           onChanged: (v) => setState(() => _fallback = v),

@@ -20,7 +20,7 @@ import {
 } from './smsLog';
 
 /**
- * Every SMS on KodiHub — its own sign-in and security messages and every organisation's —
+ * Every SMS on KodiHQ — its own sign-in and security messages and every organisation's —
  * newest first, with filters and a phone search. Each row opens the message. With `orgId`
  * (and a period) it lists one organisation's messages, as the SMS report's drill-down.
  */
@@ -78,8 +78,8 @@ export function AdminSmsMessages({ orgId, from: fixedFrom, to: fixedTo }: { orgI
         {orgId ? null : (
           <select className="ad__select" aria-label="Sent by" value={kind}
             onChange={(e) => { reset(setKind)(e.target.value as SmsKind | ''); setType(''); }}>
-            <option value="">KodiHub and organisations</option>
-            <option value="PLATFORM">KodiHub’s own</option>
+            <option value="">KodiHQ and organisations</option>
+            <option value="PLATFORM">KodiHQ’s own</option>
             <option value="ORG">Organisations’</option>
           </select>
         )}
@@ -138,7 +138,7 @@ export function AdminSmsMessages({ orgId, from: fixedFrom, to: fixedTo }: { orgI
                 return (
                   <tr key={r.id}>
                     <td>{formatDateTime(r.at)}</td>
-                    {orgId ? null : <td>{r.organization ? r.organization.name : <span className="ad__muted">KodiHub</span>}</td>}
+                    {orgId ? null : <td>{r.organization ? r.organization.name : <span className="ad__muted">KodiHQ</span>}</td>}
                     <td className="num">{r.to}</td>
                     <td>{smsTypeLabel(r.type)}</td>
                     <td>{r.provider ? PROVIDER_LABEL[r.provider] : '—'}</td>

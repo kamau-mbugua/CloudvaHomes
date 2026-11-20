@@ -13,7 +13,7 @@ describe('PWA_OPTIONS', () => {
     expect((PWA_OPTIONS.workbox?.globPatterns ?? []).some((g) => g.includes('json'))).toBe(false);
   });
 
-  it('installs as KodiHub, full screen from the app root', () => {
-    expect(PWA_OPTIONS.manifest).toMatchObject({ name: 'KodiHub', short_name: 'KodiHub', start_url: '/', display: 'standalone' });
+  it('installs as KodiHQ, full screen from the app root', () => {
+    expect(PWA_OPTIONS.manifest).toMatchObject({ name: 'KodiHQ', short_name: 'KodiHQ', start_url: '/', display: 'standalone' });
   });
 });

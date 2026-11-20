@@ -32,15 +32,15 @@ class BillingBanner extends ConsumerWidget {
     final String text;
     if (status == 'CLOSED') {
       text =
-          'This organisation is closed on KodiHub. Contact KodiHub to reopen it.';
+          'This organisation is closed on KodiHQ. Contact KodiHQ to reopen it.';
     } else if (suspended) {
       text =
-          'Your account is read-only until the KodiHub bill is paid. Tenants can still pay rent.'
+          'Your account is read-only until the KodiHQ bill is paid. Tenants can still pay rent.'
           '${billing != null && billing.balance > 0 ? ' ${formatKes(billing.balance)} is owed.' : ''}';
     } else {
       text = billing?.overdueAmount != null
-          ? 'Your KodiHub bill of ${formatKes(billing!.overdueAmount!)} was due on ${formatDay(billing.overdueSince)}.'
-          : 'Your KodiHub bill is overdue.';
+          ? 'Your KodiHQ bill of ${formatKes(billing!.overdueAmount!)} was due on ${formatDay(billing.overdueSince)}.'
+          : 'Your KodiHQ bill is overdue.';
     }
 
     return Material(

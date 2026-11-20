@@ -1,4 +1,4 @@
-/** Pure checks for the KodiHub admin SMS forms (provider settings, organisation SMS). */
+/** Pure checks for the KodiHQ admin SMS forms (provider settings, organisation SMS). */
 
 export function adjustProblem(units: number, balance: number, reason: string): string | null {
   if (!Number.isInteger(units) || units === 0) return 'Enter a whole number of units other than 0';

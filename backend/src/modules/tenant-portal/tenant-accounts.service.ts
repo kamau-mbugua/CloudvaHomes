@@ -293,7 +293,7 @@ export class TenantAccountsService {
   private formatPaymentInstructions(channels: PaymentChannel[], tenantCode: string): string {
     const ways = this.howToPay(channels, tenantCode);
     if (!ways.length) {
-      return `Sign in to the KodiHub Tenant Portal to view payment options (Account ref: ${tenantCode}).`;
+      return `Sign in to the KodiHQ Tenant Portal to view payment options (Account ref: ${tenantCode}).`;
     }
     return ways
       .map((w) => {

@@ -18,7 +18,7 @@ export interface SmsPurchaseView {
 }
 
 /**
- * KodiHub SMS bundles bought by M-Pesa (spec §5). Credits units exactly once per M-Pesa receipt
+ * KodiHQ SMS bundles bought by M-Pesa (spec §5). Credits units exactly once per M-Pesa receipt
  * and never touches platform invoices or platform payments.
  */
 @Injectable()
@@ -187,7 +187,7 @@ export class SmsPurchasesService {
     await this.notifications.notifyOwners(
       orgId,
       { kind: 'sms_bought', title: 'SMS units added', body },
-      { subject: 'SMS units added', text: `${body}\n\nThank you for buying KodiHub SMS.` },
+      { subject: 'SMS units added', text: `${body}\n\nThank you for buying KodiHQ SMS.` },
     );
   }
 }

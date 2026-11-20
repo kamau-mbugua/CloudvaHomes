@@ -255,7 +255,7 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
         m.channel === 'email' && m.to === 'owner@kilimani.test',
     );
     expect(welcomeEmail).toBeDefined();
-    expect(welcomeEmail!.subject).toContain('Welcome to KodiHub — Set up Kilimani Estates');
+    expect(welcomeEmail!.subject).toContain('Welcome to KodiHQ — Set up Kilimani Estates');
     expect(welcomeEmail!.text).toContain(
       'Sign-in identifier: owner@kilimani.test or +254711222333',
     );
@@ -361,21 +361,19 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     // Customise the owner_welcome template
     const updatedTpl = (
       await put(admin, '/platform/email/templates/owner_welcome', {
-        subject: 'Karibu KodiHub: {{organizationName}} ({{planName}})',
+        subject: 'Karibu KodiHQ: {{organizationName}} ({{planName}})',
         body: 'Jambo {{firstName}}, activate {{organizationName}} at {{inviteLink}} (Ref {{billingRef}})',
       })
     ).data;
     expect(updatedTpl.customized).toBe(true);
-    expect(updatedTpl.subject).toBe('Karibu KodiHub: {{organizationName}} ({{planName}})');
+    expect(updatedTpl.subject).toBe('Karibu KodiHQ: {{organizationName}} ({{planName}})');
 
     // Send a test of the customised template
     const tplTestRes = await post(admin, '/platform/email/templates/owner_welcome/test', {
       to: 'preview@kilimani.test',
     });
     expect(tplTestRes.data.sent).toBe(true);
-    expect(tplTestRes.data.subject).toBe(
-      '[Test] Karibu KodiHub: Kilimani Crest Estates (Standard)',
-    );
+    expect(tplTestRes.data.subject).toBe('[Test] Karibu KodiHQ: Kilimani Crest Estates (Standard)');
 
     // Onboard another organisation and verify it uses the customised owner_welcome template
     await onboardOrg(t, admin, {
@@ -388,7 +386,7 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
         m.channel === 'email' && m.to === 'amina@lavington.test',
     );
     expect(customEmail).toBeDefined();
-    expect(customEmail!.subject).toBe('Karibu KodiHub: Lavington Court (Standard)');
+    expect(customEmail!.subject).toBe('Karibu KodiHQ: Lavington Court (Standard)');
     expect(customEmail!.text).toMatch(
       /Jambo Olive, activate Lavington Court at http.*\/invite\/.* \(Ref H\d{5}\)/,
     );

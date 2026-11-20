@@ -5,7 +5,7 @@ import { injectMeta, siteCsp, siteSlugFromHost } from './site-html.js';
 describe('site-html — injectMeta and siteSlugFromHost', () => {
   it('escapes HTML characters in title, description, image, and url, and omits og:image when image is null', () => {
     const base =
-      '<!doctype html><html><head><title>KodiHub</title></head><body><div id="root"></div></body></html>';
+      '<!doctype html><html><head><title>KodiHQ</title></head><body><div id="root"></div></body></html>';
 
     const withImg = injectMeta(base, {
       title: 'Cozy "<script>alert(1)</script>',

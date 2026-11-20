@@ -109,7 +109,7 @@ JOBS_SHARED_SECRET=$jobs
 DARAJA_MODE=$([ "$ENV" = prod ] && echo live || echo simulated)
 SMS_PROVIDER=log
 EMAIL_PROVIDER=log
-EMAIL_FROM=KodiHub <noreply@kodihub.co.ke>
+EMAIL_FROM=KodiHQ <noreply@kodihub.co.ke>
 API
   echo "$ENV: secrets generated"
 else

@@ -19,7 +19,7 @@ import { useAppConfig } from './useAppConfig';
 import { useCountdown } from './useCountdown';
 
 /**
- * Sign in — the pos-react auth layout with KodiHub branding.
+ * Sign in — the pos-react auth layout with KodiHQ branding.
  *
  * One identifier field takes an email address OR a phone number; the server decides
  * which it is. "Use a one-time code instead" is the phone-only path (most tenants and
@@ -251,7 +251,7 @@ export function LoginPage() {
           <div className="au__step">
             <h1>Enter your code</h1>
             <p className="au__lede">
-              If {phone.trim()} has a KodiHub account, a 6-digit code is on its way. It works for 5 minutes.
+              If {phone.trim()} has a KodiHQ account, a 6-digit code is on its way. It works for 5 minutes.
             </p>
 
             <div className="au__field">
@@ -298,7 +298,7 @@ export function LoginPage() {
           {appConfig.data?.maintenanceMode ? (
             <p className="au__error" role="status">
               {appConfig.data.maintenanceMessage ||
-                'KodiHub is currently undergoing scheduled maintenance. Platform administrators can still sign in below.'}
+                'KodiHQ is currently undergoing scheduled maintenance. Platform administrators can still sign in below.'}
             </p>
           ) : null}
 
@@ -366,7 +366,7 @@ export function LoginPage() {
 
         {appConfig.data?.allowPublicSignup ? (
           <p className="au__note">
-            New to KodiHub? <Link to="/register">Create an organisation account</Link>
+            New to KodiHQ? <Link to="/register">Create an organisation account</Link>
           </p>
         ) : null}
       </form>

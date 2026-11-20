@@ -140,7 +140,7 @@ describe('Stays — guest emails, receipts and listing locations (e2e)', () => {
       await patch(host, `/host/listings/${l.id}`, { location: { address: 'x', lat: 1 } }, 422);
     });
 
-    it('lets KodiHub admin set the Maps key; hosts and the public listing page get it', async () => {
+    it('lets KodiHQ admin set the Maps key; hosts and the public listing page get it', async () => {
       expect((await get(host, '/host/listings/maps')).data).toEqual({ key: null });
       await put(admin, '/platform/settings', { googleMapsKey: 'not a key' }, 422);
       await put(admin, '/platform/settings', { googleMapsKey: MAPS_KEY });
@@ -162,7 +162,7 @@ describe('Stays — guest emails, receipts and listing locations (e2e)', () => {
       const confirmed = mails().find((m) => m.subject.startsWith('Booking confirmed'));
       expect(confirmed).toMatchObject({
         subject: expect.stringContaining('Cozy 1BR with balcony'),
-        fromName: 'Makini Homes via KodiHub',
+        fromName: 'Makini Homes via KodiHQ',
       });
       expect(confirmed!.text).toContain('Hi Achieng,');
       expect(confirmed!.text).toContain(`Address: ${LOCATION.address}`);

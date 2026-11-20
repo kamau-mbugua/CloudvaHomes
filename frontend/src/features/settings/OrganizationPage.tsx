@@ -219,7 +219,7 @@ function OrganizationForm({ org }: { org: Organization }) {
               <h2>Organisation details</h2>
               <p>
                 {org.kind === 'HOST'
-                  ? 'Your organisation’s name and contacts on KodiHub.'
+                  ? 'Your organisation’s name and contacts on KodiHQ.'
                   : 'Shown on invoices, receipts and messages to tenants.'}
               </p>
               {canSeeChannels ? (
@@ -237,7 +237,7 @@ function OrganizationForm({ org }: { org: Organization }) {
                 <div className="fld">
                   <label htmlFor="org-kind">Type</label>
                   <input id="org-kind" value={KIND_LABEL[org.kind] ?? org.kind} disabled readOnly />
-                  <span className="hint">Set when KodiHub created the organisation.</span>
+                  <span className="hint">Set when KodiHQ created the organisation.</span>
                 </div>
               </div>
             </section>

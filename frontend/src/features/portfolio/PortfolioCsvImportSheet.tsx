@@ -585,7 +585,7 @@ export function PortfolioCsvImportSheet({
     <CsvImportSheet
       title="Import portfolio CSV (Properties, Units & Setup)"
       subtitle="Onboard properties, unit types, categories, features, and units in one flat CSV file. Missing properties, categories, types, and features are created automatically."
-      sampleFilename="kodihub-portfolio-template.csv"
+      sampleFilename="kodihq-portfolio-template.csv"
       sampleHeaders={SAMPLE_HEADERS}
       sampleRows={SAMPLE_ROWS}
       columns={COLUMNS}

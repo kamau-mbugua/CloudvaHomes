@@ -108,7 +108,7 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
 
       const one = (await get(admin, `/platform/sms/logs/${row.id}`)).data;
       expect(one).toMatchObject({ to: PHONE, secret: { label: 'Code', hidden: true } });
-      expect(one.text).toContain('Your KodiHub sign-in code is ••••••.');
+      expect(one.text).toContain('Your KodiHQ sign-in code is ••••••.');
       expect(one.text).not.toContain('482913');
 
       // The database holds no readable text.
@@ -173,7 +173,7 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
       await sms.send({ kind: 'platform', type: 'password_reset' }, '+254744000333', 'Reset 1.');
     });
 
-    it('lists every SMS newest first and filters by organisation, KodiHub, status and type', async () => {
+    it('lists every SMS newest first and filters by organisation, KodiHQ, status and type', async () => {
       const all = await get(admin, '/platform/sms/logs');
       expect(all.meta.total).toBe(4);
       expect(all.data[0].type).toBe('password_reset');
@@ -209,20 +209,20 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
       await get(admin, '/platform/sms/logs?from=2026-02-01&to=2026-01-01', 422);
     });
 
-    it('is for KodiHub admins only', async () => {
+    it('is for KodiHQ admins only', async () => {
       await get(owner, '/platform/sms/logs', 403);
       await get(owner, '/platform/sms/stats', 403);
     });
   });
 
-  describe('testing KodiHub’s provider', () => {
+  describe('testing KodiHQ’s provider', () => {
     it('asks for a provider when none is saved', async () => {
       const r = (await post(admin, '/platform/sms/test', { phone: '0722000111' })).data;
       expect(r).toEqual({
         sent: false,
         provider: null,
         messageId: null,
-        reason: 'Choose and save KodiHub’s SMS provider first.',
+        reason: 'Choose and save KodiHQ’s SMS provider first.',
       });
       expect(outbox.filter((m) => m.channel === 'sms')).toHaveLength(0);
     });
@@ -254,7 +254,7 @@ describe('Platform SMS log, provider test and dashboard (e2e)', () => {
       const [row] = (await get(admin, '/platform/sms/logs')).data;
       expect(row).toMatchObject({ type: 'sms_test', status: 'SENT', provider: 'HOSTPINNACLE' });
       const one = (await get(admin, `/platform/sms/logs/${row.id}`)).data;
-      expect(one.text).toBe('KodiHub test message: SMS through HostPinnacle works.');
+      expect(one.text).toBe('KodiHQ test message: SMS through HostPinnacle works.');
     });
 
     it('shows the provider’s own error', async () => {

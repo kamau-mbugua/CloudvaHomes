@@ -41,10 +41,10 @@ type SettingsTab =
 
 /**
  * Admin → Settings (`/admin/settings`):
- * - Billing rules: due days, grace days, default plan, KodiHub's paybill.
+ * - Billing rules: due days, grace days, default plan, KodiHQ's paybill.
  * - Document instructions: system-wide footer/notice instructions for invoices and receipts.
  * - Landing page: environment-specific marketing site content (`kodihq.co.ke` in prod, `landing.kodihq.co.ke` in dev).
- * - M-Pesa (Daraja): KodiHub's Daraja keys & callback URLs.
+ * - M-Pesa (Daraja): KodiHQ's Daraja keys & callback URLs.
  * - Admin 2FA: require 2FA for platform operators & channel (Email/SMS).
  * - Rate-limit locks: active OTP & login rate-limit lockouts.
  * - SMS (Africa's Talking): username, sender ID, API key (write-only).
@@ -195,7 +195,7 @@ function SettingsForm({ settings }: { settings: PlatformSettings }) {
             {offered.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Field>
-        <Field id="ps-paybill" label="KodiHub’s paybill" optional error={errors.paybill}
+        <Field id="ps-paybill" label="KodiHQ’s paybill" optional error={errors.paybill}
           hint="Organisations pay to it with their billing account number (H00001).">
           <input id="ps-paybill" inputMode="numeric" autoComplete="off" maxLength={7} value={draft.paybill} aria-invalid={Boolean(errors.paybill)}
             onChange={(e) => set('paybill', e.target.value)} />
@@ -220,7 +220,7 @@ function DarajaSection({ settings }: { settings: PlatformSettings }) {
   return (
     <section className="fm__section" aria-labelledby="ps-daraja">
       <div className="mp__cardhead">
-        <h2 id="ps-daraja">KodiHub’s M-Pesa connection</h2>
+        <h2 id="ps-daraja">KodiHQ’s M-Pesa connection</h2>
         <div className="mp__badges">
           {daraja?.configured ? <span className="ad__badge ad__badge--ok">Connected</span> : <span className="ad__badge ad__badge--off">Not connected</span>}
           {daraja?.configured && daraja.environment ? <Badge table={DARAJA_ENV} value={daraja.environment} /> : null}
@@ -232,7 +232,7 @@ function DarajaSection({ settings }: { settings: PlatformSettings }) {
         </div>
       </div>
       <p>
-        KodiHub’s own Daraja app for its paybill: organisations’ “Pay now” prompts go out through it, and payments to the paybill
+        KodiHQ’s own Daraja app for its paybill: organisations’ “Pay now” prompts go out through it, and payments to the paybill
         with a billing account number are matched automatically. Without it, organisations pay to the paybill and you record the payment.
       </p>
       {daraja?.configured && daraja.passkey === false ? (
@@ -245,7 +245,7 @@ function DarajaSection({ settings }: { settings: PlatformSettings }) {
             <CallbackUrl label="Paybill confirmation" url={urls.c2bConfirm} />
             <CallbackUrl label="Paybill validation" url={urls.c2bValidate} />
           </dl>
-          <p className="hint mp__hint">Register the confirmation and validation URLs for KodiHub’s paybill with Safaricom. Keep them private.</p>
+          <p className="hint mp__hint">Register the confirmation and validation URLs for KodiHQ’s paybill with Safaricom. Keep them private.</p>
         </>
       ) : null}
       {settings.updatedAt ? <p className="hint">Settings last changed {formatDateTime(settings.updatedAt)}.</p> : null}
@@ -273,7 +273,7 @@ function DarajaKeysSheet({ settings, onClose }: { settings: PlatformSettings; on
   const save = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.put<unknown>('/platform/settings', body),
     onSuccess: async () => {
-      toast.saved(configured ? 'KodiHub’s M-Pesa keys were changed.' : 'KodiHub’s paybill is connected to M-Pesa.');
+      toast.saved(configured ? 'KodiHQ’s M-Pesa keys were changed.' : 'KodiHQ’s paybill is connected to M-Pesa.');
       await queryClient.invalidateQueries({ queryKey: keys.platform });
       onClose();
     },
@@ -300,7 +300,7 @@ function DarajaKeysSheet({ settings, onClose }: { settings: PlatformSettings; on
 
   return (
     <Sheet
-      title={configured ? 'Change KodiHub’s M-Pesa keys' : 'Connect KodiHub’s paybill to M-Pesa'}
+      title={configured ? 'Change KodiHQ’s M-Pesa keys' : 'Connect KodiHQ’s paybill to M-Pesa'}
       wide
       busy={save.isPending}
       onClose={onClose}
@@ -313,7 +313,7 @@ function DarajaKeysSheet({ settings, onClose }: { settings: PlatformSettings; on
     >
       <form id="hodi-daraja" className="sheet-form" onSubmit={submit} noValidate autoComplete="off">
         <p className="ad__muted">
-          From KodiHub’s app on the Safaricom Daraja portal. The keys are stored encrypted and never shown again —
+          From KodiHQ’s app on the Safaricom Daraja portal. The keys are stored encrypted and never shown again —
           {configured ? ' enter all of them again to change any one.' : ' keep your own copy.'} Saving asks for a verification code.
         </p>
         <div className={`fld ${errors.environment ? 'is-bad' : ''}`}>
@@ -596,7 +596,7 @@ function AppAndMaintenanceForm({ settings }: { settings: PlatformSettings }) {
         <div className="fld fld--wide">
           <label className="fld__check">
             <input type="checkbox" checked={maintenanceMode} onChange={(e) => setMaintenanceMode(e.target.checked)} />
-            Enable maintenance mode banner across KodiHub
+            Enable maintenance mode banner across KodiHQ
           </label>
         </div>
         <Field id="am-maint" label="Maintenance message" optional wide>
@@ -716,8 +716,8 @@ function DocumentInstructionsForm({ settings }: { settings: PlatformSettings }) 
 
 const DEFAULT_LANDING_PAGE: LandingPageContent = {
   topBarText: 'New organisations start with a free trial. Vacant units are never billed.',
-  brandName: 'KodiHub',
-  pageTitle: 'KodiHub: rent, M-Pesa and short-stay management in Kenya',
+  brandName: 'KodiHQ',
+  pageTitle: 'KodiHQ: rent, M-Pesa and short-stay management in Kenya',
   metaDescription:
     'Rent invoicing, M-Pesa and bank reconciliation, landlord payouts and short-stay bookings in one place. For Kenyan landlords, letting agencies and BNB hosts.',
   signInLabel: 'Sign in',
@@ -725,7 +725,7 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
   heroBadge: 'Property software for Kenya',
   heroTitle: 'Collect rent on M-Pesa. Let the books reconcile themselves.',
   heroSubtitle:
-    'KodiHub runs rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, pays landlords their net remittance and takes short-stay bookings. Built for Kenyan landlords, letting agencies and hosts.',
+    'KodiHQ runs rent and utility invoicing, matches every Paybill, Till and bank payment to the right tenant, pays landlords their net remittance and takes short-stay bookings. Built for Kenyan landlords, letting agencies and hosts.',
   heroPrimaryCta: 'Start your free trial',
   heroSecondaryCta: 'See how it works',
   heroStatsTitle: 'Sample portfolio · October',
@@ -785,7 +785,7 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
       tag: 'Communications',
       title: 'Branded PDF invoices, receipts and reminders',
       description:
-        'Invoices, receipts and reminders go out by SMS and email with an official PDF. Send SMS under your own sender ID, or buy SMS units from KodiHub.',
+        'Invoices, receipts and reminders go out by SMS and email with an official PDF. Send SMS under your own sender ID, or buy SMS units from KodiHQ.',
     },
     {
       tag: 'Maintenance',
@@ -841,7 +841,7 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
   appStoreUrl: null,
   agenciesTitle: 'Manage for many landlords. Remit to each one, on time.',
   agenciesSubtitle:
-    'Set a management agreement per landlord with commission and remittance day. KodiHub builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.',
+    'Set a management agreement per landlord with commission and remittance day. KodiHQ builds the owner statement, deducts approved expenses and sends the net by M-Pesa B2C.',
   hostsTitle: 'Run your BNB like a business. Your own booking site included.',
   hostsSubtitle:
     'Guests pick dates, see your photos and pay you by M-Pesa on your own page at yourname.kodihq.co.ke. You run the calendar, cleaning, money and profit from the same app as your rentals.',
@@ -868,22 +868,22 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
     {
       question: 'How does automatic M-Pesa matching work?',
       answer:
-        "When a payment arrives, KodiHub reads the account reference and the payer's phone number, finds the tenant and clears their oldest unpaid invoice first. Payments it cannot place go to a review queue.",
+        "When a payment arrives, KodiHQ reads the account reference and the payer's phone number, finds the tenant and clears their oldest unpaid invoice first. Payments it cannot place go to a review queue.",
     },
     {
-      question: 'Is KodiHub suitable for letting agencies?',
+      question: 'Is KodiHQ suitable for letting agencies?',
       answer:
         'Yes. Agencies set up management agreements per landlord, earn commission automatically, deduct approved expenses and remit the net to each owner, who gets a read-only portal.',
     },
     {
-      question: 'Can I run short-stay BNB units on KodiHub?',
+      question: 'Can I run short-stay BNB units on KodiHQ?',
       answer:
         'Yes. Sign up as a short-stay host and you get your own booking site at yourname.kodihq.co.ke. Guests pick dates, see photos and pay you by M-Pesa, with no app or account needed. You run the calendar, cleaning, guests and profit per unit from the web and mobile apps.',
     },
     {
       question: 'How are short-stay hosts billed?',
       answer:
-        'At the same rate, counted per published listing each month. Listings you unpublish cost nothing. Guest payments go straight to your own Paybill or Till, and KodiHub never holds them.',
+        'At the same rate, counted per published listing each month. Listings you unpublish cost nothing. Guest payments go straight to your own Paybill or Till, and KodiHQ never holds them.',
     },
     {
       question: 'Can caretakers use it from their phone?',
@@ -901,7 +901,7 @@ const DEFAULT_LANDING_PAGE: LandingPageContent = {
     'Set up your first property in an afternoon. Your tenants get receipts the moment they pay.',
   contactEmail: 'hello@kodihq.co.ke',
   contactPhone: null,
-  footerCopyright: 'KodiHub Property Management. All rights reserved.',
+  footerCopyright: 'KodiHQ Property Management. All rights reserved.',
   footerTagline:
     'Rent, short stays, M-Pesa and landlord payouts in one place. Built in Nairobi for landlords, letting agencies and hosts across Kenya.',
 };

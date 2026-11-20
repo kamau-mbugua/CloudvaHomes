@@ -50,7 +50,7 @@ class _HodiAppState extends ConsumerState<HodiApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'KodiHub',
+      title: 'KodiHQ',
       debugShowCheckedModeBanner: false,
       theme: hodiTheme(Brightness.light),
       darkTheme: hodiTheme(Brightness.dark),

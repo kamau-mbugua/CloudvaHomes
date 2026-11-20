@@ -22,7 +22,7 @@ import { HodiInvoicesTable } from '../platform/ui';
 import { AdminInvoiceActions, VoidHodiInvoiceSheet } from './sheets';
 
 /**
- * Admin → Invoices (`/admin/invoices`): KodiHub's invoices to every organisation, filtered by
+ * Admin → Invoices (`/admin/invoices`): KodiHQ's invoices to every organisation, filtered by
  * status and month (in the address), each with its PDF and Void. "Run a month" bills a
  * finished month by hand (`POST /platform/invoices/run`); it is idempotent, so running a
  * month twice never bills an organisation twice.
@@ -104,7 +104,7 @@ export function AdminInvoicesPage() {
         <div className="ad__tablewrap">
           {filtered
             ? <EmptyState title="No invoices match" detail="Try a different month or status." onClear={() => filters.clear()} />
-            : <EmptyState title="No KodiHub invoices yet" detail="They are issued on the 1st for the month before. Run a finished month to issue them now." />}
+            : <EmptyState title="No KodiHQ invoices yet" detail="They are issued on the 1st for the month before. Run a finished month to issue them now." />}
         </div>
       ) : (
         <HodiInvoicesTable rows={rows} showOrg actions={(inv) => <AdminInvoiceActions invoice={inv} onVoid={superAdmin ? setVoiding : undefined} />} />

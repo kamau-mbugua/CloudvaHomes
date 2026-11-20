@@ -161,6 +161,12 @@ Things to know:
   `/opt/hodi/edge/edge.env` and deploy. `edge.env.before-move` and `api.env.before-move`, next
   to the originals, hold what the server had before its last move.
 - A value in `api.env` that was set by hand to some other domain is never changed.
+- **The name changed as well, from KodiHub to KodiHQ.** A deploy renames what the server holds
+  under the old name: the sender name in `api.env` (`EMAIL_FROM=KodiHub <...>` becomes
+  `KodiHQ <...>`; the address stays, and so does a name set by hand), and, in two migrations,
+  the wording saved in platform settings and the automatic note on opening deposits. The app
+  id (`co.ke.kodihub`), the `kodihub-edge` image and the SMS sender ID registered with the
+  provider keep their names.
 
 ## Wildcard HTTPS for host booking sites (`*.kodihq.co.ke` / `*.dev.kodihq.co.ke`)
 

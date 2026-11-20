@@ -27,7 +27,7 @@ type AdminSmsView = SmsAccountView & {
 };
 
 /**
- * Admin → Organisation → SMS: how this organisation's messages are sent (KodiHub SMS or its
+ * Admin → Organisation → SMS: how this organisation's messages are sent (KodiHQ SMS or its
  * own TextSMS / Africa's Talking / HostPinnacle account), a test SMS through its account, its
  * own unit price, and its units (add or remove with a reason), usage and top-ups.
  */
@@ -45,7 +45,7 @@ export function AdminOrgSms({ orgId }: { orgId: string }) {
       <div className="hb__top">
         <section className="ag__card" aria-labelledby="osms-now">
           <h3 id="osms-now">SMS now</h3>
-          <p className="ad__muted">{a.mode === 'PLATFORM' ? 'KodiHub sends its SMS' : smsModeLabel(a).replace('Your own', 'Its own')}</p>
+          <p className="ad__muted">{a.mode === 'PLATFORM' ? 'KodiHQ sends its SMS' : smsModeLabel(a).replace('Your own', 'Its own')}</p>
           <dl className="pf__facts hb__facts">
             <Fact label="Units left">{a.balance.toLocaleString('en-KE')}</Fact>
             <Fact label="Bought">{a.unitsBought.toLocaleString('en-KE')}</Fact>
@@ -134,7 +134,7 @@ function SetupForm({ orgId, base, account }: { orgId: string; base: string; acco
         <legend className="sr-only">SMS mode</legend>
         <label className="sms__bundle">
           <input type="radio" name="osms-mode" checked={mode === 'PLATFORM'} onChange={() => setMode('PLATFORM')} />
-          <span>KodiHub sends its SMS (paid with SMS units)</span>
+          <span>KodiHQ sends its SMS (paid with SMS units)</span>
           <span />
         </label>
         <label className="sms__bundle">
@@ -179,7 +179,7 @@ function SetupForm({ orgId, base, account }: { orgId: string; base: string; acco
 
       <div className="fm__grid">
         <Field id="osms-price" label="Own price per unit (KES)" optional error={errors.unitPrice}
-          hint="Leave empty to use KodiHub’s price.">
+          hint="Leave empty to use KodiHQ’s price.">
           <input id="osms-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>
       </div>
@@ -292,7 +292,7 @@ function AdminLists({ base, orgId }: { base: string; orgId: string }) {
                     <td>{formatDateTime(r.at)}</td>
                     <td className="num">{r.units > 0 ? `+${r.units}` : r.units}</td>
                     <td className="num">{r.amount ? formatKES(Number(r.amount)) : '—'}</td>
-                    <td>{r.kind === 'PURCHASE' ? 'M-Pesa' : 'Added by KodiHub'}{r.reason ? <span className="ad__sub">{r.reason}</span> : null}</td>
+                    <td>{r.kind === 'PURCHASE' ? 'M-Pesa' : 'Added by KodiHQ'}{r.reason ? <span className="ad__sub">{r.reason}</span> : null}</td>
                     <td className="num">{r.balanceAfter}</td>
                   </tr>
                 ))}

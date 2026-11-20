@@ -9,7 +9,7 @@ import type { OrgStatus } from '../platform/types';
 
 /**
  * Admin → Overview (`/admin`): organisations by status (each opens the filtered list),
- * units let across KodiHub, last month's billing, what is outstanding and what came in this
+ * units let across KodiHQ, last month's billing, what is outstanding and what came in this
  * month (`GET /platform/stats`), and the SMS dashboard.
  */
 

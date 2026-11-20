@@ -114,6 +114,6 @@ class _ShellTitle extends ConsumerWidget {
     final accounts = session.valueOrNull?.tenantOf ?? const [];
     final currentId = ref.watch(currentTenantIdProvider);
     final current = accounts.where((a) => a.tenantId == currentId).firstOrNull;
-    return Text(current?.orgName ?? 'KodiHub');
+    return Text(current?.orgName ?? 'KodiHQ');
   }
 }

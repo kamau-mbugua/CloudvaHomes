@@ -124,7 +124,7 @@ export function AppShell() {
     <div className={`ms ${drawerOpen ? 'is-drawer-open' : ''}`}>
       <Sidebar
         groups={groups}
-        orgName={org?.name ?? 'KodiHub'}
+        orgName={org?.name ?? 'KodiHQ'}
         switcher={
           <WorkspaceSwitcher
             here="staff"

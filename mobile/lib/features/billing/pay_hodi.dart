@@ -18,9 +18,9 @@ Future<void> showPayKodiHub(
   return StkPaySheet.show(
     context,
     StkPaySheet(
-      title: 'Pay your KodiHub bill',
+      title: 'Pay your KodiHQ bill',
       intro:
-          'An M-Pesa prompt goes to the phone below. The payment pays the oldest KodiHub invoice '
+          'An M-Pesa prompt goes to the phone below. The payment pays the oldest KodiHQ invoice '
           'first; anything extra is kept as credit.',
       defaultAmount: wholeShillingsUp(billing.balance),
       defaultPhone: phone,

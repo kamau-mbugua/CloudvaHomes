@@ -60,7 +60,7 @@ export function lastCode(to: string): string {
 }
 
 /**
- * Follows a KodiHub short link (go.<site domain>/<code>, as SMS carry them) through the API's
+ * Follows a KodiHQ short link (go.<site domain>/<code>, as SMS carry them) through the API's
  * redirect and returns where it leads. Throws when the text has no short link.
  */
 export async function followShortLink(t: TestApp, text: string): Promise<string> {

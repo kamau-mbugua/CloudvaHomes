@@ -17,7 +17,7 @@ export type SmsProviderConfig =
       senderId: string;
     };
 
-/** Messages about a person's KodiHub account: KodiHub's provider and sender, never units. */
+/** Messages about a person's KodiHQ account: KodiHQ's provider and sender, never units. */
 export type PlatformSmsType =
   | 'login_otp'
   | 'password_reset'

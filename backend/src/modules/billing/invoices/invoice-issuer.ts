@@ -199,7 +199,7 @@ export class InvoiceIssuer {
       if (!fullInvoice || !tenant) return;
 
       const unit = fullInvoice.tenancy.unit;
-      const orgName = org?.name ?? 'KodiHub';
+      const orgName = org?.name ?? 'KodiHQ';
       const issueDateStr = formatDateOnly(fullInvoice.issueDate);
       const dueDateStr = formatDateOnly(fullInvoice.dueDate);
 

@@ -89,14 +89,14 @@ export default function GuestSiteApp({ slug }: GuestSiteAppProps) {
             <p className="site-not-found__host">
               Run short stays?{' '}
               <a href="https://kodihq.co.ke" rel="noreferrer">
-                Get your own booking site with KodiHub
+                Get your own booking site with KodiHQ
               </a>
             </p>
           </div>
         </main>
         <footer className="site-footer">
           <div className="site-footer__inner">
-            <span className="site-footer__powered">Powered by KodiHub</span>
+            <span className="site-footer__powered">Powered by KodiHQ</span>
           </div>
         </footer>
       </div>
@@ -206,7 +206,7 @@ export default function GuestSiteApp({ slug }: GuestSiteAppProps) {
             <span>
               © {year} {site.businessName}. All rights reserved.
             </span>
-            <span className="site-footer__powered">Powered by KodiHub</span>
+            <span className="site-footer__powered">Powered by KodiHQ</span>
           </div>
         </footer>
 

@@ -50,8 +50,8 @@ export function phoneDigits(q: string): string {
 }
 
 /**
- * KodiHub admin view of every SMS sent on KodiHub (its own and organisations'): the list, one
- * message with its text, the audited reveal of a hidden code, a test of KodiHub's provider, and
+ * KodiHQ admin view of every SMS sent on KodiHQ (its own and organisations'): the list, one
+ * message with its text, the audited reveal of a hidden code, a test of KodiHQ's provider, and
  * the SMS dashboard.
  */
 @Injectable()

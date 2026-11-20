@@ -8,7 +8,7 @@ export const PROVIDER_LABEL: Record<SmsProvider, string> = {
 };
 
 export function smsModeLabel(a: SmsAccountView): string {
-  if (a.mode === 'PLATFORM') return 'KodiHub sends your SMS';
+  if (a.mode === 'PLATFORM') return 'KodiHQ sends your SMS';
   const parts = [a.senderId ? `sender ID ${a.senderId}` : null, a.provider ? PROVIDER_LABEL[a.provider] : null].filter(Boolean);
   return parts.length ? `Your own SMS account (${parts.join(', ')})` : 'Your own SMS account';
 }

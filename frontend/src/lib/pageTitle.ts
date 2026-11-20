@@ -8,7 +8,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
  */
 
 export function composeTitle(override: string | null, shell: string): string {
-  return `${override ?? shell} · KodiHub`;
+  return `${override ?? shell} · KodiHQ`;
 }
 
 export function createTitleStack() {

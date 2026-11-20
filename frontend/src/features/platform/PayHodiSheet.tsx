@@ -17,10 +17,10 @@ import { stkView } from './rules';
 import type { PlatformStk } from './types';
 
 /**
- * "Pay now" for the organisation's KodiHub bill (`POST /billing/pay`): an M-Pesa prompt to the
- * payer's phone from KodiHub's own paybill, then followed (`GET /billing/pay/:id` every 3 s)
+ * "Pay now" for the organisation's KodiHQ bill (`POST /billing/pay`): an M-Pesa prompt to the
+ * payer's phone from KodiHQ's own paybill, then followed (`GET /billing/pay/:id` every 3 s)
  * until they pay, cancel or let it lapse — the same flow as the tenant portal's "Pay now".
- * KodiHub records the payment, pays the oldest invoice first and lifts a suspension; closing
+ * KodiHQ records the payment, pays the oldest invoice first and lifts a suspension; closing
  * this stops only the watching.
  *
  * The `Idempotency-Key` stays the same while the input does, so pressing Pay again after
@@ -90,7 +90,7 @@ export function PayHodiSheet({ owed, ownPhone, onClose }: {
 
   return (
     <Sheet
-      title="Pay your KodiHub bill"
+      title="Pay your KodiHQ bill"
       busy={send.isPending}
       onClose={onClose}
       footer={(
@@ -104,7 +104,7 @@ export function PayHodiSheet({ owed, ownPhone, onClose }: {
     >
       <form id="hodi-pay" className="sheet-form" onSubmit={submit} noValidate>
         <p className="ad__muted">
-          An M-Pesa prompt goes to the phone below. Enter the M-Pesa PIN to pay KodiHub. The payment pays the oldest KodiHub
+          An M-Pesa prompt goes to the phone below. Enter the M-Pesa PIN to pay KodiHQ. The payment pays the oldest KodiHQ
           invoice first; anything extra is kept as credit for the next one.
         </p>
         <div className="fm__grid sheet-grid">
@@ -148,7 +148,7 @@ function PayProgress({ first, startedAt, onAgain, onClose }: {
 
   return (
     <Sheet
-      title="M-Pesa payment to KodiHub"
+      title="M-Pesa payment to KodiHQ"
       onClose={onClose}
       footer={(
         <>

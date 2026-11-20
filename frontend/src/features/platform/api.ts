@@ -15,7 +15,7 @@ import type {
  * unknown query parameters (422), so they are called bare.
  */
 export const keys = {
-  /** The organisation's own KodiHub billing — summary, invoices, payments, pay requests. */
+  /** The organisation's own KodiHQ billing — summary, invoices, payments, pay requests. */
   billing: ['hodi-billing'] as const,
   /** Everything under /platform. */
   platform: ['platform'] as const,
@@ -114,7 +114,7 @@ export function usePlatformLocks(enabled = true) {
 }
 
 /**
- * A KodiHub invoice as a PDF, saved as `HODI-2026-000001.pdf` — the organisation's own
+ * A KodiHQ invoice as a PDF, saved as `HODI-2026-000001.pdf` — the organisation's own
  * (`/billing/…`) or, for a platform admin, any (`/platform/…`).
  */
 export async function downloadHodiInvoicePdf(invoice: { id: string; number: string }, from: 'billing' | 'platform' = 'billing'): Promise<void> {
@@ -141,11 +141,11 @@ export function platformErrorMessage(error: unknown, overrides: Record<string, s
       case 'PLAN_IN_USE':
         return 'Organisations are on this plan, so it can’t be deleted. Move them to another plan first, or mark it inactive so no new organisation gets it.';
       case 'NO_MPESA':
-        return 'Paying in the app isn’t available right now. Pay with M-Pesa to KodiHub’s paybill using the account number shown under “How to pay”.';
+        return 'Paying in the app isn’t available right now. Pay with M-Pesa to KodiHQ’s paybill using the account number shown under “How to pay”.';
       case 'DUPLICATE_REFERENCE':
         return 'A payment with this reference is already recorded, so it may already be in. Check the payments list before entering it again.';
       case 'NOTHING_DUE':
-        return 'Nothing is owed to KodiHub right now.';
+        return 'Nothing is owed to KodiHQ right now.';
       case 'INVOICE_SETTLED':
         return 'Something has already been paid on this invoice, so it can’t be voided.';
       case 'INVOICE_VOID':
@@ -154,7 +154,7 @@ export function platformErrorMessage(error: unknown, overrides: Record<string, s
         return 'Another plan already has this name. Choose a different one.';
       case 'PERMISSION_DENIED':
       case 'FORBIDDEN':
-        return 'Only KodiHub’s platform admins can do this.';
+        return 'Only KodiHQ’s platform admins can do this.';
       case STEP_UP_REQUIRED:
         return 'This change needs the verification code we send you. Nothing was changed.';
       default:

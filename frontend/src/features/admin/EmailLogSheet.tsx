@@ -48,7 +48,7 @@ export function EmailLogSheet({ log, onClose }: { log: PlatformEmailLog; onClose
         {email ? (
           email.text === null ? (
             <p className="ad__sub">
-              This email was sent before KodiHub kept what emails said, so only the details above were recorded.
+              This email was sent before KodiHQ kept what emails said, so only the details above were recorded.
             </p>
           ) : (
             <pre className="ad__emailbody" aria-label="Email text">{email.text}</pre>

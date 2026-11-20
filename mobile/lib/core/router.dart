@@ -162,7 +162,7 @@ class _Offline extends ConsumerWidget {
     final error = ref.watch(sessionProvider).error;
     return Scaffold(
       body: ErrorState(
-        message: error == null ? 'Can’t reach KodiHub.' : messageOf(error),
+        message: error == null ? 'Can’t reach KodiHQ.' : messageOf(error),
         onRetry: () => ref.invalidate(sessionProvider),
       ),
     );
@@ -180,9 +180,9 @@ class _NoAccess extends ConsumerWidget {
         children: [
           const EmptyState(
             icon: Icons.web_outlined,
-            title: 'Use KodiHub on the web',
+            title: 'Use KodiHQ on the web',
             body:
-                'This account has nothing to show in the app yet. Owners and KodiHub admins use the web app.',
+                'This account has nothing to show in the app yet. Owners and KodiHQ admins use the web app.',
           ),
           TextButton(
             onPressed: () => ref.read(sessionProvider.notifier).signOut(),
@@ -271,7 +271,7 @@ class _MustChangePasswordScreenState
             ),
             const SizedBox(height: 6),
             Text(
-              'You signed in with a system-generated temporary password. Choose a new password to continue using KodiHub.',
+              'You signed in with a system-generated temporary password. Choose a new password to continue using KodiHQ.',
               style: TextStyle(color: muted, fontSize: 13.5, height: 1.4),
             ),
             const SizedBox(height: 20),

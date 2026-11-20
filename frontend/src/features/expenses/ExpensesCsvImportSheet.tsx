@@ -279,7 +279,7 @@ export function ExpensesCsvImportSheet({
     <CsvImportSheet
       title="Import expenses CSV"
       subtitle="Bulk-record property expenses from a CSV file."
-      sampleFilename="kodihub-expenses-template.csv"
+      sampleFilename="kodihq-expenses-template.csv"
       sampleHeaders={SAMPLE_HEADERS}
       sampleRows={buildSampleRows(today)}
       columns={COLUMNS}

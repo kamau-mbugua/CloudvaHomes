@@ -384,7 +384,7 @@ class AccountSheet extends ConsumerWidget {
                   color: HodiColors.lime,
                 ),
               ),
-              title: 'KodiHub Platform',
+              title: 'KodiHQ Platform',
               subtitle: session.isSuperAdmin
                   ? 'Organisations, plans, billing and operators'
                   : 'Your organisations, their plans and billing',
@@ -499,7 +499,7 @@ class AccountSheet extends ConsumerWidget {
           builder: (_, snap) => Padding(
             padding: const EdgeInsets.only(top: 12),
             child: Text(
-              'kodihub ${snap.data?.version ?? '1.0.0'}${AppConfig.isProd ? '' : ' · ${AppConfig.flavor}'}',
+              'kodiHQ ${snap.data?.version ?? '1.0.0'}${AppConfig.isProd ? '' : ' · ${AppConfig.flavor}'}',
               textAlign: TextAlign.center,
               style: TextStyle(color: muted, fontSize: 11.5),
             ),

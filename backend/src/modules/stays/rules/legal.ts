@@ -2,7 +2,7 @@
  * Host booking sites: theme presets and starter legal pages.
  *
  * The legal texts are plain-English STARTER templates in Markdown (## section headings, - bullet
- * lists) that the host can edit in Site settings. They are not legal advice; KodiHub Legal should
+ * lists) that the host can edit in Site settings. They are not legal advice; KodiHQ Legal should
  * review them once, and hosts are told to review theirs. A host's own text
  * (HostSite.termsText / termsOfUseText / privacyText) replaces them.
  */
@@ -82,7 +82,7 @@ We try to keep descriptions, photos, prices and availability accurate and up to 
 Buttons such as WhatsApp or call links open other apps or services, which have their own terms.
 
 ## 4. The platform
-This website runs on KodiHub, a software platform. ${biz} is responsible for the stays, prices and bookings offered here.
+This website runs on KodiHQ, a software platform. ${biz} is responsible for the stays, prices and bookings offered here.
 
 ## 5. Changes
 We may update these terms from time to time. The version on this page applies when you use the website.
@@ -104,7 +104,7 @@ For questions about this website, ${contact}.`;
 - To keep accurate records and meet our legal obligations.
 
 ## 3. Who we share it with
-- KodiHub, the platform that runs this website, which processes your information for us.
+- KodiHQ, the platform that runs this website, which processes your information for us.
 - Safaricom (M-Pesa) and SMS providers, only as needed to take payments and send messages.
 - Authorities, when the law requires it.
 We do not sell your personal information.

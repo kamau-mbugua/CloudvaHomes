@@ -371,7 +371,7 @@ describe('Platform billing (e2e)', () => {
     ).data;
     expect(req).toMatchObject({ state: 'PENDING', phone: ownerPhone });
     expect(fake.pushes[0]!.accountReference).toBe(me.billingRef);
-    expect(fake.pushes[0]!.description).toBe('KodiHub bill');
+    expect(fake.pushes[0]!.description).toBe('KodiHQ bill');
     const again = (
       await post(session, '/billing/pay', { amount: KES(1000) }, 202, {
         'Idempotency-Key': 'hodi-1',
@@ -475,7 +475,7 @@ describe('Platform billing (e2e)', () => {
   it('superadmin controls the public landing page content and reset restores defaults', async () => {
     await setUp();
     const initialRes = await t.http().get('/api/v1/public/landing').expect(200);
-    expect(initialRes.body.data.content.brandName).toBe('KodiHub');
+    expect(initialRes.body.data.content.brandName).toBe('KodiHQ');
     expect(initialRes.body.data.defaultPlan).toMatchObject({
       name: 'Standard',
       pricePerUnit: KES(100),
@@ -484,25 +484,25 @@ describe('Platform billing (e2e)', () => {
 
     const updated = (
       await put(admin, '/platform/landing', {
-        brandName: 'KodiHub Kenya',
+        brandName: 'KodiHQ Kenya',
         heroTitle: 'Modern Property Management for Nairobi Estates.',
         heroStats: [{ label: 'Active estates', value: '120+' }],
         contactEmail: 'support@kodihub.co.ke',
       })
     ).data;
-    expect(updated.brandName).toBe('KodiHub Kenya');
+    expect(updated.brandName).toBe('KodiHQ Kenya');
     expect(updated.heroTitle).toBe('Modern Property Management for Nairobi Estates.');
     expect(updated.heroStats).toEqual([{ label: 'Active estates', value: '120+' }]);
 
     const publicAfter = await t.http().get('/api/v1/public/landing').expect(200);
     expect(publicAfter.body.data.content).toMatchObject({
-      brandName: 'KodiHub Kenya',
+      brandName: 'KodiHQ Kenya',
       heroTitle: 'Modern Property Management for Nairobi Estates.',
       contactEmail: 'support@kodihub.co.ke',
     });
 
     const reset = (await put(admin, '/platform/landing', { reset: true })).data;
-    expect(reset.brandName).toBe('KodiHub');
+    expect(reset.brandName).toBe('KodiHQ');
   });
 });
 

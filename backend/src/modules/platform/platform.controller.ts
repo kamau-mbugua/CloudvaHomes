@@ -82,8 +82,8 @@ async function pdf(res: Response, filename: string, data: Promise<Buffer>) {
   return new StreamableFile(await data);
 }
 
-/** An organisation's own KodiHub plan, bill and payments. Works while suspended: that's how they pay. */
-@ApiTags('KodiHub billing')
+/** An organisation's own KodiHQ plan, bill and payments. Works while suspended: that's how they pay. */
+@ApiTags('KodiHQ billing')
 @ApiBearerAuth()
 @AllowWhenSuspended()
 @Controller('billing')

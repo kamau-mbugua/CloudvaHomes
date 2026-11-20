@@ -58,7 +58,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   static String? _roleHintFor(Session? s) {
     if (s == null) return null;
     if (s.activeOrganization != null) return s.activeOrganization!.name;
-    if (s.isPlatformOperator) return platformRoleLabel(s.user) ?? 'KodiHub';
+    if (s.isPlatformOperator) return platformRoleLabel(s.user) ?? 'KodiHQ';
     if (s.tenantOf.isNotEmpty) return s.tenantOf.first.orgName;
     if (s.ownerOf.isNotEmpty) return s.ownerOf.first.orgName;
     return null;
@@ -319,13 +319,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       children: [
         if (appConfig?.maintenanceMode == true) ...[
           const ErrorBox(
-            'KodiHub is currently in maintenance mode. Only platform administrators can sign in right now.',
+            'KodiHQ is currently in maintenance mode. Only platform administrators can sign in right now.',
           ),
           const SizedBox(height: 12),
         ],
         if (appConfig?.forceUpdateRequired == true) ...[
           ErrorBox(
-            'Please update the KodiHub app${appConfig?.minimumMobileVersion != null ? ' to v${appConfig!.minimumMobileVersion} or newer' : ''} for the latest features.',
+            'Please update the KodiHQ app${appConfig?.minimumMobileVersion != null ? ' to v${appConfig!.minimumMobileVersion} or newer' : ''} for the latest features.',
           ),
           const SizedBox(height: 12),
         ],

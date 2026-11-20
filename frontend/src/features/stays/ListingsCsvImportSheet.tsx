@@ -118,7 +118,7 @@ export function ListingsCsvImportSheet({ onClose }: { onClose: () => void }) {
     <CsvImportSheet
       title="Import listings CSV"
       subtitle="Add your stays in one go: one row per listing, with its property and nightly price. Missing properties are created; a unit that already exists becomes the listing. Add photos to each listing afterwards."
-      sampleFilename="kodihub-listings-template.csv"
+      sampleFilename="kodihq-listings-template.csv"
       sampleHeaders={LISTING_CSV_HEADERS}
       sampleRows={LISTING_CSV_SAMPLE_ROWS}
       columns={LISTING_CSV_COLUMNS}

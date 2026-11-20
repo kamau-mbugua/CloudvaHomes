@@ -4,7 +4,7 @@ import { useSmsAccount } from './api';
 import { bannerFor } from './rules';
 
 /**
- * Above every page while the organisation's SMS needs attention: out of or low on KodiHub
+ * Above every page while the organisation's SMS needs attention: out of or low on KodiHQ
  * units, or its own SMS account failing (spec §6). Only for people who may see SMS.
  */
 export function SmsBanner() {

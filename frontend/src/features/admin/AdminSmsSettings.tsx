@@ -14,8 +14,8 @@ import { parseBundles } from './smsAdmin';
 import type { SmsTestResult } from './smsLog';
 
 /**
- * Admin → Settings → SMS: which provider sends KodiHub's own SMS (login codes and
- * organisations on KodiHub SMS), its credentials (write-only), and the price and bundles of
+ * Admin → Settings → SMS: which provider sends KodiHQ's own SMS (login codes and
+ * organisations on KodiHQ SMS), its credentials (write-only), and the price and bundles of
  * SMS units organisations buy.
  */
 export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
@@ -95,12 +95,12 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
     <form className="fm__section" onSubmit={submit} noValidate autoComplete="off">
       <h2>SMS</h2>
       <p>
-        KodiHub’s provider sends sign-in and security codes, and the messages of organisations on KodiHub SMS (paid with
+        KodiHQ’s provider sends sign-in and security codes, and the messages of organisations on KodiHQ SMS (paid with
         their SMS units). Organisations with their own SMS account are set up on their page.
       </p>
 
       <fieldset className="sms__bundles">
-        <legend>KodiHub’s SMS provider</legend>
+        <legend>KodiHQ’s SMS provider</legend>
         {(Object.keys(PROVIDER_LABEL) as SmsProvider[]).map((p) => (
           <label key={p} className="sms__bundle">
             <input type="radio" name="sms-provider" checked={provider === p} onChange={() => setProvider(p)} />
@@ -115,7 +115,7 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
           <Field id="at-user" label="Username" hint="e.g. sandbox, or your Africa’s Talking username">
             <input id="at-user" value={atUser} onChange={(e) => setAtUser(e.target.value)} />
           </Field>
-          <Field id="at-sender" label="Sender ID" optional hint="e.g. KODIHUB">
+          <Field id="at-sender" label="Sender ID" optional hint="e.g. KODIHQ">
             <input id="at-sender" value={atSender} onChange={(e) => setAtSender(e.target.value)} />
           </Field>
           <Field id="at-key" label="API key" wide hint={keyHint(sms?.apiKeySet)}>
@@ -154,7 +154,7 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
       <h3>SMS units</h3>
       <div className="fm__grid">
         <Field id="sms-price" label="Price per unit (KES)" error={errors.price}
-          hint={`Organisations on KodiHub SMS pay this per SMS part. Now ${formatKES(Number(sms?.unitPrice ?? 80))}.`}>
+          hint={`Organisations on KodiHQ SMS pay this per SMS part. Now ${formatKES(Number(sms?.unitPrice ?? 80))}.`}>
           <input id="sms-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>
         <Field id="sms-bundles" label="Bundles (units)" error={errors.bundles} hint="Up to 6, separated by commas, e.g. 500, 1000, 5000">
@@ -180,7 +180,7 @@ export function AdminSmsSettings({ settings }: { settings: PlatformSettings }) {
 }
 
 /**
- * One real SMS through KodiHub's saved provider — only that provider, never a fallback — so
+ * One real SMS through KodiHQ's saved provider — only that provider, never a fallback — so
  * "sent" proves it works. The result shows the provider's own words when it refuses.
  */
 function TestSms({ saved, chosen }: { saved: SmsProvider | null; chosen: SmsProvider }) {

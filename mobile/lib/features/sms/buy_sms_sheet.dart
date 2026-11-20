@@ -11,7 +11,7 @@ import '../../core/widgets/common.dart';
 import 'sms_api.dart';
 import 'sms_models.dart';
 
-/// "Buy SMS": pick a bundle, then an M-Pesa prompt to KodiHub's paybill, followed until paid.
+/// "Buy SMS": pick a bundle, then an M-Pesa prompt to KodiHQ's paybill, followed until paid.
 /// The same Idempotency-Key is reused while the choice is unchanged, so a retry never prompts twice.
 class BuySmsSheet extends ConsumerStatefulWidget {
   const BuySmsSheet({super.key, this.phone});

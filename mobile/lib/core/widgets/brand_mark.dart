@@ -162,7 +162,7 @@ class _C21MarkPainter extends CustomPainter {
       oldDelegate.tone != tone || oldDelegate.progress != progress;
 }
 
-/// Lowercase `kodihub` two-tone wordmark (`Lufga` SemiBold, `-0.04em` tracking).
+/// Two-tone `kodiHQ` wordmark (`Lufga` SemiBold, `-0.04em` tracking).
 class KodiHubWordmark extends StatelessWidget {
   const KodiHubWordmark({
     super.key,
@@ -178,7 +178,7 @@ class KodiHubWordmark extends StatelessWidget {
     final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
     final useNavyColors = tone == BrandTone.navy || isDarkTheme;
     final kodiColor = useNavyColors ? Colors.white : HodiColors.navy;
-    final hubColor = useNavyColors ? HodiColors.lime : HodiColors.limeText;
+    final hqColor = useNavyColors ? HodiColors.lime : HodiColors.limeText;
 
     return Text.rich(
       TextSpan(
@@ -195,8 +195,8 @@ class KodiHubWordmark extends StatelessWidget {
             style: TextStyle(color: kodiColor),
           ),
           TextSpan(
-            text: 'hub',
-            style: TextStyle(color: hubColor),
+            text: 'HQ',
+            style: TextStyle(color: hqColor),
           ),
         ],
       ),

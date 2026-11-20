@@ -10,8 +10,8 @@ export const PWA_OPTIONS: Partial<VitePWAOptions> = {
   injectRegister: false,
   includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180x180.png'],
   manifest: {
-    name: 'KodiHub',
-    short_name: 'KodiHub',
+    name: 'KodiHQ',
+    short_name: 'KodiHQ',
     description: 'Rent, invoices, M-Pesa payments and statements for landlords, agencies and tenants.',
     start_url: '/',
     scope: '/',

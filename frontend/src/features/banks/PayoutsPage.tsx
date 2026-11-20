@@ -19,7 +19,7 @@ import type { PayoutAccount } from './types';
 
 /**
  * Settings → Payouts (`/app/settings/payouts`): the organisation's M-Pesa B2C account,
- * which sends landlords' remittances by M-Pesa from KodiHub. Everyone with `settings:view`
+ * which sends landlords' remittances by M-Pesa from KodiHQ. Everyone with `settings:view`
  * sees whether it is set up and its callback addresses; `settings:update` sets it up,
  * changes it and removes it, each with a verification code. Keys and the security
  * credential are write-only.
@@ -34,14 +34,14 @@ export function PayoutsPage() {
     <div className="pg">
       <div className="ad__callout ad__callout--info bk__intro">
         <p>
-          To send landlords their money by M-Pesa from KodiHub, connect a <strong>B2C (bulk disbursement) shortcode</strong>. This is a
+          To send landlords their money by M-Pesa from KodiHQ, connect a <strong>B2C (bulk disbursement) shortcode</strong>. This is a
           separate account you apply for with Safaricom — the paybill or till you collect rent on can’t send money. Payouts come
           out of the B2C account’s balance, so keep it topped up.
         </p>
         <p>
           You also need an app on the Safaricom Daraja portal with B2C enabled (for the consumer key and secret), the name of
           the API operator (initiator) set up in the M-Pesa org portal, and the <strong>security credential</strong>, which you
-          generate on the Daraja portal from that operator’s password. KodiHub never sees the password itself.
+          generate on the Daraja portal from that operator’s password. KodiHQ never sees the password itself.
         </p>
       </div>
 
@@ -95,7 +95,7 @@ function B2cCard({ account, canUpdate, onEdit }: { account: PayoutAccount | null
                 <CallbackUrl label="Result URL" url={account.callbackUrls.result} />
                 <CallbackUrl label="Queue timeout URL" url={account.callbackUrls.timeout} />
               </dl>
-              <p className="hint mp__hint">KodiHub sends these to Safaricom with each payout. Copy them only if Safaricom support asks.</p>
+              <p className="hint mp__hint">KodiHQ sends these to Safaricom with each payout. Copy them only if Safaricom support asks.</p>
             </>
           ) : null}
           {account.environment === 'SANDBOX' ? (
@@ -104,7 +104,7 @@ function B2cCard({ account, canUpdate, onEdit }: { account: PayoutAccount | null
         </>
       ) : (
         <p className="ad__muted">
-          Not set up: remittances are paid outside KodiHub and then marked paid.
+          Not set up: remittances are paid outside KodiHQ and then marked paid.
           {canUpdate ? '' : ' Someone who can change settings can set it up.'}
         </p>
       )}
@@ -116,7 +116,7 @@ function B2cCard({ account, canUpdate, onEdit }: { account: PayoutAccount | null
           </button>
           {account ? (
             <ConfirmDelete size="sm" label="Remove" verb="Remove" what="the M-Pesa payout account" busy={remove.isPending}
-              consequence="Deletes the saved keys and credential. Remittances can’t be sent by M-Pesa from KodiHub until it’s set up again. Payouts already sent stay as they are."
+              consequence="Deletes the saved keys and credential. Remittances can’t be sent by M-Pesa from KodiHQ until it’s set up again. Payouts already sent stay as they are."
               onConfirm={() => remove.mutate()} />
           ) : null}
         </div>

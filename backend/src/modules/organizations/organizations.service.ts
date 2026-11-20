@@ -156,7 +156,7 @@ export class OrganizationsService {
 
   // ── Platform admin ──
 
-  /** Creates an organisation with its system roles and invites its owner (design: KodiHub onboards customers). */
+  /** Creates an organisation with its system roles and invites its owner (design: KodiHQ onboards customers). */
   async create(dto: CreateOrganizationDto) {
     const ctx = authContext();
     const phone = requirePhone(dto.phone, 'phone');
@@ -167,7 +167,7 @@ export class OrganizationsService {
     // Platform work spans organisations: org scoping off, everything filtered explicitly.
     return withoutOrgScope(async () => {
       const { org, membershipId, token } = await this.db.$transaction(async (tx) => {
-        // KodiHub billing (phase 8): account number, default plan and its free trial.
+        // KodiHQ billing (phase 8): account number, default plan and its free trial.
         const [{ n }] = await tx.$queryRaw<
           { n: bigint }[]
         >`SELECT nextval('"billing_ref_seq"') AS n`;

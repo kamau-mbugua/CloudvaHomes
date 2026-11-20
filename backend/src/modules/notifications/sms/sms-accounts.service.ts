@@ -3,7 +3,7 @@ import type { Tx } from '../../../prisma/prisma.module.js';
 /** Organisation SMS accounts (balances, settings). Endpoints are added in Task 8 of the SMS plan. */
 export class SmsAccountsService {
   /**
-   * Every new organisation starts on KodiHub SMS with the platform's free units (spec call 8),
+   * Every new organisation starts on KodiHQ SMS with the platform's free units (spec call 8),
    * recorded as an "Opening balance" adjustment. Runs inside the organisation-creating transaction.
    */
   static async openAccount(tx: Tx, orgId: string): Promise<void> {

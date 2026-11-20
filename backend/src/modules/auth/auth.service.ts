@@ -137,7 +137,7 @@ export class AuthService {
       throw new AppError(
         403,
         'SIGNUP_DISABLED',
-        'Public organisation registration is currently disabled. Contact KodiHub to get started.',
+        'Public organisation registration is currently disabled. Contact KodiHQ to get started.',
       );
     }
 

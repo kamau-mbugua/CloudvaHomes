@@ -289,9 +289,9 @@ void main() {
 
       await tester.tap(find.text('Open switcher'));
       await tester.pumpAndSettle();
-      expect(find.text('KodiHub Platform'), findsOneWidget);
+      expect(find.text('KodiHQ Platform'), findsOneWidget);
       expect(find.text('SALESPERSON'), findsNothing);
-      await tester.tap(find.text('KodiHub Platform'));
+      await tester.tap(find.text('KodiHQ Platform'));
       await tester.pumpAndSettle();
       expect(capturedRef.read(modeProvider), AppMode.platform);
       expect(adapter.calls.last.path, '/auth/switch-context');

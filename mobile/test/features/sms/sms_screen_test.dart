@@ -66,7 +66,7 @@ void main() {
     });
     await pump(tester, adapter, {'sms:view', 'sms:manage'});
 
-    expect(find.text('KodiHub sends your SMS'), findsOneWidget);
+    expect(find.text('KodiHQ sends your SMS'), findsOneWidget);
     expect(find.text('100'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('sms-buy')));

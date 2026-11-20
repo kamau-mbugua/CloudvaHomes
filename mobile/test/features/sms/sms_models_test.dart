@@ -32,7 +32,7 @@ void main() {
   test('says plainly how messages are sent', () {
     expect(
       smsModeLabel(SmsAccount.fromJson(accountJson())),
-      'KodiHub sends your SMS',
+      'KodiHQ sends your SMS',
     );
     expect(
       smsModeLabel(SmsAccount.fromJson(accountJson(mode: 'OWN'))),

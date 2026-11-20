@@ -145,7 +145,7 @@ export class AuthGuard implements CanActivate {
     ) {
       throw AppError.forbidden(
         'ORG_SUSPENDED',
-        'Your KodiHub account is read-only until the KodiHub bill is paid. Tenants can still pay rent.',
+        'Your KodiHQ account is read-only until the KodiHQ bill is paid. Tenants can still pay rent.',
       );
     }
     if (anyOf.length && !anyOf.some((p) => ctx.permissions.has(p))) throw AppError.forbidden();

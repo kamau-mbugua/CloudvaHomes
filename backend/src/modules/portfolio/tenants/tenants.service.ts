@@ -258,7 +258,7 @@ export class TenantsService {
           where: { id: orgId },
           select: { name: true },
         });
-        const orgName = org?.name ?? 'KodiHub';
+        const orgName = org?.name ?? 'KodiHQ';
         if (!alreadyExisted) {
           await this.notifications.sendTenantWelcome(
             { email: created.email, phone: created.phone },
@@ -292,7 +292,7 @@ export class TenantsService {
    * Used during move-in (`POST /tenancies`) when inline `tenant` details are provided:
    * - If a tenant with this phone already exists in the organisation (e.g. occupying a
    *   second unit in the same property or another property), reuses that tenant record!
-   * - Otherwise creates the tenant and reports whether they were a brand-new person on KodiHub.
+   * - Otherwise creates the tenant and reports whether they were a brand-new person on KodiHQ.
    */
   async resolveOrCreateForMoveInInTx(
     tx: Tx,

@@ -48,9 +48,9 @@ export interface SessionInvitation {
 }
 
 /**
- * Where an organisation stands with its KodiHub bill (phase 8). GRACE: overdue, nothing is
+ * Where an organisation stands with its KodiHQ bill (phase 8). GRACE: overdue, nothing is
  * blocked yet. SUSPENDED: read-only for staff until paid (tenants can still pay rent).
- * CLOSED: closed by KodiHub.
+ * CLOSED: closed by KodiHQ.
  */
 export type OrgStatus = 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'CLOSED';
 

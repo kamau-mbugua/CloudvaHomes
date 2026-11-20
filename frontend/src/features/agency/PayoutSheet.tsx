@@ -16,7 +16,7 @@ import type { PayoutMethod, PayoutSummary } from './types';
  *
  * Write-only: the API never returns the details in full, so the form always starts empty
  * and shows only the masked version on file. Saving asks for a verification code
- * (step-up, handled by the app-wide StepUpProvider) and KodiHub tells the landlord — quietly
+ * (step-up, handled by the app-wide StepUpProvider) and KodiHQ tells the landlord — quietly
  * changed payout details are a known fraud route.
  */
 export function PayoutSheet({ landlord, current, onClose }: {
@@ -85,7 +85,7 @@ export function PayoutSheet({ landlord, current, onClose }: {
       <form id="payout-form" className="sheet-form" onSubmit={submit} noValidate>
         <p className="ad__callout ad__callout--note ag__warnnote">
           {current ? <>On file now: <strong className="num">{current.masked}</strong> ({PAYOUT_METHOD[current.method] ?? current.method}). </> : null}
-          You’ll be asked for a verification code, and KodiHub will tell {landlord.name} about this change by SMS and e-mail — so
+          You’ll be asked for a verification code, and KodiHQ will tell {landlord.name} about this change by SMS and e-mail — so
           if someone changes these details without their knowledge, they can raise the alarm before a payout goes out.
         </p>
 

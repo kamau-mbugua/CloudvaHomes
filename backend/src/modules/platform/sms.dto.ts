@@ -91,10 +91,10 @@ export class SmsReportQueryDto {
 
 const SMS_STATUSES = ['SENT', 'FAILED', 'NO_UNITS', 'LOGGED'] as const;
 
-/** KodiHub admin list of every SMS. Dates are Nairobi days. */
+/** KodiHQ admin list of every SMS. Dates are Nairobi days. */
 export class SmsLogsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() orgId?: string;
-  @ApiPropertyOptional({ enum: ['PLATFORM', 'ORG'], description: 'PLATFORM = KodiHub’s own' })
+  @ApiPropertyOptional({ enum: ['PLATFORM', 'ORG'], description: 'PLATFORM = KodiHQ’s own' })
   @IsOptional()
   @IsIn(['PLATFORM', 'ORG'])
   kind?: 'PLATFORM' | 'ORG';

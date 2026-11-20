@@ -111,7 +111,7 @@ export function RequireSuperAdmin({ children }: { children?: ReactNode }) {
       <div className="ph">
         <EmptyState
           title="Superadmin access required"
-          detail="This area is only available to KodiHub superadministrators."
+          detail="This area is only available to KodiHQ superadministrators."
         />
       </div>
     );

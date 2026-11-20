@@ -236,13 +236,13 @@ export function bookingRefText(b: Pick<MpesaBookingRef, 'code' | 'guestName' | '
 /** Why a host's payment is waiting in Reconciliation. */
 export function hostUnmatchedText(accountRef: string | null): string {
   return accountRef
-    ? `KodiHub couldn’t tell which booking this is — the account reference “${accountRef}” isn’t a booking number.`
-    : 'KodiHub couldn’t tell which booking this is — there was no account reference.';
+    ? `KodiHQ couldn’t tell which booking this is — the account reference “${accountRef}” isn’t a booking number.`
+    : 'KodiHQ couldn’t tell which booking this is — there was no account reference.';
 }
 
 export function reconciliationEmptyText(kind: string | null | undefined): string {
   return kind === 'HOST'
-    ? 'Every M-Pesa and bank payment KodiHub has been told about found its booking. Payments it can’t place wait here — for example a wrong booking number.'
-    : 'Every M-Pesa payment KodiHub has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number.';
+    ? 'Every M-Pesa and bank payment KodiHQ has been told about found its booking. Payments it can’t place wait here — for example a wrong booking number.'
+    : 'Every M-Pesa payment KodiHQ has been told about found its tenant. Payments it can’t place wait here — for example a wrong account number.';
 }
 

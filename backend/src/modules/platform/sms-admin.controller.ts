@@ -26,7 +26,7 @@ import {
 import { SmsLogsService } from './sms-logs.service.js';
 import { SmsSettingsService } from './sms-settings.service.js';
 
-/** KodiHub admin controls for organisations' SMS (spec §3.3, §6). */
+/** KodiHQ admin controls for organisations' SMS (spec §3.3, §6). */
 @ApiTags('Platform')
 @ApiBearerAuth()
 @PlatformOperatorOnly()
@@ -81,7 +81,7 @@ export class SmsAdminController {
     return ok(await this.sms.report(q.month));
   }
 
-  /** One real SMS through KodiHub's chosen provider, as saved. */
+  /** One real SMS through KodiHQ's chosen provider, as saved. */
   @Post('sms/test')
   @HttpCode(200)
   @PlatformAdminOnly()
@@ -89,7 +89,7 @@ export class SmsAdminController {
     return ok(await this.logs.test(dto.phone));
   }
 
-  /** Every SMS on KodiHub, KodiHub's own and organisations', newest first. */
+  /** Every SMS on KodiHQ, KodiHQ's own and organisations', newest first. */
   @Get('sms/logs')
   @PlatformAdminOnly()
   async logList(@Query() q: SmsLogsQueryDto) {

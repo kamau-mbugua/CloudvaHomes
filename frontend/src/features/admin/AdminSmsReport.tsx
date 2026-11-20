@@ -22,7 +22,7 @@ interface SmsReportRow {
 /**
  * Admin → Reports → SMS. "By organisation": units sold, paid for and used per organisation in
  * a month; a row opens that organisation's messages for the month. "All messages": every SMS
- * on KodiHub, its own included.
+ * on KodiHQ, its own included.
  */
 export function AdminSmsReport() {
   const [view, setView] = useState<'orgs' | 'all'>('orgs');

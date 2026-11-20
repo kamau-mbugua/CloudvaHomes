@@ -1,6 +1,6 @@
 /**
- * Loads the Google Maps JavaScript API once per page with KodiHub's browser key (set by
- * KodiHub admin). Resolves to `google.maps`, whose `importLibrary` loads parts on demand.
+ * Loads the Google Maps JavaScript API once per page with KodiHQ's browser key (set by
+ * KodiHQ admin). Resolves to `google.maps`, whose `importLibrary` loads parts on demand.
  */
 export interface GoogleMapsNamespace {
   importLibrary: (name: string) => Promise<unknown>;

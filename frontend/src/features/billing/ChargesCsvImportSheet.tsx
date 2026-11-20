@@ -386,7 +386,7 @@ export function ChargesCsvImportSheet({
     <CsvImportSheet
       title="Import charges CSV"
       subtitle="Import recurring charges (Fixed, Variable, Metered) and move-in charges (Deposits, Fees) across one or more properties."
-      sampleFilename="kodihub-charges-template.csv"
+      sampleFilename="kodihq-charges-template.csv"
       sampleHeaders={SAMPLE_HEADERS}
       sampleRows={SAMPLE_ROWS}
       columns={COLUMNS}

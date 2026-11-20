@@ -21,9 +21,9 @@ type SmsTab = 'usage' | 'top-ups';
 
 /**
  * Settings → SMS (`/app/settings/sms`): how the organisation's messages to tenants and guests
- * are sent, its KodiHub SMS units (balance, bought, used, Buy SMS), its low-balance level and,
- * on its own SMS account, the KodiHub fallback switch; plus usage and top-up lists.
- * Login and security codes are always sent by KodiHub and never use units.
+ * are sent, its KodiHQ SMS units (balance, bought, used, Buy SMS), its low-balance level and,
+ * on its own SMS account, the KodiHQ fallback switch; plus usage and top-up lists.
+ * Login and security codes are always sent by KodiHQ and never use units.
  */
 export function SmsPage() {
   const account = useSmsAccount();
@@ -83,7 +83,7 @@ function Sms({ account }: { account: SmsAccountView }) {
           </dl>
           <p className="ad__muted">
             One unit is one SMS of up to 160 characters (70 with emoji); longer messages use more. Sign-in and security
-            codes are sent by KodiHub and never use your units.
+            codes are sent by KodiHQ and never use your units.
           </p>
         </section>
 
@@ -147,7 +147,7 @@ function SmsSettingsCard({ account }: { account: SmsAccountView }) {
         {account.mode === 'OWN' ? (
           <label className="sms__check">
             <input type="checkbox" checked={fallback} onChange={(e) => setFallback(e.target.checked)} />
-            <span>If my SMS account fails, send through KodiHub using my units</span>
+            <span>If my SMS account fails, send through KodiHQ using my units</span>
           </label>
         ) : null}
         {error ? <p className="fld__err" role="alert">{error}</p> : null}
@@ -196,7 +196,7 @@ function UsageList() {
                 <tr key={r.id}>
                   <td>{formatDateTime(r.at)}</td>
                   <td className="num">{r.to}</td>
-                  <td>{r.type.replace(/_/g, ' ')}{r.route === 'PLATFORM_FREE' ? <span className="ad__sub">Sent free by KodiHub</span> : null}</td>
+                  <td>{r.type.replace(/_/g, ' ')}{r.route === 'PLATFORM_FREE' ? <span className="ad__sub">Sent free by KodiHQ</span> : null}</td>
                   <td className="num">{r.units}</td>
                   <td>
                     <span className={`ad__badge ${STATUS_TONE[r.status]}`}>{usageStatusLabel(r.status)}</span>
@@ -239,7 +239,7 @@ function TopUpList() {
                 <td className="num">{r.units > 0 ? `+${r.units.toLocaleString('en-KE')}` : r.units.toLocaleString('en-KE')}</td>
                 <td className="num">{r.amount ? formatKES(Number(r.amount)) : '—'}</td>
                 <td>
-                  {r.kind === 'PURCHASE' ? (r.source === 'C2B' ? 'M-Pesa paybill' : 'M-Pesa prompt') : 'Added by KodiHub'}
+                  {r.kind === 'PURCHASE' ? (r.source === 'C2B' ? 'M-Pesa paybill' : 'M-Pesa prompt') : 'Added by KodiHQ'}
                   {r.mpesaReceipt ? <span className="ad__sub num">{r.mpesaReceipt}</span> : null}
                   {r.reason ? <span className="ad__sub">{r.reason}</span> : null}
                 </td>

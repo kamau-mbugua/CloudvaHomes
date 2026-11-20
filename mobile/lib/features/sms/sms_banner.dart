@@ -7,7 +7,7 @@ import '../../core/theme.dart';
 import 'sms_api.dart';
 import 'sms_models.dart';
 
-/// Above every screen while the organisation's SMS needs attention: KodiHub units low or out,
+/// Above every screen while the organisation's SMS needs attention: KodiHQ units low or out,
 /// or its own SMS account failing. Only for people who may see SMS; taps open Settings → SMS.
 class SmsBanner extends ConsumerWidget {
   const SmsBanner({super.key});

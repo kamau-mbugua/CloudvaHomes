@@ -27,7 +27,7 @@ const basePayload = (over: Partial<SessionPayload> = {}): SessionPayload => ({
 describe('initials', () => {
   it('builds up to two initials from a workspace name', () => {
     expect(initials('Makini Homes')).toBe('MH');
-    expect(initials('KodiHub')).toBe('K');
+    expect(initials('KodiHQ')).toBe('K');
     expect(initials('')).toBe('?');
   });
 });

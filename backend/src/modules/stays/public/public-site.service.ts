@@ -53,7 +53,7 @@ import type { WrapperType } from '../../../common/di/wrapper-type.js';
 
 const DAY_MS = 86_400_000;
 const DEFAULT_INDEX_HTML =
-  '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>KodiHub</title></head><body><div id="root"></div></body></html>';
+  '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>KodiHQ</title></head><body><div id="root"></div></body></html>';
 
 export function describePayWhen(r: StayRules): string {
   if (r.payWhen === 'ON_ARRIVAL') {
@@ -809,7 +809,7 @@ export class PublicSiteService {
         include: { organization: { select: { name: true } } },
       }),
     );
-    const biz = site?.businessName || site?.organization.name || 'KodiHub';
+    const biz = site?.businessName || site?.organization.name || 'KodiHQ';
 
     const code = await this.otp.issue(phone, 'GUEST_BOOKING', null);
     await this.notifications.sendBookingCode(

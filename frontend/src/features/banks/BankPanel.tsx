@@ -34,8 +34,8 @@ export function BankPanel({ channels, canManage }: { channels: PaymentChannel[];
     <section className="fm__section mp__daraja" aria-labelledby="banks-title">
       <div className="pf__sectionhead"><h2 id="banks-title">Bank accounts</h2></div>
       <p className="ad__muted mp__lead">
-        Bring money paid into your bank accounts into KodiHub: import the statement your bank lets you download, or have the
-        bank (or your integration partner) notify KodiHub of each deposit. {copy.bankMatching}
+        Bring money paid into your bank accounts into KodiHQ: import the statement your bank lets you download, or have the
+        bank (or your integration partner) notify KodiHQ of each deposit. {copy.bankMatching}
       </p>
       <div className="mp__cards">
         {channels.map((c) => (
@@ -122,7 +122,7 @@ function BankCard({ channel, canManage, onImport, onSecret }: {
           </>
         ) : (
           <p className="ad__muted">
-            Off. If your bank or an integration partner can send each deposit to a web address, KodiHub records it straight away.
+            Off. If your bank or an integration partner can send each deposit to a web address, KodiHQ records it straight away.
             {canManage ? ' Turning it on gives you the address and a secret to sign with.' : ' Someone who can manage payment channels can turn it on.'}
           </p>
         )}
@@ -134,7 +134,7 @@ function BankCard({ channel, canManage, onImport, onSecret }: {
                   consequence="Makes a new secret and the old one stops working at once. Notifications signed with the old secret are refused until the sender uses the new one."
                   onConfirm={() => turnOn.mutate()} />
                 <ConfirmDelete size="sm" label="Turn off" verb="Turn off" what={`bank notifications for ${channel.name}`} busy={turnOff.isPending}
-                  consequence="KodiHub stops accepting notifications for this account. Payments already recorded stay. You can still import statements."
+                  consequence="KodiHQ stops accepting notifications for this account. Payments already recorded stay. You can still import statements."
                   onConfirm={() => turnOff.mutate()} />
               </>
             ) : (
@@ -196,7 +196,7 @@ function SigningHelp() {
       <div className="bk__help">
         <p>POST JSON to the notification address with two headers:</p>
         <ul>
-          <li><code>X-Hodi-Timestamp</code>: the time in Unix seconds. KodiHub refuses one more than 5 minutes off.</li>
+          <li><code>X-Hodi-Timestamp</code>: the time in Unix seconds. KodiHQ refuses one more than 5 minutes off.</li>
           <li><code>X-Hodi-Signature</code>: <code>sha256=</code> then the HMAC-SHA256 (hex) of <code>timestamp + "." + raw body</code>, keyed with the secret.</li>
         </ul>
         <p>The body:</p>
@@ -239,7 +239,7 @@ function SecretSheet({ channel, secret, onClose }: { channel: PaymentChannel; se
     >
       <div className="sheet-form">
         <p className="ad__callout ad__callout--note ag__warnnote" role="note">
-          <strong>Store the secret now.</strong> KodiHub keeps it encrypted and won’t show it again. If it’s lost, make a new
+          <strong>Store the secret now.</strong> KodiHQ keeps it encrypted and won’t show it again. If it’s lost, make a new
           one with “New secret” — the old one then stops working.
         </p>
         <dl className="mp__urls">

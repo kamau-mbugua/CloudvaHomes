@@ -122,7 +122,7 @@ const envSchema = z
     SMTP_PORT: z.coerce.number().int().default(587),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
-    EMAIL_FROM: z.string().default('KodiHub <noreply@example.invalid>'),
+    EMAIL_FROM: z.string().default('KodiHQ <noreply@example.invalid>'),
     // ── Push notifications (Firebase Cloud Messaging HTTP v1) ──
     FCM_PROVIDER: z.enum(['log', 'fcm']).default('log'),
     FCM_PROJECT_ID: z.string().min(1).optional(),

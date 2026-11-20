@@ -39,7 +39,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
   const ledger = () =>
     t.prisma.smsLedgerEntry.findMany({ where: { orgId }, orderBy: { createdAt: 'asc' } });
   const sentTo = (to: string) => outbox.filter((m) => m.channel === 'sms' && m.to === to);
-  /** KodiHub's provider, saved in platform settings (a test sender; 'test-reject' fails). */
+  /** KodiHQ's provider, saved in platform settings (a test sender; 'test-reject' fails). */
   const platformProvider = (apiKey = 'ok', extra: Record<string, unknown> = {}) => {
     const data = {
       smsProvider: 'TEXTSMS' as const,
@@ -163,7 +163,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
     const out = await sms.send(
       { kind: 'platform', type: 'login_otp' },
       GUEST,
-      'Your KodiHub sign-in code is 123456.',
+      'Your KodiHQ sign-in code is 123456.',
     );
     expect(out).toMatchObject({ status: 'SENT', route: 'PLATFORM', units: 0 });
     expect((await account()).balance).toBe(0);
@@ -196,7 +196,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
     expect(acc.lastFailReason).toBe('The SMS provider rejected the API key');
   });
 
-  it('falls back to KodiHub when the owner allows it and units cover it', async () => {
+  it('falls back to KodiHQ when the owner allows it and units cover it', async () => {
     await ownSms('test-reject', { fallbackToPlatform: true, balance: 5 });
     const out = await sms.send({ kind: 'org', orgId, type: 'booking' }, GUEST, 'Confirmed.');
     expect(out).toMatchObject({ status: 'SENT', route: 'PLATFORM_FALLBACK', units: 1 });
@@ -240,7 +240,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
   });
 
   describe('every existing SMS goes through its route', () => {
-    it('sends a staff password-reset code through KodiHub even at zero units', async () => {
+    it('sends a staff password-reset code through KodiHQ even at zero units', async () => {
       await ownSms('test-reject', { balance: 0 });
       await t
         .http()
@@ -249,7 +249,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
         .expect(202);
       const last = sentTo('+254712000001').at(-1);
       expect(last).toMatchObject({ via: 'platform' });
-      expect(last!.text).toMatch(/KodiHub password reset code is \d{6}/);
+      expect(last!.text).toMatch(/KodiHQ password reset code is \d{6}/);
       expect((await account()).balance).toBe(0);
     });
 
@@ -288,7 +288,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
     expect(err).toMatchObject({ status: 502, code: 'DELIVERY_FAILED' });
   });
 
-  it('never sends real SMS to the log when the chosen KodiHub provider is incomplete', async () => {
+  it('never sends real SMS to the log when the chosen KodiHQ provider is incomplete', async () => {
     await t.prisma.platformSettings.deleteMany({});
     await t.prisma.platformSettings.create({
       data: {
@@ -301,7 +301,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
     const out = await sms.send(
       { kind: 'platform', type: 'login_otp' },
       GUEST,
-      'Your KodiHub sign-in code is 123456.',
+      'Your KodiHQ sign-in code is 123456.',
     );
     // Falls back to the complete Africa's Talking settings (which reject here), not the log sender.
     expect(out).toMatchObject({
@@ -334,7 +334,7 @@ describe('SMS: platform vs organisation (e2e)', () => {
     const code = await sms.send(
       { kind: 'platform', type: 'login_otp' },
       GUEST,
-      'Your KodiHub sign-in code is 123456.',
+      'Your KodiHQ sign-in code is 123456.',
     );
     expect(code.status).toBe('SENT');
     expect(await t.prisma.smsLog.findUniqueOrThrow({ where: { id: code.logId } })).toMatchObject({

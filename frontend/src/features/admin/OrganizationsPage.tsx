@@ -15,9 +15,9 @@ import type { PlatformOrganization } from '../platform/types';
 import { CustomBadge, OrgStatusBadge } from '../platform/ui';
 
 /**
- * Admin → Organisations (`/admin/organizations`): every organisation on KodiHub, searchable
+ * Admin → Organisations (`/admin/organizations`): every organisation on KodiHQ, searchable
  * and filtered by status (both in the address), with its plan and price ("Custom" when it
- * has its own), let units now and what it owes KodiHub. A row opens the organisation.
+ * has its own), let units now and what it owes KodiHQ. A row opens the organisation.
  */
 export function OrganizationsPage() {
   const filters = useListFilters();
@@ -72,7 +72,7 @@ export function OrganizationsPage() {
         <div className="ad__tablewrap">
           {filtered
             ? <EmptyState title="No organisations match" detail="Try a different search, or clear the filters." onClear={() => filters.clear()} />
-            : <EmptyState title="No organisations yet" detail="Organisations appear here once KodiHub creates them." />}
+            : <EmptyState title="No organisations yet" detail="Organisations appear here once KodiHQ creates them." />}
         </div>
       ) : (
         <div className="ad__tablewrap">

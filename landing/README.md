@@ -1,4 +1,4 @@
-# Hodi / KodiHub — Marketing Landing Page (`landing/`)
+# Hodi / KodiHQ — Marketing Landing Page (`landing/`)
 
 Public marketing landing page served at:
 - **Production**: `https://kodihq.co.ke` *(and `https://www.kodihq.co.ke` → 308 redirect)*

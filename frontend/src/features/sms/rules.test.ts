@@ -19,7 +19,7 @@ const own: SmsAccountView = { ...platform, mode: 'OWN', provider: 'TEXTSMS', sen
 
 describe('SMS page rules', () => {
   it('says plainly how messages are sent', () => {
-    expect(smsModeLabel(platform)).toBe('KodiHub sends your SMS');
+    expect(smsModeLabel(platform)).toBe('KodiHQ sends your SMS');
     expect(smsModeLabel(own)).toBe('Your own SMS account (sender ID MAKINI, TextSMS Kenya)');
     expect(smsModeLabel({ ...own, provider: 'HOSTPINNACLE' })).toBe('Your own SMS account (sender ID MAKINI, HostPinnacle)');
   });

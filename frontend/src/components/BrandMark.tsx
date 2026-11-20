@@ -4,8 +4,8 @@
  * - Primary mark (`viewBox="0 0 48 48"`): Roof chevron (`M6 20 24 6l18 14`) over three
  *   left-aligned ledger lines (rent, utilities, and a shorter third bar in #84BD00 lime
  *   representing the cleared balance).
- * - Wordmark: Lowercase `kodihub` in Lufga SemiBold (600), -0.04em tracking, split into
- *   `kodi` + `hub`.
+ * - Wordmark: `kodiHQ` in Lufga SemiBold (600), -0.04em tracking, split into a lowercase
+ *   `kodi` and a capital `HQ`.
  */
 
 export type BrandTone = 'light' | 'navy' | 'ink' | 'lime';
@@ -101,7 +101,7 @@ export function BrandWordmark({
         ? '#0a2540'
         : '#002b4d';
 
-  const hubColor =
+  const hqColor =
     tone === 'navy'
       ? '#84bd00'
       : tone === 'ink'
@@ -124,7 +124,7 @@ export function BrandWordmark({
       }}
     >
       <span style={{ color: kodiColor }}>kodi</span>
-      <span style={{ color: hubColor }}>hub</span>
+      <span style={{ color: hqColor }}>HQ</span>
     </span>
   );
 }

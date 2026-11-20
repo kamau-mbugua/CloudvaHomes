@@ -15,7 +15,7 @@ import { authErrorMessage } from './authErrors';
 /**
  * `/invite/:token` — join an organisation from an emailed or texted link.
  *
- * Someone new to KodiHub chooses a password here; someone who already has an account just
+ * Someone new to KodiHQ chooses a password here; someone who already has an account just
  * accepts. Either way they come out signed in to the organisation that invited them.
  */
 export function AcceptInvitationPage() {
@@ -110,7 +110,7 @@ export function AcceptInvitationPage() {
           <p className="au__lede">
             {invite.firstName ? `Hi ${invite.firstName}. ` : ''}
             {invite.inviterName ? `${invite.inviterName} invited you` : 'You have been invited'} to
-            manage {invite.organizationName} on KodiHub
+            manage {invite.organizationName} on KodiHQ
             {invite.email || invite.phone ? ` as ${invite.email ?? invite.phone}` : ''}.
           </p>
 
@@ -148,7 +148,7 @@ export function AcceptInvitationPage() {
               </AuthField>
             </>
           ) : (
-            <p className="au__ok">You already have a KodiHub account, so there is no password to choose.</p>
+            <p className="au__ok">You already have a KodiHQ account, so there is no password to choose.</p>
           )}
         </div>
 

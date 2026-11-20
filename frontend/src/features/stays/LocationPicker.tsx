@@ -20,7 +20,7 @@ type SelectEvent = Event & {
 };
 
 /**
- * Where the listing is: search Google Places (when KodiHub admin has set a Maps key), or paste
+ * Where the listing is: search Google Places (when KodiHQ admin has set a Maps key), or paste
  * a Google Maps link or coordinates. Guests see the exact pin and get a Google Maps link.
  */
 export function LocationPicker({
@@ -128,12 +128,12 @@ export function LocationPicker({
         </div>
       ) : !key && !config.isPending ? (
         <p className="loc__hint">
-          Map search isn’t set up yet (KodiHub admin adds a Google Maps key). Paste a Google Maps link or the coordinates below.
+          Map search isn’t set up yet (KodiHQ admin adds a Google Maps key). Paste a Google Maps link or the coordinates below.
         </p>
       ) : null}
       {searchError || refused ? (
         <p className="loc__error" role="alert">
-          {refused ? 'Google refused the Maps key. Ask KodiHub admin to check it. You can paste a link below.' : searchError}
+          {refused ? 'Google refused the Maps key. Ask KodiHQ admin to check it. You can paste a link below.' : searchError}
         </p>
       ) : null}
 

@@ -450,7 +450,7 @@ export function TenantsCsvImportSheet({ onClose }: { onClose: () => void }) {
           // Single-step move-in with inline tenant details.
           // Backend reuses the tenant if they already exist in this org (e.g. occupying
           // multiple units in the same property or across different properties), sending
-          // Welcome only when brand-new to KodiHub and Unit Assigned for every house.
+          // Welcome only when brand-new to KodiHQ and Unit Assigned for every house.
           await api.post<DataEnvelope<Tenancy>>('/tenancies', {
             unitId: data.unit.id,
             rentAmount: data.rentMinor ?? data.unit.rentAmount,
@@ -514,7 +514,7 @@ export function TenantsCsvImportSheet({ onClose }: { onClose: () => void }) {
     <CsvImportSheet
       title="Import tenants & houses CSV"
       subtitle="Register tenants in bulk and optionally move them straight into their units when property and unit_number are included."
-      sampleFilename="kodihub-tenants-template.csv"
+      sampleFilename="kodihq-tenants-template.csv"
       sampleHeaders={SAMPLE_HEADERS}
       sampleRows={SAMPLE_ROWS}
       columns={COLUMNS}

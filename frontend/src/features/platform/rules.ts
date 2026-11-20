@@ -58,8 +58,8 @@ export function bannerFor(
       return {
         tone: 'warn',
         message: overdue
-          ? `Your KodiHub bill of ${formatKES(overdue.amount)} was due on ${formatDayish(overdue.since)}.`
-          : 'Your KodiHub bill is overdue.',
+          ? `Your KodiHQ bill of ${formatKES(overdue.amount)} was due on ${formatDayish(overdue.since)}.`
+          : 'Your KodiHQ bill is overdue.',
         payable: true,
       };
     }
@@ -67,14 +67,14 @@ export function bannerFor(
       const owed = summary && summary.balance > 0 ? ` ${formatKES(summary.balance)} is owed.` : '';
       return {
         tone: 'alert',
-        message: `Your account is read-only until the KodiHub bill is paid. Tenants can still pay rent.${owed}`,
+        message: `Your account is read-only until the KodiHQ bill is paid. Tenants can still pay rent.${owed}`,
         payable: true,
       };
     }
     case 'CLOSED':
       return {
         tone: 'off',
-        message: 'This organisation’s KodiHub account is closed. Contact KodiHub to reopen it.',
+        message: 'This organisation’s KodiHQ account is closed. Contact KodiHQ to reopen it.',
         payable: false,
       };
     default:
@@ -369,7 +369,7 @@ export function checkSettings(draft: SettingsDraft): Checked<SettingsBody, keyof
 }
 
 /**
- * KodiHub's Daraja keys as `PUT /platform/settings` takes them (flat, write-only), from the
+ * KodiHQ's Daraja keys as `PUT /platform/settings` takes them (flat, write-only), from the
  * checked form (`checkDaraja`). Sending any of them asks for a verification code.
  */
 export function darajaSettingsBody(body: { environment: 'SANDBOX' | 'PRODUCTION'; consumerKey: string; consumerSecret: string; passkey?: string }) {

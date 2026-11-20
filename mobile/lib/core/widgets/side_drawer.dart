@@ -21,7 +21,7 @@ class KodiHubSideDrawer extends ConsumerWidget {
     final mode = ref.watch(modeProvider);
     final location = GoRouterState.of(context).matchedLocation;
 
-    String workspaceTitle = 'KodiHub';
+    String workspaceTitle = 'KodiHQ';
     String workspaceSubtitle = session?.user.fullName ?? '';
     String modeBadge = 'Staff';
 
@@ -32,7 +32,7 @@ class KodiHubSideDrawer extends ConsumerWidget {
         final membership = session?.organizations
             .where((o) => o.id == org?.id)
             .firstOrNull;
-        workspaceTitle = org?.name ?? 'KodiHub';
+        workspaceTitle = org?.name ?? 'KodiHQ';
         workspaceSubtitle =
             membership?.roleName ?? session?.user.fullName ?? 'Staff';
         modeBadge = mode == AppMode.host ? 'Host' : 'Staff';
@@ -55,7 +55,7 @@ class KodiHubSideDrawer extends ConsumerWidget {
         workspaceSubtitle = current?.name ?? session?.user.fullName ?? 'Owner';
         modeBadge = 'Owner';
       case AppMode.platform:
-        workspaceTitle = 'KodiHub Platform';
+        workspaceTitle = 'KodiHQ Platform';
         workspaceSubtitle =
             (session == null ? null : platformRoleLabel(session.user)) ??
             'Platform operator';
