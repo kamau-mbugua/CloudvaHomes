@@ -352,8 +352,19 @@ hosts_ready() {
     done
   done
   if [ -n "$missing" ]; then
-    warn "Public DNS cannot find these names yet:$missing. Nothing is wrong with the deploy: a new domain or new nameservers can take a day to reach everyone."
+    warn "Public DNS cannot find these names yet:$missing. Nothing is wrong on this server: a new domain or new nameservers can take a day to reach everyone."
     return 1
+  fi
+
+  # A Cloudflare token that changed in this very run is in edge.env but not yet in the running
+  # proxy, which would then ask for the booking sites' certificate with the old token and never
+  # get it. So the proxy is restarted on the current edge.env first.
+  if [ "$(cat "$ROOT/edge/.env.sum" 2>/dev/null)" != "$(edge_env_sum)" ]; then
+    log "edge.env changed since the proxy started: restarting it before the check..."
+    if ! edge_start; then
+      warn "The edge proxy did not come back up on the current edge.env."
+      return 1
+    fi
   fi
 
   mkdir -p "$conf/sites" "$conf/legacy"
@@ -377,6 +388,9 @@ hosts_ready() {
   log "Waiting for certificates for: $names"
   if ! hosts_answer "$names" 36; then
     warn "No valid certificate after 3 minutes for: $UNANSWERED. Check that these names point to this server in DNS and that the Cloudflare token can edit DNS for $base."
+    # What the proxy itself said about it, so the reason is in this log and not only on the server.
+    ( cd "$ROOT/infra/edge" && docker compose logs --no-color --tail 500 caddy 2>/dev/null \
+        | grep -F '"level":"error"' | grep -F "$base" | tail -n 4 | cut -c1-700 ) || true
     return 1
   fi
   return 0
@@ -517,6 +531,33 @@ CADDY
   return 0
 }
 
+# A fingerprint of edge.env, to tell whether the running proxy was started with this content.
+edge_env_sum() {
+  (sha256sum 2>/dev/null || shasum -a 256) < "$ROOT/edge/edge.env" | cut -d' ' -f1
+}
+
+# Starts the proxy and makes it load the config on disk. edge.env is read when the container
+# starts, so a changed value (a new Cloudflare token, other hosts) needs a recreate; otherwise a
+# reload keeps connections open. 0 = Caddy took the config, 2 = the container did not start.
+edge_start() {
+  local sum recreate="" tries=0 out=""
+  sum="$(edge_env_sum)"
+  [ "$(cat "$ROOT/edge/.env.sum" 2>/dev/null)" = "$sum" ] || recreate="--force-recreate"
+  ( cd "$ROOT/infra/edge" && docker compose up -d --quiet-pull $recreate >/dev/null ) || return 2
+  # A container that was just (re)started needs a moment before its admin API takes a reload.
+  until out=$( cd "$ROOT/infra/edge" \
+      && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>&1 ); do
+    tries=$((tries + 1))
+    if [ "$tries" -ge 20 ]; then
+      warn "Last reload error: ${out:-none}"
+      ( cd "$ROOT/infra/edge" && docker compose ps caddy && docker compose logs --tail 30 caddy ) || true
+      return 1
+    fi
+    sleep 1
+  done
+  echo "$sum" > "$ROOT/edge/.env.sum"
+}
+
 # Points the edge proxy at the current infra bundle and reloads it (no dropped connections).
 edge_up() {
   local base
@@ -529,8 +570,8 @@ edge_up() {
       if hosts_ready "$base"; then
         hosts_apply
       else
-        warn "This server stays on its current hosts. Nothing changed for visitors; the next deploy tries again."
-        echo "::warning::The hosts were not moved to $base. The reason is in the deploy log, a few lines above this one."
+        warn "This server stays on its current hosts. Nothing changed for visitors; the next run tries again."
+        echo "::warning::The hosts were not moved to $base. The reason is in this step's log, a few lines above this one."
       fi
     fi
   fi
@@ -555,24 +596,8 @@ edge_up() {
   cp "$ROOT/infra/edge/Caddyfile" "$conf/Caddyfile.tmp" && mv "$conf/Caddyfile.tmp" "$conf/Caddyfile"
   cp "$ROOT/infra/edge/maintenance.html" "$ROOT/maintenance/index.html"
 
-  # edge.env is read when the container starts, so a changed value (e.g. a new Cloudflare
-  # token) needs a recreate; otherwise a reload keeps connections open.
-  local sum recreate=""
-  sum=$( (sha256sum 2>/dev/null || shasum -a 256) < "$ROOT/edge/edge.env" | cut -d' ' -f1)
-  [ "$(cat "$ROOT/edge/.env.sum" 2>/dev/null)" = "$sum" ] || recreate="--force-recreate"
-  ( cd "$ROOT/infra/edge" && docker compose up -d --quiet-pull $recreate >/dev/null ) \
-    || fail "Could not start the edge proxy."
-  # A container that was just (re)started needs a moment before its admin API takes a reload.
-  local tries=0 out=""
-  until out=$( cd "$ROOT/infra/edge" \
-      && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>&1 ); do
-    tries=$((tries + 1))
-    if [ "$tries" -ge 20 ]; then
-      warn "Last reload error: ${out:-none}"
-      ( cd "$ROOT/infra/edge" && docker compose ps caddy && docker compose logs --tail 30 caddy ) || true
-      fail "Could not reload the edge proxy (Caddy did not accept its config)."
-    fi
-    sleep 1
-  done
-  echo "$sum" > "$ROOT/edge/.env.sum"
+  local rc=0
+  edge_start || rc=$?
+  if [ "$rc" = 2 ]; then fail "Could not start the edge proxy."; fi
+  if [ "$rc" != 0 ]; then fail "Could not reload the edge proxy (Caddy did not accept its config)."; fi
 }
