@@ -309,7 +309,7 @@ export class SmsLogsService {
       row.units += o._sum.units ?? 0;
       orgMap.set(o.orgId, row);
     }
-    const topOrgs = [...orgMap.values()].sort((a, b) => all(b) - all(a)).slice(0, 10);
+    const topOrgs = rankOrgs([...orgMap.values()]).slice(0, 10);
 
     const names = await this.orgNames([
       ...topOrgs.map((o) => o.orgId),
@@ -341,9 +341,13 @@ export class SmsLogsService {
         unitsHeld: held._sum.balance ?? 0,
       },
       daily: [...dailyMap.values()],
-      byProvider: [...providerMap.values()].sort(byCount),
-      byType: [...typeMap.values()].sort(byCount),
-      byRoute: [...routeMap.values()].sort(byCount),
+      byProvider: [...providerMap.values()].sort(
+        (a, b) => byCount(a, b) || byText(a.provider, b.provider),
+      ),
+      byType: [...typeMap.values()].sort(
+        (a, b) => byCount(a, b) || byText(a.type, b.type) || byText(a.kind, b.kind),
+      ),
+      byRoute: [...routeMap.values()].sort((a, b) => byCount(a, b) || byText(a.route, b.route)),
       topOrgs: topOrgs.map((o) => ({ ...o, name: names.get(o.orgId) ?? '' })),
       lowBalance: low.map((l) => ({ ...l, name: names.get(l.orgId) ?? '' })),
       failing: failing.map((f) => ({
@@ -383,3 +387,13 @@ function bump(row: StatusCounts, status: SmsLogStatus, n: number) {
 }
 
 const all = (r: StatusCounts) => r.sent + r.failed + r.noUnits + r.logged;
+/** A fixed order for equal counts: a list must not follow the order the database answered in. */
+const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * Organisations by SMS volume, busiest first. With equal volumes the one that got more
+ * messages through comes first, then the older organisation (ids are time-ordered).
+ */
+export function rankOrgs<T extends StatusCounts & { orgId: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => all(b) - all(a) || b.sent - a.sent || byText(a.orgId, b.orgId));
+}

@@ -378,7 +378,9 @@ describe('Stays — guest emails, receipts and listing locations (e2e)', () => {
       expect(open.status).toBe(200);
       expect(open.headers['content-type']).toBe('application/pdf');
       const forged = new URLSearchParams(target.search);
-      forged.set('s', `${forged.get('s')!.slice(0, -1)}A`);
+      // Swap the last character for one it is not: one signature in sixteen already ends in A.
+      const sig = forged.get('s')!;
+      forged.set('s', `${sig.slice(0, -1)}${sig.endsWith('A') ? 'B' : 'A'}`);
       await t.http().get(`${target.pathname}?${forged.toString()}`).expect(404);
       const expired = new URLSearchParams(target.search);
       expired.set('e', '1700000000');
