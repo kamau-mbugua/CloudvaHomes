@@ -112,7 +112,7 @@ void main() {
 
       expect(find.text('Sea Breeze Studio'), findsOneWidget);
       expect(find.textContaining('KES 2,000'), findsOneWidget);
-      expect(find.text('Published'), findsOneWidget);
+      expect(find.text('Live on your site'), findsOneWidget);
     },
   );
 
@@ -139,6 +139,11 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('listing-unit-number')), 'A2');
     await tester.enterText(find.byKey(const Key('listing-title')), 'Palm Loft');
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('listing-nightly-price')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(
       find.byKey(const Key('listing-nightly-price')),
       '2000.50',

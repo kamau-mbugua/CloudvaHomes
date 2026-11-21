@@ -9,6 +9,7 @@ import 'booking_form_screen.dart';
 import 'bookings_screen.dart';
 import 'calendar_screen.dart';
 import 'cleaning_screen.dart';
+import 'guest_detail_screen.dart';
 import 'guests_screen.dart';
 import 'host_more_screen.dart';
 import 'host_receipts_screen.dart';
@@ -18,6 +19,8 @@ import 'listing_editor_screen.dart';
 import 'listings_screen.dart';
 import 'site_settings_screen.dart';
 import 'today_screen.dart';
+import 'unit_month_screen.dart';
+import 'unit_picker_screen.dart';
 
 /// Host mode (`/host/...`): 5 bottom tabs (Today, Calendar, Bookings, Listings, More)
 /// plus full-screen top-level routes outside the shell (no `parentNavigatorKey` inside a branch).
@@ -74,6 +77,17 @@ List<RouteBase> hostRoutes() => [
     ),
   ),
   GoRoute(
+    path: '/host/calendar/units',
+    builder: (_, _) => const UnitPickerScreen(),
+  ),
+  GoRoute(
+    path: '/host/calendar/unit/:unitId',
+    builder: (_, state) => UnitMonthScreen(
+      unitId: state.pathParameters['unitId']!,
+      month: state.uri.queryParameters['month'],
+    ),
+  ),
+  GoRoute(
     path: '/host/bookings/:bookingId',
     builder: (_, state) =>
         BookingDetailScreen(bookingId: state.pathParameters['bookingId']!),
@@ -92,6 +106,11 @@ List<RouteBase> hostRoutes() => [
   GoRoute(path: '/host/sms', builder: (_, _) => const SmsScreen()),
   GoRoute(path: '/host/cleaning', builder: (_, _) => const CleaningScreen()),
   GoRoute(path: '/host/guests', builder: (_, _) => const GuestsScreen()),
+  GoRoute(
+    path: '/host/guests/:guestId',
+    builder: (_, state) =>
+        GuestDetailScreen(guestId: state.pathParameters['guestId']!),
+  ),
   GoRoute(path: '/host/expenses', builder: (_, _) => const ExpensesScreen()),
   GoRoute(
     path: '/host/expenses/new',

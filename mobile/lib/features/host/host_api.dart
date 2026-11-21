@@ -383,13 +383,9 @@ class HostApi {
     return StkStatus.fromJson(data);
   }
 
-  Future<
-    ({
-      List<({String id, String number, String? listingId, String title})> units,
-      List<CalItem> items,
-    })
-  >
-  calendar({
+  /// Units and their bookings and blocks overlapping [from, to). Also returns guests still
+  /// checked in after their check-out day, whatever the range.
+  Future<CalData> calendar({
     required String from,
     required String to,
     String? propertyId,
@@ -404,22 +400,13 @@ class HostApi {
       },
     );
     final data = res['data'] as Map<String, dynamic>? ?? const {};
-    final unitRows = data['units'] as List? ?? const [];
-    final itemRows = data['items'] as List? ?? const [];
-    return (
+    return CalData(
       units: [
-        for (final u in unitRows)
-          if (u is Map<String, dynamic>)
-            (
-              id: (u['unitId'] as String?) ?? '',
-              number: (u['unitNumber'] as String?) ?? '',
-              listingId: u['listingId'] as String?,
-              title:
-                  (u['title'] as String?) ?? (u['unitNumber'] as String?) ?? '',
-            ),
+        for (final u in data['units'] as List? ?? const [])
+          if (u is Map<String, dynamic>) CalUnit.fromJson(u),
       ],
       items: [
-        for (final it in itemRows)
+        for (final it in data['items'] as List? ?? const [])
           if (it is Map<String, dynamic>) CalItem.fromJson(it),
       ],
     );

@@ -495,4 +495,49 @@ describe('Host bookings, blocks, statuses & calendar API (e2e)', () => {
     const late = await checkIn(ended, 409);
     expect(late.body.error.code).toBe('STAY_ENDED');
   });
+
+  it('says which stay this is for the guest and who checked them in', async () => {
+    const { owner, listingId } = await setupHost();
+    const today = nairobiToday();
+    const day = (n: number) => {
+      const d = new Date(`${today}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    const book = async (checkIn: string, checkOut: string) =>
+      (
+        await t
+          .http()
+          .post('/api/v1/host/bookings')
+          .set(auth(owner))
+          .send({
+            listingId,
+            checkIn,
+            checkOut,
+            guests: 1,
+            guest: { name: 'Repeat Guest', phone: '0733111225' },
+            confirm: true,
+          })
+          .expect(201)
+      ).body.data.id as string;
+
+    const later = await book(day(10), day(12));
+    const now = await book(today, day(2));
+    await t
+      .http()
+      .post(`/api/v1/host/bookings/${now}/check-in`)
+      .set(auth(owner))
+      .send({})
+      .expect(200);
+
+    const detail = async (id: string) =>
+      (await t.http().get(`/api/v1/host/bookings/${id}`).set(auth(owner)).expect(200)).body.data;
+    const current = await detail(now);
+    expect(current.guestStayNumber).toBe(1);
+    expect(current.activity.map((a: any) => [a.action, a.by])).toEqual([
+      ['create', 'Olive Owner'],
+      ['checked_in', 'Olive Owner'],
+    ]);
+    expect((await detail(later)).guestStayNumber).toBe(2);
+  });
 });

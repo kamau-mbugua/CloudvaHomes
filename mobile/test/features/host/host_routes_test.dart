@@ -49,6 +49,10 @@ void main() {
     for (final path in [
       '/host',
       '/host/calendar',
+      '/host/calendar/units',
+      '/host/calendar/unit/u1',
+      '/host/guests/g1',
+      '/host/bookings/b1',
       '/host/bookings',
       '/host/listings',
       '/host/more',

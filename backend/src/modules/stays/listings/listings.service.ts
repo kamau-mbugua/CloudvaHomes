@@ -82,6 +82,16 @@ function locationData(loc: ListingLocationDto | null | undefined) {
   };
 }
 
+/** The longest stay can't be shorter than the shortest. */
+function assertStayLengths(minNights: number, maxNights: number | null): void {
+  if (maxNights !== null && maxNights < minNights) {
+    throw AppError.fieldInvalid(
+      'maxNights',
+      `The longest stay can't be shorter than the shortest (${minNights} nights)`,
+    );
+  }
+}
+
 export function toListingView(l: ListingRow) {
   const photos = l.photos.map(toPhotoView);
   const cover = photos[0] ?? null;
@@ -104,6 +114,9 @@ export function toListingView(l: ListingRow) {
     cleaningFee: l.cleaningFee.toString(),
     weeklyDiscountBps: l.weeklyDiscountBps,
     minNights: l.minNights,
+    maxNights: l.maxNights,
+    checkInFrom: l.checkInFrom,
+    checkOutBy: l.checkOutBy,
     checkInInstructions: l.checkInInstructions,
     rulesOverride: (l.rulesOverride as unknown as StayRules | null) ?? null,
     published: l.published,
@@ -177,6 +190,7 @@ export class ListingsService {
   async create(dto: CreateListingDto) {
     const ctx = orgContext();
     await assertHostOrg(this.db, ctx.orgId);
+    assertStayLengths(dto.minNights ?? 1, dto.maxNights ?? null);
 
     const prop = await this.db.property.findFirst({
       where: { AND: [{ id: dto.propertyId }, propertyScope()] },
@@ -244,6 +258,9 @@ export class ListingsService {
             cleaningFee,
             weeklyDiscountBps: dto.weeklyDiscountBps ?? null,
             minNights: dto.minNights ?? 1,
+            maxNights: dto.maxNights ?? null,
+            checkInFrom: dto.checkInFrom ?? null,
+            checkOutBy: dto.checkOutBy ?? null,
             checkInInstructions: dto.checkInInstructions?.trim() || null,
             ...(dto.rulesOverride !== undefined && dto.rulesOverride !== null
               ? { rulesOverride: dto.rulesOverride as unknown as Prisma.InputJsonValue }
@@ -279,6 +296,10 @@ export class ListingsService {
     const ctx = orgContext();
     await assertHostOrg(this.db, ctx.orgId);
     const before = await this.findScoped(id);
+    assertStayLengths(
+      dto.minNights ?? before.minNights,
+      dto.maxNights !== undefined ? dto.maxNights : before.maxNights,
+    );
 
     const nightlyPrice =
       dto.nightlyPrice !== undefined
@@ -330,6 +351,9 @@ export class ListingsService {
               ? { weeklyDiscountBps: dto.weeklyDiscountBps }
               : {}),
             ...(dto.minNights !== undefined ? { minNights: dto.minNights } : {}),
+            ...(dto.maxNights !== undefined ? { maxNights: dto.maxNights } : {}),
+            ...(dto.checkInFrom !== undefined ? { checkInFrom: dto.checkInFrom } : {}),
+            ...(dto.checkOutBy !== undefined ? { checkOutBy: dto.checkOutBy } : {}),
             ...(dto.checkInInstructions !== undefined
               ? { checkInInstructions: dto.checkInInstructions?.trim() || null }
               : {}),

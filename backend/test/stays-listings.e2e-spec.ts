@@ -107,6 +107,15 @@ describe('Host site settings & listings API (e2e)', () => {
     const photo1Id = p1.body.data.id as string;
     const photo2Id = p2.body.data.id as string;
 
+    // The host's app loads photos (of hidden listings too) as small WebP copies, with their login.
+    const thumb = await t
+      .http()
+      .get(`/api/v1/uploads/${p1.body.data.uploadId as string}/content?w=160`)
+      .set(auth(owner))
+      .expect(200);
+    expect(thumb.headers['content-type']).toBe('image/webp');
+    expect(thumb.headers['cache-control']).toBe('private, max-age=86400');
+
     // Reorder so photo 2 is the cover (first)
     const reordered = await t
       .http()
@@ -345,5 +354,92 @@ describe('Host site settings & listings API (e2e)', () => {
 
     const units = await t.prisma.unit.count({ where: { propertyId: prop.id } });
     expect(units).toBe(1);
+  });
+
+  it('saves check-in and check-out times and a longest stay, and quotes within it', async () => {
+    const { owner } = await onboardOrg(t, admin, {
+      name: 'Long Stays',
+      ownerEmail: 'longstays@example.invalid',
+      ownerPhone: '+254700000409',
+      kind: 'HOST',
+    });
+    const prop = await t
+      .http()
+      .post('/api/v1/properties')
+      .set(auth(owner))
+      .send({ name: 'Riverside', code: 'RS' })
+      .expect(201);
+    const create = (body: object) =>
+      t
+        .http()
+        .post('/api/v1/host/listings')
+        .set(auth(owner))
+        .send({
+          propertyId: prop.body.data.id,
+          unitNumber: 'R1',
+          title: 'River 1BR',
+          nightlyPrice: '500000',
+          ...body,
+        });
+
+    // The longest stay can't be shorter than the shortest; times must be HH:MM.
+    const short = await create({ minNights: 3, maxNights: 2 });
+    expect(short.status).toBe(422);
+    expect(short.body.error.details[0].field).toBe('maxNights');
+    expect((await create({ checkInFrom: '2pm' })).status).toBe(422);
+
+    const listing = (
+      await create({
+        minNights: 1,
+        maxNights: 3,
+        checkInFrom: '14:00',
+        checkOutBy: '10:00',
+      }).expect(201)
+    ).body.data;
+    expect([listing.maxNights, listing.checkInFrom, listing.checkOutBy]).toEqual([
+      3,
+      '14:00',
+      '10:00',
+    ]);
+
+    const quote = (checkOut: string) =>
+      t
+        .http()
+        .post('/api/v1/host/bookings/quote')
+        .set(auth(owner))
+        .send({ listingId: listing.id, checkIn: '2026-12-01', checkOut, guests: 1 })
+        .expect(201);
+    expect((await quote('2026-12-04')).body.data.problems).toEqual([]);
+    expect((await quote('2026-12-05')).body.data.problems).toContain('Maximum stay is 3 nights');
+
+    // Clearing the limit and a time.
+    const patched = (
+      await t
+        .http()
+        .patch(`/api/v1/host/listings/${listing.id}`)
+        .set(auth(owner))
+        .send({ maxNights: null, checkOutBy: null })
+        .expect(200)
+    ).body.data;
+    expect([patched.maxNights, patched.checkInFrom, patched.checkOutBy]).toEqual([
+      null,
+      '14:00',
+      null,
+    ]);
+    expect((await quote('2026-12-05')).body.data.problems).toEqual([]);
+
+    // Raising the shortest stay above an existing longest stay is refused.
+    await t
+      .http()
+      .patch(`/api/v1/host/listings/${listing.id}`)
+      .set(auth(owner))
+      .send({ maxNights: 4 })
+      .expect(200);
+    await t
+      .http()
+      .patch(`/api/v1/host/listings/${listing.id}`)
+      .set(auth(owner))
+      .send({ minNights: 5 })
+      .expect(422);
   });
 });

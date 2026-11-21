@@ -1776,6 +1776,11 @@ model Listing {
   weeklyDiscountBps   Int?
   cleaningFee         BigInt   @default(0)
   minNights           Int      @default(1)
+  /// Longest stay in nights; null = no limit.
+  maxNights           Int?
+  /// "HH:MM" in Nairobi time; null = not said.
+  checkInFrom         String?
+  checkOutBy          String?
   checkInInstructions String?
   area                String?
   /// Where it is, picked on a map (Google Places): all four set together, or none.

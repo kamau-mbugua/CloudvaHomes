@@ -171,9 +171,15 @@ ThemeData hodiTheme(Brightness brightness) {
       checkmarkColor: dark ? HodiColors.navy : Colors.white,
       side: BorderSide(color: scheme.outline),
       shape: const StadiumBorder(),
+      // Material 3 chips ignore secondaryLabelStyle: the label colour must follow the selected
+      // state itself, or a selected chip draws navy text on its navy fill.
       labelStyle: TextStyle(
         fontFamily: 'Lufga',
-        color: scheme.onSurface,
+        color: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? (dark ? HodiColors.navy : Colors.white)
+              : scheme.onSurface,
+        ),
         fontSize: 12.5,
         fontWeight: FontWeight.w600,
       ),

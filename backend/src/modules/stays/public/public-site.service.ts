@@ -227,6 +227,9 @@ export class PublicSiteService {
         cleaningFee: listing.cleaningFee.toString(),
         weeklyDiscountBps: listing.weeklyDiscountBps,
         minNights: listing.minNights,
+        maxNights: listing.maxNights,
+        checkInFrom: listing.checkInFrom,
+        checkOutBy: listing.checkOutBy,
         photoUrls: listing.photos.map((p) => `/api/v1/public/photos/${p.uploadId}`),
         photos: listing.photos.map((p) => ({
           id: p.id,
@@ -311,6 +314,7 @@ export class PublicSiteService {
           published: true,
           maxGuests: { gte: q.guests },
           minNights: { lte: nights },
+          OR: [{ maxNights: null }, { maxNights: { gte: nights } }],
         },
         select: { id: true, unitId: true },
       });
@@ -501,6 +505,9 @@ export class PublicSiteService {
 
     if (q.nights < listing.minNights) {
       throw AppError.fieldInvalid('checkOut', `Minimum stay is ${listing.minNights} nights`);
+    }
+    if (listing.maxNights !== null && q.nights > listing.maxNights) {
+      throw AppError.fieldInvalid('checkOut', `Maximum stay is ${listing.maxNights} nights`);
     }
 
     const siteRules = this.siteRulesFromRow(site.rules);

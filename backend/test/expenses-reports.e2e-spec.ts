@@ -133,6 +133,14 @@ describe('Expenses, files and reports (e2e)', () => {
     expect(file.headers['cache-control']).toBe('private, no-store');
     expect((file.body as Buffer).equals(PNG)).toBe(true);
 
+    // Asking for a small copy of a file that isn't a listing photo changes nothing: the original,
+    // never cached.
+    const sized = await raw(owner, `/uploads/${up.id}/content?w=160`);
+    expect(sized.status).toBe(200);
+    expect(sized.headers['content-type']).toBe('image/png');
+    expect(sized.headers['cache-control']).toBe('private, no-store');
+    expect((sized.body as Buffer).equals(PNG)).toBe(true);
+
     // Attached once; other organisations can't read it; wrong purpose refused.
     const again = await post(
       owner,

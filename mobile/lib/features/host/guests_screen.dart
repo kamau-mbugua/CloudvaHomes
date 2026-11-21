@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../core/api/api_error.dart';
 import '../../core/money.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
@@ -25,25 +25,8 @@ class _GuestsScreenState extends ConsumerState<GuestsScreen> {
   }
 
   Future<void> _openGuest(HostGuest summary) async {
-    final canUpdate = can(ref, 'guests:update');
-    HostGuest detail;
-    try {
-      detail = await ref.read(hostApiProvider).guest(summary.id);
-    } on ApiError catch (e) {
-      if (mounted) showMessage(context, e.message);
-      return;
-    }
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => _GuestDetailSheet(
-        guest: detail,
-        canUpdate: canUpdate,
-        onSaved: _reload,
-      ),
-    );
+    await context.push('/host/guests/${summary.id}');
+    if (mounted) _reload();
   }
 
   @override
@@ -94,119 +77,6 @@ class _GuestsScreenState extends ConsumerState<GuestsScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GuestDetailSheet extends ConsumerStatefulWidget {
-  const _GuestDetailSheet({
-    required this.guest,
-    required this.canUpdate,
-    required this.onSaved,
-  });
-
-  final HostGuest guest;
-  final bool canUpdate;
-  final VoidCallback onSaved;
-
-  @override
-  ConsumerState<_GuestDetailSheet> createState() => _GuestDetailSheetState();
-}
-
-class _GuestDetailSheetState extends ConsumerState<_GuestDetailSheet> {
-  late final TextEditingController _notes = TextEditingController(
-    text: widget.guest.notes ?? '',
-  );
-  final TextEditingController _idNumber = TextEditingController();
-  late bool _doNotAccept = widget.guest.doNotAccept;
-  bool _saving = false;
-
-  @override
-  void dispose() {
-    _notes.dispose();
-    _idNumber.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      await ref.read(hostApiProvider).updateGuest(widget.guest.id, {
-        'notes': _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-        'doNotAccept': _doNotAccept,
-        if (_idNumber.text.trim().isNotEmpty) 'idNumber': _idNumber.text.trim(),
-      });
-      widget.onSaved();
-      if (mounted) Navigator.of(context).pop();
-    } on ApiError catch (e) {
-      if (mounted) showMessage(context, e.message);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final g = widget.guest;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              g.name,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${g.phone}${g.email != null ? ' · ${g.email}' : ''}',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text('ID / Passport: ${g.idNumberHint ?? 'Not recorded'}'),
-            const SizedBox(height: 4),
-            if (g.totalPaidCents != null)
-              Text('Total paid: ${formatKes(g.totalPaidCents!)}'),
-            if (widget.canUpdate) ...[
-              const SizedBox(height: 14),
-              TextField(
-                controller: _notes,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Host notes'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _idNumber,
-                decoration: const InputDecoration(
-                  labelText: 'Update ID / Passport (optional)',
-                ),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Require review (no instant booking)'),
-                value: _doNotAccept,
-                onChanged: (v) => setState(() => _doNotAccept = v),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _saving ? null : _save,
-                  child: Text(_saving ? 'Saving…' : 'Save changes'),
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }

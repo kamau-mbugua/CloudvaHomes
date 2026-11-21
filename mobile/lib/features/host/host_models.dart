@@ -371,7 +371,6 @@ class HostListing {
     this.description,
     required this.bedrooms,
     required this.bathrooms,
-    required this.beds,
     required this.maxGuests,
     required this.amenities,
     this.area,
@@ -379,11 +378,12 @@ class HostListing {
     required this.nightlyPrice,
     this.weekendPrice,
     required this.cleaningFee,
-    required this.securityDeposit,
     required this.weeklyDiscountBps,
     required this.monthlyDiscountBps,
     required this.minNights,
-    required this.maxNights,
+    this.maxNights,
+    this.checkInFrom,
+    this.checkOutBy,
     required this.published,
     this.rulesOverride,
     this.coverUploadId,
@@ -402,7 +402,6 @@ class HostListing {
   final String? description;
   final int bedrooms;
   final int bathrooms;
-  final int beds;
   final int maxGuests;
   final List<String> amenities;
   final String? area;
@@ -410,11 +409,16 @@ class HostListing {
   final String nightlyPrice;
   final String? weekendPrice;
   final String cleaningFee;
-  final String securityDeposit;
   final int weeklyDiscountBps;
   final int monthlyDiscountBps;
   final int minNights;
-  final int maxNights;
+
+  /// Longest stay in nights; null = no limit.
+  final int? maxNights;
+
+  /// "HH:MM"; null = not said.
+  final String? checkInFrom;
+  final String? checkOutBy;
   final bool published;
   final StayRules? rulesOverride;
   final String? coverUploadId;
@@ -438,7 +442,6 @@ class HostListing {
       description: j['description'] as String?,
       bedrooms: (j['bedrooms'] as num?)?.toInt() ?? 1,
       bathrooms: (j['bathrooms'] as num?)?.toInt() ?? 1,
-      beds: (j['beds'] as num?)?.toInt() ?? 1,
       maxGuests: (j['maxGuests'] as num?)?.toInt() ?? 2,
       amenities: [
         for (final a in (j['amenities'] as List? ?? const [])) a.toString(),
@@ -448,11 +451,12 @@ class HostListing {
       nightlyPrice: (j['nightlyPrice'] ?? '0').toString(),
       weekendPrice: j['weekendPrice']?.toString(),
       cleaningFee: (j['cleaningFee'] ?? '0').toString(),
-      securityDeposit: (j['securityDeposit'] ?? '0').toString(),
       weeklyDiscountBps: (j['weeklyDiscountBps'] as num?)?.toInt() ?? 0,
       monthlyDiscountBps: (j['monthlyDiscountBps'] as num?)?.toInt() ?? 0,
       minNights: (j['minNights'] as num?)?.toInt() ?? 1,
-      maxNights: (j['maxNights'] as num?)?.toInt() ?? 30,
+      maxNights: (j['maxNights'] as num?)?.toInt(),
+      checkInFrom: j['checkInFrom'] as String?,
+      checkOutBy: j['checkOutBy'] as String?,
       published: j['published'] == true,
       rulesOverride: j['rulesOverride'] is Map<String, dynamic>
           ? StayRules.fromJson(j['rulesOverride'] as Map<String, dynamic>)
@@ -505,6 +509,7 @@ class HostPayment {
     this.note,
     required this.paidAt,
     this.voidedAt,
+    this.voidReason,
   });
 
   final String id;
@@ -518,6 +523,7 @@ class HostPayment {
   final String? note;
   final String paidAt;
   final String? voidedAt;
+  final String? voidReason;
 
   /// A payment that stands has a receipt to preview, send and download.
   bool get hasReceipt => kind == 'PAYMENT' && voidedAt == null;
@@ -533,6 +539,7 @@ class HostPayment {
     // The API calls it receivedAt; older builds read paidAt.
     paidAt: (j['receivedAt'] as String?) ?? (j['paidAt'] as String?) ?? '',
     voidedAt: j['voidedAt'] as String?,
+    voidReason: j['voidReason'] as String?,
   );
 }
 
@@ -615,6 +622,17 @@ class HostBooking {
     this.balanceDueOn,
     this.lines = const [],
     this.payments = const [],
+    this.createdAt,
+    this.checkedInAt,
+    this.checkedOutAt,
+    this.cancelledAt,
+    this.writtenOffAt,
+    this.guestNote,
+    this.hostNote,
+    this.holdExpiresAt,
+    this.requestExpiresAt,
+    this.guestStayNumber,
+    this.activity = const [],
   });
 
   final String id;
@@ -657,6 +675,24 @@ class HostBooking {
   final String? balanceDueOn;
   final List<HostBookingLine> lines;
   final List<HostPayment> payments;
+
+  /// ISO timestamps; null when it hasn't happened.
+  final String? createdAt;
+  final String? checkedInAt;
+  final String? checkedOutAt;
+  final String? cancelledAt;
+  final String? writtenOffAt;
+  final String? guestNote;
+  final String? hostNote;
+  final String? holdExpiresAt;
+  final String? requestExpiresAt;
+
+  /// 1 for the guest's first stay with this host, 2 for the second… (detail only).
+  final int? guestStayNumber;
+
+  /// Staff changes to the booking (detail only): action is create | confirmed | declined |
+  /// checked_in | completed | cancelled | no_show | balance_written_off.
+  final List<({String action, String at, String? by})> activity;
 
   bool get hasMoney => totalCents != null;
 
@@ -716,6 +752,27 @@ class HostBooking {
       payments: [
         for (final p in (j['payments'] as List? ?? const []))
           if (p is Map<String, dynamic>) HostPayment.fromJson(p),
+      ],
+      createdAt: j['createdAt'] as String?,
+      checkedInAt: j['checkedInAt'] as String?,
+      checkedOutAt: j['checkedOutAt'] as String?,
+      cancelledAt: j['cancelledAt'] as String?,
+      writtenOffAt: j['writeOff'] is Map<String, dynamic>
+          ? (j['writeOff'] as Map<String, dynamic>)['at'] as String?
+          : null,
+      guestNote: j['guestNote'] as String?,
+      hostNote: j['hostNote'] as String?,
+      holdExpiresAt: j['holdExpiresAt'] as String?,
+      requestExpiresAt: j['requestExpiresAt'] as String?,
+      guestStayNumber: (j['guestStayNumber'] as num?)?.toInt(),
+      activity: [
+        for (final a in (j['activity'] as List? ?? const []))
+          if (a is Map<String, dynamic>)
+            (
+              action: (a['action'] as String?) ?? '',
+              at: (a['at'] as String?) ?? '',
+              by: a['by'] as String?,
+            ),
       ],
     );
   }

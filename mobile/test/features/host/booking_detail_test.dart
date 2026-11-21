@@ -84,6 +84,22 @@ Map<String, Object?> _bookingJson({
   },
 };
 
+/// Opens the ⋮ menu when the page has one.
+Future<void> openMenu(WidgetTester tester) async {
+  final menu = find.byTooltip('More actions');
+  if (menu.evaluate().isEmpty) return;
+  await tester.tap(menu);
+  await tester.pumpAndSettle();
+}
+
+Future<void> closeMenu(WidgetTester tester) async {
+  final open = find.byWidgetPredicate((w) => w is PopupMenuItem);
+  if (open.evaluate().isEmpty) return;
+  // Tapping outside the menu (on the barrier) closes it.
+  await tester.tapAt(const Offset(5, 5));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
     'booking detail for REQUESTED shows Accept and Decline and has no overflow at 1.3x text scale',
@@ -326,13 +342,15 @@ void main() {
     );
 
     await tester.scrollUntilVisible(
-      find.textContaining('SRC-2026-000006'),
+      find.textContaining('SRC-2026-000007'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    // The payment shows its number, method and day; only the payment has a receipt.
-    expect(find.text('SRC-2026-000006 · Payment'), findsOneWidget);
-    expect(find.textContaining('Cash · 13 Nov 2026'), findsWidgets);
+    // "What happened" shows the payment and the refund with method and number; only the
+    // payment has a receipt.
+    expect(find.text('Paid KES 14,000'), findsOneWidget);
+    expect(find.text('Refunded KES 500'), findsOneWidget);
+    expect(find.textContaining('Cash · SRC-2026-000006'), findsOneWidget);
     expect(find.byTooltip('Receipt SRC-2026-000006'), findsOneWidget);
     expect(find.byTooltip('Receipt SRC-2026-000007'), findsNothing);
 
@@ -345,7 +363,8 @@ void main() {
     await tester.tap(find.textContaining('Send to '));
     await tester.pumpAndSettle();
     expect(find.textContaining('with a link to the receipt.'), findsOneWidget);
-    await tester.tap(find.text('Send receipt'));
+    // The sheet's button (the page's bottom bar has one too).
+    await tester.tap(find.text('Send receipt').last);
     await tester.pumpAndSettle();
     expect(adapter.sent('POST', send), hasLength(1));
     expect(find.text('Receipt SRC-2026-000006 sent by SMS.'), findsOneWidget);
@@ -360,7 +379,9 @@ void main() {
       'checkOut': day(3),
     });
     expect(find.text('Check in'), findsNothing);
-    expect(find.text('No-show'), findsNothing);
+    await openMenu(tester);
+    expect(find.text('Mark no-show'), findsNothing);
+    await closeMenu(tester);
 
     await pumpDetail(tester, {
       ..._bookingJson(status: 'CONFIRMED', includeMoney: true),
@@ -368,12 +389,16 @@ void main() {
       'checkOut': day(2),
     });
     expect(find.text('Check in'), findsOneWidget);
-    expect(find.text('No-show'), findsOneWidget);
     // Check-in with a balance is allowed, with a warning.
     expect(
-      find.textContaining('The guest still owes KES 6,500'),
+      find.textContaining(
+        'You can check the guest in, but the stay must be paid',
+      ),
       findsOneWidget,
     );
+    expect(find.text('KES 6,500 owed'), findsOneWidget);
+    await openMenu(tester);
+    expect(find.text('Mark no-show'), findsOneWidget);
   });
 
   testWidgets('Only owners see Write off balance on a checked-in stay', (
@@ -385,14 +410,18 @@ void main() {
       'checkOut': day(1),
     };
     await pumpDetail(tester, stay);
+    await openMenu(tester);
     expect(find.text('Write off balance'), findsNothing);
+    await closeMenu(tester);
 
     await pumpDetail(
       tester,
       stay,
       extraPermissions: const {'stay-payments:refund'},
     );
+    await openMenu(tester);
     expect(find.text('Write off balance'), findsOneWidget);
+    await closeMenu(tester);
 
     await pumpDetail(
       tester,
@@ -407,7 +436,9 @@ void main() {
       },
       extraPermissions: const {'stay-payments:refund'},
     );
+    await openMenu(tester);
     expect(find.text('Write off balance'), findsNothing);
+    await closeMenu(tester);
     expect(
       find.textContaining('written off: Left without paying'),
       findsOneWidget,
@@ -420,12 +451,13 @@ void main() {
       'checkIn': day(-1),
       'checkOut': day(1),
     });
-    final button = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Check out'),
-    );
-    expect(button.onPressed, isNull);
+    // While money is owed there is no check-out: collecting it comes first.
+    expect(find.text('Check out'), findsNothing);
+    await openMenu(tester);
+    expect(find.text('Check out'), findsNothing);
+    await closeMenu(tester);
     expect(
-      find.textContaining('Collect the remaining KES 6,500'),
+      find.textContaining('Collect the rest, or write it off, before checking'),
       findsOneWidget,
     );
 
@@ -448,8 +480,11 @@ void main() {
       tester,
       _bookingJson(status: 'NO_SHOW', includeMoney: true),
     );
-    expect(find.text('Not collected'), findsOneWidget);
-    expect(find.text('Balance owed'), findsNothing);
+    expect(
+      find.textContaining('KES 6,500 was never collected.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('owed'), findsNothing);
     expect(find.text('M-Pesa prompt'), findsNothing);
     expect(find.text('Record payment'), findsNothing);
   });

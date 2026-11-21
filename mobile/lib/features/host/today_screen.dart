@@ -38,6 +38,8 @@ class TodayScreen extends ConsumerStatefulWidget {
 
 class _TodayScreenState extends ConsumerState<TodayScreen> {
   int _refreshTick = 0;
+  Future<HostDashboard>? _future;
+  String? _futureKey;
   String _tab = 'arriving';
   bool _tabPicked = false;
   String? _busyId;
@@ -134,11 +136,16 @@ class _TodayScreenState extends ConsumerState<TodayScreen> {
     final session = ref.watch(sessionProvider).value;
     final propId = session?.activePropertyId;
 
+    // Fetch again only when the property or refresh changes, not when a tab is picked.
+    final key = '$propId-$_refreshTick';
+    if (key != _futureKey) {
+      _futureKey = key;
+      _future = ref.read(hostApiProvider).dashboard(propertyId: propId);
+    }
     return HostTabScaffold(
       title: 'Today',
       body: FutureBuilder<HostDashboard>(
-        key: ValueKey('$propId-$_refreshTick'),
-        future: ref.read(hostApiProvider).dashboard(propertyId: propId),
+        future: _future,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

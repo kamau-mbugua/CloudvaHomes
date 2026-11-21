@@ -133,6 +133,19 @@ export class UploadsService {
    */
   async publicPhotoVariant(id: string, width: PhotoWidth) {
     const { upload, data } = await this.publicPhotoContent(id);
+    return this.variantOf(upload, data, width);
+  }
+
+  /** A smaller WebP copy of a photo the caller may read (listing photos and logos only). */
+  async contentVariant(id: string, width: PhotoWidth) {
+    const { upload, data } = await this.content(id);
+    if (!IMAGE_ONLY_PURPOSES.has(upload.purpose)) {
+      return { data, contentType: upload.contentType, resized: false };
+    }
+    return this.variantOf(upload, data, width);
+  }
+
+  private async variantOf(upload: Upload, data: Buffer, width: PhotoWidth) {
     const key = photoVariantKey(upload.key, width);
     try {
       return { data: await this.storage.get(key), contentType: 'image/webp', resized: true };

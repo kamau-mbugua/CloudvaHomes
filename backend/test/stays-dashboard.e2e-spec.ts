@@ -124,6 +124,23 @@ describe('Host dashboard API (e2e)', () => {
     expect(d.summary.money.owed).toBe((BigInt(arriving.total) / 2n).toString());
     expect(d.balances.map((b: any) => b.code)).toEqual([arriving.code]);
 
+    // The calendar from today also returns the overdue stay (its nights are all before today),
+    // and the money on each stay for the owner.
+    const calendar = async (s: Session) =>
+      (
+        await t
+          .http()
+          .get(`/api/v1/host/bookings/calendar?from=${today}&to=${addIsoDays(today, 7)}`)
+          .set(auth(s))
+          .expect(200)
+      ).body.data;
+    const cal = await calendar(owner);
+    expect(cal.items.map((i: any) => i.code).sort()).toEqual([arriving.code, overdue.code].sort());
+    const arrivingItem = cal.items.find((i: any) => i.code === arriving.code);
+    expect(arrivingItem.owed).toBe((BigInt(arriving.total) / 2n).toString());
+    expect(arrivingItem.total).toBe(arriving.total);
+    expect(cal.units[0].nightlyPrice).toBe('500000');
+
     // A caretaker sees the day's work but no money.
     const caretakerRole = await t.prisma.role.findFirstOrThrow({
       where: { orgId, systemKey: 'CARETAKER' },
@@ -147,6 +164,10 @@ describe('Host dashboard API (e2e)', () => {
     expect(cv.balances).toEqual([]);
     expect(cv.stays.arriving[0].owed).toBeUndefined();
     expect(cv.stays.arriving).toHaveLength(1);
+    const ccal = await calendar(caretaker);
+    expect(ccal.items).toHaveLength(2);
+    expect(ccal.items[0].owed).toBeUndefined();
+    expect(ccal.units[0].nightlyPrice).toBeUndefined();
   });
 
   it('is for host organisations only', async () => {

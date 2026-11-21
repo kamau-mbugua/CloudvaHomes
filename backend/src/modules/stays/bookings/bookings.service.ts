@@ -44,6 +44,18 @@ import type {
 
 const HOLD_TTL_MS = 12 * 3600_000;
 
+/** Audit actions shown as a booking's history. */
+const BOOKING_ACTIVITY = [
+  'booking.create',
+  'booking.confirmed',
+  'booking.declined',
+  'booking.checked_in',
+  'booking.completed',
+  'booking.cancelled',
+  'booking.no_show',
+  'booking.balance_written_off',
+] as const;
+
 export const BOOKING_INCLUDE = {
   unit: { select: { id: true, number: true } },
   property: { select: { id: true, code: true, name: true } },
@@ -177,6 +189,9 @@ export class BookingsService {
     const problems: string[] = [];
     if (q.nights < listing.minNights) {
       problems.push(`Minimum stay is ${listing.minNights} nights`);
+    }
+    if (listing.maxNights !== null && q.nights > listing.maxNights) {
+      problems.push(`Maximum stay is ${listing.maxNights} nights`);
     }
     if (guests > listing.maxGuests) {
       problems.push(`Maximum ${listing.maxGuests} guests`);
@@ -815,7 +830,46 @@ export class BookingsService {
     if (!row) {
       throw AppError.notFound('Booking');
     }
-    return viewBooking(row, { permissions: this.callerPermissions() }, nairobiToday());
+
+    const [earlierStays, audits] = await Promise.all([
+      row.guestId
+        ? this.db.booking.count({
+            where: {
+              orgId,
+              guestId: row.guestId,
+              kind: 'STAY',
+              status: { in: ['CONFIRMED', 'CHECKED_IN', 'COMPLETED'] },
+              checkIn: { lt: row.checkIn },
+              property: propertyScope(),
+            },
+          })
+        : Promise.resolve(0),
+      this.db.auditLog.findMany({
+        where: { orgId, entity: 'booking', entityId: id, action: { in: [...BOOKING_ACTIVITY] } },
+        select: { action: true, actorId: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    const actorIds = [...new Set(audits.map((a) => a.actorId).filter((x): x is string => !!x))];
+    const actors = actorIds.length
+      ? await this.db.user.findMany({
+          where: { id: { in: actorIds } },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
+    const nameOf = new Map(actors.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
+
+    return {
+      ...viewBooking(row, { permissions: this.callerPermissions() }, nairobiToday()),
+      /** 1 for the guest's first stay with this host, 2 for the second… Null with no guest. */
+      guestStayNumber: row.guestId ? earlierStays + 1 : null,
+      /** Who changed the booking and when (staff actions; guests and jobs have no actor). */
+      activity: audits.map((a) => ({
+        action: a.action.replace(/^booking\./, ''),
+        at: a.createdAt.toISOString(),
+        by: a.actorId ? (nameOf.get(a.actorId) ?? null) : null,
+      })),
+    };
   }
 
   async list(query: ListBookingsQueryDto) {
@@ -891,15 +945,24 @@ export class BookingsService {
         orgId,
         property: propertyScope(),
         ...(query.propertyId ? { propertyId: query.propertyId } : {}),
-        status: { in: [...BLOCKING, 'COMPLETED'] },
-        checkIn: { lt: toDate },
-        checkOut: { gt: fromDate },
+        OR: [
+          {
+            status: { in: [...BLOCKING, 'COMPLETED'] },
+            checkIn: { lt: toDate },
+            checkOut: { gt: fromDate },
+          },
+          // A guest still checked in after their check-out day is still in the unit: return the
+          // stay even when its booked nights are all before the range.
+          { status: 'CHECKED_IN', checkIn: { lt: toDate } },
+        ],
       },
       include: {
         guest: { select: { name: true } },
       },
       orderBy: { checkIn: 'asc' },
     });
+
+    const canSeeMoney = this.callerPermissions().has('stay-payments:view');
 
     return {
       units: listings.map((l) => ({
@@ -908,8 +971,16 @@ export class BookingsService {
         unitNumber: l.unit.number,
         title: l.title,
         property: l.property,
+        ...(canSeeMoney ? { nightlyPrice: l.nightlyPrice.toString() } : {}),
       })),
       items: bookings.map((b) => ({
+        ...(canSeeMoney && b.kind === 'STAY'
+          ? {
+              total: b.total.toString(),
+              paid: (b.amountPaid - b.amountRefunded).toString(),
+              owed: owedOn(b).toString(),
+            }
+          : {}),
         id: b.id,
         unitId: b.unitId,
         listingId: b.listingId,

@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Res,
   StreamableFile,
   UploadedFile,
@@ -17,6 +18,7 @@ import type { Response } from 'express';
 import { ok } from '../../common/http/response.js';
 import type { Upload } from '../../generated/prisma/client.js';
 import { RequireOrg } from '../auth/decorators.js';
+import { photoWidth } from './photo-variants.js';
 import { MAX_UPLOAD_BYTES, UploadsService } from './uploads.service.js';
 
 class UploadBodyDto {
@@ -87,7 +89,25 @@ export class UploadsController {
 
   @Get(':id/content')
   @RequireOrg()
-  async content(@Param('id', ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response) {
+  async content(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('w') w: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // ?w=160|480|1024 → a smaller WebP copy of a listing photo or logo, for lists and thumbnails.
+    // Only a copy we made ourselves is served this way (and may be cached); anything else — other
+    // kinds of file, or a photo that couldn't be resized — goes out exactly as without ?w=.
+    const width = photoWidth(w);
+    if (width) {
+      const variant = await this.uploads.contentVariant(id, width);
+      if (variant.resized) {
+        res.setHeader('Content-Type', 'image/webp');
+        res.setHeader('Content-Disposition', 'inline');
+        res.setHeader('Cache-Control', 'private, max-age=86400');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return new StreamableFile(variant.data);
+      }
+    }
     const { upload, data } = await this.uploads.content(id);
     return sendFile(res, upload, data);
   }

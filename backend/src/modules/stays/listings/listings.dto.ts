@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsObject,
   IsOptional,
+  Matches,
   IsString,
   IsUUID,
   Max,
@@ -171,6 +172,27 @@ export class CreateListingDto {
   @Max(365)
   minNights?: number;
 
+  @ApiPropertyOptional({ nullable: true, description: 'Longest stay in nights; null = no limit' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  maxNights?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, example: '14:00' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Use a 24-hour time like 14:00' })
+  checkInFrom?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: '10:00' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Use a 24-hour time like 10:00' })
+  checkOutBy?: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
@@ -292,6 +314,27 @@ export class UpdateListingDto {
   @Min(1)
   @Max(365)
   minNights?: number;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Longest stay in nights; null = no limit' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  maxNights?: number | null;
+
+  @ApiPropertyOptional({ nullable: true, example: '14:00' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Use a 24-hour time like 14:00' })
+  checkInFrom?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: '10:00' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Use a 24-hour time like 10:00' })
+  checkOutBy?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()

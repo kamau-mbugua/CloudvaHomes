@@ -130,12 +130,20 @@ class HostTabScaffold extends ConsumerWidget {
     required this.body,
     this.actions = const [],
     this.floatingActionButton,
+    this.subtitle,
+    this.bottom,
   });
 
   final String title;
   final Widget body;
   final List<Widget> actions;
   final Widget? floatingActionButton;
+
+  /// Replaces the organisation name under the title.
+  final String? subtitle;
+
+  /// Shown under the title in the navy bar (e.g. a search field).
+  final PreferredSizeWidget? bottom;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -148,7 +156,8 @@ class HostTabScaffold extends ConsumerWidget {
       drawer: const KodiHubSideDrawer(),
       appBar: KodiHubAppBar(
         title: Text(title),
-        subtitle: orgName,
+        subtitle: subtitle ?? orgName,
+        bottom: bottom,
         actions: [
           ...actions,
           const NotificationButton(),
