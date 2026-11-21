@@ -11,6 +11,7 @@ import '../../core/widgets/common.dart';
 import '../../core/widgets/paged_list.dart';
 import '../../core/widgets/stk_sheet.dart';
 import 'calendar_rules.dart';
+import 'host_dashboard.dart';
 import 'host_models.dart';
 
 /// Picks a photo via `image_picker` with `maxWidth: 1600, imageQuality: 80`.
@@ -240,6 +241,20 @@ class HostApi {
     ];
   }
 
+  /// The Today tab: stays, what needs the host, nights ahead and money, in one call.
+  Future<HostDashboard> dashboard({String? propertyId}) async {
+    final res = await _api.get(
+      '/host/dashboard',
+      query: {
+        if (propertyId != null && propertyId.isNotEmpty)
+          'propertyId': propertyId,
+      },
+    );
+    return HostDashboard.fromJson(
+      res['data'] as Map<String, dynamic>? ?? const {},
+    );
+  }
+
   Future<PageResult<HostBooking>> bookings({
     int page = 1,
     String? propertyId,
@@ -396,10 +411,11 @@ class HostApi {
         for (final u in unitRows)
           if (u is Map<String, dynamic>)
             (
-              id: (u['id'] as String?) ?? '',
-              number: (u['number'] as String?) ?? '',
+              id: (u['unitId'] as String?) ?? '',
+              number: (u['unitNumber'] as String?) ?? '',
               listingId: u['listingId'] as String?,
-              title: (u['title'] as String?) ?? (u['number'] as String?) ?? '',
+              title:
+                  (u['title'] as String?) ?? (u['unitNumber'] as String?) ?? '',
             ),
       ],
       items: [

@@ -23,16 +23,18 @@ class CalItem {
   final String? code;
   final String? reason;
 
+  /// Parses an item from `GET /host/bookings/calendar`. The API sends `kind` as
+  /// `STAY | BLOCK`, dates as `checkIn`/`checkOut` and the block note as `hostNote`.
   factory CalItem.fromJson(Map<String, dynamic> j) => CalItem(
-    kind: (j['kind'] as String?) ?? 'BOOKING',
+    kind: j['kind'] == 'BLOCK' ? 'BLOCK' : 'BOOKING',
     id: (j['id'] as String?) ?? '',
     unitId: (j['unitId'] as String?) ?? '',
-    from: (j['from'] as String?) ?? '',
-    to: (j['to'] as String?) ?? '',
+    from: (j['checkIn'] as String?) ?? '',
+    to: (j['checkOut'] as String?) ?? '',
     status: j['status'] as String?,
     guestName: j['guestName'] as String?,
     code: j['code'] as String?,
-    reason: j['reason'] as String?,
+    reason: j['hostNote'] as String?,
   );
 }
 

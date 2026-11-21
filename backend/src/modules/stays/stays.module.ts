@@ -7,6 +7,8 @@ import { BookingsController } from './bookings/bookings.controller.js';
 import { BookingsService } from './bookings/bookings.service.js';
 import { CleaningController } from './cleaning/cleaning.controller.js';
 import { CleaningService } from './cleaning/cleaning.service.js';
+import { HostDashboardController } from './dashboard/host-dashboard.controller.js';
+import { HostDashboardService } from './dashboard/host-dashboard.service.js';
 import { GuestsController } from './guests/guests.controller.js';
 import { GuestsService } from './guests/guests.service.js';
 import { StaysJobsController } from './jobs/stays-jobs.controller.js';
@@ -38,6 +40,7 @@ import { HostSiteService } from './site/host-site.service.js';
     HostReportsController,
     GuestsController,
     CleaningController,
+    HostDashboardController,
   ],
   providers: [
     IdNumbers,
@@ -50,6 +53,7 @@ import { HostSiteService } from './site/host-site.service.js';
     HostReportsService,
     GuestsService,
     CleaningService,
+    HostDashboardService,
     JobTokenVerifier,
     JobsGuard,
   ],

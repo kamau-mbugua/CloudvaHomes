@@ -85,4 +85,39 @@ void main() {
       expect(isClosedBooking('COMPLETED'), isFalse);
     },
   );
+
+  test('CalItem.fromJson reads the /host/bookings/calendar item shape', () {
+    final stay = CalItem.fromJson({
+      'id': 'b1',
+      'unitId': 'u1',
+      'listingId': 'l1',
+      'kind': 'STAY',
+      'status': 'CONFIRMED',
+      'checkIn': '2026-12-01',
+      'checkOut': '2026-12-05',
+      'guestName': 'Guest One',
+      'hostNote': null,
+      'code': 'BK-1',
+    });
+    expect(stay.kind, 'BOOKING');
+    expect(stay.from, '2026-12-01');
+    expect(stay.to, '2026-12-05');
+
+    final block = CalItem.fromJson({
+      'id': 'k1',
+      'unitId': 'u1',
+      'kind': 'BLOCK',
+      'status': 'CONFIRMED',
+      'checkIn': '2026-12-10',
+      'checkOut': '2026-12-12',
+      'hostNote': 'Repairs',
+    });
+    expect(block.kind, 'BLOCK');
+    expect(block.reason, 'Repairs');
+
+    final days = monthDays('2026-12', [stay, block]);
+    expect(days[0].status, DayStatus.checkIn);
+    expect(days[2].status, DayStatus.booked);
+    expect(days[9].status, DayStatus.blocked);
+  });
 }
