@@ -7,6 +7,7 @@ import '../../core/auth/session_controller.dart';
 import '../../core/widgets/common.dart';
 import 'auth_scaffold.dart';
 import '../../core/widgets/phone_field.dart';
+import '../../core/legal.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -168,6 +169,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
         const SizedBox(height: 16),
+        Text(
+          'By creating an account you agree to the KodiHQ terms of service and privacy policy.',
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.4,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const LegalLinks(),
+        const SizedBox(height: 8),
         if (_error != null) ...[ErrorBox(_error!), const SizedBox(height: 12)],
         FilledButton(
           onPressed: _busy ? null : _submit,

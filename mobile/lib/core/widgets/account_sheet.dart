@@ -8,7 +8,9 @@ import '../../features/tenant/tenant_api.dart';
 import '../api/api_error.dart';
 import '../auth/session.dart';
 import '../auth/session_controller.dart';
+import '../../features/account/delete_account_screen.dart';
 import '../config.dart';
+import '../legal.dart';
 import '../theme.dart';
 import '../theme_mode.dart';
 import 'common.dart';
@@ -466,6 +468,34 @@ class AccountSheet extends ConsumerWidget {
               ),
               const Divider(height: 1),
               ListTile(
+                key: const Key('account-delete'),
+                leading: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: HodiColors.paper2,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.person_remove_outlined,
+                    size: 19,
+                    color: HodiColors.navy,
+                  ),
+                ),
+                title: const Text(
+                  'Delete account',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Close your KodiHQ login'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  DeleteAccountScreen.open(nav.context);
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
                 leading: Container(
                   width: 34,
                   height: 34,
@@ -494,6 +524,7 @@ class AccountSheet extends ConsumerWidget {
             ],
           ),
         ),
+        const Padding(padding: EdgeInsets.only(top: 8), child: LegalLinks()),
         FutureBuilder(
           future: PackageInfo.fromPlatform(),
           builder: (_, snap) => Padding(

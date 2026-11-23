@@ -27,6 +27,7 @@ import {
   AppConfigQueryDto,
   ChangePasswordDto,
   type ClientKind,
+  DeleteAccountDto,
   ForgotPasswordDto,
   LoginDto,
   OtpRequestDto,
@@ -39,6 +40,7 @@ import {
   SwitchOrgDto,
   UpdateMeDto,
 } from './auth.dto.js';
+import { AccountDeletionService } from './account-deletion.service.js';
 import { AuthService } from './auth.service.js';
 import {
   AllowWhenMustChangePassword,
@@ -277,6 +279,7 @@ export class MeController {
     private readonly auth: AuthService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly deletion: AccountDeletionService,
   ) {}
 
   /** The session object (without tokens) for the current access token. */
@@ -325,5 +328,16 @@ export class MeController {
   @HttpCode(204)
   async changePassword(@Body() dto: ChangePasswordDto) {
     await this.auth.changePassword(dto.currentPassword, dto.newPassword);
+  }
+
+  /**
+   * Deletes the signed-in person's account (soft delete; see AccountDeletionService). Needs a
+   * step-up code: `POST /auth/step-up/request`, `/verify`, then this with `X-Step-Up`.
+   */
+  @AllowWhenMustChangePassword()
+  @Post('delete')
+  @HttpCode(204)
+  async deleteAccount(@Body() dto: DeleteAccountDto) {
+    await this.deletion.deleteOwnAccount(dto.reason);
   }
 }

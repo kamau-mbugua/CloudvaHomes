@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The KodiHQ mark (roof and three lines) from frontend/public/favicon.svg, drawn inside the
+     adaptive icon's 66dp safe zone of a 108dp canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.25"
+        android:scaleY="1.25"
+        android:translateX="24"
+        android:translateY="23">
+        <path
+            android:pathData="M9,21 L24,9 L39,21"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M15.1,24 H32.9 A2.1,2.1 0 0 1 32.9,28.2 H15.1 A2.1,2.1 0 0 1 15.1,24 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M15.1,31 H26.9 A2.1,2.1 0 0 1 26.9,35.2 H15.1 A2.1,2.1 0 0 1 15.1,31 Z" />
+        <path
+            android:fillColor="#84BD00"
+            android:pathData="M15.1,38 H20.9 A2.1,2.1 0 0 1 20.9,42.2 H15.1 A2.1,2.1 0 0 1 15.1,38 Z" />
+    </group>
+</vector>

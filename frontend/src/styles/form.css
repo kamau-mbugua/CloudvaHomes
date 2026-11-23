@@ -643,3 +643,10 @@
   background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg);
   font-size: 13.5px;
 }
+
+/* ---- delete account (/app/account, /tenant/profile, /delete-account) ---- */
+.del__points { margin: 0 0 16px; padding-left: 20px; color: var(--text-muted); line-height: 1.5; }
+.del__points li + li { margin-top: 6px; }
+.del__confirm { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 8px; cursor: pointer; }
+.del__confirm input { margin-top: 3px; }
+a.del__signin { display: flex; align-items: center; justify-content: center; text-decoration: none; }

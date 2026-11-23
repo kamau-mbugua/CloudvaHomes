@@ -263,6 +263,15 @@ export class AdminTwoFactorVerifyDto extends ClientDto {
   code!: string;
 }
 
+export class DeleteAccountDto {
+  /** Why they're leaving (optional, for us). */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
 export class UpdateMeDto {
   @ApiPropertyOptional()
   @IsOptional()

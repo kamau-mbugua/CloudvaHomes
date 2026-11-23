@@ -35,6 +35,14 @@ model User {
   defaultPlace       Place?
   defaultHomeId      String?       @db.Uuid
   lastLoginAt        DateTime?
+  /// Soft delete: the person closed their account. The row stays for the records it signed
+  /// (payments, audit); sign-in details are cleared so the email and phone are free again.
+  deletedAt          DateTime?
+  deletionReason     String?
+  /// The email and phone it had, kept for the grace period in the privacy policy (support,
+  /// restoring a mistaken deletion); never used to sign in.
+  deletedEmail       String?
+  deletedPhone       String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

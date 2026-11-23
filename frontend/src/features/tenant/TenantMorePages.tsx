@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { CardSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { PasswordSection, ProfileSection } from '../account/AccountPage';
+import { DeleteAccountSection } from '../account/DeleteAccount';
 import { downloadTenantLeasePdf, downloadTenantSignedLease, tenantErrorMessage, useTenantNotices } from './api';
 import { homeText, noticeLink } from './rules';
 import { useTenantContext } from './tenantContext';
@@ -117,6 +118,7 @@ export function TenantProfilePage() {
           ))}
         </ul>
       </section>
+      <section className="ag__card"><DeleteAccountSection /></section>
     </div>
   );
 }

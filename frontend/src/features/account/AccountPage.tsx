@@ -10,18 +10,21 @@ import type { SessionPayload } from '../../lib/auth/types';
 import { useSession } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { settingsErrorMessage } from '../settings/api';
+import { DeleteAccountSection } from './DeleteAccount';
 
 /**
  * `/app/account` — your own name and password. Email and phone are how you sign in, so
- * they are shown but changed by an organisation owner (or support), not here.
+ * they are shown but changed by an organisation owner (or support), not here. The third tab
+ * deletes the account.
  */
 export function AccountPage() {
   const session = useSession();
   const [params, setParams] = useSearchParams();
   const mustChange = Boolean(session.user.mustChangePassword);
-  const tab = mustChange || params.get('tab') === 'password' ? 'password' : 'profile';
+  const asked = params.get('tab');
+  const tab = mustChange || asked === 'password' ? 'password' : asked === 'delete' ? 'delete' : 'profile';
 
-  const setTab = (next: 'profile' | 'password') => {
+  const setTab = (next: 'profile' | 'password' | 'delete') => {
     setParams(
       (prev) => {
         const p = new URLSearchParams(prev);
@@ -56,10 +59,19 @@ export function AccountPage() {
             >
               Password
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'delete'}
+              className="pf__tab"
+              onClick={() => setTab('delete')}
+            >
+              Delete account
+            </button>
           </div>
         </div>
 
-        {tab === 'profile' ? <ProfileSection /> : <PasswordSection />}
+        {tab === 'profile' ? <ProfileSection /> : tab === 'password' ? <PasswordSection /> : <DeleteAccountSection />}
       </div>
     </div>
   );

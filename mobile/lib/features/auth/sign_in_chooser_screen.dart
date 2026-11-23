@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/session_controller.dart';
 import '../../core/config.dart';
+import '../../core/legal.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/brand_mark.dart';
@@ -212,6 +213,8 @@ class _SignInChooserScreenState extends ConsumerState<SignInChooserScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 4),
+                    const LegalLinks(),
                   ],
                 ),
               ),

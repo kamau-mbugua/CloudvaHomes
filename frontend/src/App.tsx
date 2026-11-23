@@ -20,6 +20,7 @@ import { useSession } from './lib/auth/useAuth';
 
 const MessagesPage = lazy(() => import('./features/messages/MessagesPage').then((m) => ({ default: m.MessagesPage })));
 const AccountPage = lazy(() => import('./features/account/AccountPage').then((m) => ({ default: m.AccountPage })));
+const DeleteAccountPage = lazy(() => import('./features/account/DeleteAccount').then((m) => ({ default: m.DeleteAccountPage })));
 const OrganizationPage = lazy(() => import('./features/settings/OrganizationPage').then((m) => ({ default: m.OrganizationPage })));
 const UsersPage = lazy(() => import('./features/settings/UsersPage').then((m) => ({ default: m.UsersPage })));
 const RolesPage = lazy(() => import('./features/settings/RolesPage').then((m) => ({ default: m.RolesPage })));
@@ -203,6 +204,8 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/invite/:token" element={<AcceptInvitationPage />} />
+              {/* Public: the Play Store listing's account-deletion link. */}
+              <Route path="/delete-account" element={<DeleteAccountPage />} />
 
               <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
                 <Route index element={<HomeOrTodayPage />} />

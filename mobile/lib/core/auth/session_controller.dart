@@ -323,6 +323,42 @@ class SessionController extends AsyncNotifier<Session?> {
     }
   }
 
+  /// Sends a one-time code to the person's own phone (or email) to confirm a sensitive change.
+  Future<void> requestStepUp() => _api.post('/auth/step-up/request');
+
+  /// The code from [requestStepUp] → a short-lived grant for the `X-Step-Up` header.
+  Future<String> verifyStepUp(String code) async {
+    final res = await _api.post(
+      '/auth/step-up/verify',
+      body: {'code': code.trim()},
+    );
+    return (res['data'] as Map<String, dynamic>)['stepUpToken'] as String;
+  }
+
+  /// Deletes the signed-in person's account, then forgets it on this phone: the session, the
+  /// push token (the server dropped it) and any saved login for its email or phone.
+  Future<void> deleteAccount({
+    required String stepUpToken,
+    String? reason,
+  }) async {
+    final user = state.valueOrNull?.user;
+    await _api.post(
+      '/me/delete',
+      body: {
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      },
+      headers: {'X-Step-Up': stepUpToken},
+    );
+    for (final id in [user?.email, user?.phone]) {
+      if (id != null && id.isNotEmpty) await _store.removeSavedCredential(id);
+    }
+    // The server already ended every session: no logout call, just forget it here.
+    await _store.clear();
+    _api.accessToken = null;
+    ref.read(appModeProvider.notifier).state = null;
+    state = const AsyncData(null);
+  }
+
   Future<void> signOut() async {
     await ref.read(pushNotificationsServiceProvider).unregisterCurrentDevice();
     final token = await _store.read();

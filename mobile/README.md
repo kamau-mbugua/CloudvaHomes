@@ -68,6 +68,9 @@ carry an Idempotency-Key and are never retried automatically.
 
 ## Release signing
 
+The full Play Store checklist (keys, listing, Data safety, account deletion) is in
+`docs/plans/2026-11-23-play-store-release.md`; store graphics are in `store/play/`.
+
 There is **no keystore in this repo**. A release build signs with `android/key.properties`
 (git-ignored), which CI writes from secrets:
 

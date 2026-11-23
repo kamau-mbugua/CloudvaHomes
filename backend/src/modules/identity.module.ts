@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { RateLimitService } from '../common/rate-limit/rate-limit.service.js';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditService } from './audit/audit.service.js';
+import { AccountDeletionService } from './auth/account-deletion.service.js';
 import { AuthController, MeController } from './auth/auth.controller.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuthService } from './auth/auth.service.js';
@@ -46,6 +47,7 @@ import { UsersService } from './users/users.service.js';
     SessionsService,
     OtpService,
     AuthService,
+    AccountDeletionService,
     InvitationsService,
     UsersService,
     RolesService,
