@@ -261,6 +261,62 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     expect(noPhone.phone).toBeNull();
   });
 
+  it("refuses a new organisation's owner details that would pick the wrong account", async () => {
+    await post(
+      admin,
+      '/platform/operators',
+      {
+        firstName: 'Sam',
+        lastName: 'Seller',
+        email: 'sam@hodi.test',
+        phone: '0722000111',
+        role: 'SALESPERSON',
+        password: PASSWORD,
+      },
+      201,
+    );
+    const sam = await login(t, 'sam@hodi.test');
+    const create = (s: Session, owner: { email: string; phone: string }, status: number) =>
+      post(
+        s,
+        '/platform/organizations',
+        {
+          name: `Org ${owner.email}`,
+          kind: 'LANDLORD',
+          phone: '0711000000',
+          email: `office+${owner.email}`,
+          owner: { firstName: 'Olive', lastName: 'Owner', ...owner },
+        },
+        status,
+      );
+    const fields = (body: any) => body.error.details.map((d: { field: string }) => d.field);
+
+    // The salesperson's own phone, or the admin's email, would make them the owner.
+    expect(fields(await create(sam, { email: 'olive@x.test', phone: '0722000111' }, 422))).toEqual([
+      'owner.phone',
+    ]);
+    expect(
+      fields(await create(admin, { email: 'admin@hodi.test', phone: '0733000222' }, 422)),
+    ).toEqual(['owner.email']);
+    expect(await t.prisma.organization.count()).toBe(0);
+
+    // A customer's existing phone with a different email (or the reverse) is refused too…
+    await create(admin, { email: 'olive@x.test', phone: '0733000222' }, 201);
+    expect(
+      fields(await create(admin, { email: 'other@x.test', phone: '0733000222' }, 422)),
+    ).toEqual(['owner.phone']);
+    expect(
+      fields(await create(admin, { email: 'olive@x.test', phone: '0744000333' }, 422)),
+    ).toEqual(['owner.email']);
+
+    // …but the same person's matching details can own a second organisation.
+    await create(sam, { email: 'Olive@X.test', phone: '+254733000222' }, 201);
+    const olive = await t.prisma.user.findUniqueOrThrow({ where: { email: 'olive@x.test' } });
+    expect(await t.prisma.membership.count({ where: { userId: olive.id } })).toBe(2);
+    const samUser = await t.prisma.user.findUniqueOrThrow({ where: { email: 'sam@hodi.test' } });
+    expect(await t.prisma.membership.count({ where: { userId: samUser.id } })).toBe(0);
+  });
+
   it('requires a 6-digit 2FA code for platform operators when requireAdminTwoFactor is enabled', async () => {
     // Enable Admin 2FA via EMAIL
     const updatedSettings = (

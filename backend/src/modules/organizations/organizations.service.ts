@@ -166,6 +166,7 @@ export class OrganizationsService {
 
     // Platform work spans organisations: org scoping off, everything filtered explicitly.
     return withoutOrgScope(async () => {
+      await this.checkOwnerContacts(ownerEmail, ownerPhone);
       const { org, membershipId, token } = await this.db.$transaction(async (tx) => {
         // KodiHQ billing (phase 8): account number, default plan and its free trial.
         const [{ n }] = await tx.$queryRaw<
@@ -244,5 +245,43 @@ export class OrganizationsService {
       const invitationDelivered = await this.invitations.deliver(membershipId, token);
       return { ...toOrg(org), invitationDelivered };
     });
+  }
+
+  /**
+   * The owner's email and phone pick an existing account when one has them, so a wrong detail
+   * would hand the new organisation to someone else. Refuse when either belongs to a KodiHQ
+   * staff account, or to an account whose other contact detail is different from the one given.
+   */
+  private async checkOwnerContacts(email: string | null, phone: string | null) {
+    const [byEmail, byPhone] = await Promise.all([
+      email ? this.db.user.findUnique({ where: { email } }) : null,
+      phone ? this.db.user.findUnique({ where: { phone } }) : null,
+    ]);
+    const isStaff = (u: { isPlatformAdmin: boolean; platformRole: string | null }) =>
+      u.isPlatformAdmin || u.platformRole !== null;
+    const errors: { field: string; message: string }[] = [];
+    if (byEmail && isStaff(byEmail)) {
+      errors.push({
+        field: 'owner.email',
+        message: 'This email belongs to a KodiHQ staff account. Use the owner’s own email.',
+      });
+    } else if (byEmail && phone && byEmail.phone && byEmail.phone !== phone) {
+      errors.push({
+        field: 'owner.email',
+        message: 'This email is already on an account with a different phone number.',
+      });
+    }
+    if (byPhone && isStaff(byPhone)) {
+      errors.push({
+        field: 'owner.phone',
+        message: 'This phone number belongs to a KodiHQ staff account. Use the owner’s own number.',
+      });
+    } else if (byPhone && email && byPhone.email && byPhone.email !== email) {
+      errors.push({
+        field: 'owner.phone',
+        message: 'This phone number is already on an account with a different email.',
+      });
+    }
+    if (errors.length) throw AppError.validation(errors);
   }
 }
