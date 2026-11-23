@@ -301,13 +301,17 @@ class SessionController extends AsyncNotifier<Session?> {
     await reload();
   }
 
+  /// Changes the password; with no [currentPassword], sets a first one for someone who signs
+  /// in with codes, which needs a [stepUpToken] (see [requestStepUp]).
   Future<void> changePassword({
-    required String currentPassword,
+    String? currentPassword,
     required String newPassword,
+    String? stepUpToken,
   }) async {
     await _api.post(
       '/me/password',
-      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      body: {'currentPassword': ?currentPassword, 'newPassword': newPassword},
+      headers: stepUpToken == null ? null : {'X-Step-Up': stepUpToken},
     );
     await reload();
   }

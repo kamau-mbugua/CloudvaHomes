@@ -148,6 +148,7 @@ class SessionUser {
     this.isPlatformAdmin = false,
     this.platformRole,
     this.mustChangePassword = false,
+    this.hasPassword = true,
     this.defaultPlace,
     this.defaultHomeId,
   });
@@ -159,6 +160,9 @@ class SessionUser {
   final bool isPlatformAdmin;
   final String? platformRole;
   final bool mustChangePassword;
+
+  /// False for people who only ever sign in with a one-time code: they can set a first one.
+  final bool hasPassword;
   final String? defaultPlace;
   final String? defaultHomeId;
 
@@ -176,6 +180,7 @@ class SessionUser {
     isPlatformAdmin: j['isPlatformAdmin'] == true,
     platformRole: j['platformRole'] as String?,
     mustChangePassword: j['mustChangePassword'] == true,
+    hasPassword: j['hasPassword'] != false,
     defaultPlace: j['defaultPlace'] as String?,
     defaultHomeId: j['defaultHomeId'] as String?,
   );

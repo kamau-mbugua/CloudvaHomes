@@ -289,10 +289,12 @@ export class UpdateMeDto {
 }
 
 export class ChangePasswordDto {
-  @ApiProperty()
+  /** Required when the account has a password; left out to set a first one (with step-up). */
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   @MaxLength(128)
-  currentPassword!: string;
+  currentPassword?: string;
 
   @ApiProperty({ minLength: 10 })
   @IsString()

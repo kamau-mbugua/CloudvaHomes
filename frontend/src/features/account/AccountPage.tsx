@@ -161,16 +161,20 @@ export function PasswordSection() {
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<Partial<Record<PwField, string>>>({});
   const mustChange = Boolean(session.user.mustChangePassword);
+  // Code-only sign-ins set a first password: no current one to give; the server asks for a
+  // one-time code instead (the StepUpProvider prompt).
+  const hasPassword = session.user.hasPassword !== false;
 
   const change = useMutation({
-    mutationFn: () => api.post('/me/password', { currentPassword: current, newPassword: password }),
+    mutationFn: () =>
+      api.post('/me/password', hasPassword ? { currentPassword: current, newPassword: password } : { newPassword: password }),
     onSuccess: async () => {
       setCurrent('');
       setPassword('');
       setConfirm('');
       setErrors({});
       await reloadSessionDetails();
-      toast.saved('Password changed. Your other devices have been signed out.');
+      toast.saved(hasPassword ? 'Password changed. Your other devices have been signed out.' : 'Password set.');
     },
     onError: (error) => {
       if (!(error instanceof ApiError)) return;
@@ -186,7 +190,7 @@ export function PasswordSection() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const found: Partial<Record<PwField, string>> = { ...newPasswordErrors(password, confirm) };
-    if (!current) found.currentPassword = 'Enter your current password.';
+    if (hasPassword && !current) found.currentPassword = 'Enter your current password.';
     else if (current === password && !found.password) found.password = 'Choose a password different from the current one.';
     setErrors(found);
     if (Object.keys(found).length === 0) change.mutate();
@@ -205,8 +209,12 @@ export function PasswordSection() {
 
   return (
     <form className="fm__section" onSubmit={submit} noValidate>
-      <h2>Password</h2>
-      <p>Changing it signs you out everywhere else.</p>
+      <h2>{hasPassword ? 'Password' : 'Set a password'}</h2>
+      <p>
+        {hasPassword
+          ? 'Changing it signs you out everywhere else.'
+          : 'You sign in with one-time codes now. Set a password to also sign in with it; we’ll send a code to confirm it’s you.'}
+      </p>
       {mustChange ? (
         <p className="ad__error" role="status">
           You signed in with a temporary system-generated password. Please set a new personal password to continue.
@@ -214,7 +222,9 @@ export function PasswordSection() {
       ) : null}
 
       <div className="fm__grid">
-        <div className="fm__wide pg-half">{pw('currentPassword', 'me-current', 'Current password', current, setCurrent, 'current-password')}</div>
+        {hasPassword ? (
+          <div className="fm__wide pg-half">{pw('currentPassword', 'me-current', 'Current password', current, setCurrent, 'current-password')}</div>
+        ) : null}
         {pw('password', 'me-new', 'New password', password, setPassword, 'new-password', PASSWORD_RULES_HINT)}
         {pw('confirm', 'me-confirm', 'New password again', confirm, setConfirm, 'new-password')}
       </div>
@@ -222,8 +232,8 @@ export function PasswordSection() {
       {change.isError && !handled ? <p className="ad__error pg-gap" role="alert">{settingsErrorMessage(change.error)}</p> : null}
 
       <div className="pg-actions pg-gap">
-        <button type="submit" className="nx-btn nx-btn--primary" disabled={change.isPending || !current || !password}>
-          {change.isPending ? 'Changing…' : 'Change password'}
+        <button type="submit" className="nx-btn nx-btn--primary" disabled={change.isPending || (hasPassword && !current) || !password}>
+          {change.isPending ? 'Saving…' : hasPassword ? 'Change password' : 'Set password'}
         </button>
       </div>
     </form>

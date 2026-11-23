@@ -14,7 +14,7 @@ import { RolesService } from '../roles/roles.service.js';
 import { DEFAULT_RULES } from '../stays/rules/terms.js';
 import type { RegisterOrganizationDto } from './auth.dto.js';
 import { hashPassword, verifyPassword } from './crypto.js';
-import { authContext } from './decorators.js';
+import { authContext, requireStepUp } from './decorators.js';
 import {
   type Identifier,
   normalizeEmail,
@@ -522,7 +522,12 @@ export class AuthService {
     });
   }
 
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  /**
+   * Changes the password, or sets a first one for someone who has only signed in with codes.
+   * A first password has no current password to check, so it needs a fresh one-time code
+   * (step-up) instead.
+   */
+  async changePassword(currentPassword: string | undefined, newPassword: string): Promise<void> {
     const ctx = authContext();
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ctx.userId } });
     await this.rateLimit.hit({
@@ -530,7 +535,9 @@ export class AuthService {
       limit: 5,
       windowSeconds: 15 * MIN,
     });
-    if (!(await verifyPassword(user.passwordHash, currentPassword))) {
+    if (user.passwordHash === null) {
+      requireStepUp();
+    } else if (!currentPassword || !(await verifyPassword(user.passwordHash, currentPassword))) {
       throw AppError.fieldInvalid('currentPassword', 'Your current password is wrong');
     }
     const problem = passwordProblem(newPassword, [user.email, user.phone]);
@@ -541,7 +548,7 @@ export class AuthService {
     });
     await this.sessions.revokeAllForUser(user.id, ctx.sessionId);
     await this.audit.record({
-      action: 'auth.password_change',
+      action: user.passwordHash === null ? 'auth.password_set' : 'auth.password_change',
       entity: 'user',
       entityId: user.id,
       orgId: null,

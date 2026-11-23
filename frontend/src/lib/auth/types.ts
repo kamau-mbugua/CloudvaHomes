@@ -15,6 +15,8 @@ export interface SessionUser {
   isPlatformAdmin: boolean;
   platformRole?: PlatformRole | null;
   mustChangePassword?: boolean;
+  /** False for people who only sign in with one-time codes: they can set a first password. */
+  hasPassword?: boolean;
   defaultOrgId?: string | null;
   defaultPropertyId?: string | null;
   defaultTenantId?: string | null;

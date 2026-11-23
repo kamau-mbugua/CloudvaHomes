@@ -471,6 +471,7 @@ class ActivityItem {
 class TenantNotice {
   const TenantNotice({
     required this.id,
+    this.kind = '',
     required this.title,
     required this.body,
     required this.createdAt,
@@ -480,6 +481,9 @@ class TenantNotice {
     required this.tenantId,
   });
   final String id;
+
+  /// What it's about (INVOICE_ISSUED, PAYMENT_RECEIVED, REMINDER_OVERDUE, BROADCAST…).
+  final String kind;
   final String title;
   final String body;
   final String createdAt;
@@ -489,6 +493,7 @@ class TenantNotice {
   final String tenantId;
   factory TenantNotice.fromJson(Map<String, dynamic> j) => TenantNotice(
     id: j['id'] as String,
+    kind: j['kind'] as String? ?? '',
     title: j['title'] as String? ?? '',
     body: j['body'] as String? ?? '',
     createdAt: j['createdAt'] as String? ?? '',

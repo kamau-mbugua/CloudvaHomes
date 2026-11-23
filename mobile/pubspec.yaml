@@ -48,6 +48,11 @@ dependencies:
   package_info_plus: ^10.2.2
   firebase_core: 4.15.0
   firebase_messaging: 16.7.0
+  # Document previews: thumbnails with the phone's own PDF renderer, and the preview screen.
+  printing: ^5.14.3
+  # Held below 4.11: image 4.11 calls archive APIs newer than the archive (<4.1) that pdf allows
+  # on Dart 3.11 (pdf 3.13+, which lifts that, needs Dart 3.12). Lift with the next Flutter SDK.
+  image: ">=4.1.0 <4.11.0"
 
 dev_dependencies:
   flutter_test:

@@ -32,6 +32,8 @@ export interface SessionPayload {
     isPlatformAdmin: boolean;
     platformRole: 'SUPERADMIN' | 'SALESPERSON' | null;
     mustChangePassword?: boolean;
+    /** False for people who only ever sign in with a one-time code. */
+    hasPassword: boolean;
     defaultOrgId: string | null;
     defaultPropertyId: string | null;
     defaultTenantId: string | null;
@@ -592,6 +594,7 @@ export class SessionsService {
         isPlatformAdmin,
         platformRole,
         ...(user.mustChangePassword ? { mustChangePassword: true } : {}),
+        hasPassword: user.passwordHash !== null,
         defaultOrgId: user.defaultOrgId ?? null,
         defaultPropertyId: user.defaultPropertyId ?? null,
         defaultTenantId: user.defaultTenantId ?? null,
