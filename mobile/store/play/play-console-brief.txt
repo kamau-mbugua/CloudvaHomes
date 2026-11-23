@@ -1,0 +1,182 @@
+KodiHQ - Google Play Console brief (App content and listing settings)
+Updated 2026-11-23. No passwords or keys in here: the owner uploads the signed bundle.
+
+======================================================================
+1. APP BASICS
+======================================================================
+App name:          KodiHQ
+Package:           co.ke.kodihub
+                   (A new listing. The old "Hodi" app, com.qnex.hodi, is a
+                   separate app and is not being updated.)
+Developer:         Cloudva Solutions, Nairobi, Kenya
+Default language:  English (United Kingdom)
+Price:             Free
+Category:          Business (secondary fit: House & Home)
+Contact email:     contact@cloudvalabs.com
+Website:           https://kodihq.co.ke
+Countries:         Kenya to start
+Release:           Upload app-prod-release.aab (already signed with the upload
+                   key) to Internal testing first. Turn on Play App Signing
+                   (Google-managed app signing key).
+
+======================================================================
+2. PRIVACY POLICY
+======================================================================
+URL: https://www.cloudvalabs.com/privacy
+Cloudva's policy, which covers its mobile apps. The app links to it, and to the
+terms (https://www.cloudvalabs.com/terms), on sign-in, registration, the
+account menu and the delete-account screens.
+
+======================================================================
+3. ACCOUNT DELETION
+======================================================================
+Delete account URL: https://app.kodihq.co.ke/delete-account
+  - Public page. Signed out, it explains how to delete and links to sign-in.
+    Signed in, it is the delete form itself.
+  - People who can't sign in can email privacy@cloudvalabs.com.
+  - NOTE FOR THE OWNER: deploy the latest web app to production before entering
+    this URL; the live site did not have the page yet on 2026-11-23.
+
+In the app:
+  - Account menu (avatar) > Delete account.
+  - Tenants also: More > My profile > "Delete my account".
+  - Confirmed with a one-time code sent to the account's phone or email.
+
+What is deleted:
+  - At once: sign-in details (email, phone, password); every session ends.
+  - After 30 days: the rest of the account (name, old contact details,
+    sessions, sign-in codes, in-app notifications).
+
+What is kept:
+  - Records landlords, agencies and hosts must keep (invoices, receipts,
+    payments, bookings) stay with those businesses, as the law requires.
+
+Play's "partial deletion" question: users can also ask privacy@cloudvalabs.com
+for a copy of their data, or for it to be erased sooner.
+
+======================================================================
+4. APP ACCESS
+======================================================================
+All functionality needs a login.
+  - Give reviewers an EMAIL + PASSWORD demo account. Code-only sign-in can't be
+    used: the code goes to our phone.
+  - Use a demo organisation with made-up properties, tenants and payments.
+    Never real customer data.
+  - The demo account exists on production (created 2026-11-23):
+      Sign in with: "Email and password"
+      Email:        play-review@kodihq.co.ke
+      Password:     given separately by the owner (not in this file)
+    It's a landlord owner of "KodiHQ Demo Properties": 2 properties, 7 units,
+    4 made-up tenants, invoices September to November, cash payments (one tenant
+    paid up, three in arrears). Free, with no suspension until 2027-12-31. The
+    login has no phone number, so it can't be used with a one-time code.
+
+Draft instructions for reviewers:
+  "On the sign-in page tap 'Email and password', then sign in with the demo
+  account. It is a landlord account for a demo organisation with sample
+  properties, tenants, invoices and payments."
+
+======================================================================
+5. ADS AND ADVERTISING ID
+======================================================================
+Ads: the app has no ads.
+Advertising ID: not used. No ads or analytics SDK, and no AD_ID permission in
+the manifest.
+
+======================================================================
+6. PERMISSIONS
+======================================================================
+Only: network access, notifications, wake lock, and push (FCM receive).
+No special permission declarations are needed.
+Not requested: photos/video, location, contacts, SMS, call log, foreground
+service. Photos are chosen through the system photo picker.
+
+======================================================================
+7. TARGET AUDIENCE AND CONTENT
+======================================================================
+Target age: 18 and over only (the terms require 18+).
+Appeals to children: no.
+News app: no. Government app: no. Health app: no.
+
+======================================================================
+8. CONTENT RATING (IARC QUESTIONNAIRE)
+======================================================================
+Category:   Utility / Productivity / Communication / Other
+Violence, sexual content, profanity, drugs/alcohol/tobacco: no
+Gambling or simulated gambling: no
+Users interact: yes, but only with their own landlord, agency or host
+  (maintenance requests with text and photos, notices). Nothing is public, and
+  there is no chat with strangers.
+Shares the user's location: no
+Purchases: yes. Real-money payments by M-Pesa, for rent and for bookings, to
+  the landlord's or host's own paybill or till.
+Expected rating: Everyone / PEGI 3
+
+======================================================================
+9. DATA SAFETY
+======================================================================
+Collects data: yes
+Shares data with third parties: no
+  Service providers acting for us count as processing, not sharing:
+  Africa's Talking (SMS), our email provider, Safaricom M-Pesa (payments),
+  hosting.
+Encrypted in transit: yes (HTTPS only)
+Users can request deletion: yes, in the app and at the URL in section 3
+
+Data types (type | collected | required? | purposes):
+
+- Name
+  Collected. Required. App functionality, account management.
+- Email address
+  Collected. Optional (email OR phone). App functionality, account management,
+  fraud prevention/security (sign-in codes).
+- Phone number
+  Collected. Optional (email OR phone). Same as email, plus M-Pesa payment
+  prompts.
+- Address (the rented home or unit, from the landlord's records)
+  Collected. Required for tenants. App functionality.
+- Purchase history (rent invoices, payments, receipts, bookings)
+  Collected. Required. App functionality.
+- Other financial info (balances, deposits, landlord payout details)
+  Collected. Required. App functionality.
+- User payment info (card or bank numbers)
+  NOT collected. M-Pesa is used; no card numbers are handled.
+- Photos
+  Collected. Optional. App functionality (meter readings, maintenance,
+  listings, inspections).
+- Files and docs
+  Collected. Optional. App functionality (receipts, attachments).
+- Other in-app messages / user-generated content
+  Collected. Optional. App functionality (maintenance requests, notices).
+- Device or other IDs
+  NOT collected in this build. If push notifications are turned on later (FCM
+  token), change to: collected, optional, app functionality.
+- Location, contacts, calendar, health, audio, web history, app activity
+  analytics, crash logs
+  NOT collected.
+
+None of this data is used for advertising or sold. A small amount is processed
+for security: sign-in codes and an audit log of account changes.
+
+======================================================================
+10. FINANCIAL FEATURES DECLARATION
+======================================================================
+Leave the final answer to the owner and Legal. What the app does:
+  - Shows tenants their rent, invoices, receipts and statements.
+  - Starts M-Pesa payments (STK push) for rent and bookings, to the landlord's
+    or host's OWN paybill or till, through Safaricom.
+  - Does NOT sell KodiHQ's own services in the app: in the Play build, SMS
+    bundles and the KodiHQ subscription bill can't be paid in the app, and the
+    app does not link to or explain other ways to pay for them (businesses pay
+    on the web).
+  - KodiHQ does not hold user funds, offer loans or credit, or deal in crypto.
+
+======================================================================
+11. STORE LISTING NOTES
+======================================================================
+- Screenshots: demo organisation only, with no real names or phone numbers.
+- Don't promise prices, uptime or response times in the description.
+- Don't mention buying SMS bundles or paying the KodiHQ bill in the app, or
+  paying for them elsewhere (Play's payments and anti-steering rules).
+- Reviewers who open Plan & billing will see the balance with no way to pay
+  ("Paying your KodiHQ bill isn't available in the app."). That's intended.

@@ -48,3 +48,6 @@ app.*.map.json
 /android/key.properties
 *.jks
 *.keystore
+
+# Play reviewer demo login (password): never commit.
+store/play/reviewer-account.txt
