@@ -377,6 +377,23 @@ export class CreateOperatorDto {
 }
 
 export class UpdateOperatorDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(80) firstName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(80) lastName?: string;
+
+  /** `null` (or an empty string) removes it; an operator must keep an email or a phone. */
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @IsEmail()
+  email?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @IsString()
+  @MaxLength(20)
+  phone?: string | null;
+
   @ApiPropertyOptional({ enum: ['SUPERADMIN', 'SALESPERSON'], nullable: true })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)

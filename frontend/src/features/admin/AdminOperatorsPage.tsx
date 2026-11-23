@@ -30,6 +30,7 @@ export function AdminOperatorsPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL');
   const [creating, setCreating] = useState(false);
   const [assigningFor, setAssigningFor] = useState<PlatformOperator | null>(null);
+  const [editing, setEditing] = useState<PlatformOperator | null>(null);
 
   const updateOperator = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
@@ -127,6 +128,9 @@ export function AdminOperatorsPage() {
                     <td>{op.lastLoginAt ? formatDateTime(op.lastLoginAt) : formatDayish(op.createdAt)}</td>
                     <td className="ad__rowactions">
                       <div>
+                        <button type="button" className="nx-btn nx-btn--sm" onClick={() => setEditing(op)}>
+                          Edit
+                        </button>
                         <button type="button" className="nx-btn nx-btn--sm" onClick={() => setAssigningFor(op)}>
                           Assign orgs
                         </button>
@@ -176,6 +180,7 @@ export function AdminOperatorsPage() {
       )}
 
       {creating ? <CreateOperatorSheet onClose={() => setCreating(false)} /> : null}
+      {editing ? <EditOperatorSheet operator={editing} isSelf={editing.id === user?.id} onClose={() => setEditing(null)} /> : null}
       {assigningFor ? <AssignOrganizationsSheet operator={assigningFor} onClose={() => setAssigningFor(null)} /> : null}
     </div>
   );
@@ -276,6 +281,99 @@ function CreateOperatorSheet({ onClose }: { onClose: () => void }) {
             </select>
           </Field>
         </div>
+        {general ? <p className="nx-sheet__error" role="alert">{general}</p> : null}
+      </form>
+    </Sheet>
+  );
+}
+
+function EditOperatorSheet({ operator, isSelf, onClose }: { operator: PlatformOperator; isSelf: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [firstName, setFirstName] = useState(operator.firstName);
+  const [lastName, setLastName] = useState(operator.lastName);
+  const [email, setEmail] = useState(operator.email ?? '');
+  const [phone, setPhone] = useState(operator.phone ?? '');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [general, setGeneral] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.patch<unknown>(`/platform/operators/${encodeURIComponent(operator.id)}`, body),
+    onSuccess: async () => {
+      toast.saved(`${firstName.trim()} ${lastName.trim()} updated.`);
+      await queryClient.invalidateQueries({ queryKey: keys.operators });
+      onClose();
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 422 && Object.keys(error.fieldErrors).length > 0) {
+        setErrors(error.fieldErrors);
+        return;
+      }
+      setGeneral(platformErrorMessage(error));
+    },
+  });
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setGeneral(null);
+    const next: Record<string, string> = {};
+    if (!firstName.trim()) next.firstName = 'Enter a first name.';
+    if (!lastName.trim()) next.lastName = 'Enter a last name.';
+    if (email.trim() && !email.includes('@')) next.email = 'Enter a valid email address.';
+    if (!email.trim() && !phone.trim()) next.email = 'Keep an email address or a phone number.';
+    if (Object.keys(next).length > 0) {
+      setErrors(next);
+      return;
+    }
+    setErrors({});
+    save.mutate({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim() || null,
+      phone: phone.trim() || null,
+    });
+  };
+
+  const identifierChanging =
+    email.trim().toLowerCase() !== (operator.email ?? '').toLowerCase() || phone.trim() !== (operator.phone ?? '');
+
+  return (
+    <Sheet
+      title={`Edit ${operator.firstName} ${operator.lastName}`}
+      busy={save.isPending}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="nx-btn" onClick={onClose} disabled={save.isPending}>Cancel</button>
+          <button type="submit" form="op-edit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </>
+      )}
+    >
+      <form id="op-edit" className="sheet-form" onSubmit={submit} noValidate>
+        <div className="fm__grid sheet-grid">
+          <Field id="op-edit-first" label="First name" error={errors.firstName}>
+            <input id="op-edit-first" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </Field>
+          <Field id="op-edit-last" label="Last name" error={errors.lastName}>
+            <input id="op-edit-last" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </Field>
+          <Field id="op-edit-email" label="Email" error={errors.email}>
+            <input id="op-edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+          <Field id="op-edit-phone" label="Phone" optional error={errors.phone}>
+            <input id="op-edit-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </Field>
+        </div>
+        {identifierChanging ? (
+          <p className="ad__muted">
+            {isSelf
+              ? 'You will sign in with the new email or phone from now on.'
+              : `${operator.firstName} will be signed out and must sign in with the new email or phone.`}
+          </p>
+        ) : null}
         {general ? <p className="nx-sheet__error" role="alert">{general}</p> : null}
       </form>
     </Sheet>

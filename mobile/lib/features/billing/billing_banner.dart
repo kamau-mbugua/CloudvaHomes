@@ -7,6 +7,7 @@ import '../../core/dates.dart';
 import '../../core/money.dart';
 import 'billing_api.dart';
 import 'pay_hodi.dart';
+import '../../core/config.dart';
 
 /// The Hodi bill banner for staff: GRACE (overdue, nothing blocked) and SUSPENDED
 /// (read-only). Same wording as the web app.
@@ -65,7 +66,8 @@ class BillingBanner extends ConsumerWidget {
             if (status != 'CLOSED' && canView)
               TextButton(
                 onPressed: () {
-                  if (billing != null &&
+                  if (AppConfig.inAppPurchases &&
+                      billing != null &&
                       billing.canPayInApp &&
                       session.can('settings:update')) {
                     showPayKodiHub(context, ref, billing, session.user.phone);
@@ -73,7 +75,8 @@ class BillingBanner extends ConsumerWidget {
                     context.push('/staff/billing');
                   }
                 },
-                child: const Text('Pay now'),
+                // Store builds only show the bill (see AppConfig.inAppPurchases).
+                child: Text(AppConfig.inAppPurchases ? 'Pay now' : 'View bill'),
               ),
           ],
         ),

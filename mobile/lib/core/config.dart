@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show appFlavor;
 
 /// Build- and launch-time environment settings (`dev` and `prod` flavors).
@@ -61,4 +62,24 @@ abstract final class AppConfig {
   };
 
   static bool get isProd => flavor == 'prod';
+
+  static const _envPurchases = String.fromEnvironment('IN_APP_PURCHASES');
+
+  /// Tests only: forces [inAppPurchases].
+  @visibleForTesting
+  static bool? purchasesOverride;
+
+  /// Whether businesses can buy KodiHQ's own services in the app: SMS units and the KodiHQ
+  /// bill. Off in store (prod) builds: Google Play (and the App Store) require their own
+  /// billing for an app's digital services and don't allow pointing to other ways to pay, so
+  /// those screens say paying isn't available in the app, with no link or paybill. Tenants'
+  /// rent and guests' booking payments are real-world services and are not affected.
+  /// `--dart-define=IN_APP_PURCHASES=on|off` overrides it.
+  static bool get inAppPurchases =>
+      purchasesOverride ??
+      switch (_envPurchases) {
+        'on' => true,
+        'off' => false,
+        _ => !isProd,
+      };
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hodi/core/config.dart';
 import 'package:hodi/core/providers.dart';
 import 'package:hodi/features/sms/sms_screen.dart';
 
@@ -135,5 +136,21 @@ void main() {
     await pump(tester, adapter, {'sms:view'});
     expect(find.byKey(const Key('sms-buy')), findsNothing);
     expect(find.byKey(const Key('sms-save')), findsNothing);
+  });
+
+  testWidgets('store build: no Buy SMS, just a note (no link or paybill)', (
+    tester,
+  ) async {
+    AppConfig.purchasesOverride = false;
+    addTearDown(() => AppConfig.purchasesOverride = null);
+    final adapter = FakeAdapter({
+      'GET /sms': (_) => {'data': accountJson(balance: 100)},
+      'GET /sms/quote': (_) => {'data': quote()},
+      'GET /sms/usage': (_) => page([]),
+      'GET /sms/top-ups': (_) => page([]),
+    });
+    await pump(tester, adapter, {'sms:view', 'sms:manage'});
+    expect(find.byKey(const Key('sms-buy')), findsNothing);
+    expect(find.byKey(const Key('sms-no-buy')), findsOneWidget);
   });
 }

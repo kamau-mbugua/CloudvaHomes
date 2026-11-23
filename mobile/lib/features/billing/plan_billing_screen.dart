@@ -10,6 +10,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/common.dart';
 import 'billing_api.dart';
 import 'pay_hodi.dart';
+import '../../core/config.dart';
 
 /// The organisation's Hodi plan, bill and invoices (staff: More → Plan & billing).
 class PlanBillingScreen extends ConsumerWidget {
@@ -90,7 +91,16 @@ class PlanBillingScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
-                  if (b.balance > 0 &&
+                  if (b.balance > 0 && !AppConfig.inAppPurchases) ...[
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Paying your KodiHQ bill isn’t available in the app.',
+                      key: Key('billing-no-pay'),
+                      style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 13),
+                    ),
+                  ],
+                  if (AppConfig.inAppPurchases &&
+                      b.balance > 0 &&
                       b.canPayInApp &&
                       (session?.can('settings:update') ?? false)) ...[
                     const SizedBox(height: 14),
@@ -117,7 +127,9 @@ class PlanBillingScreen extends ConsumerWidget {
                     FactRow('Free trial until', formatDay(b.trialEndsAt)),
                 ],
               ),
-              if (b.paybill != null && b.billingRef != null) ...[
+              if (AppConfig.inAppPurchases &&
+                  b.paybill != null &&
+                  b.billingRef != null) ...[
                 const SizedBox(height: 12),
                 SectionCard(
                   title: 'How to pay',

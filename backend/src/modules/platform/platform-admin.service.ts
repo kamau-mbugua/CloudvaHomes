@@ -585,20 +585,31 @@ export class PlatformAdminService {
         }
       }
 
+      const contact = await this.operatorContactChanges(before, dto);
+      const accessChanged =
+        (dto.role !== undefined && nextRole !== before.platformRole) ||
+        (dto.status !== undefined && dto.status !== before.status);
+      // A new sign-in identifier ends the operator's other sessions; editing your own row keeps
+      // you signed in here.
+      const identifierChanged = contact.email !== undefined || contact.phone !== undefined;
+
       const after = await this.db.$transaction(async (tx) => {
         const row = await tx.user.update({
           where: { id },
           data: {
+            ...contact,
             ...(dto.role !== undefined
               ? { platformRole: dto.role, isPlatformAdmin: dto.role === 'SUPERADMIN' }
               : {}),
             ...(dto.status !== undefined ? { status: dto.status } : {}),
           },
         });
-        await tx.refreshToken.updateMany({
-          where: { userId: id, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
+        if (accessChanged || (identifierChanged && id !== ctx.userId)) {
+          await tx.refreshToken.updateMany({
+            where: { userId: id, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+        }
         await this.audit.record(
           {
             action: 'platform.operator_update',
@@ -606,10 +617,18 @@ export class PlatformAdminService {
             entityId: id,
             orgId: null,
             before: {
+              firstName: before.firstName,
+              lastName: before.lastName,
+              email: before.email,
+              phone: before.phone,
               role: before.platformRole ?? (before.isPlatformAdmin ? 'SUPERADMIN' : null),
               status: before.status,
             },
             after: {
+              firstName: row.firstName,
+              lastName: row.lastName,
+              email: row.email,
+              phone: row.phone,
               role: row.platformRole,
               status: row.status,
             },
@@ -620,6 +639,70 @@ export class PlatformAdminService {
       });
       return this.toOperator(after);
     });
+  }
+
+  /**
+   * Validates the name and contact fields of an operator edit and returns only what changes.
+   * The new email or phone must not belong to another account (the columns are unique, and a
+   * customer's sign-in must never be handed to an operator).
+   */
+  private async operatorContactChanges(before: User, dto: UpdateOperatorDto) {
+    const changes: {
+      firstName?: string;
+      lastName?: string;
+      email?: string | null;
+      phone?: string | null;
+    } = {};
+    const fieldErrors: { field: string; message: string }[] = [];
+
+    if (dto.firstName !== undefined) {
+      const firstName = dto.firstName.trim();
+      if (!firstName) fieldErrors.push({ field: 'firstName', message: 'Enter a first name' });
+      else if (firstName !== before.firstName) changes.firstName = firstName;
+    }
+    if (dto.lastName !== undefined) {
+      const lastName = dto.lastName.trim();
+      if (!lastName) fieldErrors.push({ field: 'lastName', message: 'Enter a last name' });
+      else if (lastName !== before.lastName) changes.lastName = lastName;
+    }
+
+    let email = before.email;
+    if (dto.email !== undefined) {
+      const raw = dto.email?.trim() ?? '';
+      email = raw ? normalizeEmail(raw) : null;
+      if (raw && !email)
+        fieldErrors.push({ field: 'email', message: 'Enter a valid email address' });
+      else if (email !== before.email) changes.email = email;
+    }
+    let phone = before.phone;
+    if (dto.phone !== undefined) {
+      const raw = dto.phone?.trim() ?? '';
+      phone = raw ? normalizePhone(raw) : null;
+      if (raw && !phone) {
+        fieldErrors.push({
+          field: 'phone',
+          message: 'Enter a valid phone number, e.g. 0712 345 678',
+        });
+      } else if (phone !== before.phone) changes.phone = phone;
+    }
+    if (fieldErrors.length === 0 && !email && !phone) {
+      fieldErrors.push({ field: 'email', message: 'Keep an email address or a phone number' });
+    }
+    if (fieldErrors.length > 0) throw AppError.validation(fieldErrors);
+
+    if (changes.email) {
+      const taken = await this.db.user.findUnique({ where: { email: changes.email } });
+      if (taken && taken.id !== before.id) {
+        throw AppError.fieldInvalid('email', 'Another account already uses this email address');
+      }
+    }
+    if (changes.phone) {
+      const taken = await this.db.user.findUnique({ where: { phone: changes.phone } });
+      if (taken && taken.id !== before.id) {
+        throw AppError.fieldInvalid('phone', 'Another account already uses this phone number');
+      }
+    }
+    return changes;
   }
 
   unassignedOrganizations() {

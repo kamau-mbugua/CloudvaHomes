@@ -10,6 +10,7 @@ import '../staff/staff_widgets.dart';
 import 'buy_sms_sheet.dart';
 import 'sms_api.dart';
 import 'sms_models.dart';
+import '../../core/config.dart';
 
 /// Settings → SMS: how messages to tenants and guests are sent, KodiHQ SMS units (balance,
 /// Buy SMS), the warning level and — on an own SMS account — the KodiHQ fallback switch,
@@ -74,7 +75,12 @@ class _SmsBody extends ConsumerWidget {
               FactRow('Units bought', '${account.unitsBought}'),
               FactRow('Units used', '${account.unitsUsed}'),
               const SizedBox(height: 12),
-              if (canManage && account.canBuyInApp)
+              if (canManage && account.canBuyInApp && !AppConfig.inAppPurchases)
+                const Text(
+                  'Buying SMS units isn’t available in the app.',
+                  key: Key('sms-no-buy'),
+                )
+              else if (canManage && account.canBuyInApp)
                 FilledButton(
                   key: const Key('sms-buy'),
                   onPressed: () => BuySmsSheet.show(context, phone: phone),

@@ -197,6 +197,70 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     await get(tempSession, '/platform/organizations', 200);
   });
 
+  it("edits an operator's name, email and phone, and rejects details another account uses", async () => {
+    const op = (
+      await post(
+        admin,
+        '/platform/operators',
+        {
+          firstName: 'Grace',
+          lastName: 'Wanjiku',
+          email: 'grace@hodi.test',
+          phone: '0722111222',
+          role: 'SALESPERSON',
+          password: PASSWORD,
+        },
+        201,
+      )
+    ).data;
+    const before = await login(t, 'grace@hodi.test');
+
+    const edited = (
+      await patch(admin, `/platform/operators/${op.id}`, {
+        firstName: ' Grace ',
+        lastName: 'Achieng',
+        email: 'Grace.Achieng@hodi.test',
+        phone: '0733 444 555',
+      })
+    ).data;
+    expect(edited).toMatchObject({
+      firstName: 'Grace',
+      lastName: 'Achieng',
+      email: 'grace.achieng@hodi.test',
+      phone: '+254733444555',
+      role: 'SALESPERSON',
+    });
+
+    // The old sign-in identifier no longer works, the new one does, and old sessions ended.
+    await t
+      .http()
+      .post('/api/v1/auth/login')
+      .send({ identifier: 'grace@hodi.test', password: PASSWORD })
+      .expect(401);
+    await login(t, 'grace.achieng@hodi.test');
+    await t
+      .http()
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', before.refreshCookie!)
+      .send({})
+      .expect(401);
+
+    // Another account's email or phone is refused, and an operator must keep a contact.
+    const taken = await patch(
+      admin,
+      `/platform/operators/${op.id}`,
+      { email: 'admin@hodi.test' },
+      422,
+    );
+    expect(taken.error.details[0].field).toBe('email');
+    await patch(admin, `/platform/operators/${op.id}`, { email: null, phone: null }, 422);
+    await patch(admin, `/platform/operators/${op.id}`, { phone: 'not-a-phone' }, 422);
+
+    // Clearing just the phone is fine while the email stays.
+    const noPhone = (await patch(admin, `/platform/operators/${op.id}`, { phone: '' })).data;
+    expect(noPhone.phone).toBeNull();
+  });
+
   it('requires a 6-digit 2FA code for platform operators when requireAdminTwoFactor is enabled', async () => {
     // Enable Admin 2FA via EMAIL
     const updatedSettings = (
