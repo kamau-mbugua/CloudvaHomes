@@ -183,7 +183,7 @@ class KodiHubWordmark extends StatelessWidget {
     return Text.rich(
       TextSpan(
         style: TextStyle(
-          fontFamily: 'Lufga',
+          fontFamily: kBrandFont,
           fontSize: fontSize,
           fontWeight: FontWeight.w600,
           letterSpacing: fontSize * -0.04,

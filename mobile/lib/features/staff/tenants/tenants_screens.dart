@@ -15,6 +15,7 @@ import '../staff_api.dart';
 import '../staff_models.dart';
 import '../staff_widgets.dart';
 import 'record_payment_sheet.dart';
+import '../../../core/widgets/phone_field.dart';
 
 /// Tenants tab: search, paged.
 class TenantsScreen extends ConsumerStatefulWidget {
@@ -911,11 +912,7 @@ class _TenantFormSheetState extends ConsumerState<_TenantFormSheet> {
               ],
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Phone number'),
-            ),
+            PhoneField(controller: _phone),
             const SizedBox(height: 12),
             TextField(
               controller: _email,
@@ -937,12 +934,10 @@ class _TenantFormSheetState extends ConsumerState<_TenantFormSheet> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: TextField(
+                  child: PhoneField(
                     controller: _emPhone,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Emergency phone',
-                    ),
+                    labelText: 'Emergency phone',
+                    hintText: null,
                   ),
                 ),
               ],

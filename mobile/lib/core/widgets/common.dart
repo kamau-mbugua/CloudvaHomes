@@ -59,7 +59,7 @@ class KodiHubAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Text(
                   subtitle!,
                   style: const TextStyle(
-                    fontFamily: 'Lufga',
+                    fontFamily: kAppFont,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                     color: Color(0xFF9EAEC4),
@@ -206,7 +206,7 @@ class InitialsBadge extends StatelessWidget {
     child: Text(
       _text,
       style: TextStyle(
-        fontFamily: 'Lufga',
+        fontFamily: kAppFont,
         fontSize: fontSize,
         fontWeight: FontWeight.w700,
         color: foregroundColor ?? (lime ? HodiColors.navy : Colors.white),

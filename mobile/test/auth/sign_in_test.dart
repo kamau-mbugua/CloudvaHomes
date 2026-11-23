@@ -216,7 +216,9 @@ void main() {
       expect(find.text('Choose a saved account'), findsOneWidget);
       expect(find.text('Kelvin Mbugua'), findsOneWidget);
 
-      await _tapReal(tester, find.text('Kelvin Mbugua'));
+      // The pick comes back from the sheet on the next frame, then the session is restored.
+      await tester.tap(find.text('Kelvin Mbugua'));
+      await settle(tester);
       final refresh = adapter.calls.firstWhere(
         (c) => c.path == '/auth/refresh',
       );

@@ -12,6 +12,7 @@ class SavedCredential {
     this.displayName,
     this.roleHint,
     this.savedAt,
+    this.method,
   });
 
   final String identifier;
@@ -19,6 +20,13 @@ class SavedCredential {
   final String? displayName;
   final String? roleHint;
   final String? savedAt;
+
+  /// How it last signed in (a `SignInMethod` name, e.g. "phoneCode"), so picking it from the
+  /// list goes back to the same screen.
+  final String? method;
+
+  /// An email login (else a phone number).
+  bool get byEmail => identifier.contains('@');
 
   String get initials {
     final source = (displayName != null && displayName!.trim().isNotEmpty)
@@ -41,6 +49,7 @@ class SavedCredential {
     if (displayName != null) 'displayName': displayName,
     if (roleHint != null) 'roleHint': roleHint,
     if (savedAt != null) 'savedAt': savedAt,
+    if (method != null) 'method': method,
   };
 
   factory SavedCredential.fromJson(Map<String, dynamic> j) => SavedCredential(
@@ -49,6 +58,7 @@ class SavedCredential {
     displayName: j['displayName'] as String?,
     roleHint: j['roleHint'] as String?,
     savedAt: j['savedAt'] as String?,
+    method: j['method'] as String?,
   );
 }
 

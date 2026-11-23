@@ -5,20 +5,53 @@ import '../../core/api/api_error.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/widgets/common.dart';
 import 'auth_scaffold.dart';
+import '../../core/auth/token_store.dart';
+import 'saved_logins.dart';
+import 'sign_in_method.dart';
+import '../../core/widgets/phone_field.dart';
 
 /// Phone or email → 6-digit code by SMS or email → signed in. How tenants sign in.
+/// Sign-in without a password: a 6-digit code by SMS or email (picked on the sign-in page).
 class CodeSignInScreen extends ConsumerStatefulWidget {
-  const CodeSignInScreen({super.key});
+  const CodeSignInScreen({super.key, this.method, this.initialIdentifier});
+
+  /// Phone + code or email + code; null takes either.
+  final SignInMethod? method;
+
+  /// Filled in already (a saved login picked on the sign-in page).
+  final String? initialIdentifier;
+
   @override
   ConsumerState<CodeSignInScreen> createState() => _CodeSignInScreenState();
 }
 
-class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
+class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen>
+    with SavedLoginsState<CodeSignInScreen> {
   final _phone = TextEditingController();
   final _code = TextEditingController();
   bool _sent = false;
   bool _busy = false;
   String? _error;
+
+  @override
+  SignInMethod? get loginMethod => widget.method;
+  @override
+  TextEditingController get loginField => _phone;
+  @override
+  bool get mayPromptSaved => !_sent && _phone.text.isEmpty;
+  @override
+  void setRestoring(bool busy) => setState(() => _busy = busy);
+  @override
+  void onSavedLoginFilled(SavedCredential login) =>
+      setState(() => _error = null);
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialIdentifier;
+    if (initial != null && initial.isNotEmpty) _phone.text = initial;
+    loadSavedLogins(autoOpen: true);
+  }
 
   @override
   void dispose() {
@@ -47,6 +80,10 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
   }
 
   Future<void> _send() => _run(() async {
+    final problem = widget.method?.problem(_phone.text);
+    if (problem != null) {
+      throw ApiError(status: 0, code: 'LOCAL', message: problem);
+    }
     if (_phone.text.trim().isEmpty) {
       throw ApiError(
         status: 0,
@@ -69,6 +106,7 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
     await ref
         .read(sessionProvider.notifier)
         .signInWithCode(_phone.text, _code.text);
+    await rememberLogin(_phone.text);
   });
 
   @override
@@ -81,24 +119,41 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
       title: _sent ? 'Enter the 6-digit code' : 'Sign in with a code',
       subtitle: _sent
           ? 'If $target has a KodiHQ account, a 6-digit code is on its way by $channelWord.'
-          : 'We’ll send a 6-digit code to your phone or email.',
+          : switch (widget.method?.byEmail) {
+              true => 'No password needed: we’ll email you a 6-digit code.',
+              false => 'No password needed: we’ll text you a 6-digit code.',
+              null => 'We’ll send a 6-digit code to your phone or email.',
+            },
       children: [
-        TextField(
-          controller: _phone,
-          enabled: !_sent,
-          keyboardType: TextInputType.emailAddress,
-          autofillHints: const [
-            AutofillHints.telephoneNumber,
-            AutofillHints.email,
-          ],
-          decoration: const InputDecoration(
-            labelText: 'Phone number or email',
-            hintText: '0712 345 678 or tenant@example.com',
+        if (!_sent) savedLoginsBar(),
+        if (widget.method != null && !widget.method!.byEmail)
+          PhoneField(
+            controller: _phone,
+            fieldKey: const Key('sign-in-identifier'),
+            enabled: !_sent,
+            onSubmitted: (_) {
+              if (!_sent) _send();
+            },
+          )
+        else
+          TextField(
+            key: const Key('sign-in-identifier'),
+            controller: _phone,
+            enabled: !_sent,
+            keyboardType: widget.method?.keyboard ?? TextInputType.emailAddress,
+            autofillHints:
+                widget.method?.autofill ??
+                const [AutofillHints.telephoneNumber, AutofillHints.email],
+            decoration: InputDecoration(
+              labelText: widget.method?.fieldLabel ?? 'Phone number or email',
+              hintText:
+                  widget.method?.fieldHint ??
+                  '0712 345 678 or tenant@example.com',
+            ),
+            onSubmitted: (_) {
+              if (!_sent) _send();
+            },
           ),
-          onSubmitted: (_) {
-            if (!_sent) _send();
-          },
-        ),
         if (_sent) ...[
           const SizedBox(height: 16),
           SixDigitCodeField(
@@ -106,6 +161,10 @@ class _CodeSignInScreenState extends ConsumerState<CodeSignInScreen> {
             labelText: 'Code',
             onSubmitted: (_) => _verify(),
           ),
+        ],
+        if (!_sent) ...[
+          const SizedBox(height: 6),
+          Align(alignment: Alignment.centerLeft, child: rememberMeBox()),
         ],
         const SizedBox(height: 16),
         if (_error != null) ...[ErrorBox(_error!), const SizedBox(height: 12)],

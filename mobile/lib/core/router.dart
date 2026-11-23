@@ -5,6 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/code_sign_in_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/register_screen.dart';
+import '../features/auth/intro_screen.dart';
+import 'intro.dart';
+import '../features/auth/sign_in_method.dart';
+import '../features/auth/sign_in_chooser_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/host/host_routes.dart';
 import '../features/owner/owner_screens.dart';
@@ -19,13 +23,21 @@ import 'theme.dart';
 import 'widgets/brand_mark.dart';
 import 'widgets/common.dart';
 
-const _public = {'/sign-in', '/sign-in/code', '/forgot', '/register'};
+const _public = {
+  '/welcome',
+  '/sign-in',
+  '/sign-in/password',
+  '/sign-in/code',
+  '/forgot',
+  '/register',
+};
 
 /// Where to send someone, given the session and the mode. Pure, so it is unit-tested.
 String? redirectFor({
   required AsyncValue<Session?> session,
   required AppMode? mode,
   required String location,
+  bool introSeen = true,
 }) {
   if (session.isLoading && !session.hasValue) {
     return location == '/' ? null : '/';
@@ -35,7 +47,8 @@ String? redirectFor({
   }
   final s = session.valueOrNull;
   final isPublic = _public.contains(location);
-  if (s == null) return isPublic ? null : '/sign-in';
+  // Signed out: first-time devices see the intro, then the sign-in choices.
+  if (s == null) return isPublic ? null : (introSeen ? '/sign-in' : '/welcome');
   if (s.user.mustChangePassword) {
     return location == '/change-password' ? null : '/change-password';
   }
@@ -67,6 +80,7 @@ class _RouterRefresh extends ChangeNotifier {
   _RouterRefresh(Ref ref) {
     ref.listen(sessionProvider, (_, _) => notifyListeners());
     ref.listen(modeProvider, (_, _) => notifyListeners());
+    ref.listen(introSeenProvider, (_, _) => notifyListeners());
   }
 }
 
@@ -81,6 +95,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       session: ref.read(sessionProvider),
       mode: ref.read(modeProvider),
       location: state.matchedLocation,
+      introSeen: ref.read(introSeenProvider),
     ),
     routes: [
       GoRoute(path: '/', builder: (_, _) => const _Splash()),
@@ -90,10 +105,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/change-password',
         builder: (_, _) => const _MustChangePasswordScreen(),
       ),
-      GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
+      GoRoute(path: '/welcome', builder: (_, _) => const IntroScreen()),
+      // Pick how to sign in (password or code, email or phone), then sign in.
+      GoRoute(path: '/sign-in', builder: (_, _) => const SignInChooserScreen()),
+      GoRoute(
+        path: '/sign-in/password',
+        builder: (_, state) => SignInScreen(
+          method: SignInMethod.from(state.uri.queryParameters['with']),
+          // A saved login picked on the sign-in page (kept out of the URL).
+          initialIdentifier: state.extra is String
+              ? state.extra as String
+              : null,
+        ),
+      ),
       GoRoute(
         path: '/sign-in/code',
-        builder: (_, _) => const CodeSignInScreen(),
+        builder: (_, state) => CodeSignInScreen(
+          method: SignInMethod.from(state.uri.queryParameters['with']),
+          // A saved login picked on the sign-in page (kept out of the URL).
+          initialIdentifier: state.extra is String
+              ? state.extra as String
+              : null,
+        ),
       ),
       GoRoute(path: '/forgot', builder: (_, _) => const ForgotPasswordScreen()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),

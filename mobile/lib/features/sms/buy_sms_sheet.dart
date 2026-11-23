@@ -10,6 +10,7 @@ import '../../core/providers.dart';
 import '../../core/widgets/common.dart';
 import 'sms_api.dart';
 import 'sms_models.dart';
+import '../../core/widgets/phone_field.dart';
 
 /// "Buy SMS": pick a bundle, then an M-Pesa prompt to KodiHQ's paybill, followed until paid.
 /// The same Idempotency-Key is reused while the choice is unchanged, so a retry never prompts twice.
@@ -196,14 +197,12 @@ class _BuySmsSheetState extends ConsumerState<BuySmsSheet> {
                     ],
                   ),
                 ),
-              TextField(
+              PhoneField(
                 controller: _phone,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'M-Pesa phone number',
-                  helperText:
-                      'Your number is filled in. Change it to pay from another phone.',
-                ),
+                kenyaOnly: true,
+                labelText: 'M-Pesa phone number',
+                helperText:
+                    'Your number is filled in. Change it to pay from another phone.',
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),

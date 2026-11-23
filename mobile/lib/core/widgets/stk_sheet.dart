@@ -8,6 +8,7 @@ import '../api/api_error.dart';
 import '../money.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'phone_field.dart';
 
 /// One M-Pesa prompt as the API reports it (rent STK, tenant portal pay, Hodi bill pay).
 class StkStatus {
@@ -273,14 +274,11 @@ class _StkPaySheetState extends State<StkPaySheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
+              PhoneField(
                 controller: _phone,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'M-Pesa phone number',
-                  prefixIcon: Icon(Icons.phone_iphone_outlined, size: 20),
-                  helperText: 'The prompt goes to this phone.',
-                ),
+                kenyaOnly: true,
+                labelText: 'M-Pesa phone number',
+                helperText: 'The prompt goes to this phone.',
               ),
               const SizedBox(height: 12),
               Container(

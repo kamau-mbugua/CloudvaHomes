@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 
 /// KodiHQ C2.1 "Ledger roof, refined" palette (§02 Colour & §06 Mobile).
+/// The app's typeface (bundled in assets/fonts).
+const kAppFont = 'Poppins';
+
+/// The kodiHQ wordmark's typeface, kept so the logo matches the web.
+const kBrandFont = 'Lufga';
+
 abstract final class HodiColors {
   static const navy = Color(0xFF002B4D);
   static const navyDeep = Color(0xFF0A1F36);
@@ -57,7 +63,7 @@ abstract final class KodiHubButtonStyles {
     foregroundColor: HodiColors.navy,
     minimumSize: Size.fromHeight(height),
     textStyle: const TextStyle(
-      fontFamily: 'Lufga',
+      fontFamily: kAppFont,
       fontSize: 15.5,
       fontWeight: FontWeight.w600,
     ),
@@ -107,7 +113,7 @@ ThemeData hodiTheme(Brightness brightness) {
 
   return ThemeData(
     useMaterial3: true,
-    fontFamily: 'Lufga',
+    fontFamily: kAppFont,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
     appBarTheme: const AppBarTheme(
@@ -121,7 +127,7 @@ ThemeData hodiTheme(Brightness brightness) {
       iconTheme: IconThemeData(color: Colors.white),
       actionsIconTheme: IconThemeData(color: Colors.white),
       titleTextStyle: TextStyle(
-        fontFamily: 'Lufga',
+        fontFamily: kAppFont,
         color: Colors.white,
         fontSize: 18,
         fontWeight: FontWeight.w600,
@@ -135,12 +141,12 @@ ThemeData hodiTheme(Brightness brightness) {
       indicatorSize: TabBarIndicatorSize.tab,
       dividerColor: Colors.transparent,
       labelStyle: TextStyle(
-        fontFamily: 'Lufga',
+        fontFamily: kAppFont,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
       unselectedLabelStyle: TextStyle(
-        fontFamily: 'Lufga',
+        fontFamily: kAppFont,
         fontSize: 14,
         fontWeight: FontWeight.w500,
       ),
@@ -174,7 +180,7 @@ ThemeData hodiTheme(Brightness brightness) {
       // Material 3 chips ignore secondaryLabelStyle: the label colour must follow the selected
       // state itself, or a selected chip draws navy text on its navy fill.
       labelStyle: TextStyle(
-        fontFamily: 'Lufga',
+        fontFamily: kAppFont,
         color: WidgetStateColor.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? (dark ? HodiColors.navy : Colors.white)
@@ -184,7 +190,7 @@ ThemeData hodiTheme(Brightness brightness) {
         fontWeight: FontWeight.w600,
       ),
       secondaryLabelStyle: TextStyle(
-        fontFamily: 'Lufga',
+        fontFamily: kAppFont,
         color: dark ? HodiColors.navy : Colors.white,
         fontSize: 12.5,
         fontWeight: FontWeight.w600,
@@ -208,7 +214,7 @@ ThemeData hodiTheme(Brightness brightness) {
       behavior: SnackBarBehavior.floating,
       backgroundColor: HodiColors.navy,
       contentTextStyle: const TextStyle(
-        fontFamily: 'Lufga',
+        fontFamily: kAppFont,
         color: Colors.white,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -219,7 +225,7 @@ ThemeData hodiTheme(Brightness brightness) {
         foregroundColor: dark ? const Color(0xFF001A2E) : Colors.white,
         minimumSize: const Size.fromHeight(52),
         textStyle: const TextStyle(
-          fontFamily: 'Lufga',
+          fontFamily: kAppFont,
           fontSize: 15,
           fontWeight: FontWeight.w600,
         ),
@@ -234,7 +240,7 @@ ThemeData hodiTheme(Brightness brightness) {
           color: dark ? const Color(0x29FFFFFF) : const Color(0x2E0A2540),
         ),
         textStyle: const TextStyle(
-          fontFamily: 'Lufga',
+          fontFamily: kAppFont,
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
@@ -278,7 +284,7 @@ ThemeData hodiTheme(Brightness brightness) {
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
-          fontFamily: 'Lufga',
+          fontFamily: kAppFont,
           fontSize: 11,
           fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
           color: selected

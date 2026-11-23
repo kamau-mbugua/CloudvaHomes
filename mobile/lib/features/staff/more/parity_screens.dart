@@ -11,6 +11,7 @@ import '../../../core/widgets/paged_list.dart';
 import '../staff_api.dart';
 import '../staff_models.dart';
 import '../staff_widgets.dart';
+import '../../../core/widgets/phone_field.dart';
 
 // ───────────────────────────────────────────── 1. Maintenance Requests
 
@@ -1933,11 +1934,7 @@ class StaffAgencyScreen extends ConsumerWidget {
                 decoration: const InputDecoration(labelText: 'Full name'),
               ),
               const SizedBox(height: 8),
-              TextField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Phone number'),
-              ),
+              PhoneField(controller: phoneCtrl),
               const SizedBox(height: 8),
               TextField(
                 controller: emailCtrl,

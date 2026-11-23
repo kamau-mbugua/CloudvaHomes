@@ -5,6 +5,7 @@ import '../../core/api/api_error.dart';
 import '../../core/widgets/common.dart';
 import 'host_api.dart';
 import 'host_models.dart';
+import '../../core/widgets/phone_field.dart';
 
 class BookingFormScreen extends ConsumerStatefulWidget {
   const BookingFormScreen({
@@ -177,11 +178,7 @@ class _BookingFormScreenState extends ConsumerState<BookingFormScreen> {
                 decoration: const InputDecoration(labelText: 'Guest name'),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Guest phone'),
-              ),
+              PhoneField(controller: _phoneCtrl, labelText: 'Guest phone'),
               const SizedBox(height: 12),
               TextField(
                 controller: _emailCtrl,

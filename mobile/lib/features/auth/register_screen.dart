@@ -6,6 +6,7 @@ import '../../core/api/api_error.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/widgets/common.dart';
 import 'auth_scaffold.dart';
+import '../../core/widgets/phone_field.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -142,15 +143,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        TextField(
+        PhoneField(
           controller: _phone,
-          keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: 'Phone number',
-            hintText: '0712 345 678',
-            errorText: _fieldErrors['phone'],
-          ),
+          errorText: _fieldErrors['phone'],
         ),
         const SizedBox(height: 12),
         TextField(

@@ -634,7 +634,7 @@ class AccountButton extends ConsumerWidget {
         child: Text(
           user?.initials ?? '',
           style: const TextStyle(
-            fontFamily: 'Lufga',
+            fontFamily: kAppFont,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
