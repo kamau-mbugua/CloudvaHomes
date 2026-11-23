@@ -429,6 +429,8 @@ model Tenant {
   notes                 String?
   creditBalance         BigInt    @default(0) // unallocated money (phase 4)
   portalInvitedAt       DateTime? // tenant portal (phase 7)
+  /// Staff took portal access away: signing in no longer links this tenant record.
+  portalRevokedAt       DateTime?
   remindersOff          Boolean   @default(false) // no automatic SMS reminders
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt

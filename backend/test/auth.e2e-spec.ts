@@ -328,15 +328,30 @@ describe('Auth (e2e)', () => {
         .expect(201);
       outbox.length = 0;
 
-      // Requesting login OTP or password reset for attackerEmail must NOT resolve to the victim
-      // or send any OTP code.
+      // A tenant may sign in with the email on their record, so a code does go to attackerEmail —
+      // but it opens a new login holding only that email. It never resolves to the victim, and
+      // the victim's phone typed on the record is not carried over.
       await t.http().post('/api/v1/auth/otp/request').send({ phone: attackerEmail }).expect(202);
+      const signedIn = await t
+        .http()
+        .post('/api/v1/auth/otp/verify')
+        .send({ phone: attackerEmail, code: lastCode(attackerEmail) })
+        .expect(200);
+      const attackerUser = await t.prisma.user.findUniqueOrThrow({
+        where: { email: attackerEmail },
+      });
+      expect(attackerUser.phone).toBeNull();
+      expect(signedIn.body.data.user.id).toBe(attackerUser.id);
+      expect(signedIn.body.data.user.email).not.toBe('admin@example.invalid');
+      expect(signedIn.body.data.organizations).toEqual([]);
+      // Password reset for that email reaches the attacker's own new login, not the victim's.
       await t
         .http()
         .post('/api/v1/auth/password/forgot')
         .send({ identifier: attackerEmail })
         .expect(202);
-      expect(outbox.filter((m) => m.to === attackerEmail)).toHaveLength(0);
+      // Nothing was sent to the victim's phone.
+      expect(outbox.filter((m) => m.to === '+254700000099')).toHaveLength(0);
 
       // Victim's email and phone remain unchanged
       const adminUser = await t.prisma.user.findUniqueOrThrow({

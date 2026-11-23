@@ -393,6 +393,9 @@ class _UnitMonthScreenState extends ConsumerState<UnitMonthScreen> {
                           for (var i = 0; i < actions.length; i++)
                             i == 0
                                 ? FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size(0, 44),
+                                    ),
                                     onPressed: _busy
                                         ? null
                                         : () => _act(actions[i], info, unit),

@@ -127,7 +127,8 @@ export class TenantAccountsService {
       where: {
         AND: [
           tenantScope(),
-          { userId: null },
+          // Not those whose access staff took away one by one.
+          { userId: null, portalRevokedAt: null },
           {
             tenancies: {
               some: {
@@ -185,7 +186,7 @@ export class TenantAccountsService {
     await this.db.$transaction(async (tx) => {
       await tx.tenant.update({
         where: { id: t.id },
-        data: { userId: user.id, portalInvitedAt: new Date() },
+        data: { userId: user.id, portalInvitedAt: new Date(), portalRevokedAt: null },
       });
       await this.audit.record(
         {
@@ -229,7 +230,10 @@ export class TenantAccountsService {
   async revoke(tenantId: string) {
     await this.tenants.find(tenantId);
     await this.db.$transaction(async (tx) => {
-      await tx.tenant.update({ where: { id: tenantId }, data: { userId: null } });
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: { userId: null, portalRevokedAt: new Date() },
+      });
       await this.audit.record(
         { action: 'tenant.portal_revoke', entity: 'tenant', entityId: tenantId },
         tx,

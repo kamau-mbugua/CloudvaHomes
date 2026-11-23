@@ -454,3 +454,30 @@ List<BookingAct> bookingActs(
     ],
   );
 }
+
+/// Pill colour for a booking status (see detail_ui's tones).
+String bookingStatusTone(String status) => switch (status) {
+  'CONFIRMED' => 'ok',
+  'CHECKED_IN' => 'plain',
+  'REQUESTED' || 'HELD' => 'info',
+  'NO_SHOW' || 'CANCELLED' || 'DECLINED' || 'EXPIRED' => 'bad',
+  _ => 'plain',
+};
+
+/// "14 → 19 Nov", or "28 Nov → 2 Dec" across months.
+String dayRange(String checkIn, String checkOut) {
+  final a = _date(checkIn);
+  final b = _date(checkOut);
+  return a.month == b.month && a.year == b.year
+      ? '${a.day} → ${b.day} ${_months[b.month - 1]}'
+      : '${a.day} ${_months[a.month - 1]} → ${b.day} ${_months[b.month - 1]}';
+}
+
+/// The money pill on a booking row: what's owed, or that it's paid. Null without money.
+({String label, String tone})? bookingMoneyPill(HostBooking b) {
+  if (!b.hasMoney || isClosed(b.status)) return null;
+  final owed = b.owedCents ?? 0;
+  if (owed > 0) return (label: 'KES ${shillings(owed)} due', tone: 'due');
+  if ((b.totalCents ?? 0) > 0) return (label: 'Paid', tone: 'ok');
+  return null;
+}

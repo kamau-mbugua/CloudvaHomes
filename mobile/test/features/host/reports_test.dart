@@ -117,11 +117,25 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      await tester.drag(find.byType(ListView), const Offset(0, -300));
+      // The report itself (the period chips are a list too).
+      await tester.drag(find.byType(ListView).last, const Offset(0, -300));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.scrollUntilVisible(
+        find.text('Sea Breeze Studio'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(ListView).last,
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('Sea Breeze Studio'), findsOneWidget);
-      expect(find.textContaining('6,000.00'), findsWidgets);
+      expect(find.textContaining('6,000'), findsWidgets);
+      expect(find.text('KES 6,000'), findsWidgets); // the profit
     },
   );
 }

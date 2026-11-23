@@ -821,6 +821,10 @@ class HostCleaningTask {
     this.nextCheckIn,
     this.note,
     this.doneAt,
+    this.doneBy,
+    this.bookingId,
+    this.bookingCode,
+    this.guestName,
   });
 
   final String id;
@@ -835,9 +839,18 @@ class HostCleaningTask {
   final String? note;
   final String? doneAt;
 
+  /// Who marked it clean.
+  final String? doneBy;
+
+  /// The stay whose check-out left the unit to clean (none for a task added by hand).
+  final String? bookingId;
+  final String? bookingCode;
+  final String? guestName;
+
   factory HostCleaningTask.fromJson(Map<String, dynamic> j) {
     final unit = j['unit'] as Map<String, dynamic>? ?? const {};
     final prop = j['property'] as Map<String, dynamic>? ?? const {};
+    final booking = j['booking'] as Map<String, dynamic>?;
     return HostCleaningTask(
       id: (j['id'] as String?) ?? '',
       status: (j['status'] as String?) ?? 'OPEN',
@@ -851,6 +864,10 @@ class HostCleaningTask {
       nextCheckIn: j['nextCheckIn'] as String?,
       note: j['note'] as String?,
       doneAt: j['doneAt'] as String?,
+      doneBy: j['doneBy'] as String?,
+      bookingId: booking?['id'] as String?,
+      bookingCode: booking?['code'] as String?,
+      guestName: booking?['guestName'] as String?,
     );
   }
 }
@@ -1014,9 +1031,18 @@ class HostReportSummary {
     required this.totalNights,
     required this.totalOccupancy,
     required this.totalAdrCents,
+    this.totalWrittenOffCents = 0,
+    this.monthly = const [],
   });
 
   final List<HostReportUnitRow> rows;
+  final int totalWrittenOffCents;
+
+  /// One entry per month in the range ("2026-11"), oldest first.
+  final List<
+    ({String period, int received, int refunded, int expenses, int profit})
+  >
+  monthly;
   final int totalReceivedCents;
   final int totalRefundedCents;
   final int totalBookedValueCents;
@@ -1043,6 +1069,18 @@ class HostReportSummary {
       totalNights: (totals['nights'] as num?)?.toInt() ?? 0,
       totalOccupancy: (totals['occupancy'] as num?)?.toDouble() ?? 0,
       totalAdrCents: hostMinorToInt(totals['adr']),
+      totalWrittenOffCents: hostMinorToInt(totals['writtenOff']),
+      monthly: [
+        for (final m in (j['monthly'] as List? ?? const []))
+          if (m is Map<String, dynamic>)
+            (
+              period: (m['period'] as String?) ?? '',
+              received: hostMinorToInt(m['received']),
+              refunded: hostMinorToInt(m['refunded']),
+              expenses: hostMinorToInt(m['expenses']),
+              profit: hostMinorToInt(m['profit']),
+            ),
+      ],
     );
   }
 }

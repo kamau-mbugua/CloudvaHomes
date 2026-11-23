@@ -27,6 +27,7 @@ const CLEANING_INCLUDE = {
       code: true,
       checkOut: true,
       checkedOutAt: true,
+      guest: { select: { name: true } },
     },
   },
 } as const;
@@ -69,6 +70,16 @@ export class CleaningService {
         })
       : [];
 
+    // Who marked each task clean, by name.
+    const doneByIds = [...new Set(tasks.map((t) => t.doneById).filter((x): x is string => !!x))];
+    const cleaners = doneByIds.length
+      ? await this.db.user.findMany({
+          where: { id: { in: doneByIds } },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
+    const cleanerName = new Map(cleaners.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
+
     const nextCheckInByUnit = new Map<string, string>();
     for (const b of upcomingBookings) {
       if (!nextCheckInByUnit.has(b.unitId)) {
@@ -90,6 +101,7 @@ export class CleaningService {
             id: t.booking.id,
             code: t.booking.code,
             checkOut: formatDateOnly(t.booking.checkOut),
+            guestName: t.booking.guest?.name ?? null,
           }
         : null,
       since: (t.booking?.checkedOutAt ?? t.createdAt).toISOString(),
@@ -97,6 +109,7 @@ export class CleaningService {
       note: t.note,
       doneAt: t.doneAt ? t.doneAt.toISOString() : null,
       doneById: t.doneById,
+      doneBy: t.doneById ? (cleanerName.get(t.doneById) ?? null) : null,
     }));
 
     mapped.sort((a, b) => {

@@ -38,3 +38,25 @@ Future<void> shareApiPdf(ApiClient api, String path, String filename) async {
     ),
   );
 }
+
+/// Downloads any file from the API (e.g. a CSV report) and opens the share sheet, like
+/// [shareApiPdf].
+Future<void> shareApiFile(
+  ApiClient api,
+  String path,
+  String filename, {
+  required String mimeType,
+  Map<String, Object?>? query,
+}) async {
+  final bytes = await api.bytes(path, query: query);
+  final dir = await getTemporaryDirectory();
+  final safe = filename.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+  final file = File('${dir.path}/$safe');
+  await file.writeAsBytes(bytes, flush: true);
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile(file.path, mimeType: mimeType)],
+      title: filename,
+    ),
+  );
+}

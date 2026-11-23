@@ -259,7 +259,7 @@ void main() {
     expect(requestedPages, ['1', '2']);
     expect(find.textContaining('Jane PageOne'), findsOneWidget);
     expect(find.textContaining('Peter PageTwo'), findsOneWidget);
-    expect(find.textContaining('KES 6,500.00'), findsWidgets);
+    expect(find.textContaining('KES 6,500'), findsWidgets);
   });
 
   Future<FakeAdapter> pumpDetail(

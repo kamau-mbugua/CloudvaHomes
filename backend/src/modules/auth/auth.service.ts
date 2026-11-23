@@ -3,6 +3,8 @@ import { currentContext, withoutOrgScope } from '../../common/context/request-co
 import { parseDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { RateLimitService } from '../../common/rate-limit/rate-limit.service.js';
+import type { Prisma } from '../../generated/prisma/client.js';
+import { violatesUnique } from '../../prisma/errors.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -363,7 +365,10 @@ export class AuthService {
       { key: `otp:phone:${id.value}`, limit: 3, windowSeconds: 15 * MIN },
       { key: `otp:ip:${this.ip()}`, limit: 10, windowSeconds: HOUR },
     );
-    const user = await this.findUserByIdentifier(id);
+    // A tenant whose record has this email or phone can sign in without staff first granting
+    // access: their login is made here. Their tenant records are linked when the session starts
+    // (SessionsService), after the code is in.
+    const user = (await this.findUserByIdentifier(id)) ?? (await this.createLoginForTenant(id));
     if (!user || user.status !== 'ACTIVE') return;
     if (user.isPlatformAdmin || user.platformRole !== null) return;
     const code = await this.otp.issue(id.value, 'LOGIN', user.id);
@@ -470,9 +475,47 @@ export class AuthService {
 
   /**
    * Resolves a global `User` strictly from the `users` table by normalized email or phone.
-   * Never reads or links `tenant` records during authentication so unverified tenant contact
-   * fields supplied by an organisation cannot be used to take over or mutate another user's account.
+   * Tenant records (whose contact fields an organisation typed in, unverified) are only used by
+   * [createLoginForTenant], which never changes an existing user.
    */
+  /** Tenant records with [id] that may get a login: not linked yet, not cut off by staff. */
+  private tenantClaims(id: Identifier): Prisma.TenantWhereInput {
+    return {
+      userId: null,
+      portalRevokedAt: null,
+      ...(id.kind === 'email'
+        ? { email: { equals: id.value, mode: 'insensitive' } }
+        : { phone: id.value }),
+    };
+  }
+
+  /**
+   * No login has this email or phone, but a tenant record does: make the login, with only the
+   * contact the code is about to prove (never the record's other, unverified one), so nobody's
+   * address ends up on a login they don't control. Null when no tenant record matches.
+   */
+  private async createLoginForTenant(id: Identifier) {
+    const claim = await this.prisma.tenant.findFirst({
+      where: this.tenantClaims(id),
+      orderBy: { createdAt: 'desc' },
+      select: { firstName: true, lastName: true },
+    });
+    if (!claim) return null;
+    try {
+      return await this.prisma.user.create({
+        data: {
+          ...(id.kind === 'email' ? { email: id.value } : { phone: id.value }),
+          firstName: claim.firstName,
+          lastName: claim.lastName,
+        },
+      });
+    } catch (e) {
+      // Two requests at once: the other one made it.
+      if (violatesUnique(e, id.kind)) return this.findUserByIdentifier(id);
+      throw e;
+    }
+  }
+
   private findUserByIdentifier(id: Identifier) {
     return this.prisma.user.findUnique({
       where: id.kind === 'email' ? { email: id.value } : { phone: id.value },

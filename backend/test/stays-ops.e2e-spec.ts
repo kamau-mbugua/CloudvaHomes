@@ -185,6 +185,8 @@ describe('Stays — Guests and cleaning tasks (e2e)', () => {
     const task = openRes.body.data[0];
     expect(task.unit.id).toBe(unitId);
     expect(task.nextCheckIn).toBe('2026-12-05');
+    // The card says whose stay left the unit to clean.
+    expect(task.booking.guestName).toBe('Grace Njeri');
 
     // Caretaker marks task done
     const doneRes = await t
@@ -195,6 +197,14 @@ describe('Stays — Guests and cleaning tasks (e2e)', () => {
       .expect(200);
     expect(doneRes.body.data.status).toBe('DONE');
     expect(doneRes.body.data.note).toBe('Fresh linens and towels ready');
+
+    // The Done list says who cleaned it.
+    const doneList = await t
+      .http()
+      .get('/api/v1/host/cleaning?status=DONE')
+      .set(auth(owner))
+      .expect(200);
+    expect(doneList.body.data[0].doneBy).toBe('Sam Caretaker');
 
     // Caretaker creates an ad-hoc cleaning task
     const adhocRes = await t

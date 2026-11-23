@@ -647,6 +647,11 @@ class _ListingEditorScreenState extends ConsumerState<ListingEditorScreen> {
                 height: 48,
                 child: FilledButton(
                   key: const Key('listing-save'),
+                  // The theme's buttons fill the width; in this row the button sizes to its label.
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                  ),
                   onPressed: _saving || (!_isNew && !dirty) ? null : _save,
                   child: KodiHubButtonChild(
                     loading: _saving,

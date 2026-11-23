@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:hodi/core/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hodi/core/api/api_client.dart';
@@ -134,7 +135,7 @@ Future<void> pumpScreen(
   await tester.pumpWidget(
     ProviderScope(
       overrides: overridesFor(adapter, permissions, orgKind: orgKind),
-      child: MaterialApp(home: child),
+      child: MaterialApp(theme: hodiTheme(Brightness.light), home: child),
     ),
   );
   await tester.pumpAndSettle();

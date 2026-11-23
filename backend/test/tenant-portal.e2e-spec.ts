@@ -159,12 +159,84 @@ describe('Tenant portal & reminders (e2e)', () => {
     return { token: res.body.data.accessToken, refreshCookie: null, body: res.body.data };
   }
 
+  it('a tenant signs in with the phone on their record, without staff granting access first', async () => {
+    const x = await setUp();
+    expect((await get(owner, `/tenants/${x.tom.tenant.id}`)).data.portal.hasAccess).toBe(false);
+
+    const tom = await signInAsTenant('0711000701');
+    expect(tom.body).toMatchObject({
+      organizations: [],
+      tenantOf: [{ tenantId: x.tom.tenant.id, name: 'Tom T' }],
+    });
+    expect((await get(tom, `/tenant/accounts/${x.tom.tenant.id}`)).data.tenant.code).toBe('T00001');
+    // Only Tom's record: Ann's account stays out of reach.
+    await get(tom, `/tenant/accounts/${x.ann.tenant.id}`, 404);
+    expect((await get(owner, `/tenants/${x.tom.tenant.id}`)).data.portal.hasAccess).toBe(true);
+  });
+
+  it('signs in by the email on a tenant record without taking over the login that has its phone', async () => {
+    const x = await setUp();
+    // Ann's record carries an email, and her phone already belongs to someone else's login.
+    const other = await t.prisma.user.create({
+      data: { firstName: 'Other', lastName: 'Person', phone: '+254711000702' },
+    });
+    await t.prisma.tenant.update({
+      where: { id: x.ann.tenant.id },
+      data: { email: 'Ann.Tenant@example.invalid' },
+    });
+
+    await t
+      .http()
+      .post('/api/v1/auth/otp/request')
+      .send({ phone: 'ann.tenant@example.invalid' })
+      .expect(202);
+    const res = await t
+      .http()
+      .post('/api/v1/auth/otp/verify')
+      .send({ phone: 'ann.tenant@example.invalid', code: lastCode('ann.tenant@example.invalid') })
+      .expect(200);
+    expect(res.body.data.tenantOf).toEqual([
+      expect.objectContaining({ tenantId: x.ann.tenant.id }),
+    ]);
+
+    // A new login with only the proven email; the phone's owner is untouched and unlinked.
+    const ann = await t.prisma.user.findUniqueOrThrow({
+      where: { email: 'ann.tenant@example.invalid' },
+    });
+    expect(ann.phone).toBeNull();
+    expect(ann.id).not.toBe(other.id);
+    expect(await t.prisma.user.findUniqueOrThrow({ where: { id: other.id } })).toMatchObject({
+      email: null,
+      phone: '+254711000702',
+    });
+    expect(await t.prisma.tenant.count({ where: { userId: other.id } })).toBe(0);
+  });
+
+  it('a tenant whose access staff took away stays out, also from bulk access', async () => {
+    const x = await setUp();
+    await signInAsTenant('0711000701');
+    await t
+      .http()
+      .delete(`/api/v1/tenants/${x.tom.tenant.id}/portal-access`)
+      .set(auth(owner))
+      .expect(200);
+
+    // Tom still has a login (it may hold other homes), but signing in no longer links this one.
+    const again = await signInAsTenant('0711000701');
+    expect(again.body).toMatchObject({ tenantOf: [] });
+    expect((await post(owner, '/tenants/portal-access', {})).data).toEqual({ invited: 1 }); // Ann only
+    expect((await get(owner, `/tenants/${x.tom.tenant.id}`)).data.portal.hasAccess).toBe(false);
+
+    // Staff can still give it back on purpose.
+    await post(owner, `/tenants/${x.tom.tenant.id}/portal-access`);
+    const restored = await signInAsTenant('0711000701');
+    expect(restored.body).toMatchObject({
+      tenantOf: [expect.objectContaining({ tenantId: x.tom.tenant.id })],
+    });
+  });
+
   it('a tenant with access signs in with a code and sees only their own account', async () => {
     const x = await setUp();
-    // No access yet: the code never arrives (no account), so sign-in fails.
-    await t.http().post('/api/v1/auth/otp/request').send({ phone: '0711000701' }).expect(202);
-    expect(() => lastCode('+254711000701')).toThrow();
-
     const access = (await post(owner, `/tenants/${x.tom.tenant.id}/portal-access`)).data;
     expect(access.hasAccess).toBe(true);
     expect(outbox.some((m) => m.to === '+254711000701' && m.text.includes('/tenant'))).toBe(true);

@@ -78,9 +78,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sea Breeze Studio'), findsOneWidget);
-    expect(find.text('Mark done'), findsOneWidget);
+    expect(find.text('Mark clean'), findsOneWidget);
 
-    await tester.tap(find.text('Mark done'));
+    await tester.tap(find.text('Mark clean'));
     await tester.pumpAndSettle();
 
     expect(markedDoneId, 'ct-1');

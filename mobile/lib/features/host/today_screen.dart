@@ -655,6 +655,9 @@ class _NeedCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                    ),
                     onPressed: busy ? null : () => onAction(action),
                     child: Text(label),
                   ),

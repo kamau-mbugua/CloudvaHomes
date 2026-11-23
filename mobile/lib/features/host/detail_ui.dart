@@ -208,7 +208,10 @@ class DetailCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                ?trailing,
+                if (trailing != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(child: trailing!),
+                ],
               ],
             ),
           for (var i = 0; i < children.length; i++) ...[
@@ -602,6 +605,100 @@ class DetailActionBar extends StatelessWidget {
                 ),
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A search field for the navy header (the app bar's `bottom`).
+class NavySearchField extends StatefulWidget implements PreferredSizeWidget {
+  const NavySearchField({
+    super.key,
+    required this.controller,
+    required this.hint,
+    this.onChanged,
+    this.onSubmitted,
+    this.onCleared,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onCleared;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(56);
+
+  @override
+  State<NavySearchField> createState() => _NavySearchFieldState();
+}
+
+class _NavySearchFieldState extends State<NavySearchField> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() => setState(() {});
+
+  @override
+  Widget build(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide.none,
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: SizedBox(
+        height: 44,
+        child: TextField(
+          controller: widget.controller,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          cursorColor: Colors.white,
+          textInputAction: TextInputAction.search,
+          onChanged: widget.onChanged,
+          onSubmitted: widget.onSubmitted,
+          decoration: InputDecoration(
+            hintText: widget.hint,
+            hintStyle: const TextStyle(color: Color(0xFFC9D6E5), fontSize: 14),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: Color(0xFFE6EDF5),
+              size: 18,
+            ),
+            suffixIcon: widget.controller.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    icon: const Icon(
+                      Icons.close,
+                      color: Color(0xFFE6EDF5),
+                      size: 18,
+                    ),
+                    onPressed: () {
+                      widget.controller.clear();
+                      widget.onChanged?.call('');
+                      widget.onCleared?.call();
+                    },
+                  ),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.1),
+            contentPadding: EdgeInsets.zero,
+            border: border,
+            enabledBorder: border,
+            focusedBorder: border.copyWith(
+              borderSide: const BorderSide(color: HodiColors.lime),
+            ),
           ),
         ),
       ),

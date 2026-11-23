@@ -98,7 +98,7 @@ export class InvitationsService {
     if (tenantMatchOr.length > 0) {
       await withoutOrgScope(() =>
         tx.tenant.updateMany({
-          where: { userId: null, OR: tenantMatchOr },
+          where: { userId: null, portalRevokedAt: null, OR: tenantMatchOr },
           data: { userId: user.id, portalInvitedAt: new Date() },
         }),
       );
