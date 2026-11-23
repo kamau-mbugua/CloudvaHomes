@@ -4,12 +4,14 @@ import { RateLimitService } from '../common/rate-limit/rate-limit.service.js';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditService } from './audit/audit.service.js';
 import { AccountDeletionService } from './auth/account-deletion.service.js';
+import { AccountJobsController } from './auth/account-jobs.controller.js';
 import { AuthController, MeController } from './auth/auth.controller.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuthService } from './auth/auth.service.js';
 import { OtpService } from './auth/otp.service.js';
 import { SessionsService } from './auth/sessions.service.js';
 import { TokensService } from './auth/tokens.service.js';
+import { JobsGuard, JobTokenVerifier } from './jobs/job-auth.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import {
   OrganizationController,
@@ -33,6 +35,7 @@ import { UsersService } from './users/users.service.js';
   controllers: [
     AuthController,
     MeController,
+    AccountJobsController,
     UsersController,
     RolesController,
     OrganizationController,
@@ -48,6 +51,8 @@ import { UsersService } from './users/users.service.js';
     OtpService,
     AuthService,
     AccountDeletionService,
+    JobTokenVerifier,
+    JobsGuard,
     InvitationsService,
     UsersService,
     RolesService,

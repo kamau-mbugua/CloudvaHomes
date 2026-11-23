@@ -24,16 +24,22 @@ keep those records) but:
 
 - it's marked `deletedAt`, status DISABLED; every session ends at once; push tokens are dropped;
 - email, phone and password are cleared, so nobody can sign in as them and the same email/phone
-  can open a new account later (kept aside in `deletedEmail` / `deletedPhone`, see the open item
-  on purging);
+  can open a new account later (kept aside in `deletedEmail` / `deletedPhone` for 30 days);
 - staff memberships end; tenant and landlord records stop pointing at the login (the records stay
   the organisation's; a tenant who signs in again later gets a new login linked to the same record);
 - refused for the **only owner** of an open organisation (hand over first) and for KodiHQ
-  platform operators (closed by another super admin).
+  platform operators (closed by another super admin);
+- **after 30 days** the `account-purge` job (daily 01:35 Nairobi, `POST /internal/jobs/account-purge`)
+  erases what was kept: the name becomes "Deleted user", the kept email and phone and the reason
+  go, and so do its old sessions (with IP addresses), sign-in codes and in-app notifications.
+  `purgedAt` marks it, so each account is purged once. The audit log records the deletion and the
+  purge but never the email, phone or reason.
 
 ## Owner: before the first upload
 
-1. **Deploy the backend first** (migration `20261123150000_user_soft_delete`, the new endpoint) and
+1. **Deploy the backend first** (migrations `20261123150000_user_soft_delete` and
+   `20261123180000_user_purge`, the new endpoint, the `account-purge` job: the VM cron image picks
+   it up from `infra/vm/cron/crontab`; on GCP create the scheduler job in `infra/gcp/README.md`) and
    the web app (`/delete-account`). The app's delete button calls the API, and Play reviewers
    open the deletion link.
 2. **Upload key.** Create it once, keep it out of the repo and back it up (password manager +
@@ -121,15 +127,10 @@ keep those records) but:
 
 ## Open items (decisions)
 
-1. **Purging deleted accounts.** Soft-deleted rows keep `deletedEmail` / `deletedPhone` and the
-   name. The privacy policy says account data is kept "for the life of the account plus a grace
-   period after closure, typically not exceeding 24 months". A scheduled job that anonymises the
-   row (name to "Deleted user", clears `deletedEmail` / `deletedPhone` / `deletionReason`) after
-   the grace period is not built yet. **Decide the grace period** (e.g. 30 or 90 days); the app
-   only says "our privacy policy explains how long the rest is kept".
-2. **Product privacy notice.** Cloudva's policy says products may publish their own notice naming
+1. **Product privacy notice.** Cloudva's policy says products may publish their own notice naming
    their sub-processors. KodiHQ has none, and the policy and terms still say "KodiHub". Ask Legal
    whether KodiHQ needs its own notice (Africa's Talking, Safaricom Daraja, email provider,
    hosting region) before launch, and to update the product name on cloudvalabs.com.
-3. **Restoring a mistaken deletion** is manual (support moves `deletedEmail` / `deletedPhone`
-   back, sets status ACTIVE and clears `deletedAt`), if the email or phone hasn't been reused.
+2. **Restoring a mistaken deletion** within the 30 days is manual (support moves `deletedEmail` /
+   `deletedPhone` back, sets status ACTIVE and clears `deletedAt`), if the email or phone hasn't
+   been reused. After the purge it can't be restored.

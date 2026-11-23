@@ -18,7 +18,18 @@ import { authContext, requireStepUp } from './decorators.js';
  *   records stop pointing at the login (the organisation's records themselves stay theirs).
  *
  * It needs a fresh one-time code (step-up), whichever way the person signs in.
+ *
+ * After DELETED_ACCOUNT_GRACE_DAYS the account-purge job erases what was kept: the name becomes
+ * "Deleted user", the kept email and phone and the reason go, and so do its old sessions (with
+ * their IP addresses), sign-in codes and in-app notifications. Until then support can restore a
+ * mistaken deletion.
  */
+/** Days a deleted account is kept (for restoring a mistake) before the purge job erases it. */
+export const DELETED_ACCOUNT_GRACE_DAYS = 30;
+
+const DAY_MS = 24 * 3600 * 1000;
+const PURGE_BATCH = 500;
+
 @Injectable()
 export class AccountDeletionService {
   constructor(
@@ -87,13 +98,67 @@ export class AccountDeletionService {
             entity: 'user',
             entityId: user.id,
             orgId: null,
-            // Not the email or phone themselves: the audit log outlives the grace period.
-            after: { hadEmail: !!user.email, hadPhone: !!user.phone, reason: note },
+            // Not the email, phone or reason themselves: the audit log outlives the purge.
+            after: { hadEmail: !!user.email, hadPhone: !!user.phone, gaveReason: !!note },
           },
           tx,
         );
       });
     });
+  }
+
+  /**
+   * The account-purge job (daily): erases accounts deleted more than the grace period ago.
+   * Idempotent: each account is purged once (`purgedAt`), so retries and double fires are
+   * harmless. Returns how many it purged.
+   */
+  async purgeDeleted(now = new Date()): Promise<{ purged: number }> {
+    const cutoff = new Date(now.getTime() - DELETED_ACCOUNT_GRACE_DAYS * DAY_MS);
+    let purged = 0;
+    await withoutOrgScope(async () => {
+      for (;;) {
+        const due = await this.prisma.user.findMany({
+          where: { deletedAt: { lte: cutoff }, purgedAt: null },
+          select: { id: true },
+          orderBy: { deletedAt: 'asc' },
+          take: PURGE_BATCH,
+        });
+        if (due.length === 0) break;
+        for (const { id } of due) {
+          await this.prisma.$transaction(async (tx) => {
+            await tx.user.update({
+              where: { id },
+              data: {
+                firstName: 'Deleted',
+                lastName: 'user',
+                deletedEmail: null,
+                deletedPhone: null,
+                deletionReason: null,
+                lastLoginAt: null,
+                purgedAt: now,
+              },
+            });
+            await tx.refreshToken.deleteMany({ where: { userId: id } });
+            await tx.otpCode.deleteMany({ where: { userId: id } });
+            await tx.userNotification.deleteMany({ where: { userId: id } });
+            await tx.deviceToken.deleteMany({ where: { userId: id } });
+            await this.audit.record(
+              {
+                action: 'user.account_purge',
+                entity: 'user',
+                entityId: id,
+                orgId: null,
+                actorId: null,
+              },
+              tx,
+            );
+          });
+          purged += 1;
+        }
+        if (due.length < PURGE_BATCH) break;
+      }
+    });
+    return { purged };
   }
 
   /** Organisations (still open) where this person is the only active owner. */

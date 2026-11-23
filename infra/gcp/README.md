@@ -252,6 +252,15 @@ for job in recurring-expenses upload-cleanup remittance-drafts; do
 done
 ```
 
+Deleted accounts are erased 30 days after deletion (daily, idempotent):
+
+```bash
+gcloud scheduler jobs create http hodi-account-purge --location "$REGION" \
+  --schedule "35 1 * * *" --time-zone "Africa/Nairobi" \
+  --uri "$API_URL/api/v1/internal/jobs/account-purge" --http-method POST \
+  --oidc-service-account-email "$SCHED_SA" --oidc-token-audience "$API_URL" --attempt-deadline 10m
+```
+
 ## 12. Tenant reminders (phase 7)
 
 Organisations switch reminders on in their settings (off by default). The job sends at most one

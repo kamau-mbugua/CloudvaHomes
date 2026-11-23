@@ -43,6 +43,9 @@ model User {
   /// restoring a mistaken deletion); never used to sign in.
   deletedEmail       String?
   deletedPhone       String?
+  /// When the purge job erased what was kept after the 30-day grace period (name, the email
+  /// and phone above, the reason). The row itself stays for the records that point at it.
+  purgedAt           DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

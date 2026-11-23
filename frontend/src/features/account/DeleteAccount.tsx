@@ -28,8 +28,9 @@ function WhatHappens() {
       </li>
       <li>If you’re the only owner of an organisation, make someone else an owner first.</li>
       <li>
-        Our <a href={PRIVACY_URL} target="_blank" rel="noreferrer">privacy policy</a> explains how long the rest
-        is kept. To ask for a copy of your data, or for it to be erased, email{' '}
+        We keep your name and old contact details for 30 days in case you change your mind, then erase them
+        (see our <a href={PRIVACY_URL} target="_blank" rel="noreferrer">privacy policy</a>). To ask for a copy of
+        your data, or for it to be erased sooner, email{' '}
         <a href={`mailto:${PRIVACY_EMAIL}`}>{PRIVACY_EMAIL}</a>.
       </li>
     </ul>

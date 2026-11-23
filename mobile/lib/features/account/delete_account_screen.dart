@@ -147,7 +147,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   children: [
                     const TextSpan(
                       text:
-                          'Our privacy policy explains how long the rest is kept. To ask for a copy of your data, or for it to be erased, email ',
+                          'We keep your name and old contact details for 30 days in case you change your mind, then erase them. To ask for a copy of your data, or for it to be erased sooner, email ',
                     ),
                     TextSpan(
                       text: privacyEmail,
