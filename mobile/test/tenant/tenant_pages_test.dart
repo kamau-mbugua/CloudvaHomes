@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hodi/features/tenant/tenant_more_pages.dart';
 
 import '../helpers/app_harness.dart';
 import '../helpers/fake_http.dart';
+import '../helpers/fake_printing.dart';
 import 'home_switcher_test.dart' show tenancy;
 import 'tenant_dashboard_test.dart' show session;
 
@@ -31,32 +31,6 @@ void _bigPhone(WidgetTester tester) {
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
-}
-
-/// The printing plugin has no native side in tests: no renderer, so tiles fall back to an
-/// icon (after the raster timeout) and the preview says it can't render.
-void _fakePrinting() {
-  const channel = MethodChannel('net.nfet.printing');
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMethodCallHandler(
-        channel,
-        (call) async => switch (call.method) {
-          'printingInfo' => <String, Object?>{
-            'directPrint': false,
-            'dynamicLayout': false,
-            'canPrint': false,
-            'canConvertHtml': false,
-            'canShare': false,
-            'canRaster': false,
-            'canListPrinters': false,
-          },
-          _ => null,
-        },
-      );
-  addTearDown(
-    () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, null),
-  );
 }
 
 void main() {
@@ -214,7 +188,7 @@ void main() {
       tester,
     ) async {
       _bigPhone(tester);
-      _fakePrinting();
+      fakePrinting();
       final adapter = FakeAdapter(
         (c) => switch (c.path) {
           '/tenant/accounts/overview' => (
