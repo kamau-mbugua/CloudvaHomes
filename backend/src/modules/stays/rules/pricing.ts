@@ -4,12 +4,18 @@ export interface PriceInput {
   nightly: bigint;
   weekend: bigint | null;
   weeklyDiscountBps: number | null;
+  /** Phase 21: 28+ nights; replaces the weekly discount when it applies. */
+  monthlyDiscountBps?: number | null;
   cleaningFee: bigint;
+  /** Phase 21: per extra guest per night above `guestsIncluded` (null = no limit). */
+  extraGuestFee?: bigint;
+  guestsIncluded?: number | null;
+  guests?: number;
   special: { from: string; to: string; nightly: bigint }[];
 }
 
 export interface QuoteLine {
-  kind: 'NIGHT' | 'DISCOUNT' | 'CLEANING' | 'ADJUSTMENT';
+  kind: 'NIGHT' | 'DISCOUNT' | 'CLEANING' | 'EXTRA_GUESTS' | 'ADJUSTMENT';
   date?: string;
   label: string;
   amount: string;
@@ -60,18 +66,34 @@ export function quoteStay(checkIn: string, checkOut: string, p: PriceInput): Quo
     });
   }
 
+  // One length-of-stay discount: the monthly one for 28+ nights, else the weekly one.
   let discount = 0n;
-  if (nights.length >= 7 && p.weeklyDiscountBps && p.weeklyDiscountBps > 0) {
-    const rawDiscount = (nightsSubtotal * BigInt(p.weeklyDiscountBps)) / 10000n;
+  const monthly = nights.length >= 28 && p.monthlyDiscountBps && p.monthlyDiscountBps > 0;
+  const weekly = nights.length >= 7 && p.weeklyDiscountBps && p.weeklyDiscountBps > 0;
+  const bps = monthly ? p.monthlyDiscountBps! : weekly ? p.weeklyDiscountBps! : 0;
+  if (bps > 0) {
+    const rawDiscount = (nightsSubtotal * BigInt(bps)) / 10000n;
     // Round down to whole shillings (100 minor units).
     discount = (rawDiscount / 100n) * 100n;
     if (discount > 0n) {
       lines.push({
         kind: 'DISCOUNT',
-        label: '7+ nights discount',
+        label: monthly ? '28+ nights discount' : '7+ nights discount',
         amount: (-discount).toString(),
       });
     }
+  }
+
+  let extraGuests = 0n;
+  const extra =
+    p.guestsIncluded != null && p.guests != null ? Math.max(0, p.guests - p.guestsIncluded) : 0;
+  if (extra > 0 && p.extraGuestFee && p.extraGuestFee > 0n) {
+    extraGuests = p.extraGuestFee * BigInt(extra) * BigInt(nights.length);
+    lines.push({
+      kind: 'EXTRA_GUESTS',
+      label: `${extra} extra ${extra === 1 ? 'guest' : 'guests'} × ${nights.length} ${nights.length === 1 ? 'night' : 'nights'}`,
+      amount: extraGuests.toString(),
+    });
   }
 
   if (p.cleaningFee > 0n) {
@@ -82,7 +104,7 @@ export function quoteStay(checkIn: string, checkOut: string, p: PriceInput): Quo
     });
   }
 
-  const total = nightsSubtotal - discount + p.cleaningFee;
+  const total = nightsSubtotal - discount + extraGuests + p.cleaningFee;
   return {
     nights: nights.length,
     lines,

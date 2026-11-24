@@ -9,6 +9,10 @@ import { DB, type Db } from '../../../prisma/prisma.module.js';
 import { AuditService } from '../../audit/audit.service.js';
 import { orgContext } from '../../auth/decorators.js';
 import { UploadsService } from '../../files/uploads.service.js';
+import { randomToken } from '../../auth/crypto.js';
+import { ENV } from '../../../config/config.module.js';
+import { FieldCipher } from '../../../common/crypto/field-cipher.js';
+import type { Env } from '../../../config/env.js';
 import { MAX_MINOR } from '../../portfolio/money.dto.js';
 import { propertyScope } from '../../portfolio/property-scope.js';
 import { assertHostOrg } from '../host-org.js';
@@ -92,6 +96,15 @@ function assertStayLengths(minNights: number, maxNights: number | null): void {
   }
 }
 
+/** Phase 22: a listing's door code in clear, or null. */
+export function openAccessCode(
+  cipher: FieldCipher,
+  enc: Uint8Array | null,
+  orgId: string,
+): string | null {
+  return enc ? cipher.decrypt(enc, `${orgId}:listing.accessCode`) : null;
+}
+
 export function toListingView(l: ListingRow) {
   const photos = l.photos.map(toPhotoView);
   const cover = photos[0] ?? null;
@@ -113,11 +126,17 @@ export function toListingView(l: ListingRow) {
     weekendPrice: l.weekendPrice !== null ? l.weekendPrice.toString() : null,
     cleaningFee: l.cleaningFee.toString(),
     weeklyDiscountBps: l.weeklyDiscountBps,
+    monthlyDiscountBps: l.monthlyDiscountBps,
+    extraGuestFee: l.extraGuestFee.toString(),
+    guestsIncluded: l.guestsIncluded,
     minNights: l.minNights,
     maxNights: l.maxNights,
     checkInFrom: l.checkInFrom,
     checkOutBy: l.checkOutBy,
     checkInInstructions: l.checkInInstructions,
+    houseManual: l.houseManual,
+    /** The code itself is never in the view (or the audit log): see `accessCode()`. */
+    hasAccessCode: l.accessCodeEnc !== null,
     rulesOverride: (l.rulesOverride as unknown as StayRules | null) ?? null,
     published: l.published,
     coverPhotoId: cover?.id ?? null,
@@ -142,7 +161,58 @@ export class ListingsService {
     @Inject(DB) private readonly db: Db,
     private readonly audit: AuditService,
     private readonly uploads: UploadsService,
+    @Inject(ENV) private readonly env: Env,
+    private readonly cipher: FieldCipher,
   ) {}
+
+  /** Phase 22: the door code, for the host (audited). */
+  async accessCode(id: string) {
+    const { orgId } = orgContext();
+    await assertHostOrg(this.db, orgId);
+    const row = await this.findScoped(id);
+    await this.audit.record({
+      action: 'listing.access_code_view',
+      entity: 'listing',
+      entityId: id,
+    });
+    return { accessCode: openAccessCode(this.cipher, row.accessCodeEnc, orgId) };
+  }
+
+  private sealAccessCode(raw: string | null | undefined, orgId: string) {
+    const code = raw?.trim();
+    return code ? this.cipher.encrypt(code, `${orgId}:listing.accessCode`) : null;
+  }
+
+  /** The listing's calendar export URL (phase 20), made on first request. */
+  async icalLink(id: string) {
+    const { orgId } = orgContext();
+    await assertHostOrg(this.db, orgId);
+    const row = await this.findScoped(id);
+    const token = row.icalToken ?? (await this.setIcalToken(id, 'listing.ical_create'));
+    return { url: this.icalUrl(id, token) };
+  }
+
+  /** A new secret: the old link stops working (e.g. it was shared by mistake). */
+  async rotateIcal(id: string) {
+    const { orgId } = orgContext();
+    await assertHostOrg(this.db, orgId);
+    await this.findScoped(id);
+    return { url: this.icalUrl(id, await this.setIcalToken(id, 'listing.ical_rotate')) };
+  }
+
+  private async setIcalToken(id: string, action: string): Promise<string> {
+    const token = randomToken();
+    await this.db.$transaction(async (tx) => {
+      await tx.listing.update({ where: { id }, data: { icalToken: token } });
+      await this.audit.record({ action, entity: 'listing', entityId: id }, tx);
+    });
+    return token;
+  }
+
+  private icalUrl(id: string, token: string): string {
+    const base = (this.env.PUBLIC_API_URL ?? this.env.APP_URL).replace(/\/$/, '');
+    return `${base}/api/v1/public/ical/${id}/${token}.ics`;
+  }
 
   private async findScoped(id: string): Promise<ListingRow> {
     const row = await this.db.listing.findFirst({
@@ -257,11 +327,19 @@ export class ListingsService {
             weekendPrice,
             cleaningFee,
             weeklyDiscountBps: dto.weeklyDiscountBps ?? null,
+            monthlyDiscountBps: dto.monthlyDiscountBps ?? null,
+            extraGuestFee:
+              dto.extraGuestFee !== undefined
+                ? parseWholeShillings(dto.extraGuestFee, 'extraGuestFee', { allowZero: true })
+                : 0n,
+            guestsIncluded: dto.guestsIncluded ?? null,
             minNights: dto.minNights ?? 1,
             maxNights: dto.maxNights ?? null,
             checkInFrom: dto.checkInFrom ?? null,
             checkOutBy: dto.checkOutBy ?? null,
             checkInInstructions: dto.checkInInstructions?.trim() || null,
+            houseManual: dto.houseManual?.trim() || null,
+            accessCodeEnc: this.sealAccessCode(dto.accessCode, ctx.orgId),
             ...(dto.rulesOverride !== undefined && dto.rulesOverride !== null
               ? { rulesOverride: dto.rulesOverride as unknown as Prisma.InputJsonValue }
               : {}),
@@ -350,12 +428,29 @@ export class ListingsService {
             ...(dto.weeklyDiscountBps !== undefined
               ? { weeklyDiscountBps: dto.weeklyDiscountBps }
               : {}),
+            ...(dto.monthlyDiscountBps !== undefined
+              ? { monthlyDiscountBps: dto.monthlyDiscountBps }
+              : {}),
+            ...(dto.extraGuestFee !== undefined
+              ? {
+                  extraGuestFee: parseWholeShillings(dto.extraGuestFee, 'extraGuestFee', {
+                    allowZero: true,
+                  }),
+                }
+              : {}),
+            ...(dto.guestsIncluded !== undefined ? { guestsIncluded: dto.guestsIncluded } : {}),
             ...(dto.minNights !== undefined ? { minNights: dto.minNights } : {}),
             ...(dto.maxNights !== undefined ? { maxNights: dto.maxNights } : {}),
             ...(dto.checkInFrom !== undefined ? { checkInFrom: dto.checkInFrom } : {}),
             ...(dto.checkOutBy !== undefined ? { checkOutBy: dto.checkOutBy } : {}),
             ...(dto.checkInInstructions !== undefined
               ? { checkInInstructions: dto.checkInInstructions?.trim() || null }
+              : {}),
+            ...(dto.houseManual !== undefined
+              ? { houseManual: dto.houseManual?.trim() || null }
+              : {}),
+            ...(dto.accessCode !== undefined
+              ? { accessCodeEnc: this.sealAccessCode(dto.accessCode, before.orgId) }
               : {}),
             ...(dto.rulesOverride !== undefined
               ? {

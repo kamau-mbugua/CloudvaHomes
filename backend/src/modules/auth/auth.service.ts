@@ -25,6 +25,8 @@ import {
 import { OTP_TTL_MINUTES, OtpService } from './otp.service.js';
 import { type IssuedSession, SessionsService } from './sessions.service.js';
 import { TokensService } from './tokens.service.js';
+import { staffNeedsSecondCode } from './staff-two-factor.js';
+import { ALL_PERMISSIONS } from '../roles/permissions.js';
 import { SmsAccountsService } from '../notifications/sms/sms-accounts.service.js';
 
 export interface AdminTwoFactorChallenge {
@@ -280,37 +282,43 @@ export class AuthService {
     await this.rateLimit.reset(`login:id:${id.value}`);
 
     const isOperator = user.isPlatformAdmin || user.platformRole !== null;
+    let secondCode: { preferSms: boolean } | null = null;
     if (isOperator) {
       const settings = await this.prisma.platformSettings.findUnique({ where: { id: 1 } });
       if (settings?.requireAdminTwoFactor) {
-        const preferSms = settings.adminTwoFactorChannel === 'SMS';
-        const useSms = (preferSms && !!user.phone) || (!user.email && !!user.phone);
-        const destination = useSms ? user.phone : user.email;
-        if (!destination) {
-          throw AppError.conflict(
-            'Add an email address or phone number to this admin account before using 2FA',
-            'NO_CONTACT',
-          );
-        }
-        const code = await this.otp.issue(user.id, 'ADMIN_2FA', user.id);
-        await this.deliverCode(
-          useSms ? { phone: destination } : { email: destination },
-          'admin-2fa',
-          code,
-          OTP_TTL_MINUTES.ADMIN_2FA,
-        );
-        const { token, expiresAt } = await this.tokens.signAdminTwoFactorChallenge(user.id);
-        return {
-          kind: 'two_factor',
-          challenge: {
-            requiresTwoFactor: true,
-            challengeToken: token,
-            expiresAt: expiresAt.toISOString(),
-            channel: useSms ? 'SMS' : 'EMAIL',
-            destinationMasked: maskContact(destination),
-          },
-        };
+        secondCode = { preferSms: settings.adminTwoFactorChannel === 'SMS' };
       }
+    } else if (await this.staffNeedSecondCode(user.id)) {
+      // Phase 26: an organisation asks its staff (or those who handle money) for a second code.
+      secondCode = { preferSms: true };
+    }
+    if (secondCode) {
+      const useSms = (secondCode.preferSms && !!user.phone) || (!user.email && !!user.phone);
+      const destination = useSms ? user.phone : user.email;
+      if (!destination) {
+        throw AppError.conflict(
+          'Add an email address or phone number to this account before using two-step sign-in',
+          'NO_CONTACT',
+        );
+      }
+      const code = await this.otp.issue(user.id, 'ADMIN_2FA', user.id);
+      await this.deliverCode(
+        useSms ? { phone: destination } : { email: destination },
+        'admin-2fa',
+        code,
+        OTP_TTL_MINUTES.ADMIN_2FA,
+      );
+      const { token, expiresAt } = await this.tokens.signAdminTwoFactorChallenge(user.id);
+      return {
+        kind: 'two_factor',
+        challenge: {
+          requiresTwoFactor: true,
+          challengeToken: token,
+          expiresAt: expiresAt.toISOString(),
+          channel: useSms ? 'SMS' : 'EMAIL',
+          destinationMasked: maskContact(destination),
+        },
+      };
     }
 
     const session = await this.sessions.start(user.id, null);
@@ -325,6 +333,28 @@ export class AuthService {
     return { kind: 'session', session };
   }
 
+  /** Phase 26: whether an organisation this person actively works for wants a second code. */
+  private async staffNeedSecondCode(userId: string): Promise<boolean> {
+    const memberships = await this.prisma.membership.findMany({
+      where: {
+        userId,
+        status: 'ACTIVE',
+        organization: { status: { not: 'CLOSED' }, staffTwoFactor: { not: 'OFF' } },
+      },
+      select: {
+        organization: { select: { staffTwoFactor: true } },
+        role: { select: { permissions: true, systemKey: true } },
+      },
+    });
+    // Owners hold every permission (their role lists none).
+    return staffNeedsSecondCode(
+      memberships.map((m) => ({
+        rule: m.organization.staffTwoFactor,
+        permissions: m.role.systemKey === 'OWNER' ? [...ALL_PERMISSIONS] : m.role.permissions,
+      })),
+    );
+  }
+
   async verifyAdminTwoFactor(challengeToken: string, code: string): Promise<IssuedSession> {
     await this.rateLimit.hit({
       key: `admin-2fa-verify:ip:${this.ip()}`,
@@ -334,7 +364,9 @@ export class AuthService {
     const userId = await this.tokens.verifyAdminTwoFactorChallenge(challengeToken);
     await this.otp.verify(userId, 'ADMIN_2FA', code);
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || user.status !== 'ACTIVE' || (!user.isPlatformAdmin && !user.platformRole)) {
+    // The challenge is only issued when a second code is required (operators, or staff whose
+    // organisation asks for it), so any active account holding a valid one may finish.
+    if (!user || user.status !== 'ACTIVE') {
       throw AppError.unauthenticated(
         'INVALID_CODE',
         'That code is wrong or has expired. Please sign in again.',

@@ -159,7 +159,7 @@ export function LoginPage() {
       <AuthLayout>
         <form className="au__form" onSubmit={submitAdminTwoFactor} key="admin-2fa">
           <div className="au__step">
-            <h1>Confirm admin sign-in</h1>
+            <h1>Confirm it’s you</h1>
             <p className="au__lede">
               Enter the 6-digit verification code sent via {twoFactor.channel === 'SMS' ? 'SMS' : 'email'} to{' '}
               <strong>{twoFactor.destinationMasked}</strong>.

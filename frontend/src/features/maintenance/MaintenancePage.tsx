@@ -14,6 +14,7 @@ import { Sheet } from '../../components/Sheet';
 import { PropertySelect } from '../billing/ui';
 import { useListFilters } from '../portfolio/hooks';
 import { Field } from '../portfolio/ui';
+import { useActiveVendors } from './vendorsApi';
 import type { AttachmentDraft } from '../uploads/api';
 import { AttachmentField, PrivateFilePreview } from '../uploads/ui';
 import {
@@ -44,13 +45,14 @@ export function MaintenancePage() {
   const status = filters.get('status');
   const priority = filters.get('priority');
   const category = filters.get('category');
+  const late = filters.get('late') === 'true' ? 'true' : '';
 
   const canCreate = useCan('maintenance:create');
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<MaintenanceRequestItem | null>(null);
   const [converting, setConverting] = useState<MaintenanceRequestItem | null>(null);
 
-  const query = { q, propertyId, status, priority, category };
+  const query = { q, propertyId, status, priority, category, late };
   const list = useQuery({
     queryKey: [...KEY, 'list', { ...query, page }],
     queryFn: () =>
@@ -65,7 +67,7 @@ export function MaintenancePage() {
   const rows = list.data?.data ?? [];
   const meta = list.data?.meta;
   const counts = meta?.counts;
-  const filtered = Boolean(q || propertyId || status || priority || category);
+  const filtered = Boolean(q || propertyId || status || priority || category || late);
 
   return (
     <div className="pg">
@@ -150,6 +152,10 @@ export function MaintenancePage() {
             </option>
           ))}
         </select>
+        <label className="py__daterange" title="Open longer than urgent 1 day, high 3, medium 7, low 14">
+          <input type="checkbox" checked={late === 'true'} onChange={(e) => filters.setFilter({ late: e.target.checked ? 'true' : '' })} />
+          <span>Late only</span>
+        </label>
         <div className="pf__actions">
           {canCreate ? (
             <button
@@ -247,6 +253,8 @@ export function MaintenancePage() {
                     >
                       {MAINTENANCE_STATUSES[r.status] ?? r.status}
                     </span>
+                    {r.overdue ? <span className="ad__badge ad__badge--alert" style={{ marginLeft: 6 }}>Late</span> : null}
+                    {r.vendor ? <span className="ad__sub">{r.vendor.name}</span> : null}
                   </td>
                   <td>
                     {r.expense ? (
@@ -540,6 +548,8 @@ function MaintenanceDetailSheet({
           </div>
         </dl>
 
+        <VendorCard request={request} onDone={onClose} />
+
         <div className="ag__card" style={{ marginBottom: '1rem', padding: '0.85rem' }}>
           <strong>Description</strong>
           <p style={{ margin: '0.35rem 0 0', whiteSpace: 'pre-wrap' }}>{request.description}</p>
@@ -774,5 +784,70 @@ function ConvertToExpenseSheet({
         </div>
       </form>
     </Sheet>
+  );
+}
+
+/**
+ * Phase 18 (first step): send the job to a vendor — they get a text with the job and your
+ * number (not the tenant's) — or take it off them.
+ */
+function VendorCard({ request, onDone }: { request: MaintenanceRequestItem; onDone: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const canUpdate = useCan('maintenance:update');
+  const closed = request.status === 'RESOLVED' || request.status === 'CANCELLED';
+  const vendors = useActiveVendors(canUpdate && !closed);
+  const [vendorId, setVendorId] = useState(request.vendor?.id ?? '');
+  const assign = useMutation({
+    mutationFn: (id: string | null) =>
+      api.post<DataEnvelope<MaintenanceRequestItem & { vendorNotified: boolean }>>(
+        `/maintenance-requests/${encodeURIComponent(request.id)}/assign`,
+        { vendorId: id },
+      ),
+    onSuccess: async (res, id) => {
+      if (!id) toast.saved('Taken off the vendor.');
+      else if (res.data.vendorNotified) toast.saved(`Sent to ${res.data.vendor?.name ?? 'the vendor'} by SMS.`);
+      else toast.saved(`Assigned to ${res.data.vendor?.name ?? 'the vendor'}. The SMS couldn’t be sent — call them.`);
+      await qc.invalidateQueries({ queryKey: KEY });
+      onDone();
+    },
+    onError: (error) => toast.failed(errorMessage(error)),
+  });
+  // Vendors with this trade first.
+  const options = [...(vendors.data ?? [])].sort(
+    (a, b) => Number(b.trades.includes(request.category)) - Number(a.trades.includes(request.category)),
+  );
+  return (
+    <div className="ag__card" style={{ marginBottom: '1rem', padding: '0.85rem', display: 'grid', gap: 8 }}>
+      <strong>Vendor</strong>
+      {request.vendor ? (
+        <span>
+          {request.vendor.name} · {request.vendor.phone}
+          {request.assignedAt ? <span className="ad__sub">Assigned {formatDay(request.assignedAt.slice(0, 10))}</span> : null}
+        </span>
+      ) : <span className="ad__muted">Not assigned.</span>}
+      {canUpdate && !closed ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <select className="nx-select" aria-label="Vendor" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+            <option value="">Choose a vendor…</option>
+            {options.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}{v.trades.includes(request.category) ? '' : ' (other trade)'}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="nx-btn nx-btn--sm nx-btn--primary" disabled={!vendorId || assign.isPending || vendorId === request.vendor?.id}
+            onClick={() => assign.mutate(vendorId)}>
+            Send job
+          </button>
+          {request.vendor ? (
+            <button type="button" className="nx-btn nx-btn--sm" disabled={assign.isPending} onClick={() => assign.mutate(null)}>Take off vendor</button>
+          ) : null}
+        </div>
+      ) : null}
+      {canUpdate && !closed && vendors.data && vendors.data.length === 0 ? (
+        <span className="ad__muted">No vendors yet — add them under Properties → Vendors.</span>
+      ) : null}
+    </div>
   );
 }

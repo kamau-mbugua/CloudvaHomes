@@ -28,6 +28,7 @@ import { PaymentsService } from '../payments/payments.service.js';
 import { TenanciesService } from '../portfolio/tenancies/tenancies.service.js';
 import { TenantsService } from '../portfolio/tenants/tenants.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
+import { PaymentCertificatesService } from './payment-certificates.service.js';
 import type { TenantInvoicesQueryDto, TenantPayDto } from './tenant-portal.dto.js';
 import { toSkipTake, type PaginationQueryDto } from '../../common/http/pagination.js';
 import { paginated } from '../../common/http/response.js';
@@ -52,6 +53,7 @@ export class TenantPortalService {
     private readonly maintenance: MaintenanceService,
     private readonly uploads: UploadsService,
     private readonly inspectionRecords: InspectionsService,
+    private readonly certificates: PaymentCertificatesService,
   ) {}
 
   async mine() {
@@ -156,6 +158,8 @@ export class TenantPortalService {
           startDate: formatDateOnly(x.startDate),
           endDate: formatDateOnlyOrNull(x.endDate),
           leaseEndDate: formatDateOnlyOrNull(x.leaseEndDate),
+          noticeSource: x.noticeSource,
+          noticeEndsOn: formatDateOnlyOrNull(x.noticeEndsOn),
           upcomingRentChanges: x.rentChanges,
           hasSignedLease: Boolean(x.leaseUploadId),
           ...homeStatus(openInvoices, x.id, today),
@@ -529,6 +533,29 @@ export class TenantPortalService {
       await this.ownTenancy(tenantId, tenancyId);
       return this.inspectionRecords.pdf(tenancyId, kind);
     });
+  }
+
+  noticePreview(tenantId: string, tenancyId: string, moveOutDate: string) {
+    return this.as(tenantId, async () => {
+      await this.ownTenancy(tenantId, tenancyId);
+      return this.tenancies.noticePreview(tenancyId, moveOutDate);
+    });
+  }
+
+  giveNotice(
+    tenantId: string,
+    tenancyId: string,
+    dto: { moveOutDate: string; reason?: string; forwardingPhone?: string },
+  ) {
+    return this.as(tenantId, async () => {
+      await this.ownTenancy(tenantId, tenancyId);
+      return this.tenancies.tenantNotice(tenancyId, dto);
+    });
+  }
+
+  /** Phase 23: the tenant's payment history certificate for the last `months`. */
+  paymentCertificate(tenantId: string, months: number) {
+    return this.as(tenantId, () => this.certificates.issue(tenantId, months));
   }
 
   leasePdf(tenantId: string, tenancyId: string) {

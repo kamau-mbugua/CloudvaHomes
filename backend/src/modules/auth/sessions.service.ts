@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AppError } from '../../common/errors/app-error.js';
 import { currentContext } from '../../common/context/request-context.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -7,6 +7,8 @@ import { AuditService } from '../audit/audit.service.js';
 import { ALL_PERMISSIONS } from '../roles/permissions.js';
 import { randomToken, sha256 } from './crypto.js';
 import { TokensService } from './tokens.service.js';
+import { describeDevice } from './devices.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 export const REFRESH_TTL_DAYS = 30;
 /**
@@ -109,10 +111,93 @@ export class SessionsService {
     private readonly prisma: PrismaService,
     private readonly tokens: TokensService,
     private readonly audit: AuditService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
+
+  private readonly logger = new Logger(SessionsService.name);
+
+  /**
+   * "My devices" (phase 26): the person's signed-in sessions, newest activity first. Each
+   * family has one live refresh token; its first token is when that device signed in.
+   */
+  async listForUser(userId: string, currentFamilyId: string | null) {
+    const live = await this.prisma.refreshToken.findMany({
+      where: { userId, revokedAt: null, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      select: { familyId: true, userAgent: true, ip: true, createdAt: true },
+    });
+    const starts = await this.prisma.refreshToken.groupBy({
+      by: ['familyId'],
+      where: { familyId: { in: live.map((t) => t.familyId) } },
+      _min: { createdAt: true },
+    });
+    const since = new Map(starts.map((s) => [s.familyId, s._min.createdAt]));
+    return live.map((t) => ({
+      id: t.familyId,
+      device: describeDevice(t.userAgent),
+      ip: t.ip,
+      signedInAt: since.get(t.familyId) ?? t.createdAt,
+      lastActiveAt: t.createdAt,
+      current: t.familyId === currentFamilyId,
+    }));
+  }
+
+  /** Signs one of the person's own devices out. */
+  async endOwnSession(userId: string, familyId: string): Promise<void> {
+    const owned = await this.prisma.refreshToken.findFirst({
+      where: { userId, familyId },
+      select: { id: true },
+    });
+    if (!owned) throw AppError.notFound('Session');
+    await this.revokeFamily(familyId);
+    await this.audit.record({
+      action: 'session.end',
+      entity: 'session',
+      entityId: familyId,
+      actorId: userId,
+      orgId: null,
+    });
+  }
+
+  /**
+   * Tells the person when a device this account hasn't used in the last 180 days signs in
+   * (never on the very first sign-in). Best effort: a failure never blocks signing in.
+   */
+  private async alertIfNewDevice(userId: string): Promise<void> {
+    if (!this.notifications) return;
+    const ctx = currentContext();
+    const userAgent = ctx?.userAgent ?? null;
+    try {
+      const since = new Date(Date.now() - 180 * 24 * 3600 * 1000);
+      const [earlier, sameDevice] = await Promise.all([
+        this.prisma.refreshToken.count({ where: { userId } }),
+        this.prisma.refreshToken.count({ where: { userId, userAgent, createdAt: { gte: since } } }),
+      ]);
+      if (earlier === 0 || sameDevice > 0) return;
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, email: true, phone: true },
+      });
+      if (!user) return;
+      const device = describeDevice(userAgent);
+      await this.notifications.notifyUser({
+        userId,
+        kind: 'NEW_DEVICE_SIGN_IN',
+        title: 'New sign-in to your account',
+        body: `${device} signed in. If this wasn't you, change your password and sign out of other devices.`,
+      });
+      await this.notifications.sendNewDeviceAlert(
+        { email: user.email, phone: user.phone },
+        { firstName: user.firstName, device, ip: ctx?.ip ?? null },
+      );
+    } catch (err) {
+      this.logger.warn({ err }, 'New-device alert failed');
+    }
+  }
 
   /** New sign-in → new family. */
   async start(userId: string, preferredOrgId: string | null): Promise<IssuedSession> {
+    await this.alertIfNewDevice(userId);
     const userDefaults = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {

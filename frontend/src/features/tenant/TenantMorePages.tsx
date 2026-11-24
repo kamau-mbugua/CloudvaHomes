@@ -7,7 +7,8 @@ import { CardSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { PasswordSection, ProfileSection } from '../account/AccountPage';
 import { DeleteAccountSection } from '../account/DeleteAccount';
-import { downloadTenantLeasePdf, downloadTenantSignedLease, tenantErrorMessage, useTenantNotices } from './api';
+import { DevicesSection } from '../account/Devices';
+import { downloadPaymentCertificate, downloadTenantLeasePdf, downloadTenantSignedLease, tenantErrorMessage, useTenantNotices } from './api';
 import { homeText, noticeLink } from './rules';
 import { useTenantContext } from './tenantContext';
 import { TenantInspections } from './TenantInspections';
@@ -60,6 +61,11 @@ function HomeDocuments({ home }: { home: ConsolidatedTenancy }) {
             {busy === 'signed' ? 'Preparing…' : 'Signed lease copy'}
           </button>
         ) : null}
+        <button type="button" className="nx-btn nx-btn--sm" disabled={busy !== null}
+          title="Your rent payment record for the last 12 months, with a code anyone can check"
+          onClick={() => void run('cert', () => downloadPaymentCertificate(home.tenantId, home.tenantCode))}>
+          {busy === 'cert' ? 'Preparing…' : 'Payment history certificate'}
+        </button>
       </div>
       <TenantInspections tenantId={home.tenantId} tenancyId={home.id} />
     </section>
@@ -118,6 +124,7 @@ export function TenantProfilePage() {
           ))}
         </ul>
       </section>
+      <section className="ag__card"><DevicesSection /></section>
       <section className="ag__card"><DeleteAccountSection /></section>
     </div>
   );

@@ -10,6 +10,7 @@ import type { SessionPayload } from '../../lib/auth/types';
 import { useSession } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { settingsErrorMessage } from '../settings/api';
+import { DevicesSection } from './Devices';
 import { DeleteAccountSection } from './DeleteAccount';
 
 /**
@@ -22,9 +23,9 @@ export function AccountPage() {
   const [params, setParams] = useSearchParams();
   const mustChange = Boolean(session.user.mustChangePassword);
   const asked = params.get('tab');
-  const tab = mustChange || asked === 'password' ? 'password' : asked === 'delete' ? 'delete' : 'profile';
+  const tab = mustChange || asked === 'password' ? 'password' : asked === 'delete' ? 'delete' : asked === 'devices' ? 'devices' : 'profile';
 
-  const setTab = (next: 'profile' | 'password' | 'delete') => {
+  const setTab = (next: 'profile' | 'password' | 'devices' | 'delete') => {
     setParams(
       (prev) => {
         const p = new URLSearchParams(prev);
@@ -62,6 +63,15 @@ export function AccountPage() {
             <button
               type="button"
               role="tab"
+              aria-selected={tab === 'devices'}
+              className="pf__tab"
+              onClick={() => setTab('devices')}
+            >
+              Devices
+            </button>
+            <button
+              type="button"
+              role="tab"
               aria-selected={tab === 'delete'}
               className="pf__tab"
               onClick={() => setTab('delete')}
@@ -71,7 +81,7 @@ export function AccountPage() {
           </div>
         </div>
 
-        {tab === 'profile' ? <ProfileSection /> : tab === 'password' ? <PasswordSection /> : <DeleteAccountSection />}
+        {tab === 'profile' ? <ProfileSection /> : tab === 'password' ? <PasswordSection /> : tab === 'devices' ? <DevicesSection /> : <DeleteAccountSection />}
       </div>
     </div>
   );

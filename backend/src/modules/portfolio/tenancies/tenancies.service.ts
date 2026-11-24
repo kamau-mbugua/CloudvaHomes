@@ -16,7 +16,8 @@ import { UploadsService } from '../../files/uploads.service.js';
 import { formatKesMinor, NotificationsService } from '../../notifications/notifications.service.js';
 import { readOrgDocumentInstructions } from '../../../common/pdf/pdf.js';
 // Pure date helpers only — no billing module dependency.
-import { addDays, todayInNairobi } from '../../billing/billing-math.js';
+import { addDays, noticeTerms, todayInNairobi } from '../../billing/billing-math.js';
+import { normalizePhone } from '../../auth/identifiers.js';
 import { tenancyScope } from '../property-scope.js';
 import { mapTenantConflict, TenantsService } from '../tenants/tenants.service.js';
 import { CURRENT, lockUnit, UnitsService } from '../units/units.service.js';
@@ -61,6 +62,11 @@ function toTenancy(t: TenancyRow) {
     /** Scheduled rent changes not applied yet, earliest first (phase 13). */
     rentChanges: t.rentChanges,
     noticeGivenAt: t.noticeGivenAt,
+    /** Phase 14: who gave notice, this tenancy's own minimum, rent in lieu, forwarding number. */
+    noticeSource: t.noticeSource,
+    noticeDays: t.noticeDays,
+    noticeEndsOn: formatDateOnlyOrNull(t.noticeEndsOn),
+    forwardingPhone: t.forwardingPhone,
     depositHeld: t.depositHeld,
     moveOutReason: t.moveOutReason,
     hasSignedLease: Boolean(t.leaseUploadId),
@@ -86,6 +92,9 @@ function snapshot(t: TenancyRow) {
     leaseEndDate: formatDateOnlyOrNull(t.leaseEndDate),
     depositHeld: t.depositHeld,
     moveOutReason: t.moveOutReason,
+    noticeSource: t.noticeSource,
+    noticeDays: t.noticeDays,
+    noticeEndsOn: formatDateOnlyOrNull(t.noticeEndsOn),
   };
 }
 
@@ -141,6 +150,13 @@ export class TenanciesService {
         q.propertyId ? { unit: { propertyId: q.propertyId } } : {},
         q.unitId ? { unitId: q.unitId } : {},
         q.tenantId ? { tenantId: q.tenantId } : {},
+        q.leaving !== undefined
+          ? {
+              status: 'NOTICE',
+              endDate: { lte: addDays(parseDateOnly(todayInNairobi()), q.leaving) },
+            }
+          : {},
+        q.depositHeld ? { status: 'ENDED', depositHeld: { gt: 0n } } : {},
         q.expiring
           ? {
               status: { in: ['ACTIVE', 'NOTICE'] },
@@ -423,6 +439,7 @@ export class TenanciesService {
       ...(dto.leaseEndDate !== undefined
         ? { leaseEndDate: dto.leaseEndDate ? leaseEnd(dto.leaseEndDate, t.startDate) : null }
         : {}),
+      ...(dto.noticeDays !== undefined ? { noticeDays: dto.noticeDays } : {}),
     }));
   }
 
@@ -437,7 +454,12 @@ export class TenanciesService {
     const end = parseDateOnly(dto.endDate);
     return this.transition(id, ['ACTIVE', 'NOTICE'], 'tenancy.notice', (t) => {
       assertNotBefore(end, t.startDate);
-      return { status: 'NOTICE', endDate: end, noticeGivenAt: t.noticeGivenAt ?? new Date() };
+      return {
+        status: 'NOTICE',
+        endDate: end,
+        noticeGivenAt: t.noticeGivenAt ?? new Date(),
+        noticeSource: t.noticeSource ?? 'STAFF',
+      };
     });
   }
 
@@ -446,7 +468,120 @@ export class TenanciesService {
       status: 'ACTIVE',
       endDate: null,
       noticeGivenAt: null,
+      noticeSource: null,
+      noticeEndsOn: null,
+      forwardingPhone: null,
     }));
+  }
+
+  /**
+   * Phase 14: what giving notice now, to move out on `moveOutDate`, means — the minimum notice,
+   * the earliest move-out it allows, and the rent in lieu for an earlier date.
+   */
+  async noticePreview(id: string, moveOutDate: string) {
+    const t = await this.find(id);
+    const days = await this.noticeDaysFor(t);
+    const today = parseDateOnly(todayInNairobi());
+    const terms = noticeTerms({
+      givenOn: today,
+      noticeDays: days,
+      moveOut: parseDateOnly(moveOutDate),
+      billingDay: t.billingDay,
+      rent: t.rentAmount,
+    });
+    return {
+      noticeDays: days,
+      earliestMoveOut: formatDateOnly(terms.earliest),
+      shortNotice: terms.shortNotice,
+      noticeEndsOn: formatDateOnlyOrNull(terms.noticeEndsOn),
+      rentInLieu: terms.rentInLieu,
+    };
+  }
+
+  /**
+   * The tenant gives notice in the portal (phase 14). Short notice is allowed: rent runs to the
+   * end of the notice period (rent in lieu) unless staff waive it. Staff are told.
+   */
+  async tenantNotice(
+    id: string,
+    dto: { moveOutDate: string; reason?: string; forwardingPhone?: string },
+  ) {
+    const before = await this.find(id);
+    if (before.status === 'NOTICE') {
+      throw AppError.conflict(
+        'You’ve already given notice. To change the date, contact your landlord or agent.',
+        'NOTICE_ALREADY_GIVEN',
+      );
+    }
+    if (before.status === 'ENDED') throw tenancyEnded();
+    const today = parseDateOnly(todayInNairobi());
+    const moveOut = parseDateOnly(dto.moveOutDate);
+    if (moveOut < today) {
+      throw AppError.fieldInvalid('moveOutDate', 'Choose today or a later date');
+    }
+    assertNotBefore(moveOut, before.startDate);
+    let forwardingPhone: string | null = null;
+    if (dto.forwardingPhone?.trim()) {
+      forwardingPhone = normalizePhone(dto.forwardingPhone);
+      if (!forwardingPhone) {
+        throw AppError.fieldInvalid(
+          'forwardingPhone',
+          'Enter a valid phone number, e.g. 0712 345 678',
+        );
+      }
+    }
+    const days = await this.noticeDaysFor(before);
+    const terms = noticeTerms({
+      givenOn: today,
+      noticeDays: days,
+      moveOut,
+      billingDay: before.billingDay,
+      rent: before.rentAmount,
+    });
+    const updated = await this.transition(id, ['ACTIVE'], 'tenancy.notice', () => ({
+      status: 'NOTICE',
+      endDate: moveOut,
+      noticeGivenAt: new Date(),
+      noticeSource: 'TENANT',
+      noticeEndsOn: terms.noticeEndsOn,
+      forwardingPhone,
+      moveOutReason: dto.reason?.trim() || null,
+    }));
+    const name = `${before.tenant.firstName} ${before.tenant.lastName}`.trim();
+    const where = `${before.unit.number}, ${before.unit.property.name}`;
+    await this.notifications
+      ?.notifyOrgStaff(before.orgId, {
+        kind: 'TENANCY_NOTICE',
+        title: `Notice to vacate · ${where}`,
+        body:
+          `${name} plans to move out on ${formatDateOnly(moveOut)}.` +
+          (terms.shortNotice
+            ? ` That's short notice: rent is due until ${formatDateOnly(terms.earliest)} unless you waive it.`
+            : ''),
+        actionUrl: '/app/tenancies?status=NOTICE',
+      })
+      .catch(() => undefined);
+    return updated;
+  }
+
+  /** Staff let a tenant off the rent in lieu of short notice (phase 14). Audited. */
+  async waiveShortNotice(id: string) {
+    const t = await this.find(id);
+    if (!t.noticeEndsOn) {
+      throw AppError.conflict('There’s no short-notice rent to waive', 'NO_SHORT_NOTICE');
+    }
+    return this.transition(id, ['NOTICE', 'ENDED'], 'tenancy.notice_waive', () => ({
+      noticeEndsOn: null,
+    }));
+  }
+
+  private async noticeDaysFor(t: { noticeDays: number | null; orgId: string }) {
+    if (t.noticeDays !== null) return t.noticeDays;
+    const org = await this.db.organization.findUnique({
+      where: { id: t.orgId },
+      select: { noticeDays: true },
+    });
+    return org?.noticeDays ?? 30;
   }
 
   async moveOut(id: string, dto: MoveOutDto) {

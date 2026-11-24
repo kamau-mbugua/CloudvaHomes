@@ -13,6 +13,8 @@ import { UploadsService } from '../files/uploads.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { nextCode } from '../portfolio/codes.js';
 import { optionalText } from '../portfolio/fields.js';
+import { isOverdue, overdueWhere } from './sla.js';
+import { VendorsService } from './vendors.service.js';
 import { propertyScope } from '../portfolio/property-scope.js';
 import type {
   ConvertMaintenanceToExpenseDto,
@@ -45,6 +47,7 @@ const INCLUDE = {
       voidedAt: true,
     },
   },
+  vendor: { select: { id: true, name: true, phone: true } },
 } as const;
 
 type MaintenanceRow = MaintenanceRequest & {
@@ -66,6 +69,7 @@ type MaintenanceRow = MaintenanceRequest & {
     incurredOn: Date;
     voidedAt: Date | null;
   } | null;
+  vendor: { id: string; name: string; phone: string } | null;
 };
 
 function snapshot(m: MaintenanceRequest) {
@@ -94,12 +98,66 @@ export class MaintenanceService {
     private readonly uploads: UploadsService,
     private readonly expenses: ExpensesService,
     private readonly notifications: NotificationsService,
+    private readonly vendors: VendorsService,
   ) {}
+
+  /**
+   * Phase 18 (first step): send the job to a vendor (or take it back). Assigning starts an open
+   * job, and by default texts the vendor the job and the organisation's number for access —
+   * not the tenant's. Audited.
+   */
+  async assign(id: string, vendorId: string | null, notify = true) {
+    const before = await this.find(id);
+    if (before.status === 'RESOLVED' || before.status === 'CANCELLED') {
+      throw AppError.conflict('This job is closed', 'MAINTENANCE_CLOSED');
+    }
+    const vendor = vendorId ? await this.vendors.find(vendorId) : null;
+    if (vendor && !vendor.active)
+      throw AppError.fieldInvalid('vendorId', 'This vendor is archived');
+    await this.db.$transaction(async (tx) => {
+      await tx.maintenanceRequest.update({
+        where: { id },
+        data: {
+          vendorId: vendor?.id ?? null,
+          assignedAt: vendor ? new Date() : null,
+          ...(vendor && before.status === 'OPEN' ? { status: 'IN_PROGRESS' } : {}),
+        },
+      });
+      await this.audit.record(
+        {
+          action: vendor ? 'maintenance.assign' : 'maintenance.unassign',
+          entity: 'maintenance_request',
+          entityId: id,
+          before: { vendorId: before.vendorId, status: before.status },
+          after: { vendorId: vendor?.id ?? null },
+        },
+        tx,
+      );
+    });
+    let notified = false;
+    if (vendor && notify) {
+      const org = await this.db.organization.findUniqueOrThrow({
+        where: { id: before.orgId },
+        select: { name: true, phone: true },
+      });
+      const text =
+        `${org.name}: job ${before.number} — ${before.title} (${before.priority.toLowerCase()}) at ` +
+        `${before.unit.number}, ${before.property.name}. Call ${org.phone} to arrange access.`;
+      try {
+        await this.notifications.sendVendorJob(before.orgId, vendor.phone, text);
+        notified = true;
+      } catch {
+        notified = false;
+      }
+    }
+    return { ...(await this.get(id)), vendorNotified: notified };
+  }
 
   private view(rows: MaintenanceRow[]) {
     const perms = currentContext()?.permissions ?? new Set<string>();
     const canUpdate = perms.has('maintenance:update');
     const canCreateExpense = perms.has('expenses:create');
+    const now = new Date();
 
     return rows.map((r) => {
       const activeExpense = r.expense && !r.expense.voidedAt ? r.expense : null;
@@ -141,6 +199,9 @@ export class MaintenanceService {
               incurredOn: formatDateOnly(activeExpense.incurredOn),
             }
           : null,
+        vendor: r.vendor,
+        assignedAt: r.assignedAt,
+        overdue: isOverdue(r, now),
         canResolve: canUpdate && !isTerminal,
         canCancel: canUpdate && !isTerminal,
         canConvertToExpense: canCreateExpense && !activeExpense && r.status !== 'CANCELLED',
@@ -159,6 +220,8 @@ export class MaintenanceService {
         q.status ? { status: q.status } : {},
         q.priority ? { priority: q.priority } : {},
         q.category ? { category: q.category } : {},
+        q.vendorId ? { vendorId: q.vendorId } : {},
+        q.late ? overdueWhere(new Date()) : {},
         term
           ? {
               OR: [

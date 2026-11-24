@@ -8,6 +8,7 @@ import { DB, type Db } from '../../prisma/prisma.module.js';
 import { orgContext } from '../auth/decorators.js';
 import { addDays, isDueForRun, periodOf, todayInNairobi } from '../billing/billing-math.js';
 import { allowedPropertyIds, propertyScope, tenancyScope } from '../portfolio/property-scope.js';
+import { overdueWhere } from '../maintenance/sla.js';
 import {
   ageBucket,
   BUCKETS,
@@ -210,16 +211,49 @@ export class ReportsService {
       },
       select: { status: true, billingDay: true, startDate: true, endDate: true },
     });
+    // Phase 14: this week's move-outs (or ones not yet recorded), then the following week.
+    const moveOuts = await this.db.tenancy.count({
+      where: {
+        AND: [
+          tenancyScope(),
+          inProperty,
+          { status: 'NOTICE' },
+          { endDate: { lte: addDays(day, 7) } },
+        ],
+      },
+    });
     const noticeEnding = await this.db.tenancy.count({
       where: {
         AND: [
           tenancyScope(),
           inProperty,
           { status: 'NOTICE' },
-          { endDate: { lte: addDays(day, 14) } },
+          { endDate: { gt: addDays(day, 7), lte: addDays(day, 14) } },
         ],
       },
     });
+    // Phase 18: maintenance jobs past their response time.
+    const lateJobs = perms?.has('maintenance:view')
+      ? await this.db.maintenanceRequest.count({
+          where: {
+            AND: [
+              { property: propertyScope() },
+              propertyId ? { propertyId } : {},
+              overdueWhere(new Date()),
+            ],
+          },
+        })
+      : 0;
+    // Ended tenancies whose deposit hasn't been refunded or used yet.
+    const deposits = perms?.has('tenancies:view')
+      ? await this.db.tenancy.aggregate({
+          where: {
+            AND: [tenancyScope(), inProperty, { status: 'ENDED' }, { depositHeld: { gt: 0n } }],
+          },
+          _count: { _all: true },
+          _sum: { depositHeld: true },
+        })
+      : null;
     const unmatched = perms?.has('reconciliation:view')
       ? await this.db.inboundTransaction.count({ where: { matchStatus: 'UNMATCHED' } })
       : 0;
@@ -246,7 +280,11 @@ export class ReportsService {
       unmatchedInbound: unmatched,
       overdueTenants: overdue.length,
       overdueAmount: arrears.totals.total - arrears.totals.current,
+      moveOutsIn7Days: moveOuts,
       noticeEndingIn14Days: noticeEnding,
+      depositRefundsPending: deposits?._count._all ?? 0,
+      depositRefundsAmount: deposits?._sum.depositHeld ?? 0n,
+      lateJobs,
       draftRemittances: drafts,
       leasesExpiringIn60Days: leasesExpiring,
     });

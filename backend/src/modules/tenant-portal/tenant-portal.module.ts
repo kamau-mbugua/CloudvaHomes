@@ -11,11 +11,13 @@ import { BroadcastsService } from './broadcasts.service.js';
 import { MessagesService } from './messages.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
 import {
+  PublicCertificatesController,
   ReminderJobsController,
   TenantAccessController,
   TenantPortalController,
 } from './tenant-portal.controller.js';
 import { TenantPortalService } from './tenant-portal.service.js';
+import { PaymentCertificatesService } from './payment-certificates.service.js';
 import { TenantNoticesController } from './tenant-notices.controller.js';
 
 /** Tenant portal & reminders (phase 7). */
@@ -34,12 +36,14 @@ import { TenantNoticesController } from './tenant-notices.controller.js';
     TenantNoticesController,
     ReminderJobsController,
     BroadcastsController,
+    PublicCertificatesController,
   ],
   providers: [
     MessagesService,
     BroadcastsService,
     TenantAccountsService,
     TenantPortalService,
+    PaymentCertificatesService,
     JobTokenVerifier,
     JobsGuard,
   ],

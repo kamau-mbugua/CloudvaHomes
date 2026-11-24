@@ -144,6 +144,20 @@ export class PublicSiteController {
     return ok(await this.publicSite.cancelBookingByToken(token, dto, clientIp(req)));
   }
 
+  /** A listing's calendar as iCal (phase 20): dates only, behind its secret token. */
+  @Get('ical/:listingId/:file')
+  async ical(
+    @Param('listingId', ParseUUIDPipe) listingId: string,
+    @Param('file') file: string,
+    @Res() res: Response,
+  ) {
+    const token = file.endsWith('.ics') ? file.slice(0, -4) : '';
+    const ics = await this.publicSite.icalFeed(listingId, token);
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.status(200).send(ics);
+  }
+
   @Get('site-html')
   async getSiteHtml(
     @Query('host') host: string | undefined,

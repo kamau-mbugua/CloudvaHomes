@@ -554,7 +554,7 @@ describe('Expenses, files and reports (e2e)', () => {
       { tenancyId: t1.id, lines: [{ description: 'Damage', amount: KES(3000) }], dueDate: old },
       201,
     );
-    const soon = formatDateOnly(addDays(parseDateOnly(TODAY), 7));
+    const soon = formatDateOnly(addDays(parseDateOnly(TODAY), 10));
     const later = formatDateOnly(addDays(parseDateOnly(TODAY), 40));
     await post(owner, `/tenancies/${t2.id}/notice`, { endDate: soon });
 

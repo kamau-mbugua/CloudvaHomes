@@ -20,6 +20,7 @@ import { formatKES } from '../../lib/money';
 import { fromMinor, toMinorString } from './money';
 import { LocationPicker } from './LocationPicker';
 import type { StayLocation } from './location';
+import { CalendarExport } from './CalendarExport';
 import { PhotoManager } from './PhotoManager';
 import { RulesFields } from './RulesFields';
 import { SpecialPricesSheet } from './SpecialPricesSheet';
@@ -73,9 +74,22 @@ function ListingEditorForm({
   const [cleaningKes, setCleaningKes] = useState(
     existing ? fromMinor(existing.cleaningFee) : '0',
   );
+  const [monthlyDiscountPct, setMonthlyDiscountPct] = useState(
+    existing?.monthlyDiscountBps ? Math.round(existing.monthlyDiscountBps / 100) : 0,
+  );
+  const [extraGuestKes, setExtraGuestKes] = useState(
+    existing?.extraGuestFee ? fromMinor(existing.extraGuestFee) : '0',
+  );
+  const [guestsIncluded, setGuestsIncluded] = useState(
+    existing?.guestsIncluded ? String(existing.guestsIncluded) : '',
+  );
   const [weeklyDiscountPct, setWeeklyDiscountPct] = useState(
     existing?.weeklyDiscountBps ? Math.round(existing.weeklyDiscountBps / 100) : 0,
   );
+  const [houseManual, setHouseManual] = useState(existing?.houseManual ?? '');
+  /** Phase 22: blank = keep the current code; `null` = remove it. */
+  const [accessCode, setAccessCode] = useState<string | null>('');
+  const [shownCode, setShownCode] = useState<string | null>(null);
   const [checkInInstructions, setCheckInInstructions] = useState(
     existing?.checkInInstructions ?? '',
   );
@@ -148,6 +162,17 @@ function ListingEditorForm({
       return;
     }
 
+    const extraGuestMinor = extraGuestKes.trim() === '' ? '0' : toMinorString(extraGuestKes);
+    if (!extraGuestMinor) {
+      setLocalError('Extra-guest fee must be in whole shillings.');
+      return;
+    }
+    const included = guestsIncluded.trim() === '' ? null : Number(guestsIncluded);
+    if (included !== null && (!Number.isInteger(included) || included < 1 || included > maxGuests)) {
+      setLocalError(`Guests included must be between 1 and ${maxGuests}, or empty for all.`);
+      return;
+    }
+
     if (!useDefaultRules) {
       const ruleErr = validateStayRules(rulesOverride);
       if (ruleErr) {
@@ -177,7 +202,12 @@ function ListingEditorForm({
       weekendPrice: weekendMinor,
       cleaningFee: cleaningMinor,
       weeklyDiscountBps: weeklyDiscountPct > 0 ? weeklyDiscountPct * 100 : null,
+      monthlyDiscountBps: monthlyDiscountPct > 0 ? monthlyDiscountPct * 100 : null,
+      extraGuestFee: extraGuestMinor,
+      guestsIncluded: included,
       checkInInstructions: checkInInstructions.trim() || null,
+      houseManual: houseManual.trim() || null,
+      ...(accessCode === null ? { accessCode: null } : accessCode.trim() ? { accessCode: accessCode.trim() } : {}),
       rulesOverride: useDefaultRules ? null : toApiRules(rulesOverride),
       published,
     };
@@ -400,6 +430,51 @@ function ListingEditorForm({
               onChange={(e) => setWeeklyDiscountPct(Number(e.target.value))}
             />
           </div>
+          <div className="au__field">
+            <div className="au__labelrow">
+              <label htmlFor="listing-monthly">28+ night discount (%)</label>
+            </div>
+            <input
+              id="listing-monthly"
+              className="au__input"
+              type="number"
+              min={0}
+              max={90}
+              value={monthlyDiscountPct}
+              disabled={!canEdit}
+              onChange={(e) => setMonthlyDiscountPct(Number(e.target.value))}
+            />
+          </div>
+          <div className="au__field">
+            <div className="au__labelrow">
+              <label htmlFor="listing-included">Guests the price covers</label>
+            </div>
+            <input
+              id="listing-included"
+              className="au__input"
+              type="number"
+              min={1}
+              max={maxGuests}
+              placeholder="All"
+              value={guestsIncluded}
+              disabled={!canEdit}
+              onChange={(e) => setGuestsIncluded(e.target.value)}
+            />
+          </div>
+          <div className="au__field">
+            <div className="au__labelrow">
+              <label htmlFor="listing-extra">Extra guest, per night (KES)</label>
+            </div>
+            <input
+              id="listing-extra"
+              className="au__input"
+              type="text"
+              inputMode="numeric"
+              value={extraGuestKes}
+              disabled={!canEdit || guestsIncluded.trim() === ''}
+              onChange={(e) => setExtraGuestKes(e.target.value)}
+            />
+          </div>
         </div>
 
         <div className="au__field">
@@ -444,6 +519,54 @@ function ListingEditorForm({
             disabled={!canEdit}
             onChange={(e) => setCheckInInstructions(e.target.value)}
           />
+        </div>
+
+        <div className="au__field">
+          <div className="au__labelrow">
+            <label htmlFor="listing-manual">House manual (shown to confirmed guests)</label>
+          </div>
+          <textarea
+            id="listing-manual"
+            className="au__input"
+            rows={4}
+            maxLength={5000}
+            placeholder="Wi-Fi name and password, how the shower and gas work, house rules, local tips…"
+            value={houseManual}
+            disabled={!canEdit}
+            onChange={(e) => setHouseManual(e.target.value)}
+          />
+        </div>
+
+        <div className="au__field">
+          <div className="au__labelrow">
+            <label htmlFor="listing-access-code">Door or lockbox code</label>
+          </div>
+          <input
+            id="listing-access-code"
+            className="au__input"
+            type="text"
+            autoComplete="off"
+            maxLength={40}
+            placeholder={existing?.hasAccessCode && accessCode !== null ? 'Saved — type a new code to change it' : 'e.g. 4829#'}
+            value={accessCode ?? ''}
+            disabled={!canEdit}
+            onChange={(e) => setAccessCode(e.target.value)}
+          />
+          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Stored encrypted. Guests see it on their booking page only from check-in day, once the balance is paid.
+            {existing?.hasAccessCode && accessCode !== null ? (
+              <>
+                {' '}
+                {shownCode ? <strong className="num">Current code: {shownCode}</strong> : (
+                  <button type="button" className="nx-btn nx-btn--sm" disabled={!canEdit}
+                    onClick={() => void api.get<DataEnvelope<{ accessCode: string | null }>>(`/host/listings/${existing.id}/access-code`).then((r) => setShownCode(r.data.accessCode ?? ''))}>
+                    Show current code
+                  </button>
+                )}{' '}
+                <button type="button" className="nx-btn nx-btn--sm" disabled={!canEdit} onClick={() => setAccessCode(null)}>Remove code</button>
+              </>
+            ) : accessCode === null ? ' The code will be removed when you save.' : null}
+          </p>
         </div>
 
         <div
@@ -509,6 +632,9 @@ function ListingEditorForm({
         <>
           <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: 0 }} />
           <PhotoManager listing={existing} canEdit={canEdit} />
+
+          <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: 0 }} />
+          <CalendarExport listingId={existing.id} canEdit={canEdit} />
 
           <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: 0 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

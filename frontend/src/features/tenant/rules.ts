@@ -110,3 +110,10 @@ export function noticeLink(actionUrl: string | null | undefined): string | null 
   if (!actionUrl) return null;
   return actionUrl === '/tenant' || actionUrl.startsWith('/tenant/') ? actionUrl : null;
 }
+
+/** "2026-11-24" + 30 → "2026-12-24" (calendar days, no time zone involved). */
+export function addDaysToDay(day: string, days: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}

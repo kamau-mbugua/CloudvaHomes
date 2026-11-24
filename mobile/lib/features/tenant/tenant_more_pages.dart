@@ -15,6 +15,7 @@ import '../../core/widgets/profile_sheets.dart';
 import '../account/delete_account_screen.dart';
 import '../host/detail_ui.dart';
 import 'home_scope.dart';
+import 'move_out_sheet.dart';
 import 'tenant_api.dart';
 
 /// Documents, Notices and My profile (tenant portal). Documents and Notices follow the home
@@ -96,6 +97,12 @@ List<TenantDoc> docsFor(
         path: '$base/tenancies/$tenancy/lease-document',
         fileName: 'Signed lease ${home.unit}.pdf',
       ),
+    TenantDoc(
+      title: 'Payment history certificate',
+      subtitle: 'Last 12 months · ${home.orgName}',
+      path: '$base/payment-certificate/pdf?months=12',
+      fileName: 'Payment history ${home.unit}.pdf',
+    ),
     for (final i in inspections)
       TenantDoc(
         title: i.kind == 'MOVE_OUT'
@@ -914,6 +921,7 @@ class TenantProfileScreen extends ConsumerWidget {
                 ),
             ],
           ),
+        const _MyHomesCard(),
         Center(
           child: TextButton.icon(
             key: const Key('profile-delete'),
@@ -1045,6 +1053,55 @@ class _Empty extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Your current homes, each with "I'm moving out" (phase 14), or the move-out date once
+/// notice is given.
+class _MyHomesCard extends ConsumerWidget {
+  const _MyHomesCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final homes = (ref.watch(allHomesProvider).valueOrNull?.homes ?? const [])
+        .where((h) => h.status == 'ACTIVE' || h.status == 'NOTICE')
+        .toList();
+    if (homes.isEmpty) return const SizedBox.shrink();
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return DetailCard(
+      title: 'Your homes',
+      gap: 12,
+      children: [
+        for (final h in homes)
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      homeLabel(h),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      h.status == 'NOTICE' && h.endDate != null
+                          ? 'Moving out ${formatDay(h.endDate)}${h.noticeEndsOn != null ? ' · rent due until ${formatDay(h.noticeEndsOn)}' : ''}'
+                          : h.orgName,
+                      style: TextStyle(fontSize: 12.5, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+              if (h.status == 'ACTIVE')
+                TextButton(
+                  key: Key('move-out-${h.id}'),
+                  onPressed: () => MoveOutSheet.show(context, h),
+                  child: const Text('I’m moving out'),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

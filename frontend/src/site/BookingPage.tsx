@@ -260,12 +260,26 @@ export function BookingPage() {
                   <strong>Instructions:</strong> {booking.checkInInstructions}
                 </p>
               )}
+              {booking.accessCode ? (
+                <p>
+                  <strong>Door code:</strong> <span className="num">{booking.accessCode}</span>
+                </p>
+              ) : booking.accessCodeNote ? (
+                <p className="site-muted">{booking.accessCodeNote}</p>
+              ) : null}
               <p className="site-muted">
                 Check-in from {booking.contact.checkInTime} · Check-out by{' '}
                 {booking.contact.checkOutTime}
               </p>
             </section>
           )}
+
+          {booking.houseManual ? (
+            <section className="site-card-section">
+              <h2>House manual</h2>
+              <p style={{ whiteSpace: 'pre-line' }}>{booking.houseManual}</p>
+            </section>
+          ) : null}
 
           <section className="site-card-section">
             <h2>Host contact</h2>

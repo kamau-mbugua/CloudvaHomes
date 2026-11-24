@@ -115,6 +115,10 @@ describe('actionLink', () => {
     expect(actionLink('NOTICE_ENDING')).toMatchObject({ to: '/app/tenancies?status=NOTICE', permission: 'tenancies:view' });
     expect(actionLink('REMITTANCES_TO_APPROVE')).toMatchObject({ to: '/app/remittances?status=DRAFT', permission: 'remittances:view' });
     expect(actionLink('LEASES_EXPIRING')).toMatchObject({ to: '/app/tenancies?expiring=60', permission: 'tenancies:view' });
+    expect(actionLink('MOVE_OUTS_THIS_WEEK')).toMatchObject({ to: '/app/tenancies?leaving=7', permission: 'tenancies:view' });
+    expect(actionLink('DEPOSIT_REFUNDS_PENDING')).toMatchObject({ to: '/app/tenancies?depositHeld=true', permission: 'tenancies:view' });
+    expect(actionLink('DEPOSIT_REFUNDS_PENDING').label(2)).toBe('2 deposits to settle after move-out');
+    expect(actionLink('WORK_ORDERS_OVERDUE')).toMatchObject({ to: '/app/maintenance?late=true', permission: 'maintenance:view' });
   });
 
   it('words singular and plural counts', () => {

@@ -157,6 +157,12 @@ export async function downloadTenantStatement(tenantId: string, code: string | u
   saveBlob(blob, `Statement-${code || 'tenant'}${span}.pdf`, 'application/pdf');
 }
 
+/** Phase 23: a payment history certificate (last 12 months) with a code anyone can check. */
+export async function downloadPaymentCertificate(tenantId: string, code: string | undefined): Promise<void> {
+  const blob = await api.blob(`${base(tenantId)}/payment-certificate/pdf`, { months: 12 });
+  saveBlob(blob, `Payment-history-${code || 'tenant'}.pdf`, 'application/pdf');
+}
+
 export async function downloadTenantLeasePdf(
   tenantId: string,
   tenancy: { id: string },

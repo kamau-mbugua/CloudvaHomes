@@ -3,6 +3,7 @@ import {
   fromMilli,
   invoiceStatus,
   isDueForRun,
+  noticeTerms,
   meteredAmount,
   moveInAmount,
   todayInNairobi,
@@ -69,6 +70,43 @@ describe('run eligibility', () => {
       isDueForRun(t({ status: 'NOTICE', endDate: parseDateOnly('2026-10-05') }), '2026-10-20'),
     ).toBe(true);
     expect(isDueForRun(t({ status: 'ENDED' }), '2026-10-20')).toBe(false);
+  });
+
+  it('keeps billing rent in lieu of short notice, even after move-out', () => {
+    const short = {
+      endDate: parseDateOnly('2026-10-02'),
+      noticeEndsOn: parseDateOnly('2026-11-10'),
+    };
+    expect(isDueForRun(t({ status: 'NOTICE', ...short }), '2026-10-20')).toBe(true);
+    expect(isDueForRun(t({ status: 'ENDED', ...short }), '2026-11-05')).toBe(true);
+    expect(isDueForRun(t({ status: 'ENDED', ...short }), '2026-12-05')).toBe(false);
+    // Waived (no notice end): an ended tenancy stops at once.
+    expect(
+      isDueForRun(t({ status: 'ENDED', endDate: parseDateOnly('2026-10-02') }), '2026-10-20'),
+    ).toBe(false);
+  });
+
+  it('works out the notice period and the rent in lieu', () => {
+    const base = {
+      givenOn: parseDateOnly('2026-11-24'),
+      noticeDays: 30,
+      billingDay: 1,
+      rent: 2_500_000n,
+    };
+    // 30 days from 24 Nov is 24 Dec: moving out then or later is full notice.
+    expect(noticeTerms({ ...base, moveOut: parseDateOnly('2026-12-31') })).toMatchObject({
+      shortNotice: false,
+      noticeEndsOn: null,
+      rentInLieu: 0n,
+    });
+    // Out on 30 Nov: the 1 Dec rent is still due (in lieu), the notice ends 24 Dec.
+    const short = noticeTerms({ ...base, moveOut: parseDateOnly('2026-11-30') });
+    expect(short).toMatchObject({ shortNotice: true, rentInLieu: 2_500_000n });
+    expect(short.noticeEndsOn?.toISOString().slice(0, 10)).toBe('2026-12-24');
+    // Billed on the 25th: 25 Dec is after the notice ends, so nothing in lieu is due.
+    expect(
+      noticeTerms({ ...base, billingDay: 25, moveOut: parseDateOnly('2026-11-30') }).rentInLieu,
+    ).toBe(0n);
   });
 
   it('knows today in Nairobi (UTC+3)', () => {

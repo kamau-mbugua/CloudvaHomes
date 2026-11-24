@@ -69,6 +69,21 @@ describe('buildActionItems', () => {
     ]);
   });
 
+  it('puts this week’s move-outs before later notices, and deposits due after them', () => {
+    const items = buildActionItems({
+      ...none,
+      moveOutsIn7Days: 2,
+      noticeEndingIn14Days: 1,
+      depositRefundsPending: 3,
+      depositRefundsAmount: 4_500_000n,
+    });
+    expect(items).toEqual([
+      { kind: 'MOVE_OUTS_THIS_WEEK', count: 2 },
+      { kind: 'NOTICE_ENDING', count: 1 },
+      { kind: 'DEPOSIT_REFUNDS_PENDING', count: 3, amount: 4_500_000n },
+    ]);
+  });
+
   it('carries the overdue amount on OVERDUE_TENANTS only', () => {
     const items = buildActionItems({
       ...none,

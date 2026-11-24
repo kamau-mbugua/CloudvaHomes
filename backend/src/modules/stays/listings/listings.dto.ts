@@ -164,6 +164,29 @@ export class CreateListingDto {
   @Max(9000)
   weeklyDiscountBps?: number | null;
 
+  @ApiPropertyOptional({ nullable: true, description: '28+ nights discount, basis points' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9000)
+  monthlyDiscountBps?: number | null;
+
+  @ApiPropertyOptional({ description: 'Per extra guest per night, whole shillings in cents' })
+  @IsOptional()
+  @IsString()
+  extraGuestFee?: string;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Guests the nightly price covers' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  guestsIncluded?: number | null;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -199,6 +222,23 @@ export class CreateListingDto {
   @IsString()
   @MaxLength(2000)
   checkInInstructions?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Wi-Fi, appliances, rules, tips (phase 22)' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(5000)
+  houseManual?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Door or lockbox code, stored encrypted; null or "" removes it (phase 22)',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(40)
+  accessCode?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
@@ -307,6 +347,29 @@ export class UpdateListingDto {
   @Max(9000)
   weeklyDiscountBps?: number | null;
 
+  @ApiPropertyOptional({ nullable: true, description: '28+ nights discount, basis points' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9000)
+  monthlyDiscountBps?: number | null;
+
+  @ApiPropertyOptional({ description: 'Per extra guest per night, whole shillings in cents' })
+  @IsOptional()
+  @IsString()
+  extraGuestFee?: string;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Guests the nightly price covers' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  guestsIncluded?: number | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
@@ -342,6 +405,23 @@ export class UpdateListingDto {
   @IsString()
   @MaxLength(2000)
   checkInInstructions?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Wi-Fi, appliances, rules, tips (phase 22)' })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(5000)
+  houseManual?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Door or lockbox code, stored encrypted; null or "" removes it (phase 22)',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(40)
+  accessCode?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()

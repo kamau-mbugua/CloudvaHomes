@@ -470,6 +470,11 @@ export class NotificationsService {
     );
   }
 
+  /** Phase 18: a maintenance job sent to a vendor, from the organisation's SMS units. */
+  async sendVendorJob(orgId: string, phone: string, text: string): Promise<void> {
+    await this.dispatchSms({ kind: 'org', orgId, type: 'vendor_job' }, phone, text);
+  }
+
   /** A landlord was given owner-portal access. */
   async sendOwnerPortalAccess(to: Recipient, p: { organizationName: string }): Promise<void> {
     const link = `${this.env.APP_URL.replace(/\/$/, '')}/owner`;
@@ -776,6 +781,43 @@ export class NotificationsService {
     if (!tasks.length) return false;
     const results = await Promise.allSettled(tasks);
     return results.some((r) => r.status === 'fulfilled');
+  }
+
+  /**
+   * A device this account hadn't used signed in (phase 26). By email where there is one,
+   * otherwise by SMS. Says where to go if it wasn't them.
+   */
+  async sendNewDeviceAlert(
+    to: Recipient,
+    p: { firstName: string; device: string; ip: string | null },
+  ): Promise<void> {
+    const accountUrl = `${this.env.APP_URL.replace(/\/$/, '')}/account?tab=devices`;
+    if (to.email) {
+      await this.dispatchEmail(
+        {
+          to: to.email,
+          subject: 'New sign-in to your KodiHQ account',
+          text:
+            `Hi ${p.firstName},\n\n` +
+            `Your KodiHQ account was just signed in to on ${p.device}` +
+            `${p.ip ? ` (network address ${p.ip})` : ''}.\n\n` +
+            `If this was you, there's nothing to do. If not, change your password now and sign ` +
+            `the other devices out at ${accountUrl}.`,
+        },
+        'security_alert',
+      );
+      return;
+    }
+    if (to.phone) {
+      await this.dispatchSms(
+        { kind: 'platform', type: 'security_alert' },
+        to.phone,
+        `KodiHQ: new sign-in on ${p.device}. Not you? Change your password at ${accountUrl}`.slice(
+          0,
+          160,
+        ),
+      );
+    }
   }
 
   /**

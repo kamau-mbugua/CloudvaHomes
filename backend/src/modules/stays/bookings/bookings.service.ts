@@ -178,7 +178,11 @@ export class BookingsService {
       nightly: listing.nightlyPrice,
       weekend: listing.weekendPrice,
       weeklyDiscountBps: listing.weeklyDiscountBps,
+      monthlyDiscountBps: listing.monthlyDiscountBps,
       cleaningFee: listing.cleaningFee,
+      extraGuestFee: listing.extraGuestFee,
+      guestsIncluded: listing.guestsIncluded,
+      guests: guests,
       special: listing.specialPrices.map((sp) => ({
         from: formatDateOnly(sp.fromDate),
         to: formatDateOnly(sp.toDate),
@@ -326,7 +330,11 @@ export class BookingsService {
       nightly: listing.nightlyPrice,
       weekend: listing.weekendPrice,
       weeklyDiscountBps: listing.weeklyDiscountBps,
+      monthlyDiscountBps: listing.monthlyDiscountBps,
       cleaningFee: listing.cleaningFee,
+      extraGuestFee: listing.extraGuestFee,
+      guestsIncluded: listing.guestsIncluded,
+      guests: dto.guests,
       special: listing.specialPrices.map((sp) => ({
         from: formatDateOnly(sp.fromDate),
         to: formatDateOnly(sp.toDate),

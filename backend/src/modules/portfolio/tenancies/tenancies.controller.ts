@@ -108,6 +108,14 @@ export class TenanciesController {
     return ok(await this.tenancies.giveNotice(id, dto));
   }
 
+  /** Short notice: let the tenant off the rent in lieu (phase 14). */
+  @Post(':id/notice/waive')
+  @HttpCode(200)
+  @RequirePermission('tenancies:update')
+  async waiveShortNotice(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.tenancies.waiveShortNotice(id));
+  }
+
   @Delete(':id/notice')
   @RequirePermission('tenancies:update')
   async withdrawNotice(@Param('id', ParseUUIDPipe) id: string) {

@@ -140,3 +140,11 @@ describe('inspection cache keys', () => {
     expect(todo.slice(0, list.length)).toEqual(list);
   });
 });
+
+describe('addDaysToDay', () => {
+  it('adds calendar days across months and years', async () => {
+    const { addDaysToDay } = await import('./rules');
+    expect(addDaysToDay('2026-11-24', 30)).toBe('2026-12-24');
+    expect(addDaysToDay('2026-12-20', 15)).toBe('2027-01-04');
+  });
+});

@@ -133,10 +133,25 @@ const ACTION_LINKS: Record<ActionKind, { to: string; permission: string; label: 
     permission: 'reports:view',
     label: (n) => `${plural(n, 'tenant', 'tenants')} overdue`,
   },
+  MOVE_OUTS_THIS_WEEK: {
+    to: '/app/tenancies?leaving=7',
+    permission: 'tenancies:view',
+    label: (n) => (n === 1 ? '1 tenant moves out this week' : `${n} tenants move out this week`),
+  },
   NOTICE_ENDING: {
     to: '/app/tenancies?status=NOTICE',
     permission: 'tenancies:view',
     label: (n) => (n === 1 ? '1 tenancy ends within 14 days' : `${n} tenancies end within 14 days`),
+  },
+  DEPOSIT_REFUNDS_PENDING: {
+    to: '/app/tenancies?depositHeld=true',
+    permission: 'tenancies:view',
+    label: (n) => (n === 1 ? '1 deposit to settle after move-out' : `${n} deposits to settle after move-out`),
+  },
+  WORK_ORDERS_OVERDUE: {
+    to: '/app/maintenance?late=true',
+    permission: 'maintenance:view',
+    label: (n) => (n === 1 ? '1 maintenance job is late' : `${n} maintenance jobs are late`),
   },
   REMITTANCES_TO_APPROVE: {
     to: '/app/remittances?status=DRAFT',

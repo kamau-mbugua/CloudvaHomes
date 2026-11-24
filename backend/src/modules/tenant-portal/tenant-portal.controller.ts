@@ -37,6 +37,9 @@ import { JobsGuard } from '../jobs/job-auth.js';
 import { CreateTenantMaintenanceRequestDto } from '../maintenance/maintenance.dto.js';
 import { StatementQueryDto } from '../payments/payments.dto.js';
 import { renderReceiptPdf, renderStatementPdf } from '../payments/pdfs.js';
+import { renderPaymentCertificatePdf } from './payment-certificate-pdf.js';
+import { PaymentCertificatesService } from './payment-certificates.service.js';
+import { currentContext } from '../../common/context/request-context.js';
 import { renderLeasePdf } from '../portfolio/tenancies/lease-pdf.js';
 import { MessagesService } from './messages.service.js';
 import { TenantAccountsService } from './tenant-accounts.service.js';
@@ -48,6 +51,9 @@ import {
   TenantActivityQueryDto,
   TenantInvoicesQueryDto,
   TenantMonthlyQueryDto,
+  CertificateQueryDto,
+  TenantNoticeDto,
+  TenantNoticePreviewDto,
   TenantPayDto,
 } from './tenant-portal.dto.js';
 import { TenantPortalService } from './tenant-portal.service.js';
@@ -283,6 +289,42 @@ export class TenantPortalController {
     return ok(await this.portal.acknowledgeInspection(id, tenancyId, inspectionKind(kind)));
   }
 
+  /** Phase 23: a payment history certificate PDF (last `months`, default 12). */
+  @Get(':id/payment-certificate/pdf')
+  @ApiProduces('application/pdf')
+  async paymentCertificate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() q: CertificateQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const cert = await this.portal.paymentCertificate(id, q.months ?? 12);
+    return pdf(
+      res,
+      `payment-history-${cert.summary.tenantCode}.pdf`,
+      await renderPaymentCertificatePdf(cert),
+    );
+  }
+
+  /** Notice to vacate (phase 14): what a move-out date means, then giving notice. */
+  @Get(':id/tenancies/:tenancyId/notice')
+  async noticePreview(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+    @Query() q: TenantNoticePreviewDto,
+  ) {
+    return ok(await this.portal.noticePreview(id, tenancyId, q.moveOutDate));
+  }
+
+  @Post(':id/tenancies/:tenancyId/notice')
+  @HttpCode(200)
+  async giveNotice(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tenancyId', ParseUUIDPipe) tenancyId: string,
+    @Body() dto: TenantNoticeDto,
+  ) {
+    return ok(await this.portal.giveNotice(id, tenancyId, dto));
+  }
+
   @Get(':id/tenancies/:tenancyId/inspections/:kind/photos/:uploadId')
   async inspectionPhoto(
     @Param('id', ParseUUIDPipe) id: string,
@@ -336,6 +378,19 @@ export class TenantPortalController {
   ) {
     const { upload, data } = await this.portal.leaseDocument(id, tenancyId);
     return sendFile(res, upload, data);
+  }
+}
+
+/** Anyone holding a certificate's code can check it (phase 23). */
+@ApiTags('Public')
+@Public()
+@Controller('public/certificates')
+export class PublicCertificatesController {
+  constructor(private readonly certificates: PaymentCertificatesService) {}
+
+  @Get(':code')
+  async verify(@Param('code') code: string) {
+    return ok(await this.certificates.verify(code, currentContext()?.ip ?? 'unknown'));
   }
 }
 

@@ -11,6 +11,7 @@ import {
   Matches,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { IsDateOnly } from '../../../common/dates/date-only.js';
@@ -58,6 +59,23 @@ export class ListTenanciesQueryDto extends PaginationQueryDto {
   @Min(1)
   @Max(365)
   expiring?: number;
+
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: 365,
+    description: 'Under notice, moving out within this many days (or already past the date)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  leaving?: number;
+
+  @ApiPropertyOptional({ description: 'Ended tenancies still holding a deposit (refund due)' })
+  @IsOptional()
+  @IsIn(['true'])
+  depositHeld?: 'true';
 }
 
 class BillingFieldsDto {
@@ -118,6 +136,19 @@ export class UpdateTenancyDto extends BillingFieldsDto {
   @IsDateOnly({ optional: true, description: 'When the lease runs out; null clears it' })
   @IsOptional()
   leaseEndDate?: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    minimum: 0,
+    maximum: 365,
+    description: 'This tenancy’s minimum notice in days; null = the organisation’s',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  noticeDays?: number | null;
 }
 
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;

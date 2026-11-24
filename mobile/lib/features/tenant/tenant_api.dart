@@ -139,6 +139,8 @@ class Home {
     this.daysLate = 0,
     this.nextDueDate,
     this.leaseEndDate,
+    this.noticeSource,
+    this.noticeEndsOn,
   });
   final String id;
   final String tenantId;
@@ -159,6 +161,10 @@ class Home {
   final int daysLate;
   final String? nextDueDate;
   final String? leaseEndDate;
+
+  /// Phase 14: who gave notice, and the end of a short notice's rent in lieu.
+  final String? noticeSource;
+  final String? noticeEndsOn;
 
   String get key => id.isNotEmpty ? id : '$tenantId:$unit:$property';
 
@@ -184,6 +190,32 @@ class Home {
     daysLate: (j['daysLate'] as num?)?.toInt() ?? 0,
     nextDueDate: j['nextDueDate'] as String?,
     leaseEndDate: j['leaseEndDate'] as String?,
+    noticeSource: j['noticeSource'] as String?,
+    noticeEndsOn: j['noticeEndsOn'] as String?,
+  );
+}
+
+/// What giving notice to move out on a date means (phase 14).
+class NoticePreview {
+  NoticePreview({
+    required this.noticeDays,
+    required this.earliestMoveOut,
+    required this.shortNotice,
+    this.noticeEndsOn,
+    required this.rentInLieu,
+  });
+  final int noticeDays;
+  final String earliestMoveOut;
+  final bool shortNotice;
+  final String? noticeEndsOn;
+  final int rentInLieu;
+
+  factory NoticePreview.fromJson(Map<String, dynamic> j) => NoticePreview(
+    noticeDays: (j['noticeDays'] as num).toInt(),
+    earliestMoveOut: j['earliestMoveOut'] as String,
+    shortNotice: j['shortNotice'] == true,
+    noticeEndsOn: j['noticeEndsOn'] as String?,
+    rentInLieu: centsFrom(j['rentInLieu']),
   );
 }
 
@@ -602,6 +634,37 @@ class TenantApi {
     '/tenant/notices',
     {'page': page, 'tenantId': ?tenantId},
     TenantNotice.fromJson,
+  );
+
+  String noticePath(String id, String tenancyId) =>
+      '${_base(id)}/tenancies/${Uri.encodeComponent(tenancyId)}/notice';
+
+  Future<NoticePreview> noticePreview(
+    String id,
+    String tenancyId,
+    String moveOutDate,
+  ) async => NoticePreview.fromJson(
+    (await _api.get(
+          noticePath(id, tenancyId),
+          query: {'moveOutDate': moveOutDate},
+        ))['data']
+        as Map<String, dynamic>,
+  );
+
+  Future<void> giveNotice(
+    String id,
+    String tenancyId, {
+    required String moveOutDate,
+    String? reason,
+    String? forwardingPhone,
+  }) => _api.post(
+    noticePath(id, tenancyId),
+    body: {
+      'moveOutDate': moveOutDate,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      if (forwardingPhone != null && forwardingPhone.trim().isNotEmpty)
+        'forwardingPhone': forwardingPhone.trim(),
+    },
   );
 
   String inspectionsPath(String id, String tenancyId) =>

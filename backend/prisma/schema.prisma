@@ -75,27 +75,31 @@ enum UserStatus {
 }
 
 model Organization {
-  id              String    @id @default(uuid(7)) @db.Uuid
+  id              String         @id @default(uuid(7)) @db.Uuid
   name            String
   kind            OrgKind
   phone           String
   email           String
   kraPin          String?
-  status          OrgStatus @default(TRIAL)
-  settings        Json      @default("{}")
+  status          OrgStatus      @default(TRIAL)
+  settings        Json           @default("{}")
   /// Days between an invoice's issue date and its due date.
-  invoiceDueDays  Int       @default(7)
+  invoiceDueDays  Int            @default(7)
+  /// Phase 26: a second code after a password sign-in, for staff who handle money or all staff.
+  staffTwoFactor  StaffTwoFactor @default(OFF)
+  /// Minimum notice to vacate, in days (phase 14). A tenancy can set its own.
+  noticeDays      Int            @default(30)
   // ── KodiHub billing (phase 8) ──
-  billingRef      String?   @unique // "H00001": account number when paying KodiHub
-  planId          String?   @db.Uuid
+  billingRef      String?        @unique // "H00001": account number when paying KodiHub
+  planId          String?        @db.Uuid
   priceOverride   BigInt? // per occupied unit; null = the plan's
   minimumOverride BigInt?
-  trialEndsAt     DateTime? @db.Date
-  noSuspendUntil  DateTime? @db.Date
-  platformCredit  BigInt    @default(0)
-  onboardedById   String?   @db.Uuid
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  trialEndsAt     DateTime?      @db.Date
+  noSuspendUntil  DateTime?      @db.Date
+  platformCredit  BigInt         @default(0)
+  onboardedById   String?        @db.Uuid
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   onboardedBy User?        @relation("OnboardedBy", fields: [onboardedById], references: [id], onDelete: SetNull)
   memberships Membership[]
@@ -422,6 +426,23 @@ model Unit {
 }
 
 /// A person renting. Linked to a User once they get a portal login (phase 7).
+/// A tenant's payment history certificate (phase 23, no partner): figures frozen when issued,
+/// checked by anyone with the code at /verify/<code>. One per tenant, period and day.
+model PaymentCertificate {
+  id       String   @id @default(uuid(7)) @db.Uuid
+  orgId    String   @db.Uuid
+  tenantId String   @db.Uuid
+  code     String   @unique
+  fromDate DateTime @db.Date
+  toDate   DateTime @db.Date
+  /// Tenant and landlord names, homes, and the figures (money as strings, minor units).
+  summary  Json
+  issuedAt DateTime @default(now())
+
+  @@index([tenantId, toDate])
+  @@map("payment_certificates")
+}
+
 model Tenant {
   id                    String    @id @default(uuid(7)) @db.Uuid
   orgId                 String    @db.Uuid
@@ -460,23 +481,32 @@ model Tenant {
 
 /// Tenant × unit × period. At most one ACTIVE/NOTICE tenancy per unit (partial unique index).
 model Tenancy {
-  id            String        @id @default(uuid(7)) @db.Uuid
-  orgId         String        @db.Uuid
-  tenantId      String        @db.Uuid
-  unitId        String        @db.Uuid
-  rentAmount    BigInt
-  billingDay    Int // 1–28
-  startDate     DateTime      @db.Date
-  endDate       DateTime?     @db.Date // expected (NOTICE) or actual (ENDED) move-out
+  id              String        @id @default(uuid(7)) @db.Uuid
+  orgId           String        @db.Uuid
+  tenantId        String        @db.Uuid
+  unitId          String        @db.Uuid
+  rentAmount      BigInt
+  billingDay      Int // 1–28
+  startDate       DateTime      @db.Date
+  endDate         DateTime?     @db.Date // expected (NOTICE) or actual (ENDED) move-out
   /// When the lease runs out (phase 13). Not a move-out: renewing just sets a later date.
-  leaseEndDate  DateTime?     @db.Date
-  noticeGivenAt DateTime?
-  depositHeld   BigInt        @default(0)
-  status        TenancyStatus @default(ACTIVE)
-  moveOutReason String?
-  leaseUploadId String?       @unique @db.Uuid
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  leaseEndDate    DateTime?     @db.Date
+  noticeGivenAt   DateTime?
+  /// Who gave notice (phase 14): the tenant in the portal, or staff.
+  noticeSource    NoticeSource?
+  /// This tenancy's minimum notice in days; null = the organisation's.
+  noticeDays      Int?
+  /// Short notice: rent is billed until this date (rent in lieu of notice) even after the
+  /// tenant moves out, unless staff waive it (then null).
+  noticeEndsOn    DateTime?     @db.Date
+  /// A phone or M-Pesa number to reach the tenant after they leave (deposit refund).
+  forwardingPhone String?
+  depositHeld     BigInt        @default(0)
+  status          TenancyStatus @default(ACTIVE)
+  moveOutReason   String?
+  leaseUploadId   String?       @unique @db.Uuid
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   unit        Unit                 @relation(fields: [unitId], references: [id], onDelete: Restrict)
@@ -546,6 +576,17 @@ enum TenancyStatus {
   ACTIVE
   NOTICE
   ENDED
+}
+
+enum StaffTwoFactor {
+  OFF
+  MONEY_ROLES
+  ALL_STAFF
+}
+
+enum NoticeSource {
+  TENANT
+  STAFF
 }
 
 // ───────────────────────────── Billing ─────────────────────────────
@@ -1136,6 +1177,26 @@ enum MaintenanceStatus {
   CANCELLED
 }
 
+/// An artisan or company the organisation sends maintenance jobs to (phase 18, first step).
+model Vendor {
+  id        String                @id @default(uuid(7)) @db.Uuid
+  orgId     String                @db.Uuid
+  name      String
+  phone     String
+  email     String?
+  trades    MaintenanceCategory[]
+  notes     String?
+  active    Boolean               @default(true)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  jobs MaintenanceRequest[]
+
+  @@unique([orgId, phone])
+  @@index([orgId, active])
+  @@map("vendors")
+}
+
 /// A maintenance or repair request raised by a tenant or recorded by staff for a unit.
 model MaintenanceRequest {
   id             String              @id @default(uuid(7)) @db.Uuid
@@ -1152,6 +1213,9 @@ model MaintenanceRequest {
   description    String
   photoUploadIds String[]            @db.Uuid
   resolutionNote String?
+  /// Phase 18 (first step): the vendor doing the job, and when they were assigned.
+  vendorId       String?             @db.Uuid
+  assignedAt     DateTime?
   expenseId      String?             @unique @db.Uuid
   createdById    String?             @db.Uuid
   resolvedById   String?             @db.Uuid
@@ -1163,6 +1227,7 @@ model MaintenanceRequest {
   unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
   tenant   Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   expense  Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  vendor   Vendor?  @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
   @@unique([orgId, number])
   @@index([orgId, status, createdAt])
@@ -1777,6 +1842,14 @@ model Listing {
   id                  String   @id @default(uuid(7)) @db.Uuid
   orgId               String   @db.Uuid
   unitId              String   @unique @db.Uuid
+  /// Secret for the calendar export feed (phase 20): /public/ical/<id>/<token>.ics. Dates
+  /// only, no guest data; the host can rotate it. Null until the host first asks for the link.
+  icalToken           String?  @unique
+  /// Phase 22: Wi-Fi, appliances, rules, local tips — on the guest page once confirmed.
+  houseManual         String?
+  /// Phase 22: door or lockbox code, encrypted; shown to the guest only from check-in day,
+  /// once the balance is paid.
+  accessCodeEnc       Bytes?
   propertyId          String   @db.Uuid
   title               String
   description         String?
@@ -1787,6 +1860,12 @@ model Listing {
   nightlyPrice        BigInt
   weekendPrice        BigInt?
   weeklyDiscountBps   Int?
+  /// 28+ nights discount in basis points (phase 21); replaces the weekly one when it applies.
+  monthlyDiscountBps  Int?
+  /// Per extra guest per night above `guestsIncluded` (phase 21). 0 = no fee.
+  extraGuestFee       BigInt   @default(0)
+  /// Guests the nightly price covers; null = all of them.
+  guestsIncluded      Int?
   cleaningFee         BigInt   @default(0)
   minNights           Int      @default(1)
   /// Longest stay in nights; null = no limit.

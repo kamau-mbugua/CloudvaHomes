@@ -183,6 +183,71 @@ void main() {
     });
   });
 
+  group('moving out', () {
+    testWidgets(
+      'a home offers "I’m moving out"; the sheet shows short-notice rent, then gives notice',
+      (tester) async {
+        _bigPhone(tester);
+        final adapter = FakeAdapter(
+          (c) => switch (c.path) {
+            '/tenant/accounts/overview' => (
+              200,
+              {
+                'data': {
+                  'balance': 0,
+                  'credit': 0,
+                  'depositHeld': 0,
+                  'homes': 1,
+                  'tenancies': [tenancy('ty1', 't1', 'A1', 'Ivory Breeze')],
+                  'openInvoices': [],
+                  'accounts': [],
+                },
+              },
+            ),
+            '/tenant/accounts/t1/tenancies/ty1/notice' when c.method == 'GET' =>
+              (
+                200,
+                {
+                  'data': {
+                    'noticeDays': 60,
+                    'earliestMoveOut': '2027-01-23',
+                    'shortNotice': true,
+                    'noticeEndsOn': '2027-01-23',
+                    'rentInLieu': 2500000,
+                  },
+                },
+              ),
+            '/tenant/accounts/t1/tenancies/ty1/notice' => (200, {'data': {}}),
+            _ => (200, {'data': {}}),
+          },
+        );
+        await pumpWithApi(
+          tester,
+          const TenantProfileScreen(),
+          adapter: adapter,
+          session: session(),
+        );
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('move-out-ty1')),
+          200,
+        );
+        await tester.tap(find.byKey(const Key('move-out-ty1')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('move-out-terms')), findsOneWidget);
+        expect(find.textContaining('60 days'), findsOneWidget);
+        expect(find.textContaining('25,000'), findsOneWidget);
+
+        await tester.ensureVisible(find.byKey(const Key('move-out-submit')));
+        await tester.tap(find.byKey(const Key('move-out-submit')));
+        await tester.pumpAndSettle();
+        final sent = adapter.calls.where(
+          (c) => c.method == 'POST' && c.path.endsWith('/notice'),
+        );
+        expect(sent, hasLength(1));
+      },
+    );
+  });
+
   group('documents', () {
     testWidgets('each home lists its documents as tiles that open a preview', (
       tester,
@@ -237,6 +302,7 @@ void main() {
       expect(find.text('Signed lease'), findsOneWidget);
       expect(find.text('Move-in inspection'), findsOneWidget);
       expect(find.text('Please check'), findsOneWidget);
+      expect(find.text('Payment history certificate'), findsOneWidget);
 
       await tester.tap(find.text('Move-in inspection'));
       await settle(tester, andSettle: false);

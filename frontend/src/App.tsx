@@ -20,6 +20,8 @@ import { useSession } from './lib/auth/useAuth';
 
 const MessagesPage = lazy(() => import('./features/messages/MessagesPage').then((m) => ({ default: m.MessagesPage })));
 const AccountPage = lazy(() => import('./features/account/AccountPage').then((m) => ({ default: m.AccountPage })));
+const VerifyCertificatePage = lazy(() => import('./features/account/VerifyCertificatePage').then((m) => ({ default: m.VerifyCertificatePage })));
+const AccountRedirect = lazy(() => import('./features/account/Devices').then((m) => ({ default: m.AccountRedirect })));
 const DeleteAccountPage = lazy(() => import('./features/account/DeleteAccount').then((m) => ({ default: m.DeleteAccountPage })));
 const OrganizationPage = lazy(() => import('./features/settings/OrganizationPage').then((m) => ({ default: m.OrganizationPage })));
 const UsersPage = lazy(() => import('./features/settings/UsersPage').then((m) => ({ default: m.UsersPage })));
@@ -49,6 +51,7 @@ const PaymentChannelsPage = lazy(() => import('./features/payments/PaymentChanne
 const ReconciliationPage = lazy(() => import('./features/mpesa/ReconciliationPage').then((m) => ({ default: m.ReconciliationPage })));
 const InboundDetailPage = lazy(() => import('./features/mpesa/InboundDetailPage').then((m) => ({ default: m.InboundDetailPage })));
 const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })));
+const VendorsPage = lazy(() => import('./features/maintenance/VendorsPage').then((m) => ({ default: m.VendorsPage })));
 const MaintenancePage = lazy(() => import('./features/maintenance/MaintenancePage').then((m) => ({ default: m.MaintenancePage })));
 
 const ReportsPage = lazy(() => import('./features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
@@ -153,6 +156,7 @@ const BUILT: Record<string, { element: ReactNode; children?: { path: string; tit
   units: { element: <UnitsPage />, children: [{ path: ':unitId', title: 'Unit details', element: <UnitDetailPage /> }] },
   'unit-categories': { element: <UnitSetupPage /> },
   maintenance: { element: <MaintenancePage /> },
+  vendors: { element: <VendorsPage /> },
   tenants: { element: <TenantsPage />, children: [{ path: ':tenantId', title: 'Tenant details', element: <TenantDetailPage /> }] },
   tenancies: { element: <TenanciesPage /> },
   messages: { element: <MessagesPage /> },
@@ -208,6 +212,8 @@ export default function App() {
               <Route path="/invite/:token" element={<AcceptInvitationPage />} />
               {/* Public: the Play Store listing's account-deletion link. */}
               <Route path="/delete-account" element={<DeleteAccountPage />} />
+              <Route path="/verify/:code" element={<VerifyCertificatePage />} />
+              <Route path="/account" element={<AccountRedirect />} />
 
               <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
                 <Route index element={<HomeOrTodayPage />} />

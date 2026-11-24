@@ -59,7 +59,13 @@ export function TenancyTable({
               </td>
               <td>
                 {formatDay(t.startDate)} – {t.endDate ? formatDay(t.endDate) : 'now'}
-                {t.status === 'NOTICE' && t.endDate ? <span className="ad__sub">Leaving {formatDay(t.endDate)}</span> : null}
+                {t.status === 'NOTICE' && t.endDate ? (
+                  <span className="ad__sub">Leaving {formatDay(t.endDate)}{t.noticeSource === 'TENANT' ? ' · notice from the tenant' : ''}</span>
+                ) : null}
+                {t.noticeEndsOn && t.status !== 'ACTIVE' ? (
+                  <span className="ad__sub ls__soon">Short notice: rent until {formatDay(t.noticeEndsOn)}</span>
+                ) : null}
+                {t.forwardingPhone && t.status !== 'ACTIVE' ? <span className="ad__sub">Reach them on {t.forwardingPhone}</span> : null}
                 {t.status === 'ENDED' && t.moveOutReason ? <span className="ad__sub">{t.moveOutReason}</span> : null}
                 {t.status !== 'ENDED' ? <LeaseEnd leaseEndDate={t.leaseEndDate} /> : null}
               </td>

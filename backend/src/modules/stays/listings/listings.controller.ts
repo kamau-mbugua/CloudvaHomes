@@ -58,6 +58,27 @@ export class ListingsController {
     return ok(await this.listings.get(id));
   }
 
+  /** Phase 22: the door or lockbox code, shown to the host on request (audited). */
+  @Get(':id/access-code')
+  @RequirePermission('listings:update')
+  async accessCode(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.listings.accessCode(id));
+  }
+
+  /** Calendar export link for Airbnb, Booking.com and others (phase 20). */
+  @Get(':id/ical')
+  @RequirePermission('listings:update')
+  async icalLink(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.listings.icalLink(id));
+  }
+
+  @Post(':id/ical/rotate')
+  @HttpCode(200)
+  @RequirePermission('listings:update')
+  async rotateIcal(@Param('id', ParseUUIDPipe) id: string) {
+    return ok(await this.listings.rotateIcal(id));
+  }
+
   @Patch(':id')
   @RequirePermission('listings:update')
   async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateListingDto) {

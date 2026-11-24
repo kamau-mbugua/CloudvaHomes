@@ -50,14 +50,17 @@ export type ActionKind =
   | 'INVOICE_RUN_PENDING'
   | 'UNMATCHED_PAYMENTS'
   | 'OVERDUE_TENANTS'
+  | 'MOVE_OUTS_THIS_WEEK'
   | 'NOTICE_ENDING'
+  | 'DEPOSIT_REFUNDS_PENDING'
+  | 'WORK_ORDERS_OVERDUE'
   | 'REMITTANCES_TO_APPROVE'
   | 'LEASES_EXPIRING';
 
 export interface ActionItem {
   kind: ActionKind;
   count: number;
-  /** Money involved, minor units — only on OVERDUE_TENANTS. */
+  /** Money involved, minor units — on OVERDUE_TENANTS and DEPOSIT_REFUNDS_PENDING. */
   amount?: bigint;
 }
 
@@ -66,7 +69,15 @@ export interface ActionInput {
   unmatchedInbound: number;
   overdueTenants: number;
   overdueAmount: bigint;
+  /** Phase 14: still under notice with a move-out date in the next 7 days (or passed). */
+  moveOutsIn7Days?: number;
+  /** Under notice, moving out 8 to 14 days from now. */
   noticeEndingIn14Days: number;
+  /** Phase 14: ended tenancies still holding a deposit, and how much. */
+  depositRefundsPending?: number;
+  depositRefundsAmount?: bigint;
+  /** Phase 18: open maintenance jobs past their priority's response time. */
+  lateJobs?: number;
   draftRemittances: number;
   leasesExpiringIn60Days: number;
 }
@@ -77,7 +88,14 @@ export function buildActionItems(i: ActionInput): ActionItem[] {
     { kind: 'INVOICE_RUN_PENDING', count: i.uninvoicedTenancies },
     { kind: 'UNMATCHED_PAYMENTS', count: i.unmatchedInbound },
     { kind: 'OVERDUE_TENANTS', count: i.overdueTenants, amount: i.overdueAmount },
+    { kind: 'MOVE_OUTS_THIS_WEEK', count: i.moveOutsIn7Days ?? 0 },
     { kind: 'NOTICE_ENDING', count: i.noticeEndingIn14Days },
+    {
+      kind: 'DEPOSIT_REFUNDS_PENDING',
+      count: i.depositRefundsPending ?? 0,
+      amount: i.depositRefundsAmount ?? 0n,
+    },
+    { kind: 'WORK_ORDERS_OVERDUE', count: i.lateJobs ?? 0 },
     { kind: 'REMITTANCES_TO_APPROVE', count: i.draftRemittances },
     { kind: 'LEASES_EXPIRING', count: i.leasesExpiringIn60Days },
   ];

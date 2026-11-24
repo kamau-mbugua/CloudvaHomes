@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { rentForPeriod } from '../../portfolio/tenancies/rent-changes.js';
 import type { LineKind } from '../../../generated/prisma/client.js';
 import { DB, type Db, type Tx } from '../../../prisma/prisma.module.js';
-import { fromMilli, meteredAmount, moveInAmount, toMilli } from '../billing-math.js';
+import { billingDate, fromMilli, meteredAmount, moveInAmount, toMilli } from '../billing-math.js';
 
 export interface DraftLine {
   kind: LineKind;
@@ -29,6 +29,9 @@ export interface BillableTenancy {
   unit: { propertyId: string };
   /** Scheduled, not-yet-applied rent changes (phase 13). */
   rentChanges?: { effectivePeriod: string; newRent: bigint }[];
+  /** Move-out date and billing day: a month billed after move-out is rent in lieu only. */
+  endDate?: Date | null;
+  billingDay?: number;
 }
 
 const MONTHS = [
@@ -87,6 +90,14 @@ export class InvoiceBuilder {
   ): Promise<MonthlyDraft> {
     const label = periodLabel(period);
     const rent = rentForPeriod(t.rentAmount, t.rentChanges ?? [], period);
+    // Billed after the tenant moved out: short notice (phase 14), so rent in lieu and nothing
+    // else (no service charges or meter readings for a unit they've left).
+    if (t.endDate && t.billingDay && billingDate(period, t.billingDay) > t.endDate) {
+      return {
+        lines: [one('RENT', `Rent in lieu of notice — ${label}`, rent)],
+        missingReadings: [],
+      };
+    }
     const lines: DraftLine[] = [one('RENT', `Rent — ${label}`, rent)];
     const missingReadings: MonthlyDraft['missingReadings'] = [];
 

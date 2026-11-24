@@ -118,3 +118,36 @@ export class TenantNoticesQueryDto extends PaginationQueryDto {
   @IsUUID()
   tenantId?: string;
 }
+
+/** "I'm moving out" (phase 14). */
+export class TenantNoticeDto {
+  @IsDateOnly({ description: 'The day the tenant plans to move out' })
+  moveOutDate!: string;
+
+  @ApiPropertyOptional({ example: 'Moving closer to work' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string;
+
+  @ApiPropertyOptional({ description: 'A phone or M-Pesa number to reach them after they leave' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  forwardingPhone?: string;
+}
+
+export class TenantNoticePreviewDto {
+  @IsDateOnly({ description: 'The move-out date to check' })
+  moveOutDate!: string;
+}
+
+export class CertificateQueryDto {
+  @ApiPropertyOptional({ minimum: 3, maximum: 24, default: 12 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(3)
+  @Max(24)
+  months?: number;
+}

@@ -66,7 +66,13 @@ export class InvoiceRunService {
       where: {
         AND: [
           tenancyScope(),
-          { status: { in: ['ACTIVE', 'NOTICE'] } },
+          {
+            OR: [
+              { status: { in: ['ACTIVE', 'NOTICE'] } },
+              // Rent in lieu of short notice runs on after move-out (phase 14).
+              { status: 'ENDED', noticeEndsOn: { gte: parseDateOnly(`${period}-01`) } },
+            ],
+          },
           { startDate: { lte: parseDateOnly(date) } },
           { invoices: { none: { period, kind: 'MONTHLY', status: { not: 'VOID' } } } },
         ],

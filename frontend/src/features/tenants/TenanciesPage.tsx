@@ -27,20 +27,23 @@ export function TenanciesPage() {
   const status = filters.get('status');
   const propertyId = filters.get('propertyId');
   const expiring = filters.get('expiring') === '60' ? '60' : '';
+  // Phase 14 dashboard links: moving out this week; deposits still held after move-out.
+  const leaving = filters.get('leaving') === '7' ? '7' : '';
+  const depositHeld = filters.get('depositHeld') === 'true' ? 'true' : '';
   const canMoveIn = useCan('tenancies:create');
   const canSeeProperties = useCan('properties:view');
   const [movingIn, setMovingIn] = useState(false);
   const [importingCsv, setImportingCsv] = useState(false);
 
   const list = useQuery({
-    queryKey: [...keys.tenancies, { q, status, propertyId, expiring, page }],
-    queryFn: () => api.get<PageEnvelope<Tenancy>>('/tenancies', { page, pageSize: PAGE_SIZE, q, status, propertyId, expiring }),
+    queryKey: [...keys.tenancies, { q, status, propertyId, expiring, leaving, depositHeld, page }],
+    queryFn: () => api.get<PageEnvelope<Tenancy>>('/tenancies', { page, pageSize: PAGE_SIZE, q, status, propertyId, expiring, leaving, depositHeld }),
     placeholderData: keepPreviousData,
   });
   const properties = usePropertyOptions(canSeeProperties);
 
   const rows = list.data?.data ?? [];
-  const filtered = Boolean(q || status || propertyId || expiring);
+  const filtered = Boolean(q || status || propertyId || expiring || leaving || depositHeld);
 
   return (
     <div className="pg">
@@ -54,6 +57,12 @@ export function TenanciesPage() {
         <select className="ad__select" aria-label="Lease end" value={expiring} onChange={(e) => filters.setFilter({ expiring: e.target.value })}>
           <option value="">Any lease end</option>
           <option value="60">Lease ends within 60 days</option>
+        </select>
+        <select className="ad__select" aria-label="Moving out" value={leaving ? 'leaving' : depositHeld ? 'deposit' : ''}
+          onChange={(e) => filters.setFilter({ leaving: e.target.value === 'leaving' ? '7' : '', depositHeld: e.target.value === 'deposit' ? 'true' : '' })}>
+          <option value="">Any move-out</option>
+          <option value="leaving">Moving out this week</option>
+          <option value="deposit">Deposit to settle</option>
         </select>
         {canSeeProperties ? (
           <select className="ad__select" aria-label="Property" value={propertyId} onChange={(e) => filters.setFilter({ propertyId: e.target.value })}>

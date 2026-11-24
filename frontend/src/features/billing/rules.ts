@@ -146,6 +146,15 @@ export function checkDueDays(input: string): { ok: true; days: number } | { ok: 
   return { ok: true, days };
 }
 
+/** The notice-to-vacate period in days (phase 14): 0 to 365. */
+export function checkNoticeDays(input: string): { ok: true; days: number } | { ok: false; error: string } {
+  const text = input.trim();
+  if (!/^\d+$/.test(text)) return { ok: false, error: 'A whole number of days, 0 to 365.' };
+  const days = Number(text);
+  if (days > 365) return { ok: false, error: 'At most 365 days.' };
+  return { ok: true, days };
+}
+
 // ---------------------------------------------------------------- run endpoints
 
 function unwrap(body: unknown): unknown {

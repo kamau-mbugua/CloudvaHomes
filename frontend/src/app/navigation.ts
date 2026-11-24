@@ -119,6 +119,7 @@ export const ORG_NAV: NavGroup[] = [
       { label: 'Units', to: '/app/units', permission: 'units:view', orgKinds: ['LANDLORD', 'AGENCY'], phase: '2', hint: 'Rentable spaces in each property' },
       { label: 'Unit setup', to: '/app/unit-categories', permission: 'unit-categories:view', orgKinds: ['LANDLORD', 'AGENCY'], phase: '2', hint: 'Categories, types and features, e.g. Executive · 2 Bedroom · Balcony' },
       { label: 'Maintenance', to: '/app/maintenance', permission: 'maintenance:view', phase: '12', hint: 'Tenant repair requests and unit maintenance' },
+      { label: 'Vendors', to: '/app/vendors', permission: 'maintenance:view', phase: '18', hint: 'Plumbers, electricians and others you send maintenance jobs to' },
     ],
   },
   {

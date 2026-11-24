@@ -22,6 +22,7 @@ export type PlatformSmsType =
   | 'login_otp'
   | 'password_reset'
   | 'step_up'
+  | 'security_alert'
   | 'admin_2fa'
   | 'invitation'
   | 'operator_welcome'
@@ -40,7 +41,8 @@ export type OrgSmsType =
   | 'portal_access'
   | 'broadcast'
   | 'rent_change'
-  | 'tenant_notice';
+  | 'tenant_notice'
+  | 'vendor_job';
 
 export type OrgSmsSpec = { kind: 'org'; orgId: string; type: OrgSmsType };
 export type SmsSpec = { kind: 'platform'; type: PlatformSmsType } | OrgSmsSpec;

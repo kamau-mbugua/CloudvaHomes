@@ -34,6 +34,9 @@ export interface PortalTenancy {
   status: TenancyStatus;
   startDate: string;
   endDate: string | null;
+  /** Phase 14: who gave notice, and the end of a short notice's rent in lieu. */
+  noticeSource?: 'TENANT' | 'STAFF' | null;
+  noticeEndsOn?: string | null;
   hasSignedLease?: boolean;
   /** Tenant portal redesign: what this home owes now, overdue part, days late, next due. */
   due?: number;

@@ -107,6 +107,21 @@ export class UpdateOrganizationDto {
   kraPin?: string;
 
   @ApiPropertyOptional({
+    enum: ['OFF', 'MONEY_ROLES', 'ALL_STAFF'],
+    description: 'Second code after a password sign-in: off, staff who handle money, or all staff',
+  })
+  @IsOptional()
+  @IsIn(['OFF', 'MONEY_ROLES', 'ALL_STAFF'])
+  staffTwoFactor?: 'OFF' | 'MONEY_ROLES' | 'ALL_STAFF';
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 365, description: 'Minimum notice to vacate, days' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  noticeDays?: number;
+
+  @ApiPropertyOptional({
     minimum: 0,
     maximum: 60,
     description: 'Invoice due date = issue + N days',

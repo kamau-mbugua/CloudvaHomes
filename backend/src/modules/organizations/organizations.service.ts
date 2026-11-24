@@ -5,7 +5,7 @@ import { withoutOrgScope } from '../../common/context/request-context.js';
 import type { Organization, Prisma } from '../../generated/prisma/client.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
-import { authContext, orgContext } from '../auth/decorators.js';
+import { authContext, orgContext, requireStepUp } from '../auth/decorators.js';
 import { normalizeEmail, normalizePhone } from '../auth/identifiers.js';
 import { addDays, todayInNairobi } from '../billing/billing-math.js';
 import { readOrgDocumentInstructions } from '../../common/pdf/pdf.js';
@@ -32,6 +32,8 @@ function toOrg(o: Organization) {
     onboardedById: o.onboardedById,
     settings: o.settings,
     invoiceDueDays: o.invoiceDueDays,
+    noticeDays: o.noticeDays,
+    staffTwoFactor: o.staffTwoFactor,
     reminders: readReminders(o.settings),
     lateFees: readLateFees(o.settings),
     invoiceInstructions: docInstructions.invoiceInstructions,
@@ -87,12 +89,22 @@ export class OrganizationsService {
 
   async updateCurrent(dto: UpdateOrganizationDto) {
     const { orgId } = orgContext();
+    if (dto.staffTwoFactor !== undefined) {
+      const current = await this.db.organization.findUniqueOrThrow({
+        where: { id: orgId },
+        select: { staffTwoFactor: true },
+      });
+      // Changing who needs a second code is security: confirm it's you (phase 26).
+      if (current.staffTwoFactor !== dto.staffTwoFactor) requireStepUp();
+    }
     const data: Prisma.OrganizationUpdateInput = {
       ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
       ...(dto.phone !== undefined ? { phone: requirePhone(dto.phone, 'phone') } : {}),
       ...(dto.email !== undefined ? { email: requireEmail(dto.email, 'email') } : {}),
       ...(dto.kraPin !== undefined ? { kraPin: dto.kraPin ? dto.kraPin.toUpperCase() : null } : {}),
       ...(dto.invoiceDueDays !== undefined ? { invoiceDueDays: dto.invoiceDueDays } : {}),
+      ...(dto.noticeDays !== undefined ? { noticeDays: dto.noticeDays } : {}),
+      ...(dto.staffTwoFactor !== undefined ? { staffTwoFactor: dto.staffTwoFactor } : {}),
     };
     return this.db
       .$transaction(async (tx) => {

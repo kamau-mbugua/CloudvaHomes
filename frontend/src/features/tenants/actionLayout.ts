@@ -10,6 +10,7 @@ export type TenancyAction =
   | 'notice'
   | 'changeNotice'
   | 'withdrawNotice'
+  | 'waiveShortNotice'
   | 'moveOut'
   | 'leasePdf'
   | 'attachLease'
@@ -30,7 +31,7 @@ export interface ActionPermissions {
 export function tenancyActionLayout(
   status: TenancyStatus,
   can: ActionPermissions,
-  opts: { hasSignedLease?: boolean; pendingRentChanges?: number } = {},
+  opts: { hasSignedLease?: boolean; pendingRentChanges?: number; shortNotice?: boolean } = {},
 ): { buttons: TenancyAction[]; menu: TenancyAction[] } {
   const live = status === 'ACTIVE' || status === 'NOTICE';
   const buttons: TenancyAction[] = [];
@@ -41,6 +42,8 @@ export function tenancyActionLayout(
     buttons.push('moveOut', 'changeNotice');
     menu.push('withdrawNotice');
   }
+  // Short notice (phase 14): rent in lieu runs on, even after move-out, until waived.
+  if (can.update && status !== 'ACTIVE' && opts.shortNotice) menu.push('waiveShortNotice');
   if (can.view) menu.push('leasePdf');
   if (can.update || (can.view && opts.hasSignedLease)) menu.push('attachLease');
   // Inspections: move-in any time; move-out once the tenant is leaving or has left.

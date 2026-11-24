@@ -18,6 +18,8 @@ export const ORG_SCOPED_MODELS = new Set<string>([
   'UnitFeature',
   'Unit',
   'Tenant',
+  'PaymentCertificate',
+  'Vendor',
   'Tenancy',
   'ChargeType',
   'MoveInCharge',

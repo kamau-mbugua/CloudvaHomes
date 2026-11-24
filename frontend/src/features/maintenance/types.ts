@@ -26,6 +26,10 @@ export interface MaintenanceRequestItem {
     amount: number;
     incurredOn: string;
   } | null;
+  /** Phase 18: who's doing it, since when, and whether it's past its response time. */
+  vendor?: { id: string; name: string; phone: string } | null;
+  assignedAt?: string | null;
+  overdue?: boolean;
   canResolve: boolean;
   canCancel: boolean;
   canConvertToExpense: boolean;
@@ -55,3 +59,16 @@ export const MAINTENANCE_STATUSES: Record<string, string> = {
   RESOLVED: 'Resolved',
   CANCELLED: 'Cancelled',
 };
+
+/** Phase 18 (first step): someone maintenance jobs can be sent to. */
+export interface Vendor {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  trades: string[];
+  notes: string | null;
+  active: boolean;
+  openJobs?: number;
+  createdAt: string;
+}

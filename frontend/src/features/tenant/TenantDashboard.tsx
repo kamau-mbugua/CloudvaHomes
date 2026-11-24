@@ -14,6 +14,7 @@ import { pendingChangeText } from '../tenants/leaseTerms';
 import { inspectionTodoKey, keys, useTenantActivity, useTenantMonthly } from './api';
 import { heroTotal, payButton, toPayByLandlord, todoItems } from './dashboard';
 import { PayChooser } from './PayChooser';
+import { MoveOutSheet } from './MoveOutSheet';
 import { PaySheet } from './PaySheet';
 import { homeText } from './rules';
 import { accountsInScope } from './scope';
@@ -226,15 +227,25 @@ function HomeCard({ home, onPick }: { home: ConsolidatedTenancy; onPick: () => v
 
 function HomeFacts({ home }: { home: ConsolidatedTenancy }) {
   const s = statusText(home);
+  const [movingOut, setMovingOut] = useState(false);
   return (
     <section className="ag__card">
-      <div className="tp__cardhead"><h3>{homeText(home)}</h3><span className="ad__sub">{home.orgName}</span></div>
+      <div className="tp__cardhead">
+        <h3>{homeText(home)}</h3>
+        <span className="ad__sub">{home.orgName}</span>
+        {home.status === 'ACTIVE' ? (
+          <button type="button" className="nx-btn nx-btn--sm pg-push" onClick={() => setMovingOut(true)}>I’m moving out</button>
+        ) : null}
+      </div>
       <dl className="tp__facts">
         <div><dt>Status</dt><dd className={`td__status td__status--${s.tone || 'due'}`}>{s.text}</dd></div>
         <div><dt>Rent a month</dt><dd className="num">{formatKES(home.rentAmount)}</dd></div>
         {home.leaseEndDate ? <div><dt>Lease ends</dt><dd>{formatDay(home.leaseEndDate)}</dd></div> : null}
         {(home.upcomingRentChanges ?? []).map((c) => <div key={c.effectivePeriod}><dt>Rent change</dt><dd>{pendingChangeText(c)}</dd></div>)}
+        {home.status === 'NOTICE' && home.endDate ? <div><dt>Moving out</dt><dd>{formatDay(home.endDate)}</dd></div> : null}
+        {home.noticeEndsOn ? <div><dt>Rent due until</dt><dd>{formatDay(home.noticeEndsOn)} (short notice)</dd></div> : null}
       </dl>
+      {movingOut ? <MoveOutSheet home={home} onClose={() => setMovingOut(false)} /> : null}
     </section>
   );
 }

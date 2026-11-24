@@ -4,7 +4,11 @@ import {
   runWithContext,
   withoutOrgScope,
 } from '../../../common/context/request-context.js';
+import { timingSafeEqual } from 'node:crypto';
 import { formatDateOnly, parseDateOnly } from '../../../common/dates/date-only.js';
+import { buildIcs } from '../ical/ical.js';
+import { openAccessCode } from '../listings/listings.service.js';
+import { addDays, todayInNairobi } from '../../billing/billing-math.js';
 import { FieldCipher } from '../../../common/crypto/field-cipher.js';
 import { AppError } from '../../../common/errors/app-error.js';
 import { RateLimitService } from '../../../common/rate-limit/rate-limit.service.js';
@@ -495,7 +499,11 @@ export class PublicSiteService {
       nightly: listing.nightlyPrice,
       weekend: listing.weekendPrice,
       weeklyDiscountBps: listing.weeklyDiscountBps,
+      monthlyDiscountBps: listing.monthlyDiscountBps,
       cleaningFee: listing.cleaningFee,
+      extraGuestFee: listing.extraGuestFee,
+      guestsIncluded: listing.guestsIncluded,
+      guests: dto.guests,
       special: listing.specialPrices.map((sp) => ({
         from: formatDateOnly(sp.fromDate),
         to: formatDateOnly(sp.toDate),
@@ -670,6 +678,8 @@ export class PublicSiteService {
               title: true,
               area: true,
               checkInInstructions: true,
+              houseManual: true,
+              accessCodeEnc: true,
               address: true,
               lat: true,
               lng: true,
@@ -752,6 +762,7 @@ export class PublicSiteService {
         cancellationText: describeCancellation(rules),
         holdExpiresAt: booking.holdExpiresAt ? booking.holdExpiresAt.toISOString() : null,
         checkInInstructions: showArrivalInfo ? (booking.listing.checkInInstructions ?? null) : null,
+        ...this.arrivalExtras(booking, showArrivalInfo, checkIn, checkOut, owed),
         address: showArrivalInfo ? addressText : null,
         // The pin is public on the listing page too, so the booking always carries the map link.
         mapUrl: location?.mapUrl ?? null,
@@ -893,6 +904,85 @@ export class PublicSiteService {
     } catch {
       return DEFAULT_INDEX_HTML;
     }
+  }
+
+  /**
+   * Phase 22: the house manual once the stay is confirmed, and the door code only from
+   * check-in day to check-out day with nothing left to pay. Otherwise a note says when.
+   */
+  private arrivalExtras(
+    booking: {
+      orgId: string;
+      listing: { houseManual: string | null; accessCodeEnc: Uint8Array | null };
+    },
+    confirmed: boolean,
+    checkIn: string,
+    checkOut: string,
+    owed: bigint,
+  ): { houseManual: string | null; accessCode: string | null; accessCodeNote: string | null } {
+    const houseManual = confirmed ? booking.listing.houseManual : null;
+    if (!confirmed || !booking.listing.accessCodeEnc) {
+      return { houseManual, accessCode: null, accessCodeNote: null };
+    }
+    const today = todayInNairobi();
+    if (today > checkOut) return { houseManual, accessCode: null, accessCodeNote: null };
+    if (owed > 0n) {
+      return {
+        houseManual,
+        accessCode: null,
+        accessCodeNote: 'Pay the balance to see the door code.',
+      };
+    }
+    if (today < checkIn) {
+      return {
+        houseManual,
+        accessCode: null,
+        accessCodeNote: `The door code shows here from check-in day (${checkIn}).`,
+      };
+    }
+    return {
+      houseManual,
+      accessCode: openAccessCode(this.cipher, booking.listing.accessCodeEnc, booking.orgId),
+      accessCodeNote: null,
+    };
+  }
+
+  /**
+   * A listing's calendar feed (phase 20): its unit's stays and blocks that hold the dates
+   * (the same statuses as the no-overlap rule), from 30 days ago on. The token is compared in
+   * constant time; a wrong one is "not found", like a missing listing.
+   */
+  async icalFeed(listingId: string, token: string): Promise<string> {
+    return withoutOrgScope(async () => {
+      const listing = await this.prisma.listing.findUnique({
+        where: { id: listingId },
+        select: { icalToken: true, title: true, unitId: true },
+      });
+      const expected = Buffer.from(listing?.icalToken ?? '');
+      const given = Buffer.from(token);
+      if (
+        !listing?.icalToken ||
+        expected.length !== given.length ||
+        !timingSafeEqual(expected, given)
+      ) {
+        throw AppError.notFound('Calendar');
+      }
+      const since = parseDateOnly(formatDateOnly(addDays(parseDateOnly(todayInNairobi()), -30)));
+      const rows = await this.prisma.booking.findMany({
+        where: {
+          unitId: listing.unitId,
+          status: { in: ['HELD', 'REQUESTED', 'CONFIRMED', 'CHECKED_IN'] },
+          checkOut: { gte: since },
+        },
+        orderBy: { checkIn: 'asc' },
+        select: { id: true, checkIn: true, checkOut: true, kind: true },
+      });
+      return buildIcs({
+        calendarName: listing.title,
+        now: new Date(),
+        ranges: rows.map((b) => ({ id: b.id, from: b.checkIn, to: b.checkOut, kind: b.kind })),
+      });
+    });
   }
 
   async renderSiteHtml(host: string, rawPath: string): Promise<string> {

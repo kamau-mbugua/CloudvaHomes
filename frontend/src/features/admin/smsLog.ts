@@ -10,6 +10,7 @@ export const SMS_TYPE_LABEL: Record<string, string> = {
   login_otp: 'Sign-in code',
   password_reset: 'Password reset code',
   step_up: 'Confirmation code',
+  security_alert: 'New sign-in alert',
   admin_2fa: 'Admin sign-in code',
   invitation: 'Invitation',
   operator_welcome: 'Operator welcome',
@@ -26,6 +27,7 @@ export const SMS_TYPE_LABEL: Record<string, string> = {
   broadcast: 'Notice to tenants',
   rent_change: 'Rent change',
   tenant_notice: 'Tenant notice',
+  vendor_job: 'Job sent to a vendor',
 };
 
 /** Types KodiHQ sends about people's accounts, then organisations' own (filter order). */
@@ -33,6 +35,7 @@ export const PLATFORM_TYPES = [
   'login_otp',
   'password_reset',
   'step_up',
+  'security_alert',
   'admin_2fa',
   'invitation',
   'operator_welcome',
@@ -51,6 +54,7 @@ export const ORG_TYPES = [
   'broadcast',
   'rent_change',
   'tenant_notice',
+  'vendor_job',
 ];
 
 export function smsTypeLabel(type: string): string {

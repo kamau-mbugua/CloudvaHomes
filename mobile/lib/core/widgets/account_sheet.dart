@@ -9,6 +9,7 @@ import '../api/api_error.dart';
 import '../auth/session.dart';
 import '../auth/session_controller.dart';
 import '../../features/account/delete_account_screen.dart';
+import '../../features/account/devices_screen.dart';
 import '../config.dart';
 import '../legal.dart';
 import '../theme.dart';
@@ -465,6 +466,34 @@ class AccountSheet extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                key: const Key('account-devices'),
+                leading: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: HodiColors.paper2,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.devices_outlined,
+                    size: 19,
+                    color: HodiColors.navy,
+                  ),
+                ),
+                title: const Text(
+                  'Your devices',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Where you’re signed in'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  DevicesScreen.open(nav.context);
+                },
               ),
               const Divider(height: 1),
               ListTile(

@@ -128,6 +128,11 @@ export interface Tenancy {
   startDate: string;
   endDate: string | null;
   noticeGivenAt: string | null;
+  /** Phase 14: who gave notice; a short notice's rent-in-lieu end; a forwarding number. */
+  noticeSource?: 'TENANT' | 'STAFF' | null;
+  noticeDays?: number | null;
+  noticeEndsOn?: string | null;
+  forwardingPhone?: string | null;
   depositHeld: number;
   moveOutReason: string | null;
   hasSignedLease?: boolean;

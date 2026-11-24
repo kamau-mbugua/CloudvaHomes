@@ -32,7 +32,7 @@ import { uploadErrorMessage, uploadFile } from '../uploads/api';
  * change moves occupancy, so units, properties, tenants and tenancies are all refreshed.
  */
 
-type TenancyLike = Pick<Tenancy, 'id' | 'status' | 'startDate' | 'endDate' | 'hasSignedLease' | 'leaseEndDate' | 'rentChanges'> & {
+type TenancyLike = Pick<Tenancy, 'id' | 'status' | 'startDate' | 'endDate' | 'hasSignedLease' | 'leaseEndDate' | 'rentChanges' | 'noticeEndsOn'> & {
   tenant: Pick<Tenancy['tenant'], 'firstName' | 'lastName'>;
   unit?: Pick<Tenancy['unit'], 'number'> & { property?: { id: string; code?: string } };
   /** For listing the move-in charges; taken from `unit.property` when absent. */
@@ -47,7 +47,7 @@ export function TenancyActions({ tenancy, size = 'sm' }: { tenancy: TenancyLike;
   const canUpdate = useCan('tenancies:update');
   const canDelete = useCan('tenancies:delete');
   const canInvoice = useCan('invoices:create');
-  const [dialog, setDialog] = useState<'notice' | 'moveOut' | 'moveInInvoice' | 'signedLease' | 'withdraw' | 'delete' | 'renew' | 'rentChange' | 'inspectIn' | 'inspectOut' | null>(null);
+  const [dialog, setDialog] = useState<'notice' | 'moveOut' | 'moveInInvoice' | 'signedLease' | 'withdraw' | 'waive' | 'delete' | 'renew' | 'rentChange' | 'inspectIn' | 'inspectOut' | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const who = personName(tenancy.tenant);
@@ -76,6 +76,15 @@ export function TenancyActions({ tenancy, size = 'sm' }: { tenancy: TenancyLike;
     onError: (error) => toast.failed(portfolioErrorMessage(error)),
   });
 
+  const waive = useMutation({
+    mutationFn: () => api.post(`/tenancies/${tenancy.id}/notice/waive`, {}),
+    onSuccess: async () => {
+      toast.saved(`${who} won’t be billed rent in lieu of notice.`);
+      await refresh();
+    },
+    onError: (error) => toast.failed(portfolioErrorMessage(error)),
+  });
+
   const remove = useMutation({
     mutationFn: () => api.delete(`/tenancies/${tenancy.id}`),
     onSuccess: async () => {
@@ -86,19 +95,20 @@ export function TenancyActions({ tenancy, size = 'sm' }: { tenancy: TenancyLike;
   });
 
   const btn = `nx-btn ${size === 'sm' ? 'nx-btn--sm' : ''}`;
-  const busy = withdraw.isPending || remove.isPending || downloadingPdf;
+  const busy = withdraw.isPending || waive.isPending || remove.isPending || downloadingPdf;
 
   if (!canView && !canUpdate && !canDelete && !canInvoice) return null;
 
   const layout = tenancyActionLayout(
     tenancy.status,
     { view: canView, update: canUpdate, delete: canDelete, invoice: canInvoice },
-    { hasSignedLease: tenancy.hasSignedLease, pendingRentChanges: tenancy.rentChanges?.length ?? 0 },
+    { hasSignedLease: tenancy.hasSignedLease, pendingRentChanges: tenancy.rentChanges?.length ?? 0, shortNotice: Boolean(tenancy.noticeEndsOn) },
   );
   const ACTIONS: Record<TenancyAction, MoreMenuItem> = {
     notice: { label: 'Give notice', onSelect: () => setDialog('notice') },
     changeNotice: { label: 'Change notice', onSelect: () => setDialog('notice') },
     withdrawNotice: { label: 'Withdraw notice', onSelect: () => setDialog('withdraw') },
+    waiveShortNotice: { label: 'Waive short-notice rent', onSelect: () => setDialog('waive') },
     moveOut: { label: 'Move out', onSelect: () => setDialog('moveOut') },
     leasePdf: { label: downloadingPdf ? 'Preparing lease PDF…' : 'Lease PDF', onSelect: () => void downloadLeasePdf(), disabled: downloadingPdf },
     attachLease: { label: tenancy.hasSignedLease ? 'Signed lease' : 'Attach signed lease', onSelect: () => setDialog('signedLease') },
@@ -135,6 +145,16 @@ export function TenancyActions({ tenancy, size = 'sm' }: { tenancy: TenancyLike;
           busy={withdraw.isPending}
           onClose={() => setDialog(null)}
           onConfirm={() => withdraw.mutate()}
+        />
+      ) : null}
+      {dialog === 'waive' ? (
+        <ConfirmDialog
+          verb="Waive"
+          what={`the rent in lieu of notice for ${who}`}
+          consequence={`Rent stops at the move-out date instead of ${tenancy.noticeEndsOn ? formatDay(tenancy.noticeEndsOn) : 'the end of the notice period'}. Invoices already issued are unchanged.`}
+          busy={waive.isPending}
+          onClose={() => setDialog(null)}
+          onConfirm={() => waive.mutate()}
         />
       ) : null}
       {dialog === 'delete' ? (

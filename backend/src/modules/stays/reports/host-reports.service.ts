@@ -11,7 +11,10 @@ import {
   nightAllocationsForStay,
   occupancy,
 } from '../rules/report-math.js';
-import type { HostReportSummaryQueryDto } from './host-reports.dto.js';
+import type { GuestRegisterQueryDto, HostReportSummaryQueryDto } from './host-reports.dto.js';
+import { IdNumbers } from '../../portfolio/id-numbers.js';
+import { AuditService } from '../../audit/audit.service.js';
+import { orgContext } from '../../auth/decorators.js';
 
 function monthsBetween(fromIso: string, toIso: string): string[] {
   const startYm = fromIso.slice(0, 7);
@@ -35,7 +38,89 @@ function monthsBetween(fromIso: string, toIso: string): string[] {
 
 @Injectable()
 export class HostReportsService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly ids: IdNumbers,
+    private readonly audit: AuditService,
+  ) {}
+
+  /**
+   * The guest register (phase 22, first slice): stays checking in between `from` and `to`
+   * (confirmed, checked in or completed), with the guest's contact and ID number — masked
+   * unless `full` is asked for by someone allowed to edit guests. Every export is audited.
+   */
+  async guestRegister(q: GuestRegisterQueryDto): Promise<string> {
+    if (q.to < q.from) throw AppError.fieldInvalid('to', 'End date must be on or after start date');
+    const ctx = orgContext();
+    const full = q.idNumbers === 'full';
+    if (full && !ctx.permissions.has('guests:update')) {
+      throw AppError.forbidden(
+        'FULL_IDS_FORBIDDEN',
+        'Only people who can edit guests can export full ID numbers',
+      );
+    }
+    const rows = await this.db.booking.findMany({
+      where: {
+        kind: 'STAY',
+        status: { in: ['CONFIRMED', 'CHECKED_IN', 'COMPLETED'] },
+        checkIn: { gte: parseDateOnly(q.from), lte: parseDateOnly(q.to) },
+        property: propertyScope(),
+        ...(q.propertyId ? { propertyId: q.propertyId } : {}),
+      },
+      orderBy: [{ checkIn: 'asc' }, { code: 'asc' }],
+      select: {
+        code: true,
+        checkIn: true,
+        checkOut: true,
+        guests: true,
+        status: true,
+        property: { select: { name: true } },
+        unit: { select: { number: true } },
+        guest: {
+          select: { name: true, phone: true, email: true, idNumberEnc: true, idNumberHint: true },
+        },
+      },
+    });
+    await this.audit.record({
+      action: 'guest_register.export',
+      entity: 'organization',
+      entityId: ctx.orgId,
+      after: { from: q.from, to: q.to, stays: rows.length, fullIdNumbers: full },
+    });
+    const nights = (a: Date, b: Date) => Math.round((b.getTime() - a.getTime()) / 86_400_000);
+    return toCsv(
+      [
+        'Check-in',
+        'Check-out',
+        'Nights',
+        'Booking',
+        'Property',
+        'Unit',
+        'Guest name',
+        'Phone',
+        'Email',
+        'ID / passport',
+        'Guests',
+        'Status',
+      ],
+      rows.map((b) => [
+        formatDateOnly(b.checkIn),
+        formatDateOnly(b.checkOut),
+        nights(b.checkIn, b.checkOut),
+        b.code,
+        b.property.name,
+        b.unit.number,
+        b.guest?.name ?? '',
+        b.guest?.phone ?? '',
+        b.guest?.email ?? '',
+        full
+          ? this.ids.reveal(b.guest?.idNumberEnc ?? null, ctx.orgId, 'guest')
+          : this.ids.masked(b.guest?.idNumberHint ?? null),
+        b.guests,
+        b.status,
+      ]),
+    );
+  }
 
   async summary(q: HostReportSummaryQueryDto) {
     if (q.to < q.from) {

@@ -9,7 +9,7 @@ import type { Organization, SessionPayload } from '../../lib/auth/types';
 import { useCan } from '../../lib/auth/useAuth';
 import { useToast } from '../../lib/useToast';
 import { CardSkeleton } from '../../components/Loading';
-import { checkDueDays } from '../billing/rules';
+import { checkDueDays, checkNoticeDays } from '../billing/rules';
 import { type OrgSettingsTab, orgSettingsTabs } from '../payments/audience';
 import { keys, settingsErrorMessage } from './api';
 import { checkReminders, describeReminders, overdueDaysText, readReminders } from './reminders';
@@ -28,6 +28,7 @@ type Field =
   | 'email'
   | 'kraPin'
   | 'invoiceDueDays'
+  | 'noticeDays'
   | 'invoiceInstructions'
   | 'receiptInstructions'
   | 'daysBefore'
@@ -85,6 +86,7 @@ function OrganizationForm({ org }: { org: Organization }) {
     email: org.email ?? '',
     kraPin: org.kraPin ?? '',
     invoiceDueDays: String(org.invoiceDueDays ?? 7),
+    noticeDays: String(org.noticeDays ?? 30),
     invoiceInstructions: org.invoiceInstructions ?? '',
     receiptInstructions: org.receiptInstructions ?? '',
     daysBefore: String(savedReminders.daysBefore),
@@ -134,6 +136,8 @@ function OrganizationForm({ org }: { org: Organization }) {
     if (!values.name.trim()) found.name = 'The organisation needs a name.';
     const dueDays = checkDueDays(values.invoiceDueDays);
     if (!dueDays.ok) found.invoiceDueDays = dueDays.error;
+    const notice = checkNoticeDays(values.noticeDays);
+    if (!notice.ok) found.noticeDays = notice.error;
     if (values.invoiceInstructions.trim().length > 1000) {
       found.invoiceInstructions = 'Keep invoice instructions to 1,000 characters.';
     }
@@ -144,7 +148,7 @@ function OrganizationForm({ org }: { org: Organization }) {
     setErrors(found);
     if (Object.keys(found).length > 0 || !dueDays.ok || !checkedReminders.ok) {
       if (found.name || found.phone || found.email || found.kraPin) setTab('details');
-      else if (found.invoiceDueDays || found.invoiceInstructions || found.receiptInstructions) setTab('billing');
+      else if (found.invoiceDueDays || found.noticeDays || found.invoiceInstructions || found.receiptInstructions) setTab('billing');
       else if (found.daysBefore || found.overdueDays) setTab('reminders');
       return;
     }
@@ -156,6 +160,7 @@ function OrganizationForm({ org }: { org: Organization }) {
       email: values.email.trim(),
       kraPin: values.kraPin.trim().toUpperCase() || null,
       invoiceDueDays: dueDays.days,
+      ...(notice.ok ? { noticeDays: notice.days } : {}),
       // The whole object, every time (the contract's PATCH takes it whole).
       reminders: checkedReminders.reminders,
     };
@@ -255,6 +260,10 @@ function OrganizationForm({ org }: { org: Organization }) {
                   {field('invoiceDueDays', 'Invoice due after (days)', { inputMode: 'numeric', autoComplete: 'off', maxLength: 2 })}
                   <span className="hint">0 to 60. 0 means due on the day it is issued.</span>
                 </div>
+                <div className="fld-days">
+                  {field('noticeDays', 'Notice to vacate (days)', { inputMode: 'numeric', autoComplete: 'off', maxLength: 3 })}
+                  <span className="hint">Tenants who move out sooner pay rent until the notice period ends, unless you waive it.</span>
+                </div>
                 <div className={`fld fm__wide ${errors.invoiceInstructions ? 'is-bad' : ''}`}>
                   <label htmlFor="org-invoiceInstructions">Invoice instructions (optional)</label>
                   <textarea
@@ -343,6 +352,50 @@ function OrganizationForm({ org }: { org: Organization }) {
           ) : null}
         </div>
       </form>
+      {tab === 'details' ? <StaffTwoFactorSection org={org} canEdit={canEdit} /> : null}
     </>
+  );
+}
+
+const TWO_FACTOR_OPTIONS: { value: NonNullable<Organization['staffTwoFactor']>; label: string; hint: string }[] = [
+  { value: 'OFF', label: 'Off', hint: 'A password is enough.' },
+  {
+    value: 'MONEY_ROLES',
+    label: 'Staff who handle money',
+    hint: 'Owners and anyone who can refund payments, change payment channels or pay out remittances.',
+  },
+  { value: 'ALL_STAFF', label: 'All staff', hint: 'Everyone on your team.' },
+];
+
+/**
+ * Phase 26: who must enter a one-time code (SMS, or email without a phone) after signing in
+ * with a password. Saved on its own, and changing it asks you to confirm with a code.
+ */
+function StaffTwoFactorSection({ org, canEdit }: { org: Organization; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const current = org.staffTwoFactor ?? 'OFF';
+  const save = useMutation({
+    mutationFn: (value: string) => api.patch<DataEnvelope<Organization>>('/organization', { staffTwoFactor: value }),
+    onSuccess: async () => {
+      toast.saved('Two-step sign-in updated.');
+      await queryClient.invalidateQueries({ queryKey: keys.organization });
+    },
+    onError: (error) => toast.failed(settingsErrorMessage(error)),
+  });
+  return (
+    <section className="fm__section" aria-label="Two-step sign-in">
+      <h2>Two-step sign-in</h2>
+      <p>After a password, ask for a one-time code sent to their phone (or email). Signing in with a code alone already proves it’s them.</p>
+      <div role="radiogroup" aria-label="Who needs a code" style={{ display: 'grid', gap: 8 }}>
+        {TWO_FACTOR_OPTIONS.map((o) => (
+          <label key={o.value} className="fld" style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <input type="radio" name="staff-2fa" value={o.value} checked={current === o.value}
+              disabled={!canEdit || save.isPending} onChange={() => save.mutate(o.value)} />
+            <span><strong>{o.label}</strong><span className="hint" style={{ display: 'block' }}>{o.hint}</span></span>
+          </label>
+        ))}
+      </div>
+    </section>
   );
 }

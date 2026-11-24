@@ -16,6 +16,7 @@ import { ok } from '../../common/http/response.js';
 import { RequirePermission } from '../auth/decorators.js';
 import { sendFile } from '../files/uploads.controller.js';
 import {
+  AssignVendorDto,
   ConvertMaintenanceToExpenseDto,
   CreateMaintenanceRequestDto,
   ListMaintenanceQueryDto,
@@ -51,6 +52,14 @@ export class MaintenanceController {
   @RequirePermission('maintenance:update')
   async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateMaintenanceRequestDto) {
     return ok(await this.maintenance.update(id, dto));
+  }
+
+  /** Phase 18: send the job to a vendor (texting them), or take it back. */
+  @Post(':id/assign')
+  @HttpCode(200)
+  @RequirePermission('maintenance:update')
+  async assign(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AssignVendorDto) {
+    return ok(await this.maintenance.assign(id, dto.vendorId, dto.notify ?? true));
   }
 
   @Post(':id/expense')

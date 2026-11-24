@@ -19,6 +19,13 @@ describe('tenancyActionLayout', () => {
     expect(tenancyActionLayout('NOTICE', ALL, { pendingRentChanges: 1 }).menu).toContain('rentChange');
   });
 
+  it('offers waiving short-notice rent while it applies, even after move-out', () => {
+    expect(tenancyActionLayout('NOTICE', ALL, { shortNotice: true }).menu).toContain('waiveShortNotice');
+    expect(tenancyActionLayout('ENDED', ALL, { shortNotice: true }).menu).toContain('waiveShortNotice');
+    expect(tenancyActionLayout('NOTICE', ALL).menu).not.toContain('waiveShortNotice');
+    expect(tenancyActionLayout('ENDED', { ...ALL, update: false }, { shortNotice: true }).menu).not.toContain('waiveShortNotice');
+  });
+
   it('offers only the lease PDF on an ended tenancy for someone who can only view', () => {
     expect(tenancyActionLayout('ENDED', { view: true, update: false, delete: false, invoice: false }))
       .toEqual({ buttons: [], menu: ['leasePdf', 'inspectIn', 'inspectOut'] });

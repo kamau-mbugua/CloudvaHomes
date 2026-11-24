@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { api } from '../../lib/api/client';
 import type { DataEnvelope } from '../../lib/api/types';
-import { useSession } from '../../lib/auth/useAuth';
+import { useCan, useSession } from '../../lib/auth/useAuth';
+import { useToast } from '../../lib/useToast';
 import { todayInNairobi } from '../../lib/dates';
 import { csvFilename, saveBlob } from '../../lib/files';
 import { formatKES } from '../../lib/money';
@@ -34,6 +35,29 @@ export function HostReportsPage() {
   );
   const [range, setRange] = useState(defaultDateRange);
   const [downloading, setDownloading] = useState(false);
+  const toast = useToast();
+  const canSeeGuests = useCan('guests:view');
+  const canFullIds = useCan('guests:update');
+  const [fullIds, setFullIds] = useState(false);
+  const [registerBusy, setRegisterBusy] = useState(false);
+
+  /** Phase 22: the guest register — stays checking in within the dates — as CSV. */
+  const downloadRegister = async () => {
+    setRegisterBusy(true);
+    try {
+      const blob = await api.blob('/host/reports/guest-register', {
+        from: range.from,
+        to: range.to,
+        propertyId: propertyId || undefined,
+        idNumbers: fullIds ? 'full' : undefined,
+      });
+      saveBlob(blob, csvFilename('guest-register', { from: range.from, to: range.to }), 'text/csv');
+    } catch (error) {
+      toast.failed(staysErrorMessage(error));
+    } finally {
+      setRegisterBusy(false);
+    }
+  };
 
   const summaryQuery = useQuery({
     queryKey: [
@@ -118,6 +142,18 @@ export function HostReportsPage() {
           >
             {downloading ? 'Downloading…' : 'Download CSV'}
           </button>
+          {canSeeGuests ? (
+            <button type="button" className="nx-btn" disabled={registerBusy} onClick={() => void downloadRegister()}
+              title="Every stay checking in within these dates, with the guest’s contact and ID number">
+              {registerBusy ? 'Preparing…' : 'Guest register'}
+            </button>
+          ) : null}
+          {canSeeGuests && canFullIds ? (
+            <label className="py__daterange" title="Full ID numbers are recorded in the audit log">
+              <input type="checkbox" checked={fullIds} onChange={(e) => setFullIds(e.target.checked)} />
+              <span>Full ID numbers</span>
+            </label>
+          ) : null}
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import {
   Body,
+  Delete,
   Controller,
   Get,
   HttpCode,
@@ -321,6 +322,20 @@ export class MeController {
       email: user.email,
       phone: user.phone,
     });
+  }
+
+  /** "My devices" (phase 26): where this account is signed in. */
+  @Get('sessions')
+  async sessionsList() {
+    const ctx = authContext();
+    return ok(await this.sessions.listForUser(ctx.userId, ctx.sessionId));
+  }
+
+  /** Signs one device out (this one too, if it's the current session). */
+  @Delete('sessions/:id')
+  @HttpCode(204)
+  async endSession(@Param('id', ParseUUIDPipe) id: string) {
+    await this.sessions.endOwnSession(authContext().userId, id);
   }
 
   @AllowWhenMustChangePassword()

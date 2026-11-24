@@ -115,8 +115,15 @@ export interface Listing {
   weekendPrice: string | null;
   cleaningFee: string;
   weeklyDiscountBps: number | null;
+  /** Phase 21: 28+ nights discount; extra-guest fee per night above guestsIncluded. */
+  monthlyDiscountBps?: number | null;
+  extraGuestFee?: string;
+  guestsIncluded?: number | null;
   minNights: number;
   checkInInstructions: string | null;
+  /** Phase 22: house manual, and whether a door code is set (the code itself is fetched on request). */
+  houseManual?: string | null;
+  hasAccessCode?: boolean;
   rulesOverride: Partial<ApiStayRules> | null;
   published: boolean;
   coverPhotoId: string | null;
@@ -145,7 +152,7 @@ export type BookingSource = 'GUEST' | 'HOST';
 export type StayPaymentMethod = 'CASH' | 'BANK_ACCOUNT' | 'MPESA_PAYBILL' | 'MPESA_TILL';
 
 export interface QuoteLine {
-  kind: 'NIGHT' | 'DISCOUNT' | 'CLEANING' | 'ADJUSTMENT';
+  kind: 'NIGHT' | 'DISCOUNT' | 'CLEANING' | 'EXTRA_GUESTS' | 'ADJUSTMENT';
   date?: string;
   label: string;
   amount: string;

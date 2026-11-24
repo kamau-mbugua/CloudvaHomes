@@ -137,6 +137,10 @@ export interface PublicBookingDetail {
   cancellationText: string;
   holdExpiresAt: string | null;
   checkInInstructions: string | null;
+  /** Phase 22: once confirmed; the door code only on check-in day, paid (else a note). */
+  houseManual?: string | null;
+  accessCode?: string | null;
+  accessCodeNote?: string | null;
   address: string | null;
   /** Google Maps link to the place, when the host pinned it. */
   mapUrl: string | null;
