@@ -26,6 +26,7 @@ export const keys = {
   payments: ['platform', 'payments'] as const,
   settings: ['platform', 'settings'] as const,
   operators: ['platform', 'operators'] as const,
+  users: ['platform', 'users'] as const,
   emailSettings: ['platform', 'email-settings'] as const,
   emailTemplates: ['platform', 'email-templates'] as const,
   emailLogs: ['platform', 'email-logs'] as const,

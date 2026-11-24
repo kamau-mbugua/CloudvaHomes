@@ -35,6 +35,7 @@ const ICONS: Record<GroupId, ReactNode> = {
   settings: <CogIcon />,
   'admin-overview': <HomeIcon />,
   'admin-organizations': <BuildingIcon />,
+  'admin-people': <PeopleIcon />,
   'admin-billing': <InvoiceIcon />,
   'admin-reports': <ChartIcon />,
   'admin-platform': <CogIcon />,

@@ -115,7 +115,12 @@ describe('Deleting your own account (e2e)', () => {
     const audit = await t.prisma.auditLog.findFirstOrThrow({
       where: { action: 'user.account_delete', entityId: manager.userId },
     });
-    expect(audit.after).toEqual({ hadEmail: true, hadPhone: true, gaveReason: true });
+    expect(audit.after).toEqual({
+      hadEmail: true,
+      hadPhone: true,
+      gaveReason: true,
+      bySupport: false,
+    });
 
     // The email is free again: the owner can invite the same person afresh.
     const again = await addMember(t, owner, { ...MANAGER, role: 'MANAGER' });

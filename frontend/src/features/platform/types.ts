@@ -407,3 +407,70 @@ export interface RateLimitLock {
   windowStart: string;
   expiresAt: string;
 }
+
+// ---------------------------------------------------------------- people (customers' accounts)
+
+export type UserFilter = 'all' | 'business' | 'tenants' | 'owners' | 'disabled' | 'deleted';
+
+export interface DeletedAccountInfo {
+  deletedAt: string;
+  /** The email and phone it had, kept for the grace period; null once erased. */
+  email: string | null;
+  phone: string | null;
+  reason: string | null;
+  /** When the purge job erases it; null once erased. */
+  purgeOn: string | null;
+  purgedAt: string | null;
+}
+
+export interface PlatformUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  status: 'ACTIVE' | 'DISABLED';
+  hasPassword: boolean;
+  mustChangePassword: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  isTenant: boolean;
+  isOwner: boolean;
+  /** List rows only: current staff memberships (invited or active). */
+  organizations?: { id: string; name: string; role: string; status: 'INVITED' | 'ACTIVE' | 'INACTIVE' }[];
+  deleted: DeletedAccountInfo | null;
+}
+
+export interface PlatformUserDetail extends PlatformUser {
+  /** False for a salesperson when the person also belongs to organisations outside their book. */
+  canManage: boolean;
+  activeSessions: number;
+  memberships: {
+    id: string;
+    status: 'INVITED' | 'ACTIVE' | 'INACTIVE';
+    invitedAt: string | null;
+    joinedAt: string | null;
+    role: { name: string; isOwner: boolean };
+    organization: { id: string; name: string; kind: OrgKind; status: OrgStatus };
+  }[];
+  tenants: { id: string; code: string; name: string; organization: { id: string; name: string } }[];
+  landlords: { id: string; name: string; organization: { id: string; name: string } }[];
+}
+
+export interface OrgMember {
+  id: string;
+  status: 'INVITED' | 'ACTIVE' | 'INACTIVE';
+  invitedAt: string | null;
+  joinedAt: string | null;
+  role: { name: string; isOwner: boolean };
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+    status: 'ACTIVE' | 'DISABLED';
+    lastLoginAt: string | null;
+    deleted: boolean;
+  };
+}

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { withoutOrgScope } from '../../common/context/request-context.js';
 import { AppError } from '../../common/errors/app-error.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
 import { authContext, requireStepUp } from './decorators.js';
@@ -40,8 +41,20 @@ export class AccountDeletionService {
   async deleteOwnAccount(reason?: string): Promise<void> {
     const ctx = authContext();
     requireStepUp();
+    await this.closeAccount(ctx.userId, { reason, actorId: ctx.userId, self: true });
+  }
+
+  /**
+   * Closes an account: the person's own request, or KodiHQ support acting on one (e.g. a
+   * request emailed to privacy@ by someone who can't sign in). The same refusals apply.
+   */
+  async closeAccount(
+    userId: string,
+    opts: { reason?: string | null; actorId: string; self?: boolean },
+  ): Promise<void> {
     await withoutOrgScope(async () => {
-      const user = await this.prisma.user.findUniqueOrThrow({ where: { id: ctx.userId } });
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || user.deletedAt) throw AppError.notFound('Account');
       if (user.isPlatformAdmin || user.platformRole) {
         throw AppError.conflict(
           'KodiHQ team accounts are closed by another super admin, not from the app.',
@@ -52,13 +65,15 @@ export class AccountDeletionService {
       if (soleOwnerOf.length > 0) {
         const names = soleOwnerOf.join(', ');
         throw AppError.conflict(
-          `You're the only owner of ${names}. Make someone else an owner, or ask KodiHQ support to close it, then delete your account.`,
+          opts.self
+            ? `You're the only owner of ${names}. Make someone else an owner, or ask KodiHQ support to close it, then delete your account.`
+            : `This person is the only owner of ${names}. Give it another owner, or close it, first.`,
           'SOLE_OWNER',
         );
       }
 
       const now = new Date();
-      const note = reason?.trim() || null;
+      const note = opts.reason?.trim() || null;
       await this.prisma.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: user.id },
@@ -97,13 +112,98 @@ export class AccountDeletionService {
             action: 'user.account_delete',
             entity: 'user',
             entityId: user.id,
+            actorId: opts.actorId,
             orgId: null,
             // Not the email, phone or reason themselves: the audit log outlives the purge.
-            after: { hadEmail: !!user.email, hadPhone: !!user.phone, gaveReason: !!note },
+            after: {
+              hadEmail: !!user.email,
+              hadPhone: !!user.phone,
+              gaveReason: !!note,
+              bySupport: !opts.self,
+            },
           },
           tx,
         );
       });
+    });
+  }
+
+  /**
+   * Undoes a deletion within the grace period. The email and phone come back where no other
+   * account has taken them since (at least one must). There's no password (they sign in with a
+   * code or get a reset), staff memberships stay ended (organisations invite them again), and
+   * tenant records with their phone or email are linked to the login again.
+   */
+  async restore(
+    userId: string,
+    actorId: string,
+  ): Promise<{ email: string | null; phone: string | null }> {
+    return withoutOrgScope(async () => {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !user.deletedAt) throw AppError.notFound('Deleted account');
+      if (user.purgedAt) {
+        throw AppError.conflict(
+          'This account was erased after the 30-day grace period and can’t be restored.',
+          'ACCOUNT_PURGED',
+        );
+      }
+      const emailTaken = user.deletedEmail
+        ? await this.prisma.user.findUnique({ where: { email: user.deletedEmail } })
+        : null;
+      const phoneTaken = user.deletedPhone
+        ? await this.prisma.user.findUnique({ where: { phone: user.deletedPhone } })
+        : null;
+      const email = emailTaken ? null : user.deletedEmail;
+      const phone = phoneTaken ? null : user.deletedPhone;
+      if (!email && !phone) {
+        throw AppError.conflict(
+          'Its email and phone number now belong to other accounts, so it can’t be signed in to.',
+          'CONTACTS_TAKEN',
+        );
+      }
+      await this.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            status: 'ACTIVE',
+            deletedAt: null,
+            deletionReason: null,
+            deletedEmail: null,
+            deletedPhone: null,
+            email,
+            phone,
+          },
+        });
+        const match: Prisma.TenantWhereInput[] = [];
+        if (phone) match.push({ phone });
+        if (email) match.push({ email: { equals: email, mode: 'insensitive' } });
+        await tx.tenant.updateMany({
+          where: { userId: null, portalRevokedAt: null, OR: match },
+          data: { userId },
+        });
+        await this.audit.record(
+          {
+            action: 'user.account_restore',
+            entity: 'user',
+            entityId: userId,
+            actorId,
+            orgId: null,
+            after: { emailBack: !!email, phoneBack: !!phone },
+          },
+          tx,
+        );
+      });
+      return { email, phone };
+    });
+  }
+
+  /** Erases a deleted account now instead of waiting for the grace period (on request). */
+  async purgeNow(userId: string, actorId: string): Promise<void> {
+    await withoutOrgScope(async () => {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !user.deletedAt) throw AppError.notFound('Deleted account');
+      if (user.purgedAt) return;
+      await this.purgeOne(userId, new Date(), actorId);
     });
   }
 
@@ -125,40 +225,38 @@ export class AccountDeletionService {
         });
         if (due.length === 0) break;
         for (const { id } of due) {
-          await this.prisma.$transaction(async (tx) => {
-            await tx.user.update({
-              where: { id },
-              data: {
-                firstName: 'Deleted',
-                lastName: 'user',
-                deletedEmail: null,
-                deletedPhone: null,
-                deletionReason: null,
-                lastLoginAt: null,
-                purgedAt: now,
-              },
-            });
-            await tx.refreshToken.deleteMany({ where: { userId: id } });
-            await tx.otpCode.deleteMany({ where: { userId: id } });
-            await tx.userNotification.deleteMany({ where: { userId: id } });
-            await tx.deviceToken.deleteMany({ where: { userId: id } });
-            await this.audit.record(
-              {
-                action: 'user.account_purge',
-                entity: 'user',
-                entityId: id,
-                orgId: null,
-                actorId: null,
-              },
-              tx,
-            );
-          });
+          await this.purgeOne(id, now, null);
           purged += 1;
         }
         if (due.length < PURGE_BATCH) break;
       }
     });
     return { purged };
+  }
+
+  private async purgeOne(id: string, now: Date, actorId: string | null) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: {
+          firstName: 'Deleted',
+          lastName: 'user',
+          deletedEmail: null,
+          deletedPhone: null,
+          deletionReason: null,
+          lastLoginAt: null,
+          purgedAt: now,
+        },
+      });
+      await tx.refreshToken.deleteMany({ where: { userId: id } });
+      await tx.otpCode.deleteMany({ where: { userId: id } });
+      await tx.userNotification.deleteMany({ where: { userId: id } });
+      await tx.deviceToken.deleteMany({ where: { userId: id } });
+      await this.audit.record(
+        { action: 'user.account_purge', entity: 'user', entityId: id, orgId: null, actorId },
+        tx,
+      );
+    });
   }
 
   /** Organisations (still open) where this person is the only active owner. */

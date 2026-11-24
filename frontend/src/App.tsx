@@ -76,6 +76,8 @@ const AdminOverviewPage = lazy(() => import('./features/admin/OverviewPage').the
 const AdminOrganizationsPage = lazy(() => import('./features/admin/OrganizationsPage').then((m) => ({ default: m.OrganizationsPage })));
 const CreateOrganizationPage = lazy(() => import('./features/admin/CreateOrganizationPage').then((m) => ({ default: m.CreateOrganizationPage })));
 const AdminOrganizationDetailPage = lazy(() => import('./features/admin/OrganizationDetailPage').then((m) => ({ default: m.OrganizationDetailPage })));
+const AdminUsersPage = lazy(() => import('./features/admin/UsersPage').then((m) => ({ default: m.UsersPage })));
+const AdminUserDetailPage = lazy(() => import('./features/admin/UserDetailPage').then((m) => ({ default: m.UserDetailPage })));
 const AdminPlansPage = lazy(() => import('./features/admin/PlansPage').then((m) => ({ default: m.PlansPage })));
 const AdminInvoicesPage = lazy(() => import('./features/admin/AdminInvoicesPage').then((m) => ({ default: m.AdminInvoicesPage })));
 const AdminPaymentsPage = lazy(() => import('./features/admin/AdminPaymentsPage').then((m) => ({ default: m.AdminPaymentsPage })));
@@ -261,6 +263,16 @@ export default function App() {
                     element={(
                       <RouteDrawer title="Organisation details" backTo="/admin/organizations">
                         <AdminOrganizationDetailPage />
+                      </RouteDrawer>
+                    )}
+                  />
+                </Route>
+                <Route path="users" element={<WithRouteDrawer><AdminUsersPage /></WithRouteDrawer>}>
+                  <Route
+                    path=":userId"
+                    element={(
+                      <RouteDrawer title="Person" backTo="/admin/users">
+                        <AdminUserDetailPage />
                       </RouteDrawer>
                     )}
                   />

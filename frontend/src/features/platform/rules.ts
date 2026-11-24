@@ -3,7 +3,7 @@ import { formatKES, minorToInput, parseAmount } from '../../lib/money';
 import { shiftPeriod } from '../../lib/periods';
 import type {
   BillingSummary, EffectivePrice, OrgStatus, Plan, PlatformOrganization, PlatformOwner, PlatformPaymentMethod,
-  PlatformSettings, PlatformStk,
+  PlatformSettings, PlatformStk, PlatformUser,
 } from './types';
 
 /**
@@ -451,4 +451,48 @@ export function checkOrgDetails(
   if (email.toLowerCase() !== (org.email ?? '').toLowerCase()) body.email = email;
   if (kraPin !== (org.kraPin ?? '')) body.kraPin = kraPin;
   return { ok: true, body };
+}
+
+// ---------------------------------------------------------------- people
+
+export type UserState = 'active' | 'disabled' | 'deleted' | 'erased';
+
+export const USER_STATE: Record<UserState, { label: string; tone: string }> = {
+  active: { label: 'Active', tone: 'ad__badge--ok' },
+  disabled: { label: 'Disabled', tone: 'ad__badge--alert' },
+  deleted: { label: 'Deleted', tone: 'ad__badge--warn' },
+  erased: { label: 'Erased', tone: 'ad__badge--off' },
+};
+
+export function userState(u: Pick<PlatformUser, 'status' | 'deleted'>): UserState {
+  if (u.deleted) return u.deleted.purgedAt ? 'erased' : 'deleted';
+  return u.status === 'DISABLED' ? 'disabled' : 'active';
+}
+
+export function userName(u: Pick<PlatformUser, 'firstName' | 'lastName'>): string {
+  return `${u.firstName} ${u.lastName}`.trim();
+}
+
+/** How they sign in: a password, a temporary one from support, or one-time codes only. */
+export function passwordText(u: Pick<PlatformUser, 'hasPassword' | 'mustChangePassword'>): string {
+  if (!u.hasPassword) return 'None: signs in with a one-time code';
+  return u.mustChangePassword ? 'Temporary: must choose a new one' : 'Set';
+}
+
+/** "Erased in 12 days" / "Erased tomorrow" / "Due to be erased today". */
+export function purgeText(purgeOn: string | null, now = new Date()): string | null {
+  if (!purgeOn) return null;
+  const days = Math.ceil((new Date(purgeOn).getTime() - now.getTime()) / 86_400_000);
+  if (days <= 0) return 'Due to be erased today';
+  return days === 1 ? 'Erased tomorrow' : `Erased in ${days} days`;
+}
+
+/** What a person is to KodiHQ's customers, for a list row: "Owner, Ivory Breeze · Tenant". */
+export function userLinksText(u: Pick<PlatformUser, 'organizations' | 'isTenant' | 'isOwner'>): string {
+  const parts = (u.organizations ?? []).map(
+    (o) => `${o.role}, ${o.name}${o.status === 'INVITED' ? ' (invited)' : ''}`,
+  );
+  if (u.isTenant) parts.push('Tenant');
+  if (u.isOwner) parts.push('Landlord (owner portal)');
+  return parts.join(' · ');
 }

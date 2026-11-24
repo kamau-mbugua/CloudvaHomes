@@ -28,6 +28,7 @@ export type GroupId =
   // The platform admin area (`/admin`, phase 8 & 11).
   | 'admin-overview'
   | 'admin-organizations'
+  | 'admin-people'
   | 'admin-billing'
   | 'admin-reports'
   | 'admin-platform'
@@ -347,6 +348,16 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
+    id: 'admin-people',
+    label: 'People',
+    children: [
+      { label: 'All people', to: '/admin/users', phase: 'people', hint: 'Customers’ accounts: search, edit, reset passwords, sign out, disable' },
+      { label: 'Business users', to: '/admin/users?filter=business', phase: 'people', hint: 'Staff of landlords, agencies and hosts, with their organisations and roles' },
+      { label: 'Tenants', to: '/admin/users?filter=tenants', phase: 'people', hint: 'Tenants who sign in to the tenant portal' },
+      { label: 'Deleted accounts', to: '/admin/users?filter=deleted', phase: 'people', hint: 'Closed accounts in their 30-day grace period: restore or erase' },
+    ],
+  },
+  {
     id: 'admin-billing',
     label: 'Billing',
     children: [
@@ -388,6 +399,7 @@ export const ADMIN_NAV: NavGroup[] = [
 ];
 
 export const SUPERADMIN_ONLY_PATHS = new Set<string>([
+  '/admin/users?filter=deleted',
   '/admin/plans',
   '/admin/admins',
   '/admin/email',

@@ -45,6 +45,8 @@
 .adm__head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin: 8px 0 16px; }
 .adm__h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
 .adm__facts { margin: 0 0 20px; }
+.adm__h2 { margin: 24px 0 10px; font-size: 15px; font-weight: 600; }
+.ad__list { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; }
 .adm__terms { margin-top: 0; }
 .adm__override { display: flex; align-items: center; gap: 8px; }
 .adm__override input {

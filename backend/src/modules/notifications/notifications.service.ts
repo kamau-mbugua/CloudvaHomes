@@ -778,6 +778,56 @@ export class NotificationsService {
     return results.some((r) => r.status === 'fulfilled');
   }
 
+  /**
+   * KodiHQ support reset someone's password: a temporary one, to their email and phone. They
+   * choose their own on the next sign-in. The password is masked in the email and SMS logs.
+   */
+  async sendSupportPasswordReset(
+    to: Recipient,
+    p: { firstName: string; temporaryPassword: string },
+  ): Promise<boolean> {
+    const loginUrl = `${this.env.APP_URL.replace(/\/$/, '')}/login`;
+    const signInId = [to.email, to.phone].filter(Boolean).join(' or ');
+    const secret = { value: p.temporaryPassword, label: 'Temporary password' };
+    const tasks: Promise<void>[] = [];
+    if (to.email) {
+      tasks.push(
+        this.dispatchEmail(
+          {
+            to: to.email,
+            subject: 'Your KodiHQ password was reset',
+            text:
+              `Hi ${p.firstName},\n\n` +
+              `KodiHQ support reset your password, as you asked.\n\n` +
+              `Sign in at: ${loginUrl}\n` +
+              `Email / Phone: ${signInId}\n` +
+              `Temporary password: ${p.temporaryPassword}\n\n` +
+              `You'll be asked to choose a new password as soon as you sign in. ` +
+              `If you didn't ask for this, contact KodiHQ support.`,
+          },
+          'password_reset',
+          secret,
+        ),
+      );
+    }
+    if (to.phone) {
+      tasks.push(
+        this.dispatchSms(
+          { kind: 'platform', type: 'password_reset' },
+          to.phone,
+          `KodiHQ: your password was reset. Temporary password ${p.temporaryPassword} - sign in at ${loginUrl} and choose a new one.`.slice(
+            0,
+            160,
+          ),
+          secret,
+        ),
+      );
+    }
+    if (!tasks.length) return false;
+    const results = await Promise.allSettled(tasks);
+    return results.some((r) => r.status === 'fulfilled');
+  }
+
   private async renderSystemEmailTemplate(
     key: EmailTemplateKey,
     vars: Record<string, string | number | null | undefined>,

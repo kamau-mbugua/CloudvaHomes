@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api/client';
 import type { PageEnvelope } from '../../lib/api/types';
 import { isSuperAdmin } from '../../lib/auth/portals';
 import { useSession } from '../../lib/auth/useAuth';
+import { formatDateTime } from '../../lib/dates';
 import { formatKES } from '../../lib/money';
 import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
@@ -13,12 +14,12 @@ import { EmptyState } from '../../components/EmptyState';
 import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
 import { Sheet } from '../../components/Sheet';
-import { unwrap } from '../payments/rules';
+import { unwrap, unwrapList } from '../payments/rules';
 import { Breadcrumbs, Fact, Field } from '../portfolio/ui';
 import { PAGE_SIZE, keys, platformErrorMessage, usePlans, usePlatformOperators } from '../platform/api';
 import { checkOrgDetails, checkTerms, formatDayish, monthlyTotal, overridesOf, orgDetailsDraft, ownerText, priceText, termsDraft } from '../platform/rules';
 import type { OrgDetailsDraft, TermsDraft } from '../platform/rules';
-import type { PlatformInvoice, PlatformOrganization, PlatformPayment } from '../platform/types';
+import type { OrgMember, PlatformInvoice, PlatformOrganization, PlatformPayment } from '../platform/types';
 import { CustomBadge, HodiInvoicesTable, OrgStatusBadge, PlatformPaymentsTable } from '../platform/ui';
 import { AdminInvoiceActions, RecordHodiPaymentSheet, VoidHodiInvoiceSheet } from './sheets';
 import { AdminOrgSms } from './AdminOrgSms';
@@ -27,7 +28,8 @@ import { AdminOrgSms } from './AdminOrgSms';
  * Admin → an organisation (`/admin/organizations/:id`): its status, billing account, owner
  * and let units; its billing terms — plan, its own price and minimum (empty = the plan's,
  * shown "Custom" when set), trial end and "no suspension until"; close or reopen; and its
- * KodiHQ invoices (void) and payments ("Record payment"); and "Edit details" (name, phone,
+ * KodiHQ invoices (void) and payments ("Record payment"); its team (resend an invitation,
+ * remove a member, never the last owner); and "Edit details" (name, phone,
  * email, KRA PIN) for superadmins and the salesperson who looks after it. Every change is audited.
  */
 export function OrganizationDetailPage() {
@@ -48,7 +50,7 @@ export function OrganizationDetailPage() {
   return <OrganizationDetail org={org.data} />;
 }
 
-type OrgDetailTab = 'terms' | 'invoices' | 'payments' | 'sms';
+type OrgDetailTab = 'terms' | 'team' | 'invoices' | 'payments' | 'sms';
 
 function OrganizationDetail({ org }: { org: PlatformOrganization }) {
   const { user } = useSession();
@@ -61,7 +63,7 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
   const rawTab = params.get('tab');
   const defaultTab: OrgDetailTab = superAdmin ? 'terms' : 'invoices';
   const tab: OrgDetailTab =
-    rawTab === 'invoices' || rawTab === 'payments'
+    rawTab === 'invoices' || rawTab === 'payments' || rawTab === 'team'
       ? rawTab
       : (rawTab === 'terms' || rawTab === 'sms') && superAdmin
         ? rawTab
@@ -160,6 +162,15 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
           <button
             type="button"
             role="tab"
+            aria-selected={tab === 'team'}
+            className="pf__tab"
+            onClick={() => selectTab('team')}
+          >
+            Team
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={tab === 'invoices'}
             className="pf__tab"
             onClick={() => selectTab('invoices')}
@@ -193,6 +204,8 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
         <TermsForm key={`${org.id}-${org.plan?.id ?? ''}-${org.priceOverride ?? ''}-${org.minimumOverride ?? ''}-${org.trialEndsAt ?? ''}-${org.noSuspendUntil ?? ''}-${org.price?.pricePerUnit}-${org.price?.minimumMonthly}-${org.onboardedById ?? ''}`} org={org} />
       ) : tab === 'sms' && superAdmin ? (
         <AdminOrgSms orgId={org.id} />
+      ) : tab === 'team' ? (
+        <OrgTeam orgId={org.id} />
       ) : tab === 'invoices' ? (
         <OrgInvoices orgId={org.id} superAdmin={superAdmin} />
       ) : (
@@ -447,5 +460,78 @@ function OrgPayments({ orgId }: { orgId: string }) {
       ) : <PlatformPaymentsTable rows={rows} />}
       <Pager meta={list.data?.meta} onPage={setPage} />
     </section>
+  );
+}
+
+/** The organisation's team, for support: who's on it, pending invitations, removing people. */
+function OrgTeam({ orgId }: { orgId: string }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const members = useQuery({
+    queryKey: [...keys.organizations, 'detail', orgId, 'members'],
+    queryFn: () =>
+      api.get<unknown>(`/platform/organizations/${encodeURIComponent(orgId)}/members`).then((body) => unwrapList<OrgMember>(body)),
+  });
+  const base = `/platform/organizations/${encodeURIComponent(orgId)}/members`;
+  const resend = useMutation({
+    mutationFn: (m: OrgMember) => api.post<unknown>(`${base}/${encodeURIComponent(m.id)}/resend`, {}),
+    onSuccess: (body, m) => {
+      const delivered = unwrap<{ invitationDelivered: boolean }>(body).invitationDelivered;
+      if (delivered) toast.saved(`A new invitation was sent to ${m.user.firstName}.`);
+      else toast.failed('The invitation was renewed, but couldn’t be sent. Try again shortly.');
+    },
+    onError: (error) => toast.failed(platformErrorMessage(error)),
+  });
+  const remove = useMutation({
+    mutationFn: (m: OrgMember) => api.delete<unknown>(`${base}/${encodeURIComponent(m.id)}`),
+    onSuccess: async (_r, m) => {
+      toast.saved(`${m.user.firstName} ${m.user.lastName} was removed from the team.`.replace(/\s+/g, ' '));
+      await queryClient.invalidateQueries({ queryKey: keys.platform });
+    },
+    onError: (error) => toast.failed(platformErrorMessage(error)),
+  });
+
+  if (members.isPending) return <TableSkeleton />;
+  if (members.isError) return <p className="ad__error" role="alert">{platformErrorMessage(members.error)}</p>;
+  if (members.data.length === 0) return <EmptyState title="No team yet" detail="The owner’s invitation appears here." />;
+  const statusText = (m: OrgMember) =>
+    m.user.deleted ? 'Account deleted' : m.status === 'ACTIVE' ? 'Active' : m.status === 'INVITED' ? 'Invited' : 'Ended';
+
+  return (
+    <div className="ad__tablewrap">
+      <table className="ad__table">
+        <thead>
+          <tr><th>Person</th><th>Role</th><th>Status</th><th>Last sign-in</th><th aria-label="Actions" /></tr>
+        </thead>
+        <tbody>
+          {members.data.map((m) => {
+            const name = `${m.user.firstName} ${m.user.lastName}`.trim();
+            return (
+              <tr key={m.id}>
+                <td>
+                  <Link className="ad__link" to={`/admin/users/${encodeURIComponent(m.user.id)}`}><strong>{name}</strong></Link>
+                  <span className="ad__sub">{[m.user.email, m.user.phone].filter(Boolean).join(' · ') || '—'}</span>
+                </td>
+                <td>{m.role.name}</td>
+                <td>{statusText(m)}{m.user.status === 'DISABLED' && !m.user.deleted ? <span className="ad__sub">Sign-in disabled</span> : null}</td>
+                <td>{m.user.lastLoginAt ? formatDateTime(m.user.lastLoginAt) : <span className="ad__muted">Never</span>}</td>
+                <td className="ad__rowactions">
+                  {m.status === 'INVITED' ? (
+                    <button type="button" className="nx-btn nx-btn--sm" disabled={resend.isPending} onClick={() => resend.mutate(m)}>
+                      Resend invitation
+                    </button>
+                  ) : null}
+                  <ConfirmDelete label="Remove" verb="Remove" what={`${name} from the team`} busy={remove.isPending}
+                    consequence={m.role.isOwner
+                      ? 'They lose access to this organisation. An organisation must keep at least one active owner, so invite the new owner first.'
+                      : 'They lose access to this organisation now. Their account and other organisations are unchanged.'}
+                    onConfirm={() => remove.mutate(m)} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

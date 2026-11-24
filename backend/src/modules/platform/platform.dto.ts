@@ -785,3 +785,57 @@ export class UpdateLandingPageDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) footerCopyright?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) footerTagline?: string;
 }
+
+// ── People (customers' accounts) ──
+
+export const USER_FILTERS = [
+  'all',
+  'business',
+  'tenants',
+  'owners',
+  'disabled',
+  'deleted',
+] as const;
+export type UserFilter = (typeof USER_FILTERS)[number];
+
+export class ListPlatformUsersQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) q?: string;
+
+  @ApiPropertyOptional({ enum: USER_FILTERS, default: 'all' })
+  @IsOptional()
+  @IsIn(USER_FILTERS)
+  filter?: UserFilter;
+}
+
+/** Name and contact fixes. `null` or "" removes an email or phone; one must stay. */
+export class UpdatePlatformUserDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(80) firstName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(80) lastName?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @IsEmail()
+  email?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== '')
+  @IsString()
+  @MaxLength(20)
+  phone?: string | null;
+}
+
+export class SetPlatformUserStatusDto {
+  @ApiProperty({ enum: ['ACTIVE', 'DISABLED'] })
+  @IsIn(['ACTIVE', 'DISABLED'])
+  status!: 'ACTIVE' | 'DISABLED';
+}
+
+export class CloseAccountDto {
+  @ApiPropertyOptional({ description: 'Why (e.g. "Emailed privacy@ on 24 Nov")' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}

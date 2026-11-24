@@ -6,7 +6,8 @@ import { ADMIN_NAV, bestEntry, destinations, filterAdminNav } from '../../app/na
 import { platformErrorMessage } from './api';
 import {
   bannerFor, checkDays, checkOrgDetails, checkPlan, checkPlatformPayment, checkSettings, checkTerms, darajaSettingsBody, dayOf, formatDayish,
-  lastMonth, monthlyTotal, overridesOf, orgDetailsDraft, ownerText, planDraft, priceText, settingsDraft, stkView, suggestedPayment, termsDraft,
+  lastMonth, monthlyTotal, overridesOf, orgDetailsDraft, ownerText, passwordText, planDraft, priceText, purgeText, settingsDraft, stkView, suggestedPayment, termsDraft,
+  userLinksText, userState,
 } from './rules';
 import type { Plan, PlatformOrganization, PlatformSettings } from './types';
 
@@ -295,8 +296,11 @@ describe('admin area routing', () => {
   it('filters out superadmin-only groups and entries for salespeople', () => {
     const salesNav = filterAdminNav(ADMIN_NAV, false);
     const groupIds = salesNav.map((g) => g.id);
-    expect(groupIds).toEqual(['admin-overview', 'admin-organizations', 'admin-billing', 'admin-platform']);
+    expect(groupIds).toEqual(['admin-overview', 'admin-organizations', 'admin-people', 'admin-billing', 'admin-platform']);
     const links = destinations(salesNav).map((e) => e.to);
+    expect(links).toContain('/admin/users');
+    expect(links).not.toContain('/admin/users?filter=deleted');
+    expect(destinations(filterAdminNav(ADMIN_NAV, true)).map((e) => e.to)).toContain('/admin/users?filter=deleted');
     expect(links).not.toContain('/admin/plans');
     expect(links).not.toContain('/admin/admins');
     expect(links).not.toContain('/admin/email');
@@ -350,5 +354,44 @@ describe('checkOrgDetails', () => {
   it('an emptied KRA PIN clears it', () => {
     const withPin = { ...org, kraPin: 'A123456789Z' } as PlatformOrganization;
     expect(checkOrgDetails(withPin, { ...orgDetailsDraft(withPin), kraPin: '' })).toEqual({ ok: true, body: { kraPin: '' } });
+  });
+});
+
+describe('people', () => {
+  const base = { status: 'ACTIVE' as const, deleted: null };
+
+  it('a person’s state: active, disabled, deleted, erased', () => {
+    expect(userState(base)).toBe('active');
+    expect(userState({ ...base, status: 'DISABLED' })).toBe('disabled');
+    const deleted = { deletedAt: '2026-11-01', email: 'a@b.c', phone: null, reason: null, purgeOn: '2026-12-01', purgedAt: null };
+    expect(userState({ status: 'DISABLED', deleted })).toBe('deleted');
+    expect(userState({ status: 'DISABLED', deleted: { ...deleted, purgedAt: '2026-12-01' } })).toBe('erased');
+  });
+
+  it('how they sign in', () => {
+    expect(passwordText({ hasPassword: false, mustChangePassword: false })).toMatch(/one-time code/);
+    expect(passwordText({ hasPassword: true, mustChangePassword: true })).toMatch(/Temporary/);
+    expect(passwordText({ hasPassword: true, mustChangePassword: false })).toBe('Set');
+  });
+
+  it('days until a deleted account is erased', () => {
+    const now = new Date('2026-11-24T09:00:00Z');
+    expect(purgeText('2026-12-06T09:00:00Z', now)).toBe('Erased in 12 days');
+    expect(purgeText('2026-11-25T08:00:00Z', now)).toBe('Erased tomorrow');
+    expect(purgeText('2026-11-24T08:00:00Z', now)).toBe('Due to be erased today');
+    expect(purgeText(null, now)).toBeNull();
+  });
+
+  it('what a person is to customers', () => {
+    expect(
+      userLinksText({
+        organizations: [
+          { id: 'o1', name: 'Ivory Breeze', role: 'Owner', status: 'ACTIVE' },
+          { id: 'o2', name: 'Ruaka', role: 'Manager', status: 'INVITED' },
+        ],
+        isTenant: true,
+        isOwner: false,
+      }),
+    ).toBe('Owner, Ivory Breeze · Manager, Ruaka (invited) · Tenant');
   });
 });

@@ -392,7 +392,7 @@ export class PlatformAdminService {
 
   // ── Platform Operators (Superadmins & Salespeople) ──
 
-  private generateTemporaryPassword(): string {
+  generateTemporaryPassword(): string {
     const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
     const lower = 'abcdefghijkmnopqrstuvwxyz';
     const digits = '23456789';
@@ -633,7 +633,7 @@ export class PlatformAdminService {
         }
       }
 
-      const contact = await this.operatorContactChanges(before, dto);
+      const contact = await this.contactChanges(before, dto);
       const accessChanged =
         (dto.role !== undefined && nextRole !== before.platformRole) ||
         (dto.status !== undefined && dto.status !== before.status);
@@ -690,11 +690,15 @@ export class PlatformAdminService {
   }
 
   /**
-   * Validates the name and contact fields of an operator edit and returns only what changes.
+   * Validates the name and contact fields of an operator (or customer) edit and returns only
+   * what changes.
    * The new email or phone must not belong to another account (the columns are unique, and a
    * customer's sign-in must never be handed to an operator).
    */
-  private async operatorContactChanges(before: User, dto: UpdateOperatorDto) {
+  async contactChanges(
+    before: User,
+    dto: Pick<UpdateOperatorDto, 'firstName' | 'lastName' | 'email' | 'phone'>,
+  ) {
     const changes: {
       firstName?: string;
       lastName?: string;
