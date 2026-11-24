@@ -154,6 +154,7 @@ export interface PlatformOrganization {
   kind: OrgKind;
   phone?: string | null;
   email?: string | null;
+  kraPin?: string | null;
   status: OrgStatus;
   billingRef: string;
   plan: OrgPlanRef | null;

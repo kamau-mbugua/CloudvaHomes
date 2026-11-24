@@ -48,6 +48,7 @@ import {
   ListEmailLogsQueryDto,
   RevealEmailSecretDto,
   ListOrgsQueryDto,
+  UpdateOrgDetailsDto,
   ListPlatformInvoicesDto,
   ListPlatformPaymentsDto,
   PlatformAuditQueryDto,
@@ -238,6 +239,15 @@ export class PlatformController {
   @Get('organizations/:id')
   async organization(@Param('id', ParseUUIDPipe) id: string) {
     return ok(await this.admin.organization(id));
+  }
+
+  /** Name, phone, email and KRA PIN. Salespeople may fix the organisations they look after. */
+  @Patch('organizations/:id/details')
+  async updateOrganizationDetails(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateOrgDetailsDto,
+  ) {
+    return ok(await this.admin.updateOrganizationDetails(id, dto));
   }
 
   @Patch('organizations/:id')

@@ -5,8 +5,8 @@ import { isPlatformOperator, isSuperAdmin, landingFor } from '../../lib/auth/por
 import { ADMIN_NAV, bestEntry, destinations, filterAdminNav } from '../../app/navigation';
 import { platformErrorMessage } from './api';
 import {
-  bannerFor, checkDays, checkPlan, checkPlatformPayment, checkSettings, checkTerms, darajaSettingsBody, dayOf, formatDayish,
-  lastMonth, monthlyTotal, overridesOf, ownerText, planDraft, priceText, settingsDraft, stkView, suggestedPayment, termsDraft,
+  bannerFor, checkDays, checkOrgDetails, checkPlan, checkPlatformPayment, checkSettings, checkTerms, darajaSettingsBody, dayOf, formatDayish,
+  lastMonth, monthlyTotal, overridesOf, orgDetailsDraft, ownerText, planDraft, priceText, settingsDraft, stkView, suggestedPayment, termsDraft,
 } from './rules';
 import type { Plan, PlatformOrganization, PlatformSettings } from './types';
 
@@ -327,5 +327,28 @@ describe('admin area routing', () => {
     expect(winner('/admin/organizations')).toBe('/admin/organizations');
     expect(winner('/admin/reports/collections')).toBe('/admin/reports/:report');
     expect(winner('/admin/nowhere')).toBe('/admin/*');
+  });
+});
+
+describe('checkOrgDetails', () => {
+  const org = {
+    id: 'o1', name: 'Ivory Breeze', phone: '+254711000000', email: 'office@ivory.test', kraPin: null,
+  } as unknown as PlatformOrganization;
+
+  it('sends only what changed, with a cleaned-up KRA PIN', () => {
+    const draft = { ...orgDetailsDraft(org), name: ' Ivory Breeze Homes ', kraPin: 'a123456789z' };
+    expect(checkOrgDetails(org, draft)).toEqual({ ok: true, body: { name: 'Ivory Breeze Homes', kraPin: 'A123456789Z' } });
+    expect(checkOrgDetails(org, orgDetailsDraft(org))).toEqual({ ok: true, body: {} });
+  });
+
+  it('refuses empty required fields and a malformed KRA PIN', () => {
+    const result = checkOrgDetails(org, { name: ' ', phone: '', email: 'nope', kraPin: '123' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(Object.keys(result.errors).sort()).toEqual(['email', 'kraPin', 'name', 'phone']);
+  });
+
+  it('an emptied KRA PIN clears it', () => {
+    const withPin = { ...org, kraPin: 'A123456789Z' } as PlatformOrganization;
+    expect(checkOrgDetails(withPin, { ...orgDetailsDraft(withPin), kraPin: '' })).toEqual({ ok: true, body: { kraPin: '' } });
   });
 });

@@ -12,11 +12,12 @@ import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
 import { CardSkeleton, TableSkeleton } from '../../components/Loading';
 import { Pager } from '../../components/Pager';
+import { Sheet } from '../../components/Sheet';
 import { unwrap } from '../payments/rules';
 import { Breadcrumbs, Fact, Field } from '../portfolio/ui';
 import { PAGE_SIZE, keys, platformErrorMessage, usePlans, usePlatformOperators } from '../platform/api';
-import { checkTerms, formatDayish, monthlyTotal, overridesOf, ownerText, priceText, termsDraft } from '../platform/rules';
-import type { TermsDraft } from '../platform/rules';
+import { checkOrgDetails, checkTerms, formatDayish, monthlyTotal, overridesOf, orgDetailsDraft, ownerText, priceText, termsDraft } from '../platform/rules';
+import type { OrgDetailsDraft, TermsDraft } from '../platform/rules';
 import type { PlatformInvoice, PlatformOrganization, PlatformPayment } from '../platform/types';
 import { CustomBadge, HodiInvoicesTable, OrgStatusBadge, PlatformPaymentsTable } from '../platform/ui';
 import { AdminInvoiceActions, RecordHodiPaymentSheet, VoidHodiInvoiceSheet } from './sheets';
@@ -26,7 +27,8 @@ import { AdminOrgSms } from './AdminOrgSms';
  * Admin → an organisation (`/admin/organizations/:id`): its status, billing account, owner
  * and let units; its billing terms — plan, its own price and minimum (empty = the plan's,
  * shown "Custom" when set), trial end and "no suspension until"; close or reopen; and its
- * KodiHQ invoices (void) and payments ("Record payment"). Every change is audited.
+ * KodiHQ invoices (void) and payments ("Record payment"); and "Edit details" (name, phone,
+ * email, KRA PIN) for superadmins and the salesperson who looks after it. Every change is audited.
  */
 export function OrganizationDetailPage() {
   const { organizationId = '' } = useParams();
@@ -54,6 +56,7 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [recording, setRecording] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [params, setParams] = useSearchParams();
   const rawTab = params.get('tab');
   const defaultTab: OrgDetailTab = superAdmin ? 'terms' : 'invoices';
@@ -96,8 +99,10 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
           <span className="ad__muted"><span className="num">{org.billingRef}</span> · {org.kind === 'AGENCY' ? 'Agency' : org.kind === 'HOST' ? 'Host' : 'Landlord'}</span>
         </div>
         <OrgStatusBadge status={org.status} />
-        {superAdmin ? (
-          <div className="pg-actions pg-push">
+        <div className="pg-actions pg-push">
+          <button type="button" className="nx-btn" onClick={() => setEditing(true)}>Edit details</button>
+          {superAdmin ? (
+            <>
             {!closed ? (
               <button type="button" className="nx-btn nx-btn--primary" onClick={() => setRecording(true)}>Record payment</button>
             ) : null}
@@ -110,8 +115,9 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
                 consequence="Its staff can no longer change anything and it is no longer billed. The daily status check leaves a closed organisation alone; you can reopen it at any time."
                 onConfirm={() => setStatus.mutate('CLOSED')} />
             )}
-          </div>
-        ) : null}
+            </>
+          ) : null}
+        </div>
       </div>
 
       <dl className="pf__facts adm__facts">
@@ -121,6 +127,11 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
         <Fact label="A month now comes to">
           {org.price ? <span className="num">{formatKES(monthlyTotal(org.occupiedUnits ?? 0, org.price))}</span> : null}
         </Fact>
+        <Fact label="Contact">
+          {org.phone ?? null}
+          {org.email ? <span className="ad__sub">{org.email}</span> : null}
+        </Fact>
+        <Fact label="KRA PIN">{org.kraPin ? <span className="num">{org.kraPin}</span> : null}</Fact>
         <Fact label="Owner">
           {ownerText(org.owner)}
           {org.owner?.phone || org.owner?.email ? <span className="ad__sub">{[org.owner?.phone, org.owner?.email].filter(Boolean).join(' · ')}</span> : null}
@@ -189,7 +200,86 @@ function OrganizationDetail({ org }: { org: PlatformOrganization }) {
       )}
 
       {recording ? <RecordHodiPaymentSheet org={org} onClose={() => setRecording(false)} /> : null}
+      {editing ? <EditDetailsSheet org={org} onClose={() => setEditing(false)} /> : null}
     </div>
+  );
+}
+
+function EditDetailsSheet({ org, onClose }: { org: PlatformOrganization; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [draft, setDraft] = useState<OrgDetailsDraft>(() => orgDetailsDraft(org));
+  const [errors, setErrors] = useState<Partial<Record<keyof OrgDetailsDraft, string>>>({});
+  const [general, setGeneral] = useState<string | null>(null);
+  const set = (key: keyof OrgDetailsDraft) => (e: { target: { value: string } }) =>
+    setDraft((d) => ({ ...d, [key]: e.target.value }));
+
+  const save = useMutation({
+    mutationFn: (body: Partial<OrgDetailsDraft>) =>
+      api.patch<unknown>(`/platform/organizations/${encodeURIComponent(org.id)}/details`, body),
+    onSuccess: async () => {
+      toast.saved(`${draft.name.trim()} updated.`);
+      await queryClient.invalidateQueries({ queryKey: keys.platform });
+      onClose();
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 422 && Object.keys(error.fieldErrors).length > 0) {
+        setErrors(error.fieldErrors);
+        return;
+      }
+      setGeneral(platformErrorMessage(error));
+    },
+  });
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setGeneral(null);
+    const checked = checkOrgDetails(org, draft);
+    if (!checked.ok) {
+      setErrors(checked.errors);
+      return;
+    }
+    setErrors({});
+    if (Object.keys(checked.body).length === 0) {
+      onClose();
+      return;
+    }
+    save.mutate(checked.body);
+  };
+
+  return (
+    <Sheet
+      title={`Edit ${org.name}`}
+      busy={save.isPending}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" className="nx-btn" onClick={onClose} disabled={save.isPending}>Cancel</button>
+          <button type="submit" form="org-edit" className="nx-btn nx-btn--primary" disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </>
+      )}
+    >
+      <form id="org-edit" className="sheet-form" onSubmit={submit} noValidate>
+        <div className="fm__grid sheet-grid">
+          <Field id="org-edit-name" label="Organisation name" error={errors.name}>
+            <input id="org-edit-name" value={draft.name} aria-invalid={Boolean(errors.name)} onChange={set('name')} />
+          </Field>
+          <Field id="org-edit-phone" label="Organisation phone" error={errors.phone} hint="Kenyan number, e.g. 0712345678 or +254712345678.">
+            <input id="org-edit-phone" type="tel" value={draft.phone} aria-invalid={Boolean(errors.phone)} onChange={set('phone')} />
+          </Field>
+          <Field id="org-edit-email" label="Organisation email" error={errors.email}>
+            <input id="org-edit-email" type="email" value={draft.email} aria-invalid={Boolean(errors.email)} onChange={set('email')} />
+          </Field>
+          <Field id="org-edit-kra" label="KRA PIN" optional error={errors.kraPin} hint="Format: A000000000B. Leave empty to remove it.">
+            <input id="org-edit-kra" value={draft.kraPin} aria-invalid={Boolean(errors.kraPin)} maxLength={11} onChange={set('kraPin')} />
+          </Field>
+        </div>
+        <p className="ad__muted">These are the organisation’s details on its invoices and receipts. The owner’s own sign-in email and phone don’t change.</p>
+        {general ? <p className="nx-sheet__error" role="alert">{general}</p> : null}
+      </form>
+    </Sheet>
   );
 }
 

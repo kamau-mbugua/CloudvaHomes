@@ -47,6 +47,7 @@ import type {
   UpdateEmailTemplateDto,
   UpdateOperatorDto,
   UpdateOrgBillingDto,
+  UpdateOrgDetailsDto,
   UpdatePlanDto,
 } from './platform.dto.js';
 
@@ -222,6 +223,7 @@ export class PlatformAdminService {
       kind: o.kind,
       phone: o.phone,
       email: o.email,
+      kraPin: o.kraPin,
       status: o.status,
       billingRef: o.billingRef,
       plan: plan ? { id: plan.id, name: plan.name } : null,
@@ -283,6 +285,52 @@ export class PlatformAdminService {
       }
       return this.toOrg(o, await this.planMap());
     });
+  }
+
+  /** Fixes an organisation's name, phone, email or KRA PIN (e.g. a typo at onboarding). */
+  async updateOrganizationDetails(id: string, dto: UpdateOrgDetailsDto) {
+    const before = await this.organization(id); // 404 for a salesperson outside their book
+    const phone = dto.phone !== undefined ? normalizePhone(dto.phone) : undefined;
+    const email = dto.email !== undefined ? normalizeEmail(dto.email) : undefined;
+    const errors: { field: string; message: string }[] = [];
+    if (dto.name !== undefined && dto.name.trim().length < 2) {
+      errors.push({ field: 'name', message: 'Enter the organisation name' });
+    }
+    if (phone === null) {
+      errors.push({ field: 'phone', message: 'Enter a valid phone number, e.g. 0712 345 678' });
+    }
+    if (email === null) errors.push({ field: 'email', message: 'Enter a valid email address' });
+    if (errors.length) throw AppError.validation(errors);
+
+    const data: Prisma.OrganizationUpdateInput = {
+      ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+      ...(phone ? { phone } : {}),
+      ...(email ? { email } : {}),
+      ...(dto.kraPin !== undefined ? { kraPin: dto.kraPin ? dto.kraPin.toUpperCase() : null } : {}),
+    };
+    const details = (o: { name: string; phone: string; email: string; kraPin: string | null }) => ({
+      name: o.name,
+      phone: o.phone,
+      email: o.email,
+      kraPin: o.kraPin,
+    });
+    await withoutOrgScope(() =>
+      this.db.$transaction(async (tx) => {
+        const after = await tx.organization.update({ where: { id }, data });
+        await this.audit.record(
+          {
+            action: 'organization.details_update',
+            entity: 'organization',
+            entityId: id,
+            orgId: id,
+            before: details(before),
+            after: details(after),
+          },
+          tx,
+        );
+      }),
+    );
+    return this.organization(id);
   }
 
   updateOrganization(id: string, dto: UpdateOrgBillingDto) {

@@ -411,3 +411,44 @@ export function suggestedPayment(summary: Pick<BillingSummary, 'overdue' | 'bala
   if (summary.balance > 0) return summary.balance;
   return Math.max(0, summary.overdue?.amount ?? 0);
 }
+
+// ---------------------------------------------------------------- organisation details
+
+export interface OrgDetailsDraft {
+  name: string;
+  phone: string;
+  email: string;
+  kraPin: string;
+}
+
+export function orgDetailsDraft(org: PlatformOrganization): OrgDetailsDraft {
+  return { name: org.name, phone: org.phone ?? '', email: org.email ?? '', kraPin: org.kraPin ?? '' };
+}
+
+const KRA_PIN = /^[A-Z]\d{9}[A-Z]$/;
+
+/**
+ * The "Edit details" sheet → the `PATCH …/details` body, holding only what changed. Name, phone
+ * and email are required on an organisation; an empty KRA PIN clears it (sent as "").
+ */
+export function checkOrgDetails(
+  org: PlatformOrganization,
+  draft: OrgDetailsDraft,
+): Checked<Partial<OrgDetailsDraft>, keyof OrgDetailsDraft> {
+  const errors: Errors<keyof OrgDetailsDraft> = {};
+  const name = draft.name.trim();
+  const phone = draft.phone.trim();
+  const email = draft.email.trim();
+  const kraPin = draft.kraPin.trim().toUpperCase();
+  if (name.length < 2) errors.name = 'Enter the organisation name.';
+  if (!phone) errors.phone = 'Enter the organisation phone.';
+  if (!email || !email.includes('@')) errors.email = 'Enter a valid email address.';
+  if (kraPin && !KRA_PIN.test(kraPin)) errors.kraPin = 'A KRA PIN looks like A123456789Z.';
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  const body: Partial<OrgDetailsDraft> = {};
+  if (name !== org.name) body.name = name;
+  if (phone !== (org.phone ?? '')) body.phone = phone;
+  if (email.toLowerCase() !== (org.email ?? '').toLowerCase()) body.email = email;
+  if (kraPin !== (org.kraPin ?? '')) body.kraPin = kraPin;
+  return { ok: true, body };
+}

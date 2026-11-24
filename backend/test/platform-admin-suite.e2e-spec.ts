@@ -317,6 +317,80 @@ describe('Platform Admin Suite — Phase 11 (e2e)', () => {
     expect(await t.prisma.membership.count({ where: { userId: samUser.id } })).toBe(0);
   });
 
+  it("lets staff fix an organisation's name, phone, email and KRA PIN", async () => {
+    await post(
+      admin,
+      '/platform/operators',
+      {
+        firstName: 'Sam',
+        lastName: 'Seller',
+        email: 'sam@hodi.test',
+        phone: '0722000111',
+        role: 'SALESPERSON',
+        password: PASSWORD,
+      },
+      201,
+    );
+    const sam = await login(t, 'sam@hodi.test');
+    const create = async (s: Session, name: string) =>
+      (
+        await post(
+          s,
+          '/platform/organizations',
+          {
+            name,
+            kind: 'LANDLORD',
+            phone: '0711000000',
+            email: 'ofice@typo.test',
+            owner: {
+              firstName: 'Olive',
+              lastName: 'Owner',
+              email: `${name.toLowerCase()}@x.test`,
+              phone: name === 'Mine' ? '0733000222' : '0744000333',
+            },
+          },
+          201,
+        )
+      ).data.id as string;
+    const mine = await create(sam, 'Mine');
+    const other = await create(admin, 'Other');
+
+    const fixed = (
+      await patch(sam, `/platform/organizations/${mine}/details`, {
+        name: ' Mine Homes ',
+        phone: '0712 345 678',
+        email: 'Office@Mine.test',
+        kraPin: 'a123456789z',
+      })
+    ).data;
+    expect(fixed).toMatchObject({
+      name: 'Mine Homes',
+      phone: '+254712345678',
+      email: 'office@mine.test',
+      kraPin: 'A123456789Z',
+    });
+    const audit = await t.prisma.auditLog.findFirstOrThrow({
+      where: { action: 'organization.details_update', entityId: mine },
+    });
+    expect(audit.before).toMatchObject({ name: 'Mine', email: 'ofice@typo.test' });
+    expect(audit.after).toMatchObject({ name: 'Mine Homes', email: 'office@mine.test' });
+
+    // Bad values are refused field by field; an empty KRA PIN clears it.
+    const field = async (body: object) =>
+      (await patch(admin, `/platform/organizations/${mine}/details`, body, 422)).error.details[0]
+        .field;
+    expect(await field({ phone: '12' })).toBe('phone');
+    expect(await field({ email: 'nope' })).toBe('email');
+    expect(await field({ name: ' ' })).toBe('name');
+    const cleared = (await patch(admin, `/platform/organizations/${mine}/details`, { kraPin: '' }))
+      .data;
+    expect(cleared.kraPin).toBeNull();
+
+    // A salesperson can't touch an organisation outside their book.
+    await patch(sam, `/platform/organizations/${other}/details`, { name: 'Taken over' }, 404);
+    expect((await get(admin, `/platform/organizations/${other}`)).data.name).toBe('Other');
+  });
+
   it('requires a 6-digit 2FA code for platform operators when requireAdminTwoFactor is enabled', async () => {
     // Enable Admin 2FA via EMAIL
     const updatedSettings = (

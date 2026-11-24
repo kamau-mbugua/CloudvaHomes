@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -22,6 +22,7 @@ import {
 import { IsDateOnly } from '../../common/dates/date-only.js';
 import { PaginationQueryDto } from '../../common/http/pagination.js';
 import { IsPeriod } from '../billing/billing.dto.js';
+import { UpdateOrganizationDto } from '../organizations/organizations.dto.js';
 import { IsMinorAmount } from '../portfolio/money.dto.js';
 
 export class CreatePlanDto {
@@ -66,6 +67,14 @@ export class ListOrgsQueryDto extends PaginationQueryDto {
   @IsIn(STATUSES)
   status?: (typeof STATUSES)[number];
 }
+
+/** An organisation's contact details, fixed by KodiHQ staff. An empty `kraPin` clears it. */
+export class UpdateOrgDetailsDto extends PickType(UpdateOrganizationDto, [
+  'name',
+  'phone',
+  'email',
+  'kraPin',
+] as const) {}
 
 /** `null` clears an override or date. */
 export class UpdateOrgBillingDto {
