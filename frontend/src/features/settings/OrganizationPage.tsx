@@ -352,7 +352,13 @@ function OrganizationForm({ org }: { org: Organization }) {
           ) : null}
         </div>
       </form>
-      {tab === 'details' ? <StaffTwoFactorSection org={org} canEdit={canEdit} /> : null}
+      {tab === 'details' ? (
+        <div className="fm fm--single pg-narrow">
+          <div className="fm__main">
+            <StaffTwoFactorSection org={org} canEdit={canEdit} />
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -386,16 +392,24 @@ function StaffTwoFactorSection({ org, canEdit }: { org: Organization; canEdit: b
   return (
     <section className="fm__section" aria-label="Two-step sign-in">
       <h2>Two-step sign-in</h2>
-      <p>After a password, ask for a one-time code sent to their phone (or email). Signing in with a code alone already proves it’s them.</p>
-      <div role="radiogroup" aria-label="Who needs a code" style={{ display: 'grid', gap: 8 }}>
+      <p>
+        After a password, ask for a one-time code sent to their phone (or email). Signing in with a code alone already
+        proves it’s them.
+      </p>
+      <fieldset className="tf__options" disabled={!canEdit || save.isPending}>
+        <legend className="nx-sr">Who needs a code</legend>
         {TWO_FACTOR_OPTIONS.map((o) => (
-          <label key={o.value} className="fld" style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <label key={o.value} className={`tf__option${current === o.value ? ' is-on' : ''}`}>
             <input type="radio" name="staff-2fa" value={o.value} checked={current === o.value}
-              disabled={!canEdit || save.isPending} onChange={() => save.mutate(o.value)} />
-            <span><strong>{o.label}</strong><span className="hint" style={{ display: 'block' }}>{o.hint}</span></span>
+              onChange={() => save.mutate(o.value)} />
+            <span>
+              <strong>{o.label}</strong>
+              <span className="tf__hint">{o.hint}</span>
+            </span>
           </label>
         ))}
-      </div>
+      </fieldset>
+      {!canEdit ? <p className="ad__muted">Your role can see this setting but not change it.</p> : null}
     </section>
   );
 }
