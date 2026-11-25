@@ -66,4 +66,15 @@ export class SaveInspectionDto {
   @IsOptional()
   @IsBoolean()
   reopen?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'The version this edit started from: the inspection’s `updatedAt`, or "none" for a new ' +
+      'one. When given and the saved inspection has changed since, the save is refused ' +
+      '(INSPECTION_CHANGED), so an edit made offline never overwrites newer work.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  baseVersion?: string;
 }

@@ -4,10 +4,17 @@ import { IsIn, IsOptional, IsUUID } from 'class-validator';
 import type { Response } from 'express';
 import { sendCsv } from '../../common/http/csv.js';
 import { ok } from '../../common/http/response.js';
-import { RequirePermission } from '../auth/decorators.js';
+import { RequireAnyPermission, RequirePermission } from '../auth/decorators.js';
 import { periodOf, todayInNairobi } from '../billing/billing-math.js';
 import { IsPeriod } from '../billing/billing.dto.js';
 import { ReportsService } from './reports.service.js';
+
+class TodayQueryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  propertyId?: string;
+}
 
 class FormatDto {
   @ApiPropertyOptional({ enum: ['json', 'csv'] })
@@ -63,6 +70,12 @@ class PnlQueryDto extends FormatDto {
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
+
+  @Get('today')
+  @RequireAnyPermission('meters:view', 'tenancies:view', 'maintenance:view')
+  async today(@Query() q: TodayQueryDto) {
+    return ok(await this.reports.today(q.propertyId));
+  }
 
   @Get('dashboard')
   @RequirePermission('reports:view')

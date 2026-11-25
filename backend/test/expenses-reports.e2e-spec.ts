@@ -598,4 +598,181 @@ describe('Expenses, files and reports (e2e)', () => {
     const accQ = await acceptInvite(t, 'accq@example.invalid');
     expect((await get(accQ, '/reports/dashboard')).data.actions).toEqual([]);
   });
+
+  it('caretaker today list returns unread meters, move-ins, move-outs and open repairs without money', async () => {
+    const a = await property(owner, 'TDA');
+    const b = await property(owner, 'TDB');
+    const u1 = (
+      await post(owner, '/units', { propertyId: a.id, number: 'A1', rentAmount: KES(15000) }, 201)
+    ).data;
+    const u2 = (
+      await post(owner, '/units', { propertyId: a.id, number: 'A2', rentAmount: KES(15000) }, 201)
+    ).data;
+    const uB = (
+      await post(owner, '/units', { propertyId: b.id, number: 'B1', rentAmount: KES(15000) }, 201)
+    ).data;
+
+    const water = (
+      await post(
+        owner,
+        '/charge-types',
+        { propertyId: a.id, name: 'Water', kind: 'METERED', unitRate: KES(100), unitLabel: 'm³' },
+        201,
+      )
+    ).data;
+    const m1 = (
+      await post(owner, '/meters', { unitId: u1.id, chargeTypeId: water.id, serialNo: 'W-A1' }, 201)
+    ).data;
+    const m2 = (
+      await post(owner, '/meters', { unitId: u2.id, chargeTypeId: water.id, serialNo: 'W-A2' }, 201)
+    ).data;
+    // Read m2 for this period so only m1 remains unread.
+    await put(owner, '/meter-readings', {
+      period: PERIOD,
+      readings: [{ meterId: m2.id, current: '5' }],
+    });
+
+    // Move-in without MOVE_IN inspection (starts today).
+    const tIn = (
+      await post(
+        owner,
+        '/tenancies',
+        {
+          unitId: u1.id,
+          tenant: { firstName: 'Grace', lastName: 'Mwangi', phone: '0711000701' },
+          startDate: TODAY,
+          billingDay: 1,
+        },
+        201,
+      )
+    ).data;
+
+    // Move-out due within 7 days (starts 20 days ago, in NOTICE ending in 3 days).
+    const start20Ago = formatDateOnly(addDays(parseDateOnly(TODAY), -20));
+    const endIn3 = formatDateOnly(addDays(parseDateOnly(TODAY), 3));
+    const tOut = (
+      await post(
+        owner,
+        '/tenancies',
+        {
+          unitId: u2.id,
+          tenant: { firstName: 'Peter', lastName: 'Otieno', phone: '0711000702' },
+          startDate: start20Ago,
+          billingDay: 1,
+        },
+        201,
+      )
+    ).data;
+    await post(owner, `/tenancies/${tOut.id}/notice`, { endDate: endIn3 });
+
+    // Two repairs on A1: one normal MEDIUM, one URGENT backdated to be overdue.
+    const rMed = (
+      await post(
+        owner,
+        '/maintenance-requests',
+        {
+          unitId: u1.id,
+          title: 'Loose handle',
+          description: 'Bedroom door',
+          category: 'CARPENTRY',
+          priority: 'MEDIUM',
+        },
+        201,
+      )
+    ).data;
+    const rUrg = (
+      await post(
+        owner,
+        '/maintenance-requests',
+        {
+          unitId: u1.id,
+          title: 'Burst pipe',
+          description: 'Kitchen sink',
+          category: 'PLUMBING',
+          priority: 'URGENT',
+        },
+        201,
+      )
+    ).data;
+    await t.prisma.maintenanceRequest.update({
+      where: { id: rUrg.id },
+      data: { createdAt: new Date(Date.now() - 30 * 3_600_000) },
+    });
+
+    // Repair on property B (should not show for caretaker scoped to A).
+    await post(
+      owner,
+      '/maintenance-requests',
+      {
+        unitId: uB.id,
+        title: 'Roof leak',
+        description: 'Top floor',
+        category: 'STRUCTURAL',
+        priority: 'HIGH',
+      },
+      201,
+    );
+
+    // Invite a Caretaker scoped to property A (Caretaker has no reports:view).
+    const caretakerRole = await roleId(t, owner, 'CARETAKER');
+    await post(
+      owner,
+      '/users/invitations',
+      {
+        firstName: 'John',
+        lastName: 'Caretaker',
+        email: 'caretaker-a@example.invalid',
+        roleId: caretakerRole,
+        propertyIds: [a.id],
+      },
+      201,
+    );
+    const caretaker = await acceptInvite(t, 'caretaker-a@example.invalid');
+    await get(caretaker, '/reports/dashboard', 403);
+
+    const todayRes = (await get(caretaker, '/reports/today')).data;
+    expect(todayRes.period).toBe(PERIOD);
+    expect(todayRes.unreadMeters.map((m: { id: string }) => m.id)).toEqual([m1.id]);
+    expect(todayRes.moveIns.map((m: { tenancyId: string }) => m.tenancyId)).toEqual([tIn.id]);
+    expect(todayRes.moveOuts).toEqual([
+      expect.objectContaining({
+        tenancyId: tOut.id,
+        endDate: endIn3,
+        hasMoveOutInspection: false,
+      }),
+    ]);
+    // Overdue urgent repair comes before non-overdue medium repair; B's repair is excluded.
+    expect(todayRes.openRepairs.map((r: { id: string }) => r.id)).toEqual([rUrg.id, rMed.id]);
+    expect(todayRes.openRepairs[0].overdue).toBe(true);
+    expect(todayRes.openRepairs[1].overdue).toBe(false);
+
+    // Asking for unassigned property B gives 404.
+    await get(caretaker, `/reports/today?propertyId=${b.id}`, 404);
+
+    // Once MOVE_IN inspection is recorded, tIn disappears from moveIns.
+    await put(caretaker, `/tenancies/${tIn.id}/inspections/MOVE_IN`, {
+      inspectedOn: TODAY,
+      items: [{ area: 'Walls & paint', condition: 'GOOD', photoUploadIds: [] }],
+    });
+    const afterInspect = (await get(caretaker, '/reports/today')).data;
+    expect(afterInspect.moveIns).toEqual([]);
+
+    // Role without meters:view, tenancies:view, or maintenance:view gets 403.
+    const noOpsRole = (
+      await post(owner, '/roles', { name: 'Billing viewer', permissions: ['invoices:view'] }, 201)
+    ).data;
+    await post(
+      owner,
+      '/users/invitations',
+      {
+        firstName: 'Bill',
+        lastName: 'Only',
+        email: 'billonly@example.invalid',
+        roleId: noOpsRole.id,
+      },
+      201,
+    );
+    const billOnly = await acceptInvite(t, 'billonly@example.invalid');
+    await get(billOnly, '/reports/today', 403);
+  });
 });

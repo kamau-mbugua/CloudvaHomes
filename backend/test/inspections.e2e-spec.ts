@@ -192,4 +192,34 @@ describe('Move-in and move-out inspections (e2e)', () => {
       422,
     );
   });
+
+  it('refuses a save started from an older version (offline edits never overwrite)', async () => {
+    const x = await setUp();
+    const path = `/tenancies/${x.ty.id}/inspections/MOVE_IN`;
+    const items = [{ area: 'Kitchen', condition: 'GOOD', photoUploadIds: [] }];
+    // A new one, expected new: saved.
+    const first = (await put(owner, path, { inspectedOn: TODAY, items, baseVersion: 'none' })).data;
+    // Another phone, also thinking it's new: refused, the first one stays.
+    const stale = await put(
+      owner,
+      path,
+      { inspectedOn: TODAY, items: [{ ...items[0], condition: 'POOR' }], baseVersion: 'none' },
+      409,
+    );
+    expect(stale.error.code).toBe('INSPECTION_CHANGED');
+    // Edited from the version it loaded: saved.
+    const second = (
+      await put(owner, path, {
+        inspectedOn: TODAY,
+        items: [{ ...items[0], condition: 'FAIR' }],
+        baseVersion: first.updatedAt,
+      })
+    ).data;
+    expect(second.items[0].condition).toBe('FAIR');
+    // That version is now old.
+    await put(owner, path, { inspectedOn: TODAY, items, baseVersion: first.updatedAt }, 409);
+    await put(owner, path, { inspectedOn: TODAY, items, baseVersion: 'yesterday' }, 422);
+    // Without a version (the web), it saves as before.
+    await put(owner, path, { inspectedOn: TODAY, items });
+  });
 });

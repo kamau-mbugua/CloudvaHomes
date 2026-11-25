@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_error.dart';
 import '../../../core/widgets/common.dart';
 import '../inspections.dart';
+import '../more/inspection_queue.dart';
 import '../more/photo.dart';
 import '../staff_api.dart';
 import '../staff_widgets.dart';
@@ -40,7 +41,18 @@ class InspectionScreen extends ConsumerWidget {
       ),
       body: list.when(
         loading: () => const KodiHubSkeletonList(rows: 4),
-        error: (e, _) => Center(child: Text(staffErrorMessage(e))),
+        error: (e, _) {
+          if (e is ApiError && e.isNetworkError) {
+            return _InspectionForm(
+              key: const ValueKey('offline-new'),
+              tenancyId: tenancyId,
+              kind: kind,
+              title: title,
+              offline: true,
+            );
+          }
+          return Center(child: Text(staffErrorMessage(e)));
+        },
         data: (all) {
           Inspection? find(String k) {
             for (final i in all) {
@@ -71,12 +83,16 @@ class _InspectionForm extends ConsumerStatefulWidget {
     required this.title,
     this.saved,
     this.moveIn,
+    this.offline = false,
   });
   final String tenancyId;
   final String kind;
   final String title;
   final Inspection? saved;
   final Inspection? moveIn;
+
+  /// Opened without a connection: any saved inspection couldn't be loaded.
+  final bool offline;
 
   @override
   ConsumerState<_InspectionForm> createState() => _InspectionFormState();
@@ -87,6 +103,8 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
   late final TextEditingController _notes;
   final Map<String, Uint8List> _newPhotos =
       {}; // upload id → bytes, for thumbnails
+  final Map<int, List<Uint8List>> _localPhotos =
+      {}; // area index → unuploaded photo bytes
   bool _reopen = false;
   bool _saving = false;
   int? _uploading;
@@ -122,6 +140,15 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
   bool get _locked =>
       !can(ref, 'tenancies:update') || (_acknowledged && !_reopen);
 
+  /// The version this edit starts from: a new inspection ("none") or the one loaded. Opened
+  /// offline without the saved list, it counts as new, so if one exists after all the server
+  /// refuses to overwrite it.
+  String? get _baseVersion =>
+      widget.saved == null ? 'none' : widget.saved!.updatedAt;
+
+  int _totalPhotosAt(int index) =>
+      _items[index].photoUploadIds.length + (_localPhotos[index]?.length ?? 0);
+
   Future<void> _addPhoto(int index) async {
     final bytes = await pickPhoto(context);
     if (bytes == null) return;
@@ -135,13 +162,57 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
         _newPhotos[id] = bytes;
       });
     } on ApiError catch (e) {
-      setState(() => _error = staffErrorMessage(e));
+      if (e.isNetworkError) {
+        setState(() {
+          (_localPhotos[index] ??= []).add(bytes);
+        });
+      } else {
+        setState(() => _error = staffErrorMessage(e));
+      }
     } finally {
       if (mounted) setState(() => _uploading = null);
     }
   }
 
+  Future<void> _saveOffline(String inspectedOn) async {
+    final queue = await ref.read(inspectionQueueProvider.future);
+    final pending = PendingInspection(
+      tenancyId: widget.tenancyId,
+      kind: widget.kind,
+      inspectedOn: inspectedOn,
+      items: [
+        for (final i in _items)
+          PendingInspectionItem(
+            area: i.area,
+            condition: i.condition,
+            note: i.note,
+            photoUploadIds: [...i.photoUploadIds],
+          ),
+      ],
+      savedAt: DateTime.now(),
+      notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+      reopen: _reopen,
+      baseVersion: _baseVersion,
+    );
+    await queue.enqueue(pending, localPhotos: _localPhotos);
+    ref.invalidate(pendingInspectionsProvider);
+    if (!mounted) return;
+    showMessage(
+      context,
+      'No connection — inspection saved on this phone and will upload when you’re back online.',
+    );
+    Navigator.of(context).pop();
+  }
+
   Future<void> _save() async {
+    for (var idx = 0; idx < _items.length; idx++) {
+      if (_totalPhotosAt(idx) > maxPhotos) {
+        setState(
+          () => _error = 'At most $maxPhotos photos for ${_items[idx].area}.',
+        );
+        return;
+      }
+    }
     final problem = validateInspection(_items);
     if (problem != null) {
       setState(() => _error = '$problem.');
@@ -151,23 +222,41 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
       _saving = true;
       _error = null;
     });
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final inspectedOn = widget.saved?.inspectedOn ?? today;
     try {
-      final today = DateTime.now().toIso8601String().substring(0, 10);
-      await ref.read(staffApiProvider).saveInspection(
-        widget.tenancyId,
-        widget.kind,
-        {
-          'inspectedOn': widget.saved?.inspectedOn ?? today,
-          'items': [for (final i in _items) i.toJson()],
-          if (_notes.text.trim().isNotEmpty) 'notes': _notes.text.trim(),
-          if (_reopen) 'reopen': true,
-        },
-      );
+      final api = ref.read(staffApiProvider);
+      // Photos taken while offline go up one at a time; each moves from the local list to the
+      // area's ids as soon as it lands, so a dropped connection never leaves one in both.
+      for (final entry in _localPhotos.entries) {
+        final idx = entry.key;
+        while (entry.value.isNotEmpty) {
+          final bytes = entry.value.first;
+          final id = await api.upload('INSPECTION_PHOTO', bytes);
+          _items[idx].photoUploadIds.add(id);
+          _newPhotos[id] = bytes;
+          entry.value.removeAt(0);
+        }
+      }
+      _localPhotos.removeWhere((_, photos) => photos.isEmpty);
+      await api.saveInspection(widget.tenancyId, widget.kind, {
+        'inspectedOn': inspectedOn,
+        'items': [for (final i in _items) i.toJson()],
+        if (_notes.text.trim().isNotEmpty) 'notes': _notes.text.trim(),
+        if (_reopen) 'reopen': true,
+        if (_baseVersion != null) 'baseVersion': _baseVersion,
+      });
+      ref.invalidate(todayProvider);
+      ref.invalidate(dashboardProvider);
       if (!mounted) return;
       ref.invalidate(_inspectionsProvider(widget.tenancyId));
       showMessage(context, 'Inspection saved.');
       Navigator.of(context).pop();
     } on ApiError catch (e) {
+      if (e.isNetworkError) {
+        await _saveOffline(inspectedOn);
+        return;
+      }
       setState(() => _error = staffErrorMessage(e));
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -189,6 +278,15 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
+        if (widget.offline) ...[
+          const SizedBox(height: 8),
+          const Text(
+            'No connection, so any inspection already saved for this tenancy couldn’t be '
+            'loaded. This one is kept on the phone; if another was saved in the meantime, '
+            'it won’t be replaced and you’ll be asked to review it.',
+            key: Key('inspection-offline-note'),
+          ),
+        ],
         if (_acknowledged) ...[
           const SizedBox(height: 8),
           Card(
@@ -285,8 +383,18 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
                                 avatar: Icon(Icons.photo_outlined, size: 16),
                                 label: Text('Saved photo'),
                               ),
-                      if (!_locked &&
-                          _items[index].photoUploadIds.length < maxPhotos)
+                      for (final bytes
+                          in _localPhotos[index] ?? const <Uint8List>[])
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            bytes,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      if (!_locked && _totalPhotosAt(index) < maxPhotos)
                         OutlinedButton.icon(
                           icon: const Icon(
                             Icons.add_a_photo_outlined,

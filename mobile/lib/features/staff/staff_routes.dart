@@ -132,7 +132,9 @@ RouteBase staffRoutes() => StatefulShellRoute.indexedStack(
             GoRoute(
               path: 'meters',
               parentNavigatorKey: rootNavigatorKey,
-              builder: (_, _) => const MetersScreen(),
+              builder: (_, s) => MetersScreen(
+                initialPropertyId: s.uri.queryParameters['propertyId'],
+              ),
             ),
             GoRoute(
               path: 'expenses',

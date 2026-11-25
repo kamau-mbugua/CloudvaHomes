@@ -64,6 +64,7 @@ class Inspection {
     this.notes,
     this.inspectorName,
     this.tenantAcknowledgedAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -73,6 +74,9 @@ class Inspection {
   final String? notes;
   final String? inspectorName;
   final String? tenantAcknowledgedAt;
+
+  /// The version a save starts from (`baseVersion`), so a stale edit can't overwrite it.
+  final String? updatedAt;
 
   factory Inspection.fromJson(Map<String, dynamic> j) => Inspection(
     id: j['id'] as String,
@@ -85,6 +89,7 @@ class Inspection {
     notes: j['notes'] as String?,
     inspectorName: j['inspectorName'] as String?,
     tenantAcknowledgedAt: j['tenantAcknowledgedAt'] as String?,
+    updatedAt: j['updatedAt'] as String?,
   );
 }
 

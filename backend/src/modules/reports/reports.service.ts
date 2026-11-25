@@ -7,13 +7,19 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { orgContext } from '../auth/decorators.js';
 import { addDays, isDueForRun, periodOf, todayInNairobi } from '../billing/billing-math.js';
-import { allowedPropertyIds, propertyScope, tenancyScope } from '../portfolio/property-scope.js';
-import { overdueWhere } from '../maintenance/sla.js';
+import {
+  allowedPropertyIds,
+  propertyScope,
+  tenancyScope,
+  unitScope,
+} from '../portfolio/property-scope.js';
+import { isOverdue, overdueWhere } from '../maintenance/sla.js';
 import {
   ageBucket,
   BUCKETS,
   type Bucket,
   buildActionItems,
+  isoDay,
   lastMonths,
   monthBounds,
   mriDue,
@@ -106,6 +112,200 @@ export class ReportsService {
          AND e."incurredOn" BETWEEN ${from} AND ${to} ${this.scope(Prisma.sql`e."propertyId"`, propertyId)}
        GROUP BY 1`;
     return new Map(rows.map((r) => [r.m, BigInt(r.v)]));
+  }
+
+  // ── Today (phase 19: caretaker task list, no money figures) ──
+
+  async today(propertyId?: string) {
+    const today = todayInNairobi();
+    const period = periodOf(today);
+    const day = parseDateOnly(today);
+    const props = await this.properties(propertyId);
+    const propIds = props.map((p) => p.id);
+    const perms = currentContext()?.permissions;
+    const now = new Date();
+    const priorityRank: Record<string, number> = {
+      URGENT: 0,
+      HIGH: 1,
+      MEDIUM: 2,
+      LOW: 3,
+    };
+
+    const [unreadMeters, moveIns, moveOuts, openRepairs] = await Promise.all([
+      perms?.has('meters:view') && propIds.length
+        ? this.db.meter
+            .findMany({
+              where: {
+                AND: [
+                  { unit: unitScope() },
+                  { unit: { propertyId: { in: propIds }, status: 'ACTIVE' } },
+                  { status: 'ACTIVE' },
+                  { readings: { none: { period } } },
+                ],
+              },
+              include: {
+                unit: {
+                  select: {
+                    id: true,
+                    number: true,
+                    property: { select: { id: true, code: true, name: true } },
+                  },
+                },
+                chargeType: { select: { id: true, name: true, unitLabel: true } },
+              },
+            })
+            .then((rows) =>
+              rows
+                .sort(
+                  (a, b) =>
+                    a.unit.property.name.localeCompare(b.unit.property.name) ||
+                    a.unit.number.localeCompare(b.unit.number, undefined, { numeric: true }) ||
+                    a.serialNo.localeCompare(b.serialNo),
+                )
+                .map((m) => ({
+                  id: m.id,
+                  serialNo: m.serialNo,
+                  unit: { id: m.unit.id, number: m.unit.number },
+                  property: m.unit.property,
+                  chargeType: m.chargeType,
+                })),
+            )
+        : Promise.resolve([]),
+      perms?.has('tenancies:view') && propIds.length
+        ? this.db.tenancy
+            .findMany({
+              where: {
+                AND: [
+                  tenancyScope(),
+                  { unit: { propertyId: { in: propIds } } },
+                  { status: { in: ['ACTIVE', 'NOTICE'] } },
+                  { startDate: { gte: addDays(day, -14), lte: addDays(day, 7) } },
+                  { inspections: { none: { kind: 'MOVE_IN' } } },
+                ],
+              },
+              include: {
+                unit: {
+                  select: {
+                    id: true,
+                    number: true,
+                    property: { select: { id: true, code: true, name: true } },
+                  },
+                },
+                tenant: {
+                  select: {
+                    id: true,
+                    code: true,
+                    firstName: true,
+                    lastName: true,
+                    phone: true,
+                  },
+                },
+              },
+              orderBy: { startDate: 'asc' },
+            })
+            .then((rows) =>
+              rows.map((t) => ({
+                tenancyId: t.id,
+                startDate: isoDay(t.startDate),
+                unit: { id: t.unit.id, number: t.unit.number },
+                property: t.unit.property,
+                tenant: t.tenant,
+              })),
+            )
+        : Promise.resolve([]),
+      perms?.has('tenancies:view') && propIds.length
+        ? this.db.tenancy
+            .findMany({
+              where: {
+                AND: [
+                  tenancyScope(),
+                  { unit: { propertyId: { in: propIds } } },
+                  { status: 'NOTICE' },
+                  { endDate: { lte: addDays(day, 7) } },
+                ],
+              },
+              include: {
+                unit: {
+                  select: {
+                    id: true,
+                    number: true,
+                    property: { select: { id: true, code: true, name: true } },
+                  },
+                },
+                tenant: {
+                  select: {
+                    id: true,
+                    code: true,
+                    firstName: true,
+                    lastName: true,
+                    phone: true,
+                  },
+                },
+                inspections: { where: { kind: 'MOVE_OUT' }, select: { id: true } },
+              },
+              orderBy: { endDate: 'asc' },
+            })
+            .then((rows) =>
+              rows.map((t) => ({
+                tenancyId: t.id,
+                endDate: t.endDate ? isoDay(t.endDate) : today,
+                hasMoveOutInspection: t.inspections.length > 0,
+                unit: { id: t.unit.id, number: t.unit.number },
+                property: t.unit.property,
+                tenant: t.tenant,
+              })),
+            )
+        : Promise.resolve([]),
+      perms?.has('maintenance:view') && propIds.length
+        ? this.db.maintenanceRequest
+            .findMany({
+              where: {
+                AND: [
+                  { property: propertyScope() },
+                  { propertyId: { in: propIds } },
+                  { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+                ],
+              },
+              include: {
+                property: { select: { id: true, code: true, name: true } },
+                unit: { select: { id: true, number: true } },
+                vendor: { select: { id: true, name: true, phone: true } },
+              },
+            })
+            .then((rows) =>
+              rows
+                .map((r) => ({
+                  id: r.id,
+                  number: r.number,
+                  title: r.title,
+                  category: r.category,
+                  priority: r.priority,
+                  status: r.status,
+                  overdue: isOverdue(r, now),
+                  unit: r.unit,
+                  property: r.property,
+                  vendor: r.vendor,
+                  createdAt: r.createdAt,
+                }))
+                .sort(
+                  (a, b) =>
+                    Number(b.overdue) - Number(a.overdue) ||
+                    (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) ||
+                    a.createdAt.getTime() - b.createdAt.getTime(),
+                ),
+            )
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      asOf: today,
+      period,
+      propertyId: propertyId ?? currentContext()?.activePropertyId ?? null,
+      unreadMeters,
+      moveIns,
+      moveOuts,
+      openRepairs,
+    };
   }
 
   // ── Dashboard ──

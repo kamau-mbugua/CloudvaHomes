@@ -17,7 +17,8 @@ import 'reading_queue.dart';
 /// Readings go in with `PUT /meter-readings` for the month (Nairobi), photos first through
 /// `POST /uploads` (purpose METER_PHOTO) and then by id.
 class MetersScreen extends ConsumerStatefulWidget {
-  const MetersScreen({super.key});
+  const MetersScreen({super.key, this.initialPropertyId});
+  final String? initialPropertyId;
   @override
   ConsumerState<MetersScreen> createState() => _MetersScreenState();
 }
@@ -29,6 +30,7 @@ class _MetersScreenState extends ConsumerState<MetersScreen> {
   @override
   void initState() {
     super.initState();
+    _propertyId = widget.initialPropertyId;
     // Readings saved offline go up when this screen opens and when the app comes back.
     Future.microtask(() => flushPendingReadings(ref));
     _lifecycle = AppLifecycleListener(

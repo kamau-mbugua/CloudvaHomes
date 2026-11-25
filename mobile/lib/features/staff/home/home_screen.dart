@@ -9,6 +9,8 @@ import '../../../core/money.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/account_sheet.dart';
 import '../../../core/widgets/common.dart';
+import '../more/inspection_queue.dart';
+import '../more/meters_screen.dart';
 import '../staff_api.dart';
 import '../staff_models.dart';
 import '../staff_widgets.dart';
@@ -22,26 +24,45 @@ class StaffHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final canReports = can(ref, 'reports:view');
+    final canToday =
+        can(ref, 'meters:view') ||
+        can(ref, 'tenancies:view') ||
+        can(ref, 'maintenance:view');
     return StaffTabScaffold(
       title: 'Home',
       body: RefreshIndicator(
         onRefresh: () async {
+          await flushPendingReadings(ref);
+          await flushPendingInspections(ref);
           ref.invalidate(propertiesProvider);
-          ref.invalidate(dashboardProvider);
-          try {
-            await ref.read(dashboardProvider.future);
-          } catch (_) {
-            // Shown on the screen with a retry.
+          if (canReports) {
+            ref.invalidate(dashboardProvider);
+            try {
+              await ref.read(dashboardProvider.future);
+            } catch (_) {
+              // Shown on the screen with a retry.
+            }
+          } else if (canToday) {
+            ref.invalidate(todayProvider);
+            try {
+              await ref.read(todayProvider.future);
+            } catch (_) {
+              // Shown on the screen with a retry.
+            }
           }
         },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             const _PortfolioSwitcherBar(),
+            const PendingReadingsBanner(),
+            const PendingInspectionsBanner(),
             const _QuickActions(),
             const SizedBox(height: 16),
             if (canReports)
               const _DashboardBody()
+            else if (canToday)
+              const _TodayBody()
             else
               const EmptyState(
                 icon: Icons.insights_outlined,
@@ -66,6 +87,7 @@ Future<void> _switchStaffProperty(
         .read(sessionProvider.notifier)
         .switchContext(propertyId: propertyId);
     ref.invalidate(dashboardProvider);
+    ref.invalidate(todayProvider);
     ref.read(listsVersionProvider.notifier).state++;
     if (context.mounted) {
       showMessage(
@@ -1320,6 +1342,158 @@ class _ConsolidatedPropertiesCard extends ConsumerWidget {
             ),
           ],
       ],
+    );
+  }
+}
+
+class _TodayBody extends ConsumerWidget {
+  const _TodayBody();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final today = ref.watch(todayProvider);
+    return AsyncBody(
+      value: today,
+      onRetry: () => ref.invalidate(todayProvider),
+      data: (d) {
+        if (d.isEmpty) {
+          return const EmptyState(
+            icon: Icons.task_alt_outlined,
+            title: 'Nothing waiting today',
+            body:
+                'All meters are read, inspections are up to date and no open repairs need attention.',
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (d.unreadMeters.isNotEmpty) ...[
+              SectionCard(
+                title:
+                    'Meters to read · ${formatPeriod(d.period)} (${d.unreadMeters.length})',
+                children: [
+                  for (final (i, m) in d.unreadMeters.indexed) ...[
+                    if (i > 0) const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: UnitBadge(m.unitNumber),
+                      title: Text(
+                        '${m.chargeName} · ${m.serialNo}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        'Unit ${m.unitNumber} · ${m.property.name}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right, size: 18),
+                      onTap: () => context.push(
+                        '/staff/more/meters?propertyId=${m.property.id}',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (d.moveIns.isNotEmpty) ...[
+              SectionCard(
+                title: 'Move-in inspections (${d.moveIns.length})',
+                children: [
+                  for (final (i, m) in d.moveIns.indexed) ...[
+                    if (i > 0) const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: UnitBadge(m.unitNumber),
+                      title: Text(
+                        m.tenant.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        'Unit ${m.unitNumber} · ${m.property.name} · Starts ${formatDay(m.startDate)}',
+                      ),
+                      trailing: const StatusChip('Inspect', tone: Tone.warn),
+                      onTap: () => context.push(
+                        '/staff/units/${m.unitId}/tenancies/${m.tenancyId}/inspection/MOVE_IN',
+                        extra: 'Unit ${m.unitNumber} · ${m.tenant.name}',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (d.moveOuts.isNotEmpty) ...[
+              SectionCard(
+                title: 'Move-outs this week (${d.moveOuts.length})',
+                children: [
+                  for (final (i, m) in d.moveOuts.indexed) ...[
+                    if (i > 0) const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: UnitBadge(m.unitNumber),
+                      title: Text(
+                        m.tenant.name,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        'Unit ${m.unitNumber} · ${m.property.name} · Leaving ${formatDay(m.endDate)}',
+                      ),
+                      trailing: StatusChip(
+                        m.hasMoveOutInspection ? 'Inspected' : 'Inspect',
+                        tone: m.hasMoveOutInspection ? Tone.good : Tone.warn,
+                      ),
+                      onTap: () => context.push(
+                        '/staff/units/${m.unitId}/tenancies/${m.tenancyId}/inspection/MOVE_OUT',
+                        extra: 'Unit ${m.unitNumber} · ${m.tenant.name}',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (d.openRepairs.isNotEmpty) ...[
+              SectionCard(
+                title: 'Open repairs (${d.openRepairs.length})',
+                children: [
+                  for (final (i, r) in d.openRepairs.indexed) ...[
+                    if (i > 0) const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: UnitBadge(r.unitNumber),
+                      title: Text(
+                        '${r.title} · ${r.number}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text(
+                        [
+                          'Unit ${r.unitNumber}',
+                          r.property.name,
+                          r.priority,
+                          if (r.vendorName != null && r.vendorName!.isNotEmpty)
+                            r.vendorName!,
+                        ].join(' · '),
+                      ),
+                      trailing: StatusChip(
+                        r.overdue
+                            ? 'Overdue'
+                            : (r.status == 'IN_PROGRESS'
+                                  ? 'In progress'
+                                  : 'Open'),
+                        tone: r.overdue
+                            ? Tone.bad
+                            : (r.status == 'IN_PROGRESS'
+                                  ? Tone.warn
+                                  : Tone.neutral),
+                      ),
+                      onTap: () => context.push('/staff/more/maintenance'),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

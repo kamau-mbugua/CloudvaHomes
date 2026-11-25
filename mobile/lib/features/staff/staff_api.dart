@@ -27,6 +27,11 @@ class StaffApi {
       if (r is Json) r,
   ];
 
+  // ── today (caretaker operational tasks)
+  Future<TodayList> today({String? propertyId}) async => TodayList.fromJson(
+    _data(await _api.get('/reports/today', query: {'propertyId': ?propertyId})),
+  );
+
   // ── dashboard
   Future<Dashboard> dashboard({String? propertyId}) async {
     try {
@@ -493,6 +498,34 @@ class StaffApi {
   Future<Json> convertMaintenanceToExpense(String id, Json body) async =>
       _data(await _api.post('/maintenance-requests/$id/expense', body: body));
 
+  Future<List<Json>> vendors() async =>
+      _rows(await _api.get('/vendors', query: {'pageSize': 100}));
+
+  Future<Json> assignMaintenanceVendor(
+    String id,
+    String? vendorId, {
+    bool notify = true,
+  }) async => _data(
+    await _api.post(
+      '/maintenance-requests/$id/assign',
+      body: {'vendorId': vendorId, 'notify': notify},
+    ),
+  );
+
+  /// A photo on a maintenance request (the tenant's or the vendor's).
+  Future<Uint8List> maintenancePhoto(String id, String uploadId) =>
+      _api.bytes('/maintenance-requests/$id/photos/$uploadId');
+
+  Future<String> maintenanceVendorLink(String id) async =>
+      _data(await _api.get('/maintenance-requests/$id/vendor-link'))['url']
+          as String;
+
+  Future<String> rotateMaintenanceVendorLink(String id) async =>
+      _data(
+            await _api.post('/maintenance-requests/$id/vendor-link/rotate'),
+          )['url']
+          as String;
+
   // ── reports, channels, agency, users & roles
   Future<Json> reportPl(String period, {String? propertyId}) async => _data(
     await _api.get(
@@ -579,6 +612,13 @@ final dashboardProvider = FutureProvider.autoDispose((ref) {
   return ref.watch(staffApiProvider).dashboard(propertyId: activePropertyId);
 });
 
+final todayProvider = FutureProvider.autoDispose((ref) {
+  final activePropertyId = ref.watch(
+    sessionProvider.select((s) => s.valueOrNull?.activePropertyId),
+  );
+  return ref.watch(staffApiProvider).today(propertyId: activePropertyId);
+});
+
 final propertiesProvider = FutureProvider.autoDispose((ref) async {
   final sessionProps = ref.watch(
     sessionProvider.select((s) => s.valueOrNull?.properties ?? const []),
@@ -652,6 +692,17 @@ final inboundProvider = FutureProvider.autoDispose.family<Inbound, String>(
 final channelsProvider = FutureProvider.autoDispose(
   (ref) => ref.watch(staffApiProvider).activeChannels(),
 );
+
+/// Active vendors (the server's default), for assigning jobs.
+final vendorsProvider = FutureProvider.autoDispose(
+  (ref) => ref.watch(staffApiProvider).vendors(),
+);
+
+final maintenancePhotoProvider = FutureProvider.autoDispose
+    .family<Uint8List, ({String requestId, String uploadId})>(
+      (ref, k) =>
+          ref.watch(staffApiProvider).maintenancePhoto(k.requestId, k.uploadId),
+    );
 
 final metersProvider = FutureProvider.autoDispose.family<List<Meter>, String>(
   (ref, propertyId) => ref.watch(staffApiProvider).meters(propertyId),

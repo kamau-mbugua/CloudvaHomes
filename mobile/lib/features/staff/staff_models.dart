@@ -205,6 +205,190 @@ class Dashboard {
   }
 }
 
+class TodayMeter {
+  TodayMeter({
+    required this.id,
+    required this.serialNo,
+    required this.unitId,
+    required this.unitNumber,
+    required this.property,
+    required this.chargeTypeId,
+    required this.chargeName,
+    this.unitLabel,
+  });
+  final String id;
+  final String serialNo;
+  final String unitId;
+  final String unitNumber;
+  final CodedRef property;
+  final String chargeTypeId;
+  final String chargeName;
+  final String? unitLabel;
+
+  factory TodayMeter.fromJson(Json j) {
+    final u = j['unit'] as Map<String, dynamic>? ?? const {};
+    final ct = j['chargeType'] as Map<String, dynamic>? ?? const {};
+    return TodayMeter(
+      id: _s(j['id']) ?? '',
+      serialNo: _s(j['serialNo']) ?? '',
+      unitId: _s(u['id']) ?? '',
+      unitNumber: _s(u['number']) ?? '',
+      property: CodedRef.fromJson(j['property'] as Json),
+      chargeTypeId: _s(ct['id']) ?? '',
+      chargeName: _s(ct['name']) ?? '',
+      unitLabel: _s(ct['unitLabel']),
+    );
+  }
+}
+
+class TodayMoveIn {
+  TodayMoveIn({
+    required this.tenancyId,
+    required this.startDate,
+    required this.unitId,
+    required this.unitNumber,
+    required this.property,
+    required this.tenant,
+  });
+  final String tenancyId;
+  final String startDate;
+  final String unitId;
+  final String unitNumber;
+  final CodedRef property;
+  final TenantRef tenant;
+
+  factory TodayMoveIn.fromJson(Json j) {
+    final u = j['unit'] as Map<String, dynamic>? ?? const {};
+    return TodayMoveIn(
+      tenancyId: _s(j['tenancyId']) ?? '',
+      startDate: _s(j['startDate']) ?? '',
+      unitId: _s(u['id']) ?? '',
+      unitNumber: _s(u['number']) ?? '',
+      property: CodedRef.fromJson(j['property'] as Json),
+      tenant: TenantRef.fromJson(j['tenant'] as Json),
+    );
+  }
+}
+
+class TodayMoveOut {
+  TodayMoveOut({
+    required this.tenancyId,
+    required this.endDate,
+    required this.hasMoveOutInspection,
+    required this.unitId,
+    required this.unitNumber,
+    required this.property,
+    required this.tenant,
+  });
+  final String tenancyId;
+  final String endDate;
+  final bool hasMoveOutInspection;
+  final String unitId;
+  final String unitNumber;
+  final CodedRef property;
+  final TenantRef tenant;
+
+  factory TodayMoveOut.fromJson(Json j) {
+    final u = j['unit'] as Map<String, dynamic>? ?? const {};
+    return TodayMoveOut(
+      tenancyId: _s(j['tenancyId']) ?? '',
+      endDate: _s(j['endDate']) ?? '',
+      hasMoveOutInspection: j['hasMoveOutInspection'] == true,
+      unitId: _s(u['id']) ?? '',
+      unitNumber: _s(u['number']) ?? '',
+      property: CodedRef.fromJson(j['property'] as Json),
+      tenant: TenantRef.fromJson(j['tenant'] as Json),
+    );
+  }
+}
+
+class TodayRepair {
+  TodayRepair({
+    required this.id,
+    required this.number,
+    required this.title,
+    required this.category,
+    required this.priority,
+    required this.status,
+    required this.overdue,
+    required this.unitId,
+    required this.unitNumber,
+    required this.property,
+    this.vendorName,
+    this.vendorPhone,
+  });
+  final String id;
+  final String number;
+  final String title;
+  final String category;
+  final String priority;
+  final String status;
+  final bool overdue;
+  final String unitId;
+  final String unitNumber;
+  final CodedRef property;
+  final String? vendorName;
+  final String? vendorPhone;
+
+  factory TodayRepair.fromJson(Json j) {
+    final u = j['unit'] as Map<String, dynamic>? ?? const {};
+    final v = j['vendor'] as Map<String, dynamic>?;
+    return TodayRepair(
+      id: _s(j['id']) ?? '',
+      number: _s(j['number']) ?? '',
+      title: _s(j['title']) ?? '',
+      category: _s(j['category']) ?? 'OTHER',
+      priority: _s(j['priority']) ?? 'MEDIUM',
+      status: _s(j['status']) ?? 'OPEN',
+      overdue: j['overdue'] == true,
+      unitId: _s(u['id']) ?? '',
+      unitNumber: _s(u['number']) ?? '',
+      property: CodedRef.fromJson(j['property'] as Json),
+      vendorName: _s(v?['name']),
+      vendorPhone: _s(v?['phone']),
+    );
+  }
+}
+
+class TodayList {
+  TodayList({
+    required this.asOf,
+    required this.period,
+    this.propertyId,
+    required this.unreadMeters,
+    required this.moveIns,
+    required this.moveOuts,
+    required this.openRepairs,
+  });
+  final String asOf;
+  final String period;
+  final String? propertyId;
+  final List<TodayMeter> unreadMeters;
+  final List<TodayMoveIn> moveIns;
+  final List<TodayMoveOut> moveOuts;
+  final List<TodayRepair> openRepairs;
+
+  bool get isEmpty =>
+      unreadMeters.isEmpty &&
+      moveIns.isEmpty &&
+      moveOuts.isEmpty &&
+      openRepairs.isEmpty;
+
+  factory TodayList.fromJson(Json j) => TodayList(
+    asOf: _s(j['asOf']) ?? '',
+    period: _s(j['period']) ?? '',
+    propertyId: _s(j['propertyId']),
+    unreadMeters: [
+      for (final r in _list(j['unreadMeters'])) TodayMeter.fromJson(r),
+    ],
+    moveIns: [for (final r in _list(j['moveIns'])) TodayMoveIn.fromJson(r)],
+    moveOuts: [for (final r in _list(j['moveOuts'])) TodayMoveOut.fromJson(r)],
+    openRepairs: [
+      for (final r in _list(j['openRepairs'])) TodayRepair.fromJson(r),
+    ],
+  );
+}
+
 // ───────────────────────────────────────────── units, tenants
 
 class UnitRow {

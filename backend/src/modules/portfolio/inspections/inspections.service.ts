@@ -78,6 +78,19 @@ export class InspectionsService {
     const before = await this.db.inspection.findUnique({
       where: { tenancyId_kind: { tenancyId, kind } },
     });
+    if (dto.baseVersion !== undefined) {
+      const current = before ? before.updatedAt.getTime() : 'none';
+      const base = dto.baseVersion === 'none' ? 'none' : Date.parse(dto.baseVersion);
+      if (Number.isNaN(base)) {
+        throw AppError.fieldInvalid('baseVersion', 'Must be a date and time, or "none"');
+      }
+      if (base !== current) {
+        throw AppError.conflict(
+          'This inspection was changed after it was opened on this phone. Open it again to review it.',
+          'INSPECTION_CHANGED',
+        );
+      }
+    }
     if (before?.tenantAcknowledgedAt && !dto.reopen) {
       throw AppError.conflict(
         'The tenant has acknowledged this inspection. Reopen it to make changes.',
