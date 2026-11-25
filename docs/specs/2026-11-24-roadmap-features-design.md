@@ -143,16 +143,25 @@ item on the dashboard should lead somewhere.
    can be listed straight away), and the tenant gets a final statement PDF. Their portal
    access stays read-only for 12 months *(my call)*.
 
-### Done so far (2026-11-24)
-Step 1 (notice) is built:
-- `Organization.noticeDays` (default 30) in Settings → Organisation → Billing; a tenancy can
-  set its own (`Tenancy.noticeDays`).
-- Tenants give notice from the portal (web dashboard and the app's profile page) with a
-  preview of the notice period and any rent in lieu; staff get an in-app and push notice.
-- Short notice stores `Tenancy.noticeEndsOn`. The invoice run keeps billing rent (rent only,
-  "Rent in lieu of notice") up to that date, even after move-out, until staff choose "Waive
-  short-notice rent" (audited). Withdrawing notice clears it.
-- The tenancy list shows who gave notice, the short-notice end and the forwarding number.
+### Progress (2026-11-25)
+- [x] `Organization.noticeDays` (default 30), set in Settings → Organisation → Billing.
+- [x] A tenancy can have its own notice period (`Tenancy.noticeDays`), through the API.
+- [ ] A screen to set a tenancy's own notice period.
+- [x] Tenants give notice in the portal (web dashboard, app profile), with a preview of the
+  notice period and any rent in lieu; reason and forwarding phone kept.
+- [x] Staff can still record notice (`noticeSource` STAFF) and withdraw it (back to `ACTIVE`).
+- [x] Staff get an in-app and push notice when a tenant gives notice.
+- [ ] The landlord is told (agencies).
+- [x] Short notice: rent in lieu billed up to `noticeEndsOn`, even after move-out (rent only).
+- [x] Staff can waive short-notice rent (audited).
+- [x] Tenancy list shows who gave notice, the short-notice end and the forwarding number, with
+  a "Moving out" filter.
+- [x] Dashboard: `MOVE_OUTS_THIS_WEEK` and `DEPOSIT_REFUNDS_PENDING`.
+- [ ] Final billing: a final meter reading, with the caretaker asked on move-out day.
+- [ ] Exit inspection compared with the move-in one, with photos; tenant acknowledges it.
+- [ ] Deposit settlement (`DepositSettlement`, `DepositDeduction`, tenant agrees or disputes,
+  approval, refund payout).
+- [ ] Close: final statement PDF; portal read-only for 12 months.
 
 ### Data
 - `Tenancy`: add `noticeSource` (TENANT/STAFF), `forwardingPhone`, `noticeDays?`.
@@ -201,6 +210,15 @@ deleted 6 months after rejection or withdrawal *(my call; Legal to confirm)*.
 ### Reports
 Days vacant per unit, enquiries → viewings → tenants per vacancy, and where applicants came
 from.
+
+### Progress (2026-11-25)
+- [ ] Vacancy listings on the public site (`/rent`).
+- [ ] Sharing: short link, share text, widget for the agency's site.
+- [ ] Enquiries and viewings, with OTP and rate limits.
+- [ ] Applicant pipeline and application form.
+- [ ] Waitlist.
+- [ ] "Make tenant" conversion.
+- [ ] Reports.
 
 ---
 
@@ -257,6 +275,15 @@ The phase 16 plan decides between them, starting with a spike on option 1.
 ### Out of scope
 Voting and AGM tools, and the legal registration of the management company.
 
+### Progress (2026-11-25)
+- [ ] Spike on billing owners (option 1), then the plan.
+- [ ] `Property.mode` and unit owners.
+- [ ] Who pays per charge type (`ChargeType.billTo`).
+- [ ] Funds, budgets and apportionment.
+- [ ] Special levies.
+- [ ] Owner portal: unit and fund statements, shared documents.
+- [ ] Arrears flag for phase 27.
+
 ---
 
 ## 4. Phase 17 — E-signed leases and renewals [6]
@@ -287,6 +314,12 @@ just a new `leaseEndDate`.
 ### Data
 `LeaseTemplate`, `SignatureRequest` (document hash, status `SENT/VIEWED/SIGNED/DECLINED/EXPIRED`),
 `Signature` (signer, method, evidence), and `RenewalOffer`.
+
+### Progress (2026-11-25)
+- [ ] Lease templates with merge fields.
+- [ ] Signing by SMS OTP, with evidence and a locked final PDF (Legal to confirm first).
+- [ ] Renewal offers and reminders.
+- [ ] Addenda.
 
 ---
 
@@ -322,6 +355,21 @@ one to assign the job to, no quotes, no costs and no SLA.
 `Vendor`, `VendorTrade`, `WorkOrder`, `WorkOrderQuoteLine`, `WorkOrderUpdate`, `VendorBill`,
 `PlannedJob`, plus new `UploadPurpose` values `WORK_ORDER_PHOTO` and `VENDOR_DOCUMENT`.
 
+### Progress (2026-11-25)
+- [x] Vendor list: name, phone, email, trades, notes, archive (Properties → Vendors).
+- [ ] Vendor payout details, KRA PIN, service area and rating.
+- [ ] Vendor sign-in with a view of their own jobs.
+- [x] Assign a maintenance request to a vendor; the vendor gets an SMS with the job and the
+  organisation's number (one vendor per request, no link yet).
+- [x] The vendor's job link (`/r/<token>`, no sign-in): job details, photos, "done" report.
+- [ ] Work orders: statuses, accepting, quotes and updates through the link.
+- [ ] Approval limits, who pays, and the expense and vendor bill when verified.
+- [x] Response targets per priority (urgent 1 day, high 3, medium 7, low 14), a Late badge and
+  filter, and `WORK_ORDERS_OVERDUE` on the dashboard.
+- [ ] The organisation sets its own targets.
+- [ ] Tenant sees progress in the portal and rates the job.
+- [ ] Planned maintenance.
+
 ---
 
 ## 6. Phase 19 — Caretaker mobile app [9]
@@ -352,6 +400,16 @@ built for this.
 
 ### Out of scope
 Smart meters and prepaid tokens (deferred, §15).
+
+### Progress (2026-11-25)
+- [x] Caretaker home with today's tasks (`GET /reports/today`: meters to read, move-in and
+  move-out inspections, open and late repairs).
+- [x] Offline queue for readings (phase 13) and inspections, which can't overwrite newer work.
+- [ ] Offline cache of meters and units.
+- [ ] Meter reading with OCR.
+- [ ] Inspections with photos and the tenant's signature.
+- [ ] Unit status.
+- [ ] Push for new tasks.
 
 ---
 
@@ -387,6 +445,14 @@ doesn't know about those bookings. Every channel manager starts with iCal.
 Two-way API channel managers (Airbnb API, Booking.com Connectivity). These need partner
 status; iCal covers most hosts.
 
+### Progress (2026-11-25)
+- [x] Export: a secret `.ics` link per listing (stays and blocks, dates only), with copy and
+  new-link on the web listing page.
+- [ ] Import feeds every 15 minutes and "sync now", with the URL safeguards.
+- [ ] External blocks, updates and removals by `UID`.
+- [ ] Conflict flags and host alerts.
+- [ ] Feed health and failure alerts.
+
 ---
 
 ## 8. Phase 21 — Pricing rules for stays [12]
@@ -415,6 +481,16 @@ Hosts also want seasons, length-of-stay discounts and promo codes without editin
 ### Data
 `SeasonRule`, `StayDiscountRule`, `PromoCode`, `PromoRedemption`, and `Booking.priceBreakdown`
 (Json).
+
+### Progress (2026-11-25)
+- [x] Length-of-stay discounts: weekly (existed) and 28+ nights (`monthlyDiscountBps`).
+- [x] Extra-guest fee above `guestsIncluded`; cleaning fee per stay (existed).
+- [x] Every quote (host and public site) uses them; the booking keeps a frozen copy of the
+  price lines.
+- [ ] Seasons.
+- [ ] Last-minute and early-bird adjustments.
+- [ ] Promo codes.
+- [ ] Stay rules per season (min/max nights, check-in days, gap nights).
 
 ---
 
@@ -451,6 +527,16 @@ and `GuestRating`.
 
 ### Out of scope
 Smart lock integrations (Nuki, TTLock). The code is typed in by the host for now.
+
+### Progress (2026-11-25)
+- [x] House manual per listing (`Listing.houseManual`), shown on the guest page once confirmed.
+- [x] Door code (`Listing.accessCodeEnc`, encrypted; host views it on request, audited), shown
+  from check-in day to check-out day with nothing owed.
+- [ ] Pre-arrival form (guests, IDs, arrival time, house rules); the door code also waits for it.
+- [ ] Self check-in and check-out.
+- [ ] Reviews and host replies on the public listing.
+- [ ] The host rates the guest.
+- [x] Guest register CSV (IDs masked unless asked for in full; audited).
 
 ---
 
@@ -501,6 +587,17 @@ Alternatively, the offers stay on the web and only appear in the app once these 
 Which partners, what revenue share, and Legal and CBK review of each product and its
 wording.
 
+### Progress (2026-11-25)
+- [x] Payment history certificate: a PDF the tenant downloads (web and app), with a public
+  check at `/verify/<code>`.
+- [ ] Partner framework (`FinancialPartner`, `Referral`, per-organisation opt-out).
+- [ ] Consent records.
+- [ ] Rent advance or pay-later.
+- [ ] Deposit financing.
+- [ ] Insurance.
+- [ ] Landlord financing.
+- [ ] Google Play declarations, before any loan feature reaches the app.
+
 ---
 
 ## 11. Phase 24 — Accounting export [16]
@@ -529,6 +626,12 @@ Excel.
 ### Data
 `AccountMapping`, `AccountingConnection` (provider, tokens encrypted), `SyncRecord`
 (entity, externalId, hash), and `PeriodLock`.
+
+### Progress (2026-11-25)
+- [ ] General-ledger view and chart-of-accounts mapping.
+- [ ] Monthly journal export (CSV/XLSX).
+- [ ] QuickBooks Online and Xero sync.
+- [ ] Period locking.
 
 ---
 
@@ -562,6 +665,12 @@ want events.
 
 ### Data
 `ApiKey`, `WebhookEndpoint`, `OutboxEvent`, and `WebhookDelivery`.
+
+### Progress (2026-11-25)
+- [ ] API keys with scopes.
+- [ ] Public API `/api/public/v1` and its docs.
+- [ ] Webhooks with signing, retries, delivery log and the outbox.
+- [ ] Bank adapters.
 
 ---
 
@@ -611,6 +720,19 @@ system: an authenticator code becomes one more way to pass the same checks.
 `User.totpSecretEnc`, `User.twoFactorEnabledAt`, `RecoveryCode`, `TrustedDevice`, `ApprovalRule`,
 and `ApprovalRequest` (entity, amount, requestedBy, decidedBy, status).
 
+### Progress (2026-11-25)
+- [x] Organisations can require a second code for staff: off, staff who handle money, or all
+  staff (Settings → Organisation → Details; changing it needs a step-up code). Uses the SMS
+  `ADMIN_2FA` code after a password sign-in.
+- [ ] Authenticator apps (TOTP) and recovery codes.
+- [ ] Remember the device for 30 days.
+- [ ] Two-factor on by default for platform staff.
+- [ ] Step-up: authenticator as a method, a 10-minute window (5 minutes today), and the added
+  actions (payouts, remittances, payout accounts, API keys).
+- [ ] Maker–checker approvals and `APPROVALS_PENDING`.
+- [x] People see their own devices and sign each out (web account page, tenant profile, app).
+- [x] Alerts for sign-ins from a new device (email, or SMS; plus an in-app notice).
+
 ---
 
 ## 14. Phase 27 — Visitors and gate passes [19]
@@ -638,6 +760,14 @@ at the gate. A digital pass is a visible, daily-use feature that keeps residents
 ### Data
 `VisitorPass` (code hash, QR token, validity, uses), `GateEvent`, and `Guard` (a membership with
 the Guard role and assigned gates or properties).
+
+### Progress (2026-11-25)
+- [ ] Pre-registered visitor passes (SMS with QR and code).
+- [ ] Guard role and gate screen.
+- [ ] Walk-in approvals.
+- [ ] Repeating passes for deliveries and staff.
+- [ ] Logs, reports and CSV export.
+- [ ] Arrears rule (phase 16).
 
 ---
 
