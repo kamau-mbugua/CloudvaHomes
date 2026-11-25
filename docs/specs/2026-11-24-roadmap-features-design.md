@@ -405,11 +405,18 @@ Smart meters and prepaid tokens (deferred, §15).
 - [x] Caretaker home with today's tasks (`GET /reports/today`: meters to read, move-in and
   move-out inspections, open and late repairs).
 - [x] Offline queue for readings (phase 13) and inspections, which can't overwrite newer work.
-- [ ] Offline cache of meters and units.
-- [ ] Meter reading with OCR.
+  Queued items belong to the person who saved them; another user on the same phone never
+  sends them.
+- [x] Offline cache of the meters screens: property list, meter list and this month's reading
+  sheet, shown with an "Offline — showing data from …" banner (JSON file, per user and
+  organisation, cleared on sign-out).
+- [ ] Offline cache of units (and starting the app with no signal).
+- [x] Reading checks: below the last reading, or more than 3× the usual use, asks before
+  saving (app, including offline, and web). Readings record `ocrUsed` / `ocrEdited`.
+- [x] OCR suggestion from the meter photo (on-device ML Kit; the caretaker confirms it).
 - [ ] Inspections with photos and the tenant's signature.
-- [ ] Unit status.
-- [ ] Push for new tasks.
+- [x] Unit status: ready, needs cleaning or under repair (app sets it, web shows it). Vacancy photos wait for phase 15.
+- [x] Push for tasks: meter readings due, final reading on move-out day, repair late.
 
 ---
 

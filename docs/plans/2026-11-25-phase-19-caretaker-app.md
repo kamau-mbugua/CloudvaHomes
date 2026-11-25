@@ -97,8 +97,10 @@ Mobile:
   previous reading. Show "Suggested from photo: 01234.5 — Use / Ignore". Using it sets
   `ocrUsed = true`; changing the number afterwards sets `ocrEdited = true`.
 - Put the digit-picking logic in a pure function with unit tests (several sample OCR strings).
-- No data leaves the phone for OCR; nothing to add to Play's Data safety. Check the release
-  build still builds: `flutter build appbundle --release --flavor prod -t lib/main_prod.dart`.
+- The photo and recognised text never leave the phone. ML Kit itself does send Google
+  diagnostics (device model and OS, app package and version), per Google's ML Kit Android
+  data disclosure, so the Play Data safety form must be reviewed before release (owner's
+  call, with Compliance). Detailed brief: `2026-11-25-phase-19-slice-4-meter-ocr.md`.
 
 ## Slice 5 — Unit readiness and task pushes
 
@@ -137,15 +139,18 @@ Report any check you could not run and why.
 | Slice | State |
 |---|---|
 | 1. Today screen | **Done**, at `GET /reports/today` (not `/staff/today`). It lists each unread meter rather than "N of M done" per property; move-in inspections were added. |
-| 2. Reading checks and OCR fields | Not started. |
-| 3. Offline | **Inspection queue done** (`mobile/lib/features/staff/more/inspection_queue.dart`). Instead of `clientId`, a save carries `baseVersion` (the inspection's `updatedAt`, or `"none"`); the server refuses a stale one with 409 `INSPECTION_CHANGED`. Photos are recorded one by one, so a dropped connection loses none. **Meter list cache not started.** |
-| 4. OCR | Not started. |
-| 5. Unit readiness and pushes | Not started. |
+| 2. Reading checks and OCR fields | **Done** (Antigravity, brief `2026-11-25-phase-19-slice-2-reading-checks.md`). The sheet returns `averageUse`; app and web ask "Check this reading" above 3×; migration `20261126090000_reading_ocr_fields`. The web confirmation got a Cancel button and a non-red Save after review. |
+| 3. Offline | **Inspection queue done** (`mobile/lib/features/staff/more/inspection_queue.dart`). Instead of `clientId`, a save carries `baseVersion` (the inspection's `updatedAt`, or `"none"`); the server refuses a stale one with 409 `INSPECTION_CHANGED`. Photos are recorded one by one, so a dropped connection loses none. **Meter screens cache done** (Antigravity, brief `2026-11-25-phase-19-slice-3-offline-meters.md`): properties, meters and the month's sheet, used only when the network is unreachable, per user and organisation, cleared on sign-out. Units are not cached; starting the app with no signal still needs a connection. |
+| 4. OCR | **Done** (Antigravity, brief `2026-11-25-phase-19-slice-4-meter-ocr.md`). On-device ML Kit (Latin), `google_mlkit_text_recognition` 0.16.0 (newer needs Flutter 3.44). The photo suggests the number; the caretaker taps Use or Ignore. iOS minimum raised to 15.5; Android release bundle +14.1 MB. Play Data safety review still needed before release. |
+| 5. Unit readiness and pushes | **Done** (Antigravity, brief `2026-11-25-phase-19-slice-5-readiness-pushes.md`). `Unit.readiness` (Ready / Needs cleaning / Under repair), set on the app's unit screen, shown on the web units list. Pushes: readings due (1st, 08:00), final meter reading on move-out day, repair late (within 24 h of its target), to staff with the permission and the property; sent once (`task_pushes`); suspended and closed organisations skipped. Migration `20261127090000_unit_readiness`; jobs `caretaker-daily`, `maintenance-late` (cron image needs a rebuild). |
 | Extra (phase 18) | Vendor job link `/r/<token>`: the vendor sees the job, adds photos and reports it done. Stored as a SHA-256 plus an encrypted copy; a new vendor gets a new link; ends 7 days after the job closes; rate-limited; the report is audited. Migrations `20261125100000_vendor_repair_link`, `20261125110000_vendor_link_hashed`. |
 
 Fixed after review: vendor photos attach on upload; completion dates in Nairobi time (web and
 app); the app lists vendors with the job's trade first and shows the completion photos; a
 route test that checked nothing was removed; `GEMINI.md` has working rules.
+
+Fixed during slices 2–3: offline queues (readings and inspections) record who saved each
+item and only that person uploads it, so a second user on the same phone never sends them.
 
 Still open: the job SMS now carries a link (likely 2 SMS units); the Today screen shows raw
 priorities (`URGENT`) and every unread meter one by one; inline styles on the vendor pages.
