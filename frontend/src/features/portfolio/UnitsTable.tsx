@@ -9,7 +9,7 @@ import { useToast } from '../../lib/useToast';
 import { ConfirmDelete } from '../../components/ConfirmDelete';
 import { MoveInSheet } from '../tenants/MoveInSheet';
 import { keys, portfolioErrorMessage } from './api';
-import { OCCUPANCY, RECORD_STATUS, personName } from './labels';
+import { OCCUPANCY, RECORD_STATUS, UNIT_READINESS, personName } from './labels';
 import type { Unit } from './types';
 import { UnitSheet } from './UnitSheet';
 import { Badge } from './ui';
@@ -88,7 +88,15 @@ export function UnitsTable({ rows, showProperty = true }: { rows: Unit[]; showPr
                       </>
                     ) : <span className="ad__muted">—</span>}
                   </td>
-                  <td><Badge table={RECORD_STATUS} value={unit.status} /></td>
+                  <td>
+                    <Badge table={RECORD_STATUS} value={unit.status} />
+                    {unit.readiness ? (
+                      <>
+                        {' '}
+                        <Badge table={UNIT_READINESS} value={unit.readiness} />
+                      </>
+                    ) : null}
+                  </td>
                   <td className="ad__rowactions">
                     <div>
                       {canMoveIn && unit.occupancy === 'VACANT' && unit.status === 'ACTIVE' ? (

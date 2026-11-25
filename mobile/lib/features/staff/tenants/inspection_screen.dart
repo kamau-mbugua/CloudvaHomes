@@ -7,6 +7,7 @@ import '../../../core/api/api_error.dart';
 import '../../../core/widgets/common.dart';
 import '../inspections.dart';
 import '../more/inspection_queue.dart';
+import '../more/reading_queue.dart' show currentQueueOwner;
 import '../more/photo.dart';
 import '../staff_api.dart';
 import '../staff_widgets.dart';
@@ -175,6 +176,7 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
   }
 
   Future<void> _saveOffline(String inspectedOn) async {
+    final owner = await currentQueueOwner(ref);
     final queue = await ref.read(inspectionQueueProvider.future);
     final pending = PendingInspection(
       tenancyId: widget.tenancyId,
@@ -193,6 +195,7 @@ class _InspectionFormState extends ConsumerState<_InspectionForm> {
       notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
       reopen: _reopen,
       baseVersion: _baseVersion,
+      owner: owner,
     );
     await queue.enqueue(pending, localPhotos: _localPhotos);
     ref.invalidate(pendingInspectionsProvider);

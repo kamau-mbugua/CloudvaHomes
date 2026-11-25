@@ -71,6 +71,10 @@ android {
         release {
             // Without key.properties a release build is debug-signed: fine locally, refused by Play.
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

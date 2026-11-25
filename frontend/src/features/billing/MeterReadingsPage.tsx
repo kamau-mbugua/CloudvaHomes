@@ -9,7 +9,7 @@ import { formatKES } from '../../lib/money';
 import { currentPeriod, formatPeriod } from '../../lib/periods';
 import { calculateReading, formatQuantity, parseQuantity, trimQuantity } from '../../lib/quantity';
 import { useToast } from '../../lib/useToast';
-import { ConfirmDelete } from '../../components/ConfirmDelete';
+import { ConfirmDelete, ConfirmDialog } from '../../components/ConfirmDelete';
 import { EmptyState } from '../../components/EmptyState';
 import { TableSkeleton } from '../../components/Loading';
 import { Sheet } from '../../components/Sheet';
@@ -20,7 +20,7 @@ import { RECORD_STATUS } from '../portfolio/labels';
 import type { Unit } from '../portfolio/types';
 import { Badge, Field } from '../portfolio/ui';
 import { billingErrorMessage, keys, useChargeTypes } from './api';
-import { splitRowErrors, uploadRowErrors } from './rules';
+import { isUnusualUse, splitRowErrors, uploadRowErrors } from './rules';
 import { MeterPhotoCell } from './MeterPhoto';
 import type { PendingPhoto } from './MeterPhoto';
 import { MetersCsvImportSheet } from './MetersCsvImportSheet';
@@ -140,6 +140,7 @@ function ReadingSheet({ propertyId, charge, period }: { propertyId: string; char
 }
 
 interface RowValues { previous: string; current: string; note: string }
+interface ReadingPayload { meterId: string; previous: string; current: string; note?: string; photoUploadId?: string }
 
 function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: string; rows: ReadingSheetRow[] }) {
   const queryClient = useQueryClient();
@@ -157,6 +158,7 @@ function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: str
   const [photos, setPhotos] = useState<Record<string, PendingPhoto>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ readings: ReadingPayload[]; unusualCount: number } | null>(null);
 
   const setRow = (meterId: string, change: Partial<RowValues>) => setValues((v) => ({ ...v, [meterId]: { ...v[meterId], ...change } }));
   const isChanged = (r: ReadingSheetRow) => {
@@ -220,7 +222,8 @@ function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: str
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const found: Record<string, string> = {};
-    const readings: { meterId: string; previous: string; current: string; note?: string; photoUploadId?: string }[] = [];
+    const readings: ReadingPayload[] = [];
+    let unusualCount = 0;
     for (const r of changed) {
       const v = values[r.meter.id];
       const c = calcs[r.meter.id];
@@ -232,6 +235,7 @@ function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: str
       const prev = parseQuantity(v.previous);
       const curr = parseQuantity(v.current);
       if (!prev.ok || !curr.ok) continue;
+      if (isUnusualUse(v.previous, v.current, r.averageUse)) unusualCount += 1;
       readings.push({
         meterId: r.meter.id,
         previous: formatQuantity(prev.milli),
@@ -243,6 +247,10 @@ function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: str
     setErrors(found);
     setGeneral(null);
     if (Object.keys(found).length > 0 || readings.length === 0) return;
+    if (unusualCount > 0) {
+      setConfirming({ readings, unusualCount });
+      return;
+    }
     save.mutate(readings);
   };
 
@@ -271,6 +279,7 @@ function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: str
               const billed = Boolean(r.reading?.billed);
               const bad = errors[r.meter.id] ?? (c.state === 'invalid' ? c.error : undefined);
               const badField = c.state === 'invalid' ? c.field : 'current';
+              const unusual = !billed && isUnusualUse(v.previous, v.current, r.averageUse);
               return (
                 <tr key={r.meter.id}>
                   <td>
@@ -296,7 +305,14 @@ function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: str
                       {bad ? <span className="fld__err">{bad}</span> : null}
                     </div>
                   </td>
-                  <td className="num">{c.state === 'ok' ? trimQuantity(c.consumption) : <span className="ad__muted">—</span>}</td>
+                  <td className="num">
+                    {c.state === 'ok' ? (
+                      <>
+                        {trimQuantity(c.consumption)}
+                        {unusual ? <span className="ad__sub bl__warntext">More than 3× usual (about {trimQuantity(r.averageUse)})</span> : null}
+                      </>
+                    ) : <span className="ad__muted">—</span>}
+                  </td>
                   <td className="num">{c.state === 'ok' && c.amount !== null ? formatKES(c.amount) : <span className="ad__muted">—</span>}</td>
                   <td>
                     <div className="fld bl__cell bl__note">
@@ -348,12 +364,24 @@ function ReadingForm({ charge, period, rows }: { charge: ChargeType; period: str
         <div className="pg-actions pg-gap">
           <span className="ad__muted pg-grow">A meter left unread gets no line this month; its next reading covers both months.</span>
           <button type="button" className="nx-btn" disabled={changed.length === 0 || save.isPending}
-            onClick={() => { setValues(initial); setPhotos({}); setErrors({}); setGeneral(null); }}>Discard</button>
+            onClick={() => { setValues(initial); setPhotos({}); setErrors({}); setGeneral(null); setConfirming(null); }}>Discard</button>
           <button type="submit" className="nx-btn nx-btn--primary" disabled={changed.length === 0 || save.isPending}>
             {save.isPending ? 'Saving…' : changed.length > 0 ? `Save ${changed.length} ${changed.length === 1 ? 'reading' : 'readings'}` : 'Save all'}
           </button>
         </div>
       ) : <p className="ad__muted pg-gap">Your role can view readings but not enter them.</p>}
+      {confirming ? (
+        <ConfirmDialog
+          verb="Save"
+          cancel="Cancel"
+          tone="primary"
+          what={confirming.unusualCount === 1 ? 'this reading' : `these ${confirming.unusualCount} readings`}
+          consequence={`${confirming.unusualCount} ${confirming.unusualCount === 1 ? 'reading is' : 'readings are'} more than 3 times the usual use. Check the meters before saving.`}
+          busy={save.isPending}
+          onClose={() => setConfirming(null)}
+          onConfirm={() => save.mutate(confirming.readings)}
+        />
+      ) : null}
     </form>
   );
 }

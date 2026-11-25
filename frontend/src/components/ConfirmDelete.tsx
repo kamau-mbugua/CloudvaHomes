@@ -65,6 +65,8 @@ export function ConfirmDialog({
   what,
   consequence,
   verb = 'Delete',
+  cancel = 'Keep it',
+  tone = 'danger',
   busy = false,
   onClose,
   onConfirm,
@@ -72,6 +74,10 @@ export function ConfirmDialog({
   what: string;
   consequence?: string;
   verb?: string;
+  /** The button that backs out. */
+  cancel?: string;
+  /** `primary` when going ahead destroys nothing (e.g. "Save anyway"). */
+  tone?: 'danger' | 'primary';
   busy?: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -83,10 +89,10 @@ export function ConfirmDialog({
         <header className="nx-sheet__head"><h2>{verb} {what}?</h2></header>
         <p>{consequence ?? 'This cannot be undone.'}</p>
         <div className="nx-sheet__actions">
-          <button type="button" className="nx-btn" onClick={onClose}>Keep it</button>
+          <button type="button" className="nx-btn" onClick={onClose}>{cancel}</button>
           <button
             type="button"
-            className="nx-btn nx-btn--danger-solid"
+            className={`nx-btn ${tone === 'primary' ? 'nx-btn--primary' : 'nx-btn--danger-solid'}`}
             disabled={busy}
             onClick={() => { onClose(); onConfirm(); }}
           >

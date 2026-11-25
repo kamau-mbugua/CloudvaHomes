@@ -92,6 +92,21 @@ final pushTokenSourceProvider = Provider<PushTokenSource>(
   if (raw == '/app/guests' || raw.startsWith('/host/guests')) {
     return (route: '/host/guests', mode: AppMode.host);
   }
+  if (raw == '/app/meter-readings' || raw.startsWith('/app/meter-readings?')) {
+    final uri = Uri.tryParse(raw);
+    final propId = uri?.queryParameters['propertyId'];
+    final query = (propId != null && propId.isNotEmpty)
+        ? '?propertyId=${Uri.encodeQueryComponent(propId)}'
+        : '';
+    return (route: '/staff/more/meters$query', mode: AppMode.staff);
+  }
+  if (raw.startsWith('/app/units/')) {
+    final rest = raw.substring('/app/units/'.length);
+    final id = rest.split(RegExp(r'[/?#]')).first;
+    if (id.isNotEmpty) {
+      return (route: '/staff/units/$id', mode: AppMode.staff);
+    }
+  }
   if (raw == '/maintenance' || raw.startsWith('/app/maintenance')) {
     return (route: '/staff/more/maintenance', mode: AppMode.staff);
   }

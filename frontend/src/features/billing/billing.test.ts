@@ -6,7 +6,7 @@ import { labelFor } from '../portfolio/labels';
 import type { ChargeType } from './types';
 import {
   activeMoveInCharges, addChargeLine, canCreditInvoice, canVoidInvoice, chargeOptionLabel, chargesForUnit, checkAdhocLines,
-  checkCreditAmount, checkDueDays, draftTotal,
+  checkCreditAmount, checkDueDays, draftTotal, isUnusualUse,
   moveInChargeAmount, moveInChargeRule, readRunPreview, readRunResult, splitRowErrors, uploadRowErrors,
 } from './rules';
 
@@ -216,5 +216,21 @@ describe('uploadRowErrors', () => {
   it('is null for anything else', () => {
     expect(uploadRowErrors(apiError('VALIDATION_FAILED', 422), 'readings', ['m-1'], 'x')).toBeNull();
     expect(uploadRowErrors(new ApiError({ status: 422, code: 'UPLOAD_INVALID', message: 'x' }), 'readings', ['m-1'], 'x')).toBeNull();
+  });
+});
+
+describe('isUnusualUse', () => {
+  it('flags use strictly above 3× the usual use', () => {
+    expect(isUnusualUse('100.000', '130.001', '10.000')).toBe(true);
+    expect(isUnusualUse('100.000', '130.000', '10.000')).toBe(false);
+    expect(isUnusualUse('100.000', '115.000', '10.000')).toBe(false);
+  });
+
+  it('is false when averageUse is null, zero, or inputs do not parse', () => {
+    expect(isUnusualUse('100', '500', null)).toBe(false);
+    expect(isUnusualUse('100', '500', '0')).toBe(false);
+    expect(isUnusualUse('100', '500', '0.000')).toBe(false);
+    expect(isUnusualUse('100', '', '10.000')).toBe(false);
+    expect(isUnusualUse('100', '90', '10.000')).toBe(false);
   });
 });

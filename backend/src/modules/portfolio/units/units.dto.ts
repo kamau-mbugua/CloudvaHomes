@@ -20,6 +20,7 @@ import { IsMinorAmount } from '../money.dto.js';
 
 const STATUSES = ['ACTIVE', 'INACTIVE'] as const;
 const OCCUPANCY = ['OCCUPIED', 'NOTICE', 'VACANT'] as const;
+export const UNIT_READINESS_VALUES = ['READY', 'NEEDS_CLEANING', 'UNDER_REPAIR'] as const;
 export const UNIT_NUMBER = /^[A-Za-z0-9][A-Za-z0-9 ./-]{0,19}$/;
 const NUMBER_MESSAGE = 'Unit numbers are 1–20 letters, digits, spaces or . / -';
 export const MAX_BULK_UNITS = 500;
@@ -183,6 +184,15 @@ export class UpdateUnitDto {
   @IsOptional()
   @IsIn(STATUSES)
   status?: (typeof STATUSES)[number];
+
+  @ApiPropertyOptional({
+    enum: UNIT_READINESS_VALUES,
+    nullable: true,
+    description: 'null clears it',
+  })
+  @IsOptional()
+  @IsIn(UNIT_READINESS_VALUES)
+  readiness?: (typeof UNIT_READINESS_VALUES)[number] | null;
 }
 
 export class ImportUnitsCsvDto {

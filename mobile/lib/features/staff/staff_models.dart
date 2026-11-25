@@ -398,6 +398,7 @@ class UnitRow {
     required this.floor,
     required this.rentAmount,
     required this.status,
+    this.readiness,
     required this.property,
     required this.occupancy,
     required this.unitType,
@@ -408,6 +409,9 @@ class UnitRow {
   final int? floor;
   final int rentAmount;
   final String status;
+
+  /// READY, NEEDS_CLEANING, UNDER_REPAIR, or null when not set.
+  final String? readiness;
   final CodedRef property;
 
   /// OCCUPIED, NOTICE or VACANT.
@@ -431,6 +435,7 @@ class UnitRow {
       floor: (j['floor'] as num?)?.toInt(),
       rentAmount: centsFrom(j['rentAmount']),
       status: _s(j['status']) ?? 'ACTIVE',
+      readiness: _s(j['readiness']),
       property: CodedRef.fromJson(j['property'] as Json),
       occupancy: _s(j['occupancy']) ?? 'VACANT',
       unitType: _s((j['unitType'] as Map?)?['name']),
@@ -1070,12 +1075,14 @@ class SheetRow {
     required this.serialNo,
     required this.unitNumber,
     required this.suggestedPrevious,
+    this.averageUse,
     required this.reading,
   });
   final String meterId;
   final String serialNo;
   final String unitNumber;
   final String suggestedPrevious;
+  final String? averageUse;
   final ({
     String previous,
     String current,
@@ -1094,6 +1101,7 @@ class SheetRow {
       serialNo: _s((j['meter'] as Map?)?['serialNo']) ?? '',
       unitNumber: _s((j['unit'] as Map?)?['number']) ?? '',
       suggestedPrevious: '${j['suggestedPrevious'] ?? '0'}',
+      averageUse: _s(j['averageUse']),
       reading: r == null
           ? null
           : (

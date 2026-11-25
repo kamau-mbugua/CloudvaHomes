@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_error.dart';
+import '../../core/auth/session.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/config.dart';
 import '../../core/money.dart';
@@ -101,13 +102,13 @@ class StaffApi {
   }
 
   // ── properties (for pickers; paged, 100 is the most per page)
-  Future<List<PropertyOption>> properties() async {
-    final body = await _api.get(
-      '/properties',
-      query: {'status': 'ACTIVE', 'pageSize': 100},
-    );
-    return [for (final r in _rows(body)) PropertyOption.fromJson(r)];
-  }
+  Future<List<Json>> propertyRows() async => _rows(
+    await _api.get('/properties', query: {'status': 'ACTIVE', 'pageSize': 100}),
+  );
+
+  Future<List<PropertyOption>> properties() async => [
+    for (final r in await propertyRows()) PropertyOption.fromJson(r),
+  ];
 
   // ── units
   Future<Page<UnitRow>> units({
@@ -287,27 +288,37 @@ class StaffApi {
       _api.post('/inbound-transactions/$id/ignore', body: {'reason': reason});
 
   // ── meters (unpaged)
+  Future<List<Json>> meterRows(String propertyId) async =>
+      _rows(await _api.get('/meters', query: {'propertyId': propertyId}));
+
   Future<List<Meter>> meters(String propertyId) async => [
-    for (final r in _rows(
-      await _api.get('/meters', query: {'propertyId': propertyId}),
-    ))
-      Meter.fromJson(r),
+    for (final r in await meterRows(propertyId)) Meter.fromJson(r),
   ];
+
+  Future<List<Json>> sheetRows({
+    required String propertyId,
+    required String chargeTypeId,
+    required String period,
+  }) async => _rows(
+    await _api.get(
+      '/meter-readings/sheet',
+      query: {
+        'propertyId': propertyId,
+        'chargeTypeId': chargeTypeId,
+        'period': period,
+      },
+    ),
+  );
 
   Future<List<SheetRow>> readingSheet({
     required String propertyId,
     required String chargeTypeId,
     required String period,
   }) async => [
-    for (final r in _rows(
-      await _api.get(
-        '/meter-readings/sheet',
-        query: {
-          'propertyId': propertyId,
-          'chargeTypeId': chargeTypeId,
-          'period': period,
-        },
-      ),
+    for (final r in await sheetRows(
+      propertyId: propertyId,
+      chargeTypeId: chargeTypeId,
+      period: period,
     ))
       SheetRow.fromJson(r),
   ];
@@ -318,6 +329,8 @@ class StaffApi {
     required String current,
     String? note,
     String? photoUploadId,
+    bool ocrUsed = false,
+    bool ocrEdited = false,
   }) => _api.put(
     '/meter-readings',
     body: {
@@ -328,6 +341,8 @@ class StaffApi {
           'current': current,
           'note': ?note,
           'photoUploadId': ?photoUploadId,
+          if (ocrUsed) 'ocrUsed': true,
+          if (ocrEdited) 'ocrEdited': true,
         },
       ],
     },
@@ -619,11 +634,10 @@ final todayProvider = FutureProvider.autoDispose((ref) {
   return ref.watch(staffApiProvider).today(propertyId: activePropertyId);
 });
 
-final propertiesProvider = FutureProvider.autoDispose((ref) async {
-  final sessionProps = ref.watch(
-    sessionProvider.select((s) => s.valueOrNull?.properties ?? const []),
-  );
-  final fetched = await ref.watch(staffApiProvider).properties();
+List<PropertyOption> mergeSessionProperties(
+  List<SessionProperty> sessionProps,
+  List<PropertyOption> fetched,
+) {
   if (sessionProps.isEmpty) return fetched;
   final byId = {for (final p in fetched) p.id: p};
   final sessionIds = {for (final sp in sessionProps) sp.id};
@@ -644,6 +658,14 @@ final propertiesProvider = FutureProvider.autoDispose((ref) async {
     for (final p in fetched)
       if (!sessionIds.contains(p.id)) p,
   ];
+}
+
+final propertiesProvider = FutureProvider.autoDispose((ref) async {
+  final sessionProps = ref.watch(
+    sessionProvider.select((s) => s.valueOrNull?.properties ?? const []),
+  );
+  final fetched = await ref.watch(staffApiProvider).properties();
+  return mergeSessionProperties(sessionProps, fetched);
 });
 
 final unitProvider = FutureProvider.autoDispose.family<UnitRow, String>(
@@ -707,20 +729,6 @@ final maintenancePhotoProvider = FutureProvider.autoDispose
 final metersProvider = FutureProvider.autoDispose.family<List<Meter>, String>(
   (ref, propertyId) => ref.watch(staffApiProvider).meters(propertyId),
 );
-
-final sheetProvider = FutureProvider.autoDispose
-    .family<
-      List<SheetRow>,
-      ({String propertyId, String chargeTypeId, String period})
-    >(
-      (ref, k) => ref
-          .watch(staffApiProvider)
-          .readingSheet(
-            propertyId: k.propertyId,
-            chargeTypeId: k.chargeTypeId,
-            period: k.period,
-          ),
-    );
 
 /// Bumped after every write that changes a paged list, so `PagedList`s keyed on it reload.
 final listsVersionProvider = StateProvider<int>((ref) => 0);

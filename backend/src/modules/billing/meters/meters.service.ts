@@ -10,6 +10,7 @@ import { UnitsService } from '../../portfolio/units/units.service.js';
 import { fromMilli, meteredAmount, toMilli } from '../billing-math.js';
 import { UploadsService } from '../../files/uploads.service.js';
 import { alreadyBilled, ChargesService } from '../charges/charges.service.js';
+import { averageUse } from './meter-math.js';
 import type {
   CreateMeterDto,
   ListMetersQueryDto,
@@ -190,7 +191,7 @@ export class MetersService {
         readings: {
           where: { period: { lte: qry.period } },
           orderBy: { period: 'desc' },
-          take: 2,
+          take: 7,
         },
       },
       orderBy: { unit: { number: 'asc' } },
@@ -212,7 +213,8 @@ export class MetersService {
     const rate = charge.unitRate ?? 0n;
     return meters.map((m) => {
       const current = m.readings.find((r) => r.period === qry.period);
-      const earlier = m.readings.find((r) => r.period < qry.period);
+      const prior = m.readings.filter((r) => r.period < qry.period);
+      const earlier = prior[0];
       const consumption = current
         ? toMilli(q(current.current)) - toMilli(q(current.previous))
         : null;
@@ -220,6 +222,7 @@ export class MetersService {
         meter: { id: m.id, serialNo: m.serialNo },
         unit: m.unit,
         suggestedPrevious: earlier ? q(earlier.current) : q(m.initialReading),
+        averageUse: averageUse(prior),
         reading: current
           ? {
               id: current.id,
@@ -230,6 +233,8 @@ export class MetersService {
               note: current.note,
               billed: !!current.invoiceId,
               photo: current.photoUploadId ? { id: current.photoUploadId } : null,
+              ocrUsed: current.ocrUsed,
+              ocrEdited: current.ocrEdited,
               readAt: current.readAt,
               readBy: { id: current.readById, name: names.get(current.readById) ?? 'Unknown user' },
             }
@@ -280,6 +285,8 @@ export class MetersService {
         current,
         note: r.note?.trim() || null,
         photo: newPhoto ? { id: newPhoto, field: `readings[${i}].photoUploadId` } : null,
+        ocrUsed: r.ocrUsed ?? false,
+        ocrEdited: r.ocrEdited ?? false,
       };
     });
     if (details.length) throw AppError.validation(details);
@@ -291,6 +298,8 @@ export class MetersService {
           previous: fromMilli(p!.previous),
           current: fromMilli(p!.current),
           note: p!.note,
+          ocrUsed: p!.ocrUsed,
+          ocrEdited: p!.ocrEdited,
           readById: ctx.userId,
           readAt: new Date(),
           ...(p!.photo ? { photoUploadId: p!.photo.id } : {}),

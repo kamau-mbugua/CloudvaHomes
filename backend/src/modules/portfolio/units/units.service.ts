@@ -52,6 +52,7 @@ function snapshot(u: UnitRow) {
     featureIds: u.featureIds,
     description: u.description,
     status: u.status,
+    readiness: u.readiness,
   };
 }
 
@@ -102,6 +103,7 @@ export class UnitsService {
         rentAmount: u.rentAmount,
         description: u.description,
         status: u.status,
+        readiness: u.readiness,
         property: u.property,
         unitType: u.unitType,
         category: u.category,
@@ -280,6 +282,7 @@ export class UnitsService {
           ...(dto.featureIds !== undefined ? { featureIds: [...new Set(dto.featureIds)] } : {}),
           ...(dto.description !== undefined ? { description: optionalText(dto.description) } : {}),
           ...(dto.status !== undefined ? { status: dto.status } : {}),
+          ...(dto.readiness !== undefined ? { readiness: dto.readiness } : {}),
         },
         include: INCLUDE,
       });

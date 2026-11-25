@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../api/api_error.dart';
 import '../notifications/push_service.dart';
+import '../offline/offline_cache.dart';
 import '../providers.dart';
 import 'session.dart';
 import 'token_store.dart';
@@ -358,6 +359,7 @@ class SessionController extends AsyncNotifier<Session?> {
     }
     // The server already ended every session: no logout call, just forget it here.
     await _store.clear();
+    await _clearOfflineCache();
     _api.accessToken = null;
     ref.read(appModeProvider.notifier).state = null;
     state = const AsyncData(null);
@@ -374,9 +376,19 @@ class SessionController extends AsyncNotifier<Session?> {
       // Signed out locally regardless; the server session expires on its own.
     }
     await _store.clear();
+    await _clearOfflineCache();
     _api.accessToken = null;
     ref.read(appModeProvider.notifier).state = null;
     state = const AsyncData(null);
+  }
+
+  Future<void> _clearOfflineCache() async {
+    try {
+      final cache = await ref.read(offlineCacheProvider.future);
+      await cache.clear();
+    } on Object {
+      // Never block sign-out or account deletion if disk cleanup fails.
+    }
   }
 }
 

@@ -63,6 +63,7 @@ void main() {
 
         final saved = <String>[];
         final result = await queue.flush(
+          owner: 'u1|o1',
           uploadPhoto: (bytes) async => 'up-photo-1',
           save: (p, items) async => saved.add(
             '${p.tenancyId}:${p.kind}:${items.single.area}:${items.single.photoUploadIds.join(",")}',
@@ -93,6 +94,7 @@ void main() {
         ];
         var calls = 0;
         final first = await queue.flush(
+          owner: 'u1|o1',
           uploadPhoto: (_) async {
             calls++;
             if (calls == 2) throw ApiError.network();
@@ -109,6 +111,7 @@ void main() {
 
         final saved = <List<String>>[];
         final second = await queue.flush(
+          owner: 'u1|o1',
           uploadPhoto: (_) async => 'up-2',
           save: (_, items) async => saved.add(items.single.photoUploadIds),
         );
@@ -150,6 +153,7 @@ void main() {
     test('no connection: nothing is lost and no error is recorded', () async {
       await queue.enqueue(_sample());
       final result = await queue.flush(
+        owner: 'u1|o1',
         uploadPhoto: (_) async => 'unused',
         save: (_, _) async => throw ApiError.network(),
       );
@@ -162,6 +166,7 @@ void main() {
       () async {
         await queue.enqueue(_sample());
         final result = await queue.flush(
+          owner: 'u1|o1',
           uploadPhoto: (_) async => 'unused',
           save: (_, _) async => throw ApiError(
             status: 409,
@@ -174,6 +179,37 @@ void main() {
           (await queue.pending()).single.lastError,
           'Tenant already acknowledged this inspection.',
         );
+      },
+    );
+
+    test(
+      'another person\'s inspection is neither listed nor sent; theirs stays for them',
+      () async {
+        final p = _sample(tenancyId: 'ty-other');
+        await queue.enqueue(
+          PendingInspection(
+            tenancyId: p.tenancyId,
+            kind: p.kind,
+            inspectedOn: p.inspectedOn,
+            items: p.items,
+            savedAt: p.savedAt,
+            owner: 'u2|o1',
+          ),
+        );
+        await queue.enqueue(_sample()); // saved before owners were recorded
+        expect((await queue.pendingFor('u1|o1')).map((x) => x.tenancyId), [
+          'ty1',
+        ]);
+        final sent = <String>[];
+        final result = await queue.flush(
+          owner: 'u1|o1',
+          uploadPhoto: (_) async => 'unused',
+          save: (x, _) async => sent.add(x.tenancyId),
+        );
+        expect(sent, ['ty1']);
+        expect([result.sent, result.failed, result.remaining], [1, 0, 0]);
+        final left = (await queue.pending()).single;
+        expect([left.tenancyId, left.owner], ['ty-other', 'u2|o1']);
       },
     );
   });
@@ -350,6 +386,7 @@ void main() {
       expect(pending.single.kind, 'MOVE_IN');
       expect(pending.single.items.first.condition, 'FAIR');
       expect(pending.single.baseVersion, 'none');
+      expect(pending.single.owner, 'u1|o1');
       expect(find.byKey(const Key('inspection-offline-note')), findsNothing);
     },
   );

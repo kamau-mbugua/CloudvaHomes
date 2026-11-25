@@ -1,4 +1,11 @@
-import type { LandlordKind, Occupancy, RecordStatus, TenancyStatus, TenantStatus } from './types';
+import type {
+  LandlordKind,
+  Occupancy,
+  RecordStatus,
+  TenancyStatus,
+  TenantStatus,
+  UnitReadiness,
+} from './types';
 
 /**
  * Words and badge tones for the portfolio's states, in one place so a unit reads
@@ -32,6 +39,12 @@ export const TENANT_STATUS: Record<TenantStatus, Label> = {
 export const RECORD_STATUS: Record<RecordStatus, Label> = {
   ACTIVE: { label: 'Active', tone: 'ad__badge--ok' },
   INACTIVE: { label: 'Inactive', tone: 'ad__badge--off' },
+};
+
+export const UNIT_READINESS: Record<UnitReadiness, Label> = {
+  READY: { label: 'Ready', tone: 'ad__badge--ok' },
+  NEEDS_CLEANING: { label: 'Needs cleaning', tone: 'ad__badge--warn' },
+  UNDER_REPAIR: { label: 'Under repair', tone: 'ad__badge--warn' },
 };
 
 export const LANDLORD_KIND: Record<LandlordKind, string> = {

@@ -55,6 +55,7 @@ export interface ReadingSheetRow {
   meter: { id: string; serialNo: string };
   unit: { id: string; number: string };
   suggestedPrevious: string;
+  averageUse: string | null;
   reading: {
     id: string;
     previous: string;
@@ -67,6 +68,8 @@ export interface ReadingSheetRow {
     readBy: { id: string; name: string } | null;
     /** Phase 6: the meter photo, read through `GET /meter-readings/:id/photo`. */
     photo?: { id: string } | null;
+    ocrUsed?: boolean;
+    ocrEdited?: boolean;
   } | null;
 }
 

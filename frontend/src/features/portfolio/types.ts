@@ -4,6 +4,7 @@
  */
 
 export type RecordStatus = 'ACTIVE' | 'INACTIVE';
+export type UnitReadiness = 'READY' | 'NEEDS_CLEANING' | 'UNDER_REPAIR';
 export type LandlordKind = 'INDIVIDUAL' | 'COMPANY';
 export type Occupancy = 'OCCUPIED' | 'NOTICE' | 'VACANT';
 export type TenancyStatus = 'ACTIVE' | 'NOTICE' | 'ENDED';
@@ -78,6 +79,7 @@ export interface Unit {
   rentAmount: number;
   description: string | null;
   status: RecordStatus;
+  readiness?: UnitReadiness | null;
   property: CodedRef;
   unitType: Ref | null;
   category: Ref | null;

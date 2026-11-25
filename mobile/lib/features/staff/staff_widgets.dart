@@ -26,6 +26,18 @@ Tone occupancyTone(String o) => switch (o) {
   _ => Tone.neutral,
 };
 
+const unitReadinessLabel = {
+  'READY': 'Ready',
+  'NEEDS_CLEANING': 'Needs cleaning',
+  'UNDER_REPAIR': 'Under repair',
+};
+
+Tone unitReadinessTone(String r) => switch (r) {
+  'READY' => Tone.good,
+  'NEEDS_CLEANING' || 'UNDER_REPAIR' => Tone.warn,
+  _ => Tone.neutral,
+};
+
 const channelKindLabel = {
   'MPESA_PAYBILL': 'M-Pesa paybill',
   'MPESA_TILL': 'M-Pesa till',

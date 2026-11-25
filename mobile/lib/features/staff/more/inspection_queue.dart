@@ -66,6 +66,7 @@ class PendingInspection {
     this.reopen = false,
     this.baseVersion,
     this.lastError,
+    this.owner,
   });
 
   final String tenancyId;
@@ -78,7 +79,12 @@ class PendingInspection {
   final String? baseVersion;
   String? lastError;
 
+  /// See [queueOwnerOf]; null on entries saved before owners were recorded.
+  final String? owner;
+
   String get key => '$tenancyId|$kind';
+
+  bool ownedBy(String who) => owner == null || owner == who;
 
   Map<String, dynamic> toJson() => {
     'tenancyId': tenancyId,
@@ -90,6 +96,7 @@ class PendingInspection {
     'reopen': reopen,
     'baseVersion': baseVersion,
     'lastError': lastError,
+    'owner': owner,
   };
 
   factory PendingInspection.fromJson(Map<String, dynamic> j) =>
@@ -106,6 +113,7 @@ class PendingInspection {
         reopen: j['reopen'] == true,
         baseVersion: j['baseVersion'] as String?,
         lastError: j['lastError'] as String?,
+        owner: j['owner'] as String?,
       );
 }
 
@@ -126,6 +134,12 @@ class InspectionQueue {
         PendingInspection.fromJson(j as Map<String, dynamic>),
     ];
   }
+
+  /// What [owner] may see and send.
+  Future<List<PendingInspection>> pendingFor(String owner) async => [
+    for (final p in await pending())
+      if (p.ownedBy(owner)) p,
+  ];
 
   Future<void> _write(List<PendingInspection> list) async {
     await dir.create(recursive: true);
@@ -182,6 +196,7 @@ class InspectionQueue {
   /// Sends what is waiting, oldest first. No connection stops the run and keeps everything;
   /// a server refusal (4xx/5xx) keeps that inspection with the server's message.
   Future<FlushResult> flush({
+    required String owner,
     required Future<String> Function(Uint8List jpeg) uploadPhoto,
     required Future<void> Function(
       PendingInspection p,
@@ -197,7 +212,7 @@ class InspectionQueue {
     // being closed mid-run never loses a photo (at worst one is uploaded twice).
     final uploadedFiles = <String>[];
     try {
-      for (final p in [...list]) {
+      for (final p in [...list.where((x) => x.ownedBy(owner))]) {
         try {
           final resolvedItems = <InspectionItem>[];
           for (final item in p.items) {
@@ -238,7 +253,11 @@ class InspectionQueue {
         if (await f.exists()) await f.delete();
       }
     }
-    return FlushResult(sent: sent, failed: failed, remaining: list.length);
+    return FlushResult(
+      sent: sent,
+      failed: failed,
+      remaining: list.where((x) => x.ownedBy(owner)).length,
+    );
   }
 }
 
@@ -250,17 +269,22 @@ final inspectionQueueProvider = FutureProvider<InspectionQueue>((ref) async {
 final pendingInspectionsProvider = FutureProvider<List<PendingInspection>>((
   ref,
 ) async {
+  final owner = ref.watch(queueOwnerProvider);
+  if (owner == null) return const [];
   final queue = await ref.watch(inspectionQueueProvider.future);
-  return queue.pending();
+  return queue.pendingFor(owner);
 });
 
 /// Sends inspections saved offline; quietly does nothing without a connection.
 Future<FlushResult?> flushPendingInspections(WidgetRef ref) async {
   try {
+    final owner = await currentQueueOwner(ref);
+    if (owner == null) return null;
     final queue = await ref.read(inspectionQueueProvider.future);
-    if ((await queue.pending()).isEmpty) return null;
+    if ((await queue.pendingFor(owner)).isEmpty) return null;
     final api = ref.read(staffApiProvider);
     final result = await queue.flush(
+      owner: owner,
       uploadPhoto: (jpeg) => api.upload('INSPECTION_PHOTO', jpeg),
       save: (p, items) async {
         await api.saveInspection(p.tenancyId, p.kind, {

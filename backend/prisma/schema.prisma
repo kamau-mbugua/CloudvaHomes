@@ -392,22 +392,29 @@ model UnitFeature {
   @@map("unit_features")
 }
 
+enum UnitReadiness {
+  READY
+  NEEDS_CLEANING
+  UNDER_REPAIR
+}
+
 /// A rentable space. Occupancy is derived from its tenancies, never stored.
 model Unit {
-  id          String       @id @default(uuid(7)) @db.Uuid
-  orgId       String       @db.Uuid
-  propertyId  String       @db.Uuid
-  unitTypeId  String?      @db.Uuid
-  categoryId  String?      @db.Uuid
+  id          String         @id @default(uuid(7)) @db.Uuid
+  orgId       String         @db.Uuid
+  propertyId  String         @db.Uuid
+  unitTypeId  String?        @db.Uuid
+  categoryId  String?        @db.Uuid
   number      String // "A4"
-  floor       Int          @default(0)
+  floor       Int            @default(0)
   sizeSqft    Int?
   rentAmount  BigInt // default rent for new tenancies (minor units)
   description String?
-  featureIds  String[]     @db.Uuid
-  status      RecordStatus @default(ACTIVE) // INACTIVE = not lettable (e.g. renovation)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  featureIds  String[]       @db.Uuid
+  status      RecordStatus   @default(ACTIVE) // INACTIVE = not lettable (e.g. renovation)
+  readiness   UnitReadiness?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   property            Property             @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   unitType            UnitType?            @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
@@ -699,6 +706,8 @@ model MeterReading {
   readAt        DateTime @default(now())
   invoiceId     String?  @db.Uuid
   photoUploadId String?  @unique @db.Uuid
+  ocrUsed       Boolean  @default(false)
+  ocrEdited     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -1778,6 +1787,18 @@ model DeviceToken {
 
   @@index([userId])
   @@map("device_tokens")
+}
+
+/// De-duplicates scheduled staff task pushes so retries and double runs never push twice.
+model TaskPush {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  orgId     String   @db.Uuid
+  kind      String // METER_READINGS_DUE | FINAL_METER_READING | MAINTENANCE_LATE
+  refKey    String // period "2026-12", tenancyId, or maintenance request id
+  createdAt DateTime @default(now())
+
+  @@unique([orgId, kind, refKey])
+  @@map("task_pushes")
 }
 
 // ───────────────────────────── Hosts & short stays ─────────────────────────────

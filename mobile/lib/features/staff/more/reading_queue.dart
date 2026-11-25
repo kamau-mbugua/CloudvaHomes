@@ -6,6 +6,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/api/api_error.dart';
+import '../../../core/auth/session.dart';
+import '../../../core/auth/session_controller.dart';
+
+/// Who saved an offline item: `"<userId>|<orgId>"`. Queued work is uploaded only by the
+/// same person in the same organisation, so signing out and letting someone else sign in on
+/// the phone never sends it under their name (it waits until its owner signs in again).
+String? queueOwnerOf(Session? s) =>
+    s == null ? null : '${s.user.id}|${s.activeOrganization?.id ?? ''}';
+
+/// The signed-in person's queue owner, or null when signed out.
+final queueOwnerProvider = Provider<String?>(
+  (ref) =>
+      ref.watch(sessionProvider.select((s) => queueOwnerOf(s.valueOrNull))),
+);
+
+/// Like [queueOwnerProvider], but waits for the session if it is still loading, so an item
+/// is never queued or sent without knowing whose it is.
+Future<String?> currentQueueOwner(WidgetRef ref) async {
+  final session = ref.read(sessionProvider);
+  if (session.hasValue) return queueOwnerOf(session.value);
+  try {
+    return queueOwnerOf(await ref.read(sessionProvider.future));
+  } catch (_) {
+    return null; // no session: nothing is queued under, or sent for, anyone
+  }
+}
 
 /// A meter reading saved on the phone while offline (phase 13). Readings are upserted by
 /// meter and month on the server, so sending one again is harmless.
@@ -19,6 +45,9 @@ class PendingReading {
     this.note,
     this.photoPath,
     this.lastError,
+    this.ocrUsed = false,
+    this.ocrEdited = false,
+    this.owner,
   });
 
   final String meterId;
@@ -29,8 +58,16 @@ class PendingReading {
   final String? note;
   String? photoPath;
   String? lastError;
+  final bool ocrUsed;
+  final bool ocrEdited;
+
+  /// See [queueOwnerOf]. Null on entries saved before owners were recorded: whoever is
+  /// signed in next takes them, as before.
+  final String? owner;
 
   String get key => '$meterId|$period';
+
+  bool ownedBy(String who) => owner == null || owner == who;
 
   Map<String, dynamic> toJson() => {
     'meterId': meterId,
@@ -41,6 +78,9 @@ class PendingReading {
     'note': note,
     'photoPath': photoPath,
     'lastError': lastError,
+    'ocrUsed': ocrUsed,
+    'ocrEdited': ocrEdited,
+    'owner': owner,
   };
 
   factory PendingReading.fromJson(Map<String, dynamic> j) => PendingReading(
@@ -52,6 +92,9 @@ class PendingReading {
     note: j['note'] as String?,
     photoPath: j['photoPath'] as String?,
     lastError: j['lastError'] as String?,
+    ocrUsed: j['ocrUsed'] == true,
+    ocrEdited: j['ocrEdited'] == true,
+    owner: j['owner'] as String?,
   );
 }
 
@@ -82,6 +125,12 @@ class ReadingQueue {
       for (final j in raw) PendingReading.fromJson(j as Map<String, dynamic>),
     ];
   }
+
+  /// What [owner] may see and send.
+  Future<List<PendingReading>> pendingFor(String owner) async => [
+    for (final r in await pending())
+      if (r.ownedBy(owner)) r,
+  ];
 
   Future<void> _write(List<PendingReading> list) async {
     await dir.create(recursive: true);
@@ -123,10 +172,11 @@ class ReadingQueue {
     if (await f.exists()) await f.delete();
   }
 
-  /// Sends what is waiting, oldest first. No connection stops the run and keeps everything;
-  /// a refusal (e.g. the month is already billed) keeps that reading with the server's
-  /// message so someone can fix or discard it.
+  /// Sends what [owner] has waiting, oldest first; other people's entries stay untouched.
+  /// No connection stops the run and keeps everything; a refusal (e.g. the month is already
+  /// billed) keeps that reading with the server's message so someone can fix or discard it.
   Future<FlushResult> flush({
+    required String owner,
     required Future<String> Function(Uint8List jpeg) uploadPhoto,
     required Future<void> Function(PendingReading r, String? photoUploadId)
     save,
@@ -135,7 +185,7 @@ class ReadingQueue {
       ..sort((a, b) => a.savedAt.compareTo(b.savedAt));
     var sent = 0;
     var failed = 0;
-    for (final r in [...list]) {
+    for (final r in [...list.where((x) => x.ownedBy(owner))]) {
       try {
         String? photoId;
         if (r.photoPath != null && await File(r.photoPath!).exists()) {
@@ -152,7 +202,11 @@ class ReadingQueue {
       }
     }
     await _write(list);
-    return FlushResult(sent: sent, failed: failed, remaining: list.length);
+    return FlushResult(
+      sent: sent,
+      failed: failed,
+      remaining: list.where((x) => x.ownedBy(owner)).length,
+    );
   }
 }
 

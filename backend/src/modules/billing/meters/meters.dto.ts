@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -105,6 +106,16 @@ class ReadingDto {
   @IsOptional()
   @IsUUID()
   photoUploadId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  ocrUsed?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  ocrEdited?: boolean;
 }
 
 export class SaveReadingsDto {

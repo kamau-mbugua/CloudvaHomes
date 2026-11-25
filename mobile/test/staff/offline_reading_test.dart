@@ -74,6 +74,7 @@ void main() {
     final pending = await tester.runAsync(queue.pending);
     expect(pending!.single.current, '123.4');
     expect(pending.single.meterId, 'm1');
+    expect(pending.single.owner, 'u1|o1');
     expect(find.textContaining('saved on this phone'), findsOneWidget);
   });
 }

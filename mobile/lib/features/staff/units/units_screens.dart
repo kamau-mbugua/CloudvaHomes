@@ -249,10 +249,60 @@ class UnitDetailScreen extends ConsumerStatefulWidget {
 class _UnitDetailScreenState extends ConsumerState<UnitDetailScreen> {
   int _tab = 0;
 
+  Future<void> _pickReadiness(BuildContext context, UnitRow u) async {
+    final picked = await showModalBottomSheet<({String? readiness})>(
+      context: context,
+      useRootNavigator: true,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (value, label) in const [
+              ('READY', 'Ready'),
+              ('NEEDS_CLEANING', 'Needs cleaning'),
+              ('UNDER_REPAIR', 'Under repair'),
+              (null, 'Not set'),
+            ])
+              ListTile(
+                title: Text(label),
+                trailing: u.readiness == value ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(ctx).pop((readiness: value)),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    try {
+      await ref.read(staffApiProvider).updateUnit(u.id, {
+        'readiness': picked.readiness,
+      });
+      ref.invalidate(unitProvider(u.id));
+      ref.read(listsVersionProvider.notifier).state++;
+      if (!context.mounted) return;
+      showMessage(
+        context,
+        picked.readiness == null
+            ? 'Readiness cleared.'
+            : 'Unit marked as ${unitReadinessLabel[picked.readiness!]}.',
+      );
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showMessage(
+        context,
+        e.isNetworkError
+            ? "No connection. Try again when you're online."
+            : staffErrorMessage(e),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final unitId = widget.unitId;
     final unit = ref.watch(unitProvider(unitId));
+    final canUpdate = can(ref, 'units:update');
     return Scaffold(
       appBar: KodiHubAppBar(
         title: Text(
@@ -260,7 +310,7 @@ class _UnitDetailScreenState extends ConsumerState<UnitDetailScreen> {
         ),
         subtitle: unit.valueOrNull?.property.name,
         actions: [
-          if (unit.valueOrNull != null && can(ref, 'units:update'))
+          if (unit.valueOrNull != null && canUpdate)
             IconButton(
               tooltip: 'Edit unit',
               icon: const Icon(Icons.edit_outlined),
@@ -294,12 +344,54 @@ class _UnitDetailScreenState extends ConsumerState<UnitDetailScreen> {
                     tone: occupancyTone(u.occupancy),
                   ),
                   children: [
+                    if (!canUpdate && u.readiness != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: StatusChip(
+                            unitReadinessLabel[u.readiness!] ?? u.readiness!,
+                            tone: unitReadinessTone(u.readiness!),
+                          ),
+                        ),
+                      ),
                     if (u.unitType != null) FactRow('Type', u.unitType!),
                     if (u.floor != null)
                       FactRow('Floor', u.floor == 0 ? 'Ground' : '${u.floor}'),
                     FactRow('Rent (default)', formatKes(u.rentAmount)),
                     if (u.status != 'ACTIVE')
                       const FactRow('Status', 'Inactive'),
+                    if (canUpdate)
+                      ListTile(
+                        key: const Key('unit-readiness-row'),
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: const Text('Readiness'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (u.readiness != null)
+                              StatusChip(
+                                unitReadinessLabel[u.readiness!] ??
+                                    u.readiness!,
+                                tone: unitReadinessTone(u.readiness!),
+                              )
+                            else
+                              Text(
+                                'Not set',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right, size: 20),
+                          ],
+                        ),
+                        onTap: () => _pickReadiness(context, u),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),

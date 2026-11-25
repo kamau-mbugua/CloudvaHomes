@@ -1,5 +1,6 @@
 import { ApiError } from '../../lib/api/client';
 import { formatKES, minorToInput, parseAmount } from '../../lib/money';
+import { parseQuantity } from '../../lib/quantity';
 import type { ChargeType, Invoice, MoveInCharge, RunPreviewItem, RunResult } from './types';
 
 /**
@@ -195,6 +196,22 @@ export function readRunResult(body: unknown): RunResult {
 /** Sum of integer minor units. */
 export function sumMinor(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0);
+}
+
+// ---------------------------------------------------------------- meter readings
+
+/**
+ * True only when `averageUse` is a number above 0 and `current - previous > 3 × averageUse`,
+ * compared in exact integer thousandths.
+ */
+export function isUnusualUse(previous: string, current: string, averageUse: string | null | undefined): boolean {
+  if (!averageUse) return false;
+  const avg = parseQuantity(averageUse);
+  if (!avg.ok || avg.milli <= 0n) return false;
+  const prev = parseQuantity(previous);
+  const curr = parseQuantity(current);
+  if (!prev.ok || !curr.ok) return false;
+  return curr.milli - prev.milli > 3n * avg.milli;
 }
 
 // ---------------------------------------------------------------- row errors

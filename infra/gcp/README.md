@@ -312,6 +312,28 @@ statement imports need no infrastructure. A bank that pushes notifications must 
 reach `$API_URL/api/v1/hooks/bank/<token>`. If it requires a fixed source address from us,
 that is the Cloud NAT address in §0.
 
+## 14b. Caretaker task pushes (phase 19)
+
+Daily 08:00 Nairobi check for monthly meter readings (on the 1st) and same-day move-out final
+meter readings, plus a 15-minute check for newly late repair requests (both idempotent via
+`task_pushes`):
+
+```bash
+gcloud scheduler jobs create http hodi-caretaker-daily --location "$REGION" \
+  --schedule "0 8 * * *" --time-zone "Africa/Nairobi" \
+  --uri "$API_URL/api/v1/internal/jobs/caretaker-daily" --http-method POST \
+  --headers "Content-Type=application/json" --message-body '{}' \
+  --oidc-service-account-email "$SCHED_SA" --oidc-token-audience "$API_URL" \
+  --attempt-deadline 5m
+
+gcloud scheduler jobs create http hodi-maintenance-late --location "$REGION" \
+  --schedule "*/15 * * * *" --time-zone "Africa/Nairobi" \
+  --uri "$API_URL/api/v1/internal/jobs/maintenance-late" --http-method POST \
+  --headers "Content-Type=application/json" --message-body '{}' \
+  --oidc-service-account-email "$SCHED_SA" --oidc-token-audience "$API_URL" \
+  --attempt-deadline 5m
+```
+
 ## 15. VMs (created 2026-10-28)
 
 Hodi's first server is a Compute Engine VM. It is not the Cloud Run setup in §1–§9; that remains

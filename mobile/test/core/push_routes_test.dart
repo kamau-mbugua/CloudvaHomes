@@ -30,4 +30,18 @@ void main() {
       expect(r?.mode, AppMode.host);
     },
   );
+
+  test('caretaker task push links open the matching staff screen', () {
+    final cases = {
+      '/app/meter-readings': '/staff/more/meters',
+      '/app/meter-readings?propertyId=p1': '/staff/more/meters?propertyId=p1',
+      '/app/units/u1': '/staff/units/u1',
+      '/app/maintenance?late=true': '/staff/more/maintenance',
+    };
+    for (final e in cases.entries) {
+      final r = mobileRouteForActionUrl(e.key);
+      expect(r?.route, e.value, reason: e.key);
+      expect(r?.mode, AppMode.staff, reason: e.key);
+    }
+  });
 }

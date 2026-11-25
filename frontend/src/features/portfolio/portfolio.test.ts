@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../lib/api/client';
 import { buildUnitNumbers } from './unitNumbers';
 import {
-  LANDLORD_KIND, OCCUPANCY, RECORD_STATUS, TENANCY_STATUS, TENANT_STATUS,
+  LANDLORD_KIND, OCCUPANCY, RECORD_STATUS, TENANCY_STATUS, TENANT_STATUS, UNIT_READINESS,
   defaultBillingDay, labelFor, optionsOf, personName, unitLabel,
 } from './labels';
 import { splitFormError } from './formErrors';
@@ -67,6 +67,15 @@ describe('labels', () => {
     expect(TENANCY_STATUS.ENDED.label).toBe('Ended');
     expect(TENANT_STATUS.PROSPECT.label).toBe('Prospect');
     expect(LANDLORD_KIND.COMPANY).toBe('Company');
+  });
+
+  it('labels all three UNIT_READINESS values matching the backend enum', () => {
+    expect(Object.keys(UNIT_READINESS)).toEqual(['READY', 'NEEDS_CLEANING', 'UNDER_REPAIR']);
+    expect(UNIT_READINESS).toEqual({
+      READY: { label: 'Ready', tone: 'ad__badge--ok' },
+      NEEDS_CLEANING: { label: 'Needs cleaning', tone: 'ad__badge--warn' },
+      UNDER_REPAIR: { label: 'Under repair', tone: 'ad__badge--warn' },
+    });
   });
 
   it('falls back to the raw value for an unknown state', () => {

@@ -601,6 +601,80 @@ describe('Billing (e2e)', () => {
     ); // not metered
   });
 
+  it('sheet averageUse ignores the current period and OCR flags reset on manual correction', async () => {
+    const s = await setUpBilling(t, owner);
+    const { get, put } = api;
+    const TWO_MONTHS_AGO = periodOf(formatDateOnly(addDays(parseDateOnly(`${LAST_MONTH}-01`), -1)));
+
+    // 1st earlier reading (no OCR fields — old app versions keep working): < 2 readings → null.
+    await put(owner, '/meter-readings', {
+      period: TWO_MONTHS_AGO,
+      readings: [{ meterId: s.m2.id, current: '10' }],
+    });
+    const sheetOne = (
+      await get(
+        owner,
+        `/meter-readings/sheet?propertyId=${s.p.id}&chargeTypeId=${s.water.id}&period=${PERIOD}`,
+      )
+    ).data;
+    expect(sheetOne[1]).toMatchObject({
+      suggestedPrevious: '10.000',
+      averageUse: null,
+      reading: null,
+    });
+
+    // 2nd earlier reading: uses are 10 and 20 → averageUse is 15.000.
+    await put(owner, '/meter-readings', {
+      period: LAST_MONTH,
+      readings: [{ meterId: s.m2.id, current: '30' }],
+    });
+
+    // Save current period with huge use (200) and OCR flags true.
+    await put(owner, '/meter-readings', {
+      period: PERIOD,
+      readings: [{ meterId: s.m2.id, current: '230', ocrUsed: true, ocrEdited: true }],
+    });
+    const sheetWithOcr = (
+      await get(
+        owner,
+        `/meter-readings/sheet?propertyId=${s.p.id}&chargeTypeId=${s.water.id}&period=${PERIOD}`,
+      )
+    ).data;
+    expect(sheetWithOcr[1]).toMatchObject({
+      suggestedPrevious: '30.000',
+      averageUse: '15.000',
+      reading: {
+        previous: '30.000',
+        current: '230.000',
+        consumption: '200.000',
+        ocrUsed: true,
+        ocrEdited: true,
+      },
+    });
+
+    // Correcting by hand without OCR fields resets both back to false.
+    await put(owner, '/meter-readings', {
+      period: PERIOD,
+      readings: [{ meterId: s.m2.id, current: '45' }],
+    });
+    const sheetCorrected = (
+      await get(
+        owner,
+        `/meter-readings/sheet?propertyId=${s.p.id}&chargeTypeId=${s.water.id}&period=${PERIOD}`,
+      )
+    ).data;
+    expect(sheetCorrected[1]).toMatchObject({
+      averageUse: '15.000',
+      reading: {
+        previous: '30.000',
+        current: '45.000',
+        consumption: '15.000',
+        ocrUsed: false,
+        ocrEdited: false,
+      },
+    });
+  });
+
   it('other organisations’ billing ids behave like missing ids', async () => {
     const s = await setUpBilling(t, owner);
     const { get, post, put, patch, del } = api;
