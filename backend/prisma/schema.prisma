@@ -1214,9 +1214,16 @@ model MaintenanceRequest {
   photoUploadIds String[]            @db.Uuid
   resolutionNote String?
   /// Phase 18 (first step): the vendor doing the job, and when they were assigned.
-  vendorId       String?             @db.Uuid
-  assignedAt     DateTime?
-  expenseId      String?             @unique @db.Uuid
+  vendorId             String?             @db.Uuid
+  assignedAt           DateTime?
+  /// The vendor's job link (/r/<token>): a SHA-256 to find it and an encrypted copy so staff
+  /// can copy it again. Changes when the job goes to another vendor or is rotated.
+  vendorTokenHash      String?             @unique
+  vendorTokenEnc       Bytes?
+  vendorNote           String?
+  vendorPhotoUploadIds String[]            @db.Uuid
+  vendorCompletedAt    DateTime?
+  expenseId            String?             @unique @db.Uuid
   createdById    String?             @db.Uuid
   resolvedById   String?             @db.Uuid
   resolvedAt     DateTime?

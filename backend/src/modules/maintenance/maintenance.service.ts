@@ -1,11 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { currentContext } from '../../common/context/request-context.js';
+import { currentContext, withoutOrgScope } from '../../common/context/request-context.js';
 import { formatDateOnly } from '../../common/dates/date-only.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { type PaginationQueryDto, pageMeta, toSkipTake } from '../../common/http/pagination.js';
+import { FieldCipher } from '../../common/crypto/field-cipher.js';
+import { RateLimitService } from '../../common/rate-limit/rate-limit.service.js';
+import { ENV } from '../../config/config.module.js';
+import type { Env } from '../../config/env.js';
 import type { MaintenanceRequest, Prisma } from '../../generated/prisma/client.js';
 import { DB, type Db } from '../../prisma/prisma.module.js';
 import { AuditService } from '../audit/audit.service.js';
+import { randomToken, sha256 } from '../auth/crypto.js';
 import { orgContext } from '../auth/decorators.js';
 import { todayInNairobi } from '../billing/billing-math.js';
 import { ExpensesService } from '../expenses/expenses.service.js';
@@ -22,7 +27,11 @@ import type {
   CreateTenantMaintenanceRequestDto,
   ListMaintenanceQueryDto,
   UpdateMaintenanceRequestDto,
+  VendorCompleteJobDto,
 } from './maintenance.dto.js';
+
+/** Photos a vendor can add to a job through their link. */
+const MAX_VENDOR_PHOTOS = 10;
 
 const INCLUDE = {
   property: { select: { id: true, code: true, name: true } },
@@ -99,12 +108,65 @@ export class MaintenanceService {
     private readonly expenses: ExpensesService,
     private readonly notifications: NotificationsService,
     private readonly vendors: VendorsService,
+    private readonly cipher: FieldCipher,
+    private readonly rateLimit: RateLimitService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
+  private vendorUrl(token: string): string {
+    return `${this.env.APP_URL.replace(/\/$/, '')}/r/${token}`;
+  }
+
+  /** A new vendor link: the hash finds it, the encrypted copy lets staff copy it again. */
+  private newVendorToken(orgId: string) {
+    const token = randomToken();
+    return {
+      token,
+      data: {
+        vendorTokenHash: sha256(token),
+        vendorTokenEnc: this.cipher.encrypt(token, `${orgId}:maintenance.vendorToken`),
+      },
+    };
+  }
+
+  private openVendorToken(row: { orgId: string; vendorTokenEnc: Uint8Array | null }) {
+    return row.vendorTokenEnc
+      ? this.cipher.decrypt(row.vendorTokenEnc, `${row.orgId}:maintenance.vendorToken`)
+      : null;
+  }
+
+  /** The vendor's job link, made on first use. Only for a job with a vendor on it. */
+  async getVendorLink(id: string) {
+    const row = await this.find(id);
+    if (!row.vendorId) throw AppError.conflict('Assign a vendor first', 'NO_VENDOR');
+    const token =
+      this.openVendorToken(row) ??
+      (await this.setVendorToken(row, 'maintenance.vendor_link_create'));
+    return { url: this.vendorUrl(token) };
+  }
+
+  /** A new vendor link; the old one stops working. */
+  async rotateVendorLink(id: string) {
+    const row = await this.find(id);
+    if (!row.vendorId) throw AppError.conflict('Assign a vendor first', 'NO_VENDOR');
+    const token = await this.setVendorToken(row, 'maintenance.vendor_link_rotate');
+    return { url: this.vendorUrl(token) };
+  }
+
+  private async setVendorToken(row: { id: string; orgId: string }, action: string) {
+    const { token, data } = this.newVendorToken(row.orgId);
+    await this.db.$transaction(async (tx) => {
+      await tx.maintenanceRequest.update({ where: { id: row.id }, data });
+      await this.audit.record({ action, entity: 'maintenance_request', entityId: row.id }, tx);
+    });
+    return token;
+  }
+
   /**
-   * Phase 18 (first step): send the job to a vendor (or take it back). Assigning starts an open
-   * job, and by default texts the vendor the job and the organisation's number for access —
-   * not the tenant's. Audited.
+   * Phase 18: send the job to a vendor (or take it back). Assigning starts an open job and by
+   * default texts the vendor the job, their link and the organisation's number for access —
+   * not the tenant's. A different vendor gets a new link (the previous vendor's stops
+   * working); taking the vendor off removes it. Audited.
    */
   async assign(id: string, vendorId: string | null, notify = true) {
     const before = await this.find(id);
@@ -114,12 +176,16 @@ export class MaintenanceService {
     const vendor = vendorId ? await this.vendors.find(vendorId) : null;
     if (vendor && !vendor.active)
       throw AppError.fieldInvalid('vendorId', 'This vendor is archived');
+    const kept = vendor && vendor.id === before.vendorId ? this.openVendorToken(before) : null;
+    const fresh = vendor && !kept ? this.newVendorToken(before.orgId) : null;
+    const token = kept ?? fresh?.token ?? null;
     await this.db.$transaction(async (tx) => {
       await tx.maintenanceRequest.update({
         where: { id },
         data: {
           vendorId: vendor?.id ?? null,
           assignedAt: vendor ? new Date() : null,
+          ...(fresh ? fresh.data : vendor ? {} : { vendorTokenHash: null, vendorTokenEnc: null }),
           ...(vendor && before.status === 'OPEN' ? { status: 'IN_PROGRESS' } : {}),
         },
       });
@@ -135,14 +201,15 @@ export class MaintenanceService {
       );
     });
     let notified = false;
-    if (vendor && notify) {
+    if (vendor && token && notify) {
       const org = await this.db.organization.findUniqueOrThrow({
         where: { id: before.orgId },
         select: { name: true, phone: true },
       });
       const text =
         `${org.name}: job ${before.number} — ${before.title} (${before.priority.toLowerCase()}) at ` +
-        `${before.unit.number}, ${before.property.name}. Call ${org.phone} to arrange access.`;
+        `${before.unit.number}, ${before.property.name}. Details: ${this.vendorUrl(token)} ` +
+        `Access: call ${org.phone}.`;
       try {
         await this.notifications.sendVendorJob(before.orgId, vendor.phone, text);
         notified = true;
@@ -172,6 +239,10 @@ export class MaintenanceService {
         title: r.title,
         description: r.description,
         photoUploadIds: r.photoUploadIds,
+        vendorNote: r.vendorNote,
+        vendorPhotoUploadIds: r.vendorPhotoUploadIds,
+        vendorCompletedAt: r.vendorCompletedAt,
+        hasVendorLink: Boolean(r.vendorTokenHash),
         resolutionNote: r.resolutionNote,
         resolvedById: r.resolvedById,
         resolvedAt: r.resolvedAt,
@@ -568,10 +639,205 @@ export class MaintenanceService {
 
   async photoContent(id: string, uploadId: string) {
     const req = await this.find(id);
-    if (!req.photoUploadIds.includes(uploadId)) {
+    if (!req.photoUploadIds.includes(uploadId) && !req.vendorPhotoUploadIds.includes(uploadId)) {
       throw AppError.notFound('Photo');
     }
     return this.uploads.content(uploadId);
+  }
+
+  // ── Public vendor repair link (/api/v1/public/vendor-jobs/:token) ──
+
+  /**
+   * The job behind a vendor link. Rate-limited per address (and per link for writes) since it
+   * needs no sign-in. A link works while a vendor is on the job and for 7 days after it closes.
+   */
+  private async findByVendorToken(token: string, use: 'view' | 'photo' | 'write' = 'view') {
+    const ip = currentContext()?.ip ?? 'unknown';
+    await this.rateLimit.hit(
+      { key: `vendor-job:ip:${ip}`, limit: 300, windowSeconds: 3600 },
+      ...(use === 'photo'
+        ? [{ key: `vendor-job:photo:${sha256(token ?? '')}`, limit: 30, windowSeconds: 3600 }]
+        : use === 'write'
+          ? [{ key: `vendor-job:write:${sha256(token ?? '')}`, limit: 20, windowSeconds: 3600 }]
+          : []),
+    );
+    const clean = token?.trim();
+    if (!clean || clean.length < 16) throw AppError.notFound('Job');
+    return withoutOrgScope(async () => {
+      const row = await this.db.maintenanceRequest.findUnique({
+        where: { vendorTokenHash: sha256(clean) },
+        include: {
+          property: { select: { name: true, location: true } },
+          unit: { select: { number: true, floor: true } },
+          vendor: { select: { name: true } },
+        },
+      });
+      if (!row || !row.vendorId) throw AppError.notFound('Job');
+      const closedLongAgo =
+        (row.status === 'RESOLVED' || row.status === 'CANCELLED') &&
+        (row.resolvedAt ?? row.updatedAt).getTime() < Date.now() - 7 * 24 * 3_600_000;
+      if (closedLongAgo) throw AppError.notFound('Job');
+      const org = await this.db.organization.findUniqueOrThrow({
+        where: { id: row.orgId },
+        select: { name: true, phone: true },
+      });
+      return { row, org };
+    });
+  }
+
+  private toPublicVendorJob(
+    row: {
+      number: string;
+      title: string;
+      description: string;
+      category: string;
+      priority: string;
+      status: string;
+      photoUploadIds: string[];
+      vendorNote: string | null;
+      vendorPhotoUploadIds: string[];
+      vendorCompletedAt: Date | null;
+      property: { name: string; location: string | null };
+      unit: { number: string; floor: number };
+      vendor: { name: string } | null;
+    },
+    org: { name: string; phone: string },
+  ) {
+    return {
+      number: row.number,
+      title: row.title,
+      description: row.description,
+      category: row.category,
+      priority: row.priority,
+      status: row.status,
+      property: { name: row.property.name, location: row.property.location },
+      unit: { number: row.unit.number, floor: row.unit.floor },
+      organization: { name: org.name, phone: org.phone },
+      vendor: row.vendor ? { name: row.vendor.name } : null,
+      photoUploadIds: row.photoUploadIds,
+      vendorNote: row.vendorNote,
+      vendorPhotoUploadIds: row.vendorPhotoUploadIds,
+      vendorCompletedAt: row.vendorCompletedAt,
+    };
+  }
+
+  async getPublicJob(token: string) {
+    const { row, org } = await this.findByVendorToken(token);
+    return this.toPublicVendorJob(row, org);
+  }
+
+  async publicJobPhotoContent(token: string, uploadId: string) {
+    const { row } = await this.findByVendorToken(token);
+    const allowed = [...row.photoUploadIds, ...row.vendorPhotoUploadIds];
+    return this.uploads.vendorJobPhotoContent(row.orgId, uploadId, allowed);
+  }
+
+  async uploadPublicJobPhoto(token: string, file: { buffer: Buffer; size: number } | undefined) {
+    const { row } = await this.findByVendorToken(token, 'photo');
+    if (row.status === 'RESOLVED' || row.status === 'CANCELLED') {
+      throw AppError.conflict('This job is closed', 'MAINTENANCE_CLOSED');
+    }
+    if (row.vendorPhotoUploadIds.length >= MAX_VENDOR_PHOTOS) {
+      throw AppError.fieldInvalid('file', `At most ${MAX_VENDOR_PHOTOS} completion photos`);
+    }
+    const upload = await this.uploads.createForVendor(
+      row.orgId,
+      row.vendorId ?? row.createdById ?? row.id,
+      file,
+    );
+    // Attached to the job straight away, so a vendor who closes the page before sending the
+    // report doesn't lose the photo.
+    await withoutOrgScope(() =>
+      this.db.$transaction(async (tx) => {
+        await tx.upload.update({ where: { id: upload.id }, data: { attachedAt: new Date() } });
+        await tx.maintenanceRequest.update({
+          where: { id: row.id },
+          data: { vendorPhotoUploadIds: { push: upload.id } },
+        });
+      }),
+    );
+    return upload;
+  }
+
+  async completePublicJob(token: string, dto: VendorCompleteJobDto) {
+    const { row, org } = await this.findByVendorToken(token, 'write');
+    if (row.status === 'RESOLVED' || row.status === 'CANCELLED') {
+      throw AppError.conflict('This job is closed', 'MAINTENANCE_CLOSED');
+    }
+
+    const incomingIds = [...new Set(dto.photoUploadIds ?? [])];
+    const combinedPhotos = [...new Set([...row.vendorPhotoUploadIds, ...incomingIds])];
+    if (combinedPhotos.length > MAX_VENDOR_PHOTOS) {
+      throw AppError.fieldInvalid(
+        'photoUploadIds',
+        `At most ${MAX_VENDOR_PHOTOS} completion photos`,
+      );
+    }
+    const newIds = incomingIds.filter((id) => !row.vendorPhotoUploadIds.includes(id));
+    const nextNote = dto.note !== undefined ? (optionalText(dto.note) ?? null) : row.vendorNote;
+
+    const updated = await withoutOrgScope(() =>
+      this.db.$transaction(async (tx) => {
+        for (const uploadId of newIds) {
+          const { count } = await tx.upload.updateMany({
+            where: {
+              id: uploadId,
+              orgId: row.orgId,
+              purpose: 'MAINTENANCE_PHOTO',
+              attachedAt: null,
+            },
+            data: { attachedAt: new Date() },
+          });
+          if (!count) {
+            throw new AppError(
+              422,
+              'UPLOAD_INVALID',
+              'That photo can’t be attached here. Upload it again.',
+              [
+                {
+                  field: 'photoUploadIds',
+                  message: 'That photo can’t be attached here. Upload it again.',
+                },
+              ],
+            );
+          }
+        }
+        await this.audit.record(
+          {
+            orgId: row.orgId,
+            action: 'maintenance.vendor_report',
+            entity: 'maintenance_request',
+            entityId: row.id,
+            after: { vendorId: row.vendorId, note: nextNote, photos: combinedPhotos.length },
+          },
+          tx,
+        );
+        return tx.maintenanceRequest.update({
+          where: { id: row.id },
+          data: {
+            vendorNote: nextNote,
+            vendorPhotoUploadIds: combinedPhotos,
+            vendorCompletedAt: new Date(),
+            ...(row.status === 'OPEN' ? { status: 'IN_PROGRESS' } : {}),
+          },
+          include: {
+            property: { select: { name: true, location: true } },
+            unit: { select: { number: true, floor: true } },
+            vendor: { select: { name: true } },
+          },
+        });
+      }),
+    );
+
+    const vendorName = updated.vendor?.name ?? 'Vendor';
+    await this.notifications.notifyOrgStaff(row.orgId, {
+      kind: 'MAINTENANCE_UPDATE',
+      title: `Vendor marked ${updated.number} done`,
+      body: `${vendorName} reported work complete on ${updated.title} (${updated.property.name} · Unit ${updated.unit.number}).`,
+      actionUrl: '/maintenance',
+    });
+
+    return this.toPublicVendorJob(updated, org);
   }
 
   private async find(id: string): Promise<MaintenanceRow> {

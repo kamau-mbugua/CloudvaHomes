@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -402,12 +403,15 @@ class _MaintenanceDetailSheetState
     extends ConsumerState<_MaintenanceDetailSheet> {
   int _tab = 0;
   late String _status = widget.item['status'] as String? ?? 'OPEN';
+  late String? _vendorId =
+      (widget.item['vendor'] as Map<String, dynamic>?)?['id'] as String?;
   late final _note = TextEditingController(
     text: widget.item['resolutionNote'] as String? ?? '',
   );
   final _expenseAmount = TextEditingController();
   final _expensePayee = TextEditingController();
   bool _saving = false;
+  bool _linkBusy = false;
   String? _error;
 
   @override
@@ -416,6 +420,59 @@ class _MaintenanceDetailSheetState
     _expenseAmount.dispose();
     _expensePayee.dispose();
     super.dispose();
+  }
+
+  Future<void> _assignVendor(String? vendorId) async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(staffApiProvider)
+          .assignMaintenanceVendor(widget.item['id'] as String, vendorId);
+      ref.read(listsVersionProvider.notifier).state++;
+      ref.invalidate(todayProvider);
+      if (mounted) {
+        showMessage(
+          context,
+          vendorId == null ? 'Vendor unassigned.' : 'Job sent to vendor.',
+        );
+        Navigator.of(context).pop();
+      }
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = staffErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _copyVendorLink({bool rotate = false}) async {
+    setState(() {
+      _linkBusy = true;
+      _error = null;
+    });
+    try {
+      final api = ref.read(staffApiProvider);
+      final id = widget.item['id'] as String;
+      final url = rotate
+          ? await api.rotateMaintenanceVendorLink(id)
+          : await api.maintenanceVendorLink(id);
+      await Clipboard.setData(ClipboardData(text: url));
+      ref.read(listsVersionProvider.notifier).state++;
+      if (mounted) {
+        showMessage(
+          context,
+          rotate
+              ? 'New vendor link generated and copied.'
+              : 'Vendor link copied.',
+        );
+      }
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = staffErrorMessage(e));
+    } finally {
+      if (mounted) setState(() => _linkBusy = false);
+    }
   }
 
   Future<void> _update() async {
@@ -429,6 +486,7 @@ class _MaintenanceDetailSheetState
         {'status': _status, 'resolutionNote': _note.text.trim()},
       );
       ref.read(listsVersionProvider.notifier).state++;
+      ref.invalidate(todayProvider);
       if (mounted) {
         showMessage(context, 'Maintenance request updated.');
         Navigator.of(context).pop();
@@ -477,6 +535,20 @@ class _MaintenanceDetailSheetState
     final r = widget.item;
     final canUpdate = can(ref, 'maintenance:update');
     final canExpense = r['expense'] == null && can(ref, 'expenses:create');
+    final vendor = r['vendor'] as Map<String, dynamic>?;
+    final vendorNote = r['vendorNote'] as String?;
+    final vendorCompletedAt = r['vendorCompletedAt'] as String?;
+    final vendorPhotos =
+        (r['vendorPhotoUploadIds'] as List?)?.cast<String>() ??
+        const <String>[];
+    final closed = r['status'] == 'RESOLVED' || r['status'] == 'CANCELLED';
+    // Vendors with the job's trade first, as on the web.
+    final loaded = canUpdate ? ref.watch(vendorsProvider).valueOrNull : null;
+    final vendors = loaded == null
+        ? null
+        : ([...loaded]..sort(
+            (a, b) => _hasTrade(b, r['category']) - _hasTrade(a, r['category']),
+          ));
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -497,6 +569,126 @@ class _MaintenanceDetailSheetState
             ),
             const SizedBox(height: 8),
             Text('${r['description'] ?? ''}'),
+            if (vendorCompletedAt != null ||
+                (vendorNote != null && vendorNote.isNotEmpty) ||
+                vendorPhotos.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SectionCard(
+                title: 'Vendor report',
+                trailing: vendorCompletedAt != null
+                    ? const StatusChip('Reported done', tone: Tone.good)
+                    : null,
+                children: [
+                  if (vendorCompletedAt != null)
+                    Text(
+                      'Completed ${formatDay(todayIso(DateTime.parse(vendorCompletedAt)))}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (vendorNote != null && vendorNote.isNotEmpty) ...[
+                    if (vendorCompletedAt != null) const SizedBox(height: 4),
+                    Text(vendorNote),
+                  ],
+                  if (vendorPhotos.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final id in vendorPhotos)
+                          _RequestPhoto(
+                            requestId: r['id'] as String,
+                            uploadId: id,
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ],
+            if (canUpdate && !closed) ...[
+              const SizedBox(height: 12),
+              SectionCard(
+                title: 'Vendor & repair link',
+                children: [
+                  if (vendor != null)
+                    Text(
+                      'Assigned to ${vendor['name']} (${vendor['phone']})',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  if (vendors != null && vendors.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: vendors.any((v) => v['id'] == _vendorId)
+                          ? _vendorId
+                          : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Assign vendor',
+                      ),
+                      items: [
+                        for (final v in vendors)
+                          DropdownMenuItem(
+                            value: v['id'] as String,
+                            child: Text(
+                              '${v['name']} (${v['phone']})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: (v) => setState(() => _vendorId = v),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonal(
+                          onPressed:
+                              _saving ||
+                                  _vendorId == null ||
+                                  _vendorId == vendor?['id']
+                              ? null
+                              : () => _assignVendor(_vendorId),
+                          child: const Text('Send job'),
+                        ),
+                        if (vendor != null)
+                          OutlinedButton(
+                            onPressed: _saving
+                                ? null
+                                : () => _assignVendor(null),
+                            child: const Text('Unassign'),
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (vendor != null) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          key: const Key('copy-vendor-link'),
+                          icon: const Icon(Icons.link, size: 18),
+                          label: const Text('Copy vendor link'),
+                          onPressed: _linkBusy
+                              ? null
+                              : () => _copyVendorLink(rotate: false),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('rotate-vendor-link'),
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('New link'),
+                          onPressed: _linkBusy
+                              ? null
+                              : () => _copyVendorLink(rotate: true),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ],
             if (canUpdate && canExpense) ...[
               const SizedBox(height: 14),
               KodiHubSegmentedTabs(
@@ -2280,5 +2472,42 @@ class _StaffUsersScreenState extends ConsumerState<StaffUsersScreen> {
     } on ApiError catch (e) {
       if (context.mounted) showMessage(context, staffErrorMessage(e));
     }
+  }
+}
+
+int _hasTrade(Map<String, dynamic> vendor, Object? category) =>
+    ((vendor['trades'] as List?) ?? const []).contains(category) ? 1 : 0;
+
+/// A maintenance photo thumbnail, loaded with the signed-in session.
+class _RequestPhoto extends ConsumerWidget {
+  const _RequestPhoto({required this.requestId, required this.uploadId});
+  final String requestId;
+  final String uploadId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final photo = ref.watch(
+      maintenancePhotoProvider((requestId: requestId, uploadId: uploadId)),
+    );
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: photo.when(
+          data: (bytes) => Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            semanticLabel: 'Vendor completion photo',
+          ),
+          loading: () => ColoredBox(color: scheme.surfaceContainerHighest),
+          error: (_, _) => ColoredBox(
+            color: scheme.surfaceContainerHighest,
+            child: const Icon(Icons.broken_image_outlined, size: 20),
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -284,3 +284,18 @@ export class AssignVendorDto {
   @IsBoolean()
   notify?: boolean;
 }
+
+export class VendorCompleteJobDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID('all', { each: true })
+  photoUploadIds?: string[];
+}

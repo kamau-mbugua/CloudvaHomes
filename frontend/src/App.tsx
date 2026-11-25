@@ -53,6 +53,7 @@ const InboundDetailPage = lazy(() => import('./features/mpesa/InboundDetailPage'
 const ExpensesPage = lazy(() => import('./features/expenses/ExpensesPage').then((m) => ({ default: m.ExpensesPage })));
 const VendorsPage = lazy(() => import('./features/maintenance/VendorsPage').then((m) => ({ default: m.VendorsPage })));
 const MaintenancePage = lazy(() => import('./features/maintenance/MaintenancePage').then((m) => ({ default: m.MaintenancePage })));
+const VendorJobPage = lazy(() => import('./features/maintenance/VendorJobPage').then((m) => ({ default: m.VendorJobPage })));
 
 const ReportsPage = lazy(() => import('./features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const AgreementsPage = lazy(() => import('./features/agency/AgreementsPage').then((m) => ({ default: m.AgreementsPage })));
@@ -213,6 +214,7 @@ export default function App() {
               {/* Public: the Play Store listing's account-deletion link. */}
               <Route path="/delete-account" element={<DeleteAccountPage />} />
               <Route path="/verify/:code" element={<VerifyCertificatePage />} />
+              <Route path="/r/:token" element={<VendorJobPage />} />
               <Route path="/account" element={<AccountRedirect />} />
 
               <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>

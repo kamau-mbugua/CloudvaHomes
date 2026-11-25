@@ -77,6 +77,51 @@ export class UploadsService {
     return toUpload(row);
   }
 
+  /** Unauthenticated upload for a vendor holding a valid job link token (phase 19). */
+  async createForVendor(
+    orgId: string,
+    uploadedById: string,
+    file: { buffer: Buffer; size: number } | undefined,
+  ) {
+    if (!file?.size) throw AppError.fieldInvalid('file', 'Choose a file');
+    if (file.size > MAX_PHOTO_UPLOAD_BYTES) {
+      throw AppError.fieldInvalid('file', 'Photos must be 5 MB or smaller');
+    }
+    const contentType = sniffType(file.buffer);
+    if (!contentType || contentType === 'application/pdf') {
+      throw new AppError(415, 'UNSUPPORTED_FILE', 'Upload a photo (JPEG, PNG or WebP)');
+    }
+    const id = randomUUID();
+    const key = `org/${orgId}/maintenance_photo/${id}`;
+    await this.storage.put(key, file.buffer, contentType);
+    const row = await withoutOrgScope(() =>
+      this.prisma.upload.create({
+        data: {
+          orgId,
+          purpose: 'MAINTENANCE_PHOTO',
+          key,
+          contentType,
+          size: file.size,
+          sha256: createHash('sha256').update(file.buffer).digest('hex'),
+          uploadedById,
+        },
+      }),
+    );
+    return toUpload(row);
+  }
+
+  /** Serves a photo attached to a specific maintenance request (either problem or vendor photo). */
+  async vendorJobPhotoContent(orgId: string, uploadId: string, allowedUploadIds: string[]) {
+    if (!allowedUploadIds.includes(uploadId)) throw AppError.notFound('Photo');
+    return withoutOrgScope(async () => {
+      const u = await this.prisma.upload.findFirst({
+        where: { id: uploadId, orgId, purpose: 'MAINTENANCE_PHOTO' },
+      });
+      if (!u) throw AppError.notFound('Photo');
+      return { upload: u, data: await this.storage.get(u.key) };
+    });
+  }
+
   /**
    * Marks an upload as used by a record, in the record's transaction. It must be this
    * organisation's, of the right purpose, and not attached to anything yet.
@@ -172,7 +217,10 @@ export class UploadsService {
     if (u.purpose === 'MAINTENANCE_PHOTO') {
       if (!perms.has('maintenance:view')) return false;
       return !!(await this.db.maintenanceRequest.count({
-        where: { photoUploadIds: { has: u.id }, unit: unitScope() },
+        where: {
+          unit: unitScope(),
+          OR: [{ photoUploadIds: { has: u.id } }, { vendorPhotoUploadIds: { has: u.id } }],
+        },
       }));
     }
     if (u.purpose === 'INSPECTION_PHOTO') {

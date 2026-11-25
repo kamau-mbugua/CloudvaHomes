@@ -568,6 +568,33 @@ function MaintenanceDetailSheet({
           </div>
         ) : null}
 
+        {request.vendorCompletedAt || request.vendorNote || (request.vendorPhotoUploadIds?.length ?? 0) > 0 ? (
+          <div className="ag__card" style={{ marginBottom: '1rem', padding: '0.85rem', display: 'grid', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <strong>Vendor report</strong>
+              {request.vendorCompletedAt ? (
+                <span className="ad__badge ad__badge--ok">
+                  Reported done {formatDay(todayInNairobi(new Date(request.vendorCompletedAt)))}
+                </span>
+              ) : null}
+            </div>
+            {request.vendorNote ? (
+              <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{request.vendorNote}</p>
+            ) : null}
+            {request.vendorPhotoUploadIds && request.vendorPhotoUploadIds.length > 0 ? (
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                {request.vendorPhotoUploadIds.map((pid) => (
+                  <PrivateFilePreview
+                    key={pid}
+                    path={`/maintenance-requests/${encodeURIComponent(request.id)}/photos/${encodeURIComponent(pid)}`}
+                    alt="Vendor completion photo"
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {request.expense ? (
           <div className="ag__card" style={{ marginBottom: '1rem', padding: '0.85rem' }}>
             <strong>Linked repair expense</strong>
@@ -791,6 +818,16 @@ function ConvertToExpenseSheet({
  * Phase 18 (first step): send the job to a vendor — they get a text with the job and your
  * number (not the tenant's) — or take it off them.
  */
+/** Copies the link when the browser allows it; otherwise shows it to copy by hand. */
+async function copiedText(url: string, copied: string): Promise<string> {
+  try {
+    await navigator.clipboard.writeText(url);
+    return copied;
+  } catch {
+    return `Copy this link: ${url}`;
+  }
+}
+
 function VendorCard({ request, onDone }: { request: MaintenanceRequestItem; onDone: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -813,6 +850,29 @@ function VendorCard({ request, onDone }: { request: MaintenanceRequestItem; onDo
     },
     onError: (error) => toast.failed(errorMessage(error)),
   });
+  const copyLink = useMutation({
+    mutationFn: () =>
+      api
+        .get<DataEnvelope<{ url: string }>>(
+          `/maintenance-requests/${encodeURIComponent(request.id)}/vendor-link`,
+        )
+        .then((r) => r.data.url),
+    onSuccess: async (url) => toast.saved(await copiedText(url, 'Vendor link copied.')),
+    onError: (error) => toast.failed(errorMessage(error)),
+  });
+
+  const rotateLink = useMutation({
+    mutationFn: () =>
+      api
+        .post<DataEnvelope<{ url: string }>>(
+          `/maintenance-requests/${encodeURIComponent(request.id)}/vendor-link/rotate`,
+        )
+        .then((r) => r.data.url),
+    onSuccess: async (url) =>
+      toast.saved(await copiedText(url, 'New vendor link copied. The old one no longer works.')),
+    onError: (error) => toast.failed(errorMessage(error)),
+  });
+
   // Vendors with this trade first.
   const options = [...(vendors.data ?? [])].sort(
     (a, b) => Number(b.trades.includes(request.category)) - Number(a.trades.includes(request.category)),
@@ -842,6 +902,26 @@ function VendorCard({ request, onDone }: { request: MaintenanceRequestItem; onDo
           </button>
           {request.vendor ? (
             <button type="button" className="nx-btn nx-btn--sm" disabled={assign.isPending} onClick={() => assign.mutate(null)}>Take off vendor</button>
+          ) : null}
+          {request.vendor ? (
+            <>
+              <button
+                type="button"
+                className="nx-btn nx-btn--sm"
+                disabled={copyLink.isPending}
+                onClick={() => copyLink.mutate()}
+              >
+                Copy vendor link
+              </button>
+              <button
+                type="button"
+                className="nx-btn nx-btn--sm"
+                disabled={rotateLink.isPending}
+                onClick={() => rotateLink.mutate()}
+              >
+                New link
+              </button>
+            </>
           ) : null}
         </div>
       ) : null}

@@ -29,10 +29,32 @@ export interface MaintenanceRequestItem {
   /** Phase 18: who's doing it, since when, and whether it's past its response time. */
   vendor?: { id: string; name: string; phone: string } | null;
   assignedAt?: string | null;
+  /** Phase 19: vendor repair link & vendor completion report. */
+  hasVendorLink?: boolean;
+  vendorNote?: string | null;
+  vendorPhotoUploadIds?: string[];
+  vendorCompletedAt?: string | null;
   overdue?: boolean;
   canResolve: boolean;
   canCancel: boolean;
   canConvertToExpense: boolean;
+}
+
+export interface PublicVendorJob {
+  number: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED';
+  property: { name: string; location: string | null };
+  unit: { number: string; floor: number };
+  organization: { name: string; phone: string };
+  vendor: { name: string } | null;
+  photoUploadIds: string[];
+  vendorNote: string | null;
+  vendorPhotoUploadIds: string[];
+  vendorCompletedAt: string | null;
 }
 
 export const MAINTENANCE_CATEGORIES: Record<string, string> = {
