@@ -652,17 +652,19 @@ export class MaintenanceService {
    * needs no sign-in. A link works while a vendor is on the job and for 7 days after it closes.
    */
   private async findByVendorToken(token: string, use: 'view' | 'photo' | 'write' = 'view') {
+    // One normalised token for both the per-link limits and the lookup, so " token" and
+    // "token " can't each get their own allowance for the same job.
+    const clean = token?.trim() ?? '';
     const ip = currentContext()?.ip ?? 'unknown';
     await this.rateLimit.hit(
       { key: `vendor-job:ip:${ip}`, limit: 300, windowSeconds: 3600 },
       ...(use === 'photo'
-        ? [{ key: `vendor-job:photo:${sha256(token ?? '')}`, limit: 30, windowSeconds: 3600 }]
+        ? [{ key: `vendor-job:photo:${sha256(clean)}`, limit: 30, windowSeconds: 3600 }]
         : use === 'write'
-          ? [{ key: `vendor-job:write:${sha256(token ?? '')}`, limit: 20, windowSeconds: 3600 }]
+          ? [{ key: `vendor-job:write:${sha256(clean)}`, limit: 20, windowSeconds: 3600 }]
           : []),
     );
-    const clean = token?.trim();
-    if (!clean || clean.length < 16) throw AppError.notFound('Job');
+    if (clean.length < 16 || clean.length > 128) throw AppError.notFound('Job');
     return withoutOrgScope(async () => {
       const row = await this.db.maintenanceRequest.findUnique({
         where: { vendorTokenHash: sha256(clean) },
@@ -746,16 +748,25 @@ export class MaintenanceService {
       file,
     );
     // Attached to the job straight away, so a vendor who closes the page before sending the
-    // report doesn't lose the photo.
-    await withoutOrgScope(() =>
+    // report doesn't lose the photo. The cap is checked in the same statement that adds the
+    // photo, so parallel uploads can't go past it; a refused photo stays unattached and the
+    // daily upload clean-up deletes it.
+    const added = await withoutOrgScope(() =>
       this.db.$transaction(async (tx) => {
+        const count = await tx.$executeRaw`
+          UPDATE "maintenance_requests"
+          SET "vendorPhotoUploadIds" = array_append("vendorPhotoUploadIds", ${upload.id}::uuid),
+              "updatedAt" = now()
+          WHERE "id" = ${row.id}::uuid
+            AND cardinality("vendorPhotoUploadIds") < ${MAX_VENDOR_PHOTOS}`;
+        if (count === 0) return false;
         await tx.upload.update({ where: { id: upload.id }, data: { attachedAt: new Date() } });
-        await tx.maintenanceRequest.update({
-          where: { id: row.id },
-          data: { vendorPhotoUploadIds: { push: upload.id } },
-        });
+        return true;
       }),
     );
+    if (!added) {
+      throw AppError.fieldInvalid('file', `At most ${MAX_VENDOR_PHOTOS} completion photos`);
+    }
     return upload;
   }
 
@@ -765,50 +776,37 @@ export class MaintenanceService {
       throw AppError.conflict('This job is closed', 'MAINTENANCE_CLOSED');
     }
 
+    // Photos are attached to the job when they are uploaded through this link, so the report
+    // may only name those. Any other ID (say, another job's photo not yet saved) is refused.
     const incomingIds = [...new Set(dto.photoUploadIds ?? [])];
-    const combinedPhotos = [...new Set([...row.vendorPhotoUploadIds, ...incomingIds])];
-    if (combinedPhotos.length > MAX_VENDOR_PHOTOS) {
-      throw AppError.fieldInvalid(
-        'photoUploadIds',
-        `At most ${MAX_VENDOR_PHOTOS} completion photos`,
+    if (incomingIds.some((id) => !row.vendorPhotoUploadIds.includes(id))) {
+      throw new AppError(
+        422,
+        'UPLOAD_INVALID',
+        'That photo can’t be attached here. Upload it again.',
+        [
+          {
+            field: 'photoUploadIds',
+            message: 'That photo can’t be attached here. Upload it again.',
+          },
+        ],
       );
     }
-    const newIds = incomingIds.filter((id) => !row.vendorPhotoUploadIds.includes(id));
     const nextNote = dto.note !== undefined ? (optionalText(dto.note) ?? null) : row.vendorNote;
 
     const updated = await withoutOrgScope(() =>
       this.db.$transaction(async (tx) => {
-        for (const uploadId of newIds) {
-          const { count } = await tx.upload.updateMany({
-            where: {
-              id: uploadId,
-              orgId: row.orgId,
-              purpose: 'MAINTENANCE_PHOTO',
-              attachedAt: null,
-            },
-            data: { attachedAt: new Date() },
-          });
-          if (!count) {
-            throw new AppError(
-              422,
-              'UPLOAD_INVALID',
-              'That photo can’t be attached here. Upload it again.',
-              [
-                {
-                  field: 'photoUploadIds',
-                  message: 'That photo can’t be attached here. Upload it again.',
-                },
-              ],
-            );
-          }
-        }
         await this.audit.record(
           {
             orgId: row.orgId,
             action: 'maintenance.vendor_report',
             entity: 'maintenance_request',
             entityId: row.id,
-            after: { vendorId: row.vendorId, note: nextNote, photos: combinedPhotos.length },
+            after: {
+              vendorId: row.vendorId,
+              note: nextNote,
+              photos: row.vendorPhotoUploadIds.length,
+            },
           },
           tx,
         );
@@ -816,7 +814,6 @@ export class MaintenanceService {
           where: { id: row.id },
           data: {
             vendorNote: nextNote,
-            vendorPhotoUploadIds: combinedPhotos,
             vendorCompletedAt: new Date(),
             ...(row.status === 'OPEN' ? { status: 'IN_PROGRESS' } : {}),
           },

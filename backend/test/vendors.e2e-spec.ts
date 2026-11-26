@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { outbox } from '../src/modules/notifications/senders.js';
 import {
   auth,
@@ -40,6 +42,79 @@ describe('Vendors and assigning maintenance jobs (phase 18, e2e)', () => {
       ownerEmail: 'fixit@example.invalid',
       ownerPhone: '+254700000091',
     }));
+  });
+
+  it('vendor link: only its own photos, one rate limit per link, and a hard 10-photo cap', async () => {
+    const vendor = (await post('/vendors', { name: 'Cap Fixers', phone: '0733 100 300' })).data;
+    const p = (await post('/properties', { name: 'Cap Court', code: 'CAP' })).data;
+    const u = (await post('/units', { propertyId: p.id, number: 'C1', rentAmount: 1_000_000 }))
+      .data;
+    const job = (
+      await post('/maintenance-requests', {
+        unitId: u.id,
+        title: 'Door hinge',
+        description: 'Loose hinge',
+        category: 'OTHER',
+        priority: 'LOW',
+      })
+    ).data;
+    await post(`/maintenance-requests/${job.id}/assign`, { vendorId: vendor.id }, 200);
+    const token = (await get(`/maintenance-requests/${job.id}/vendor-link`)).data.url.split(
+      '/r/',
+    )[1]!;
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]);
+    const complete = (tok: string, body: object) =>
+      t
+        .http()
+        .post(`/api/v1/public/vendor-jobs/${encodeURIComponent(tok)}/complete`)
+        .send(body);
+
+    // A photo the vendor didn't upload through this link (another job's unsaved photo) is refused
+    // and stays unattached.
+    const org = await t.prisma.maintenanceRequest.findUniqueOrThrow({ where: { id: job.id } });
+    const foreign = await t.prisma.upload.create({
+      data: {
+        orgId: org.orgId,
+        purpose: 'MAINTENANCE_PHOTO',
+        key: `org/${org.orgId}/maintenance_photo/foreign-test`,
+        contentType: 'image/jpeg',
+        size: jpeg.length,
+        sha256: 'x'.repeat(64),
+        uploadedById: randomUUID(),
+      },
+    });
+    const refused = check(await complete(token, { photoUploadIds: [foreign.id] }), 422);
+    expect(refused.error.code).toBe('UPLOAD_INVALID');
+    expect(
+      (await t.prisma.upload.findUniqueOrThrow({ where: { id: foreign.id } })).attachedAt,
+    ).toBeNull();
+    expect(
+      (await t.prisma.maintenanceRequest.findUniqueOrThrow({ where: { id: job.id } }))
+        .vendorPhotoUploadIds,
+    ).toEqual([]);
+
+    // Parallel uploads can't go past 10: with 9 on the job, exactly one of three gets in.
+    const nine = Array.from({ length: 9 }, () => randomUUID());
+    await t.prisma.maintenanceRequest.update({
+      where: { id: job.id },
+      data: { vendorPhotoUploadIds: nine },
+    });
+    const results = await Promise.all(
+      [1, 2, 3].map(() =>
+        t.http().post(`/api/v1/public/vendor-jobs/${token}/photos`).attach('file', jpeg, 'a.jpg'),
+      ),
+    );
+    expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([201, 422, 422]);
+    expect(
+      (await t.prisma.maintenanceRequest.findUniqueOrThrow({ where: { id: job.id } }))
+        .vendorPhotoUploadIds,
+    ).toHaveLength(10);
+
+    // The per-link write limit (20 an hour) counts " token" and "token " as the same link.
+    // (The refused report above was the first write.)
+    for (let i = 0; i < 19; i++) check(await complete(token, { note: `n${i}` }), 200);
+    expect((await complete(` ${token}`, { note: 'padded' })).status).toBe(429);
+    expect((await complete(`${token} `, { note: 'padded' })).status).toBe(429);
   });
 
   it('keeps vendors, sends a job to one by SMS, and flags late jobs', async () => {
