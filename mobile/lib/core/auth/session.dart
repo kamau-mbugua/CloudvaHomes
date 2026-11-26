@@ -13,6 +13,7 @@ class Session {
     required this.permissions,
     required this.tenantOf,
     required this.ownerOf,
+    this.offline = false,
   });
 
   final String accessToken;
@@ -27,6 +28,10 @@ class Session {
   final Set<String> permissions;
   final List<TenantAccountRef> tenantOf;
   final List<({String landlordId, String name, String orgName})> ownerOf;
+
+  /// True when opened from a stored snapshot at launch without signal; cleared once
+  /// `/auth/refresh` succeeds.
+  final bool offline;
 
   bool can(String permission) => permissions.contains(permission);
   bool get isStaff => activeOrganization != null;
@@ -50,6 +55,7 @@ class Session {
     Object? activeTenantId = _keep,
     Object? activeLandlordId = _keep,
     List<SessionProperty>? properties,
+    bool? offline,
   }) => Session(
     accessToken: accessToken ?? this.accessToken,
     user: user,
@@ -69,12 +75,14 @@ class Session {
     permissions: permissions,
     tenantOf: tenantOf,
     ownerOf: ownerOf,
+    offline: offline ?? this.offline,
   );
 
-  factory Session.fromJson(Map<String, dynamic> j) {
+  factory Session.fromJson(Map<String, dynamic> j, {bool offline = false}) {
     final active = j['activeOrganization'];
     return Session(
-      accessToken: j['accessToken'] as String,
+      accessToken: offline ? '' : ((j['accessToken'] as String?) ?? ''),
+      offline: offline,
       user: SessionUser.fromJson(j['user'] as Map<String, dynamic>),
       organizations: [
         for (final o in (j['organizations'] as List? ?? const []))

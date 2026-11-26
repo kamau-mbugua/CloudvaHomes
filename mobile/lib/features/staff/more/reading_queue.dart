@@ -8,18 +8,15 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/api/api_error.dart';
 import '../../../core/auth/session.dart';
 import '../../../core/auth/session_controller.dart';
+import '../../../core/offline/cached_data.dart';
 
 /// Who saved an offline item: `"<userId>|<orgId>"`. Queued work is uploaded only by the
 /// same person in the same organisation, so signing out and letting someone else sign in on
 /// the phone never sends it under their name (it waits until its owner signs in again).
-String? queueOwnerOf(Session? s) =>
-    s == null ? null : '${s.user.id}|${s.activeOrganization?.id ?? ''}';
+String? queueOwnerOf(Session? s) => cacheOwnerOf(s);
 
 /// The signed-in person's queue owner, or null when signed out.
-final queueOwnerProvider = Provider<String?>(
-  (ref) =>
-      ref.watch(sessionProvider.select((s) => queueOwnerOf(s.valueOrNull))),
-);
+final queueOwnerProvider = cacheOwnerProvider;
 
 /// Like [queueOwnerProvider], but waits for the session if it is still loading, so an item
 /// is never queued or sent without knowing whose it is.

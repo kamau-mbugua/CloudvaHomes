@@ -1,16 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_error.dart';
 import '../../core/auth/session_controller.dart';
+import '../../core/dates.dart';
+import '../../core/theme.dart';
 import '../../core/widgets/account_sheet.dart';
 import '../../core/widgets/common.dart';
 import '../../core/widgets/notifications_sheet.dart';
 import '../../core/widgets/side_drawer.dart';
 import '../billing/billing_banner.dart';
-import 'staff_models.dart';
 import '../sms/sms_banner.dart';
+import 'more/inspection_queue.dart';
+import 'more/meters_screen.dart';
+import 'staff_api.dart';
+import 'staff_models.dart';
 
 // ───────────────────────────────────────────── labels (same words as the web app)
 
@@ -176,10 +183,123 @@ class StaffTabScaffold extends ConsumerWidget {
       floatingActionButton: floatingActionButton,
       body: Column(
         children: [
+          const OfflineSessionBanner(),
           const BillingBanner(),
           const SmsBanner(),
           Expanded(child: body),
         ],
+      ),
+    );
+  }
+}
+
+/// Slim banner above staff tabs while the session was opened from its saved snapshot offline.
+/// Listens for the offline→online transition so reconnecting (Retry, first API call, resume or
+/// timer) refreshes Today/dashboard and uploads queued readings and inspections.
+class OfflineSessionBanner extends ConsumerStatefulWidget {
+  const OfflineSessionBanner({super.key});
+
+  @override
+  ConsumerState<OfflineSessionBanner> createState() =>
+      _OfflineSessionBannerState();
+}
+
+class _OfflineSessionBannerState extends ConsumerState<OfflineSessionBanner> {
+  bool _retrying = false;
+
+  Future<void> _retry() async {
+    if (_retrying) return;
+    setState(() => _retrying = true);
+    try {
+      await ref.read(sessionProvider.notifier).reconnect();
+    } finally {
+      if (mounted) setState(() => _retrying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<bool>(
+      sessionProvider.select((s) => s.valueOrNull?.offline == true),
+      (wasOffline, isOffline) {
+        if (wasOffline == true && !isOffline) {
+          ref.invalidate(todayProvider);
+          ref.invalidate(dashboardProvider);
+          ref.invalidate(propertiesProvider);
+          ref.read(listsVersionProvider.notifier).state++;
+          unawaited(flushPendingReadings(ref));
+          unawaited(flushPendingInspections(ref));
+        }
+      },
+    );
+    final offline = ref.watch(
+      sessionProvider.select((s) => s.valueOrNull?.offline == true),
+    );
+    if (!offline) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fg = dark ? Colors.white : HodiColors.navy;
+    return Material(
+      key: const Key('offline-session-banner'),
+      color: dark ? scheme.surfaceContainerHighest : HodiColors.paper2,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off_outlined, size: 18, color: fg),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "Offline. Saved readings and inspections upload when you're back online.",
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: _retrying ? null : _retry,
+              child: Text(_retrying ? 'Retrying…' : 'Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown on any screen serving a saved copy from `OfflineCache` after a network error.
+class OfflineCacheBanner extends StatelessWidget {
+  const OfflineCacheBanner({
+    super.key = const Key('meter-offline-banner'),
+    required this.savedAt,
+    this.margin,
+  });
+  final DateTime savedAt;
+  final EdgeInsetsGeometry? margin;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: margin ?? const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      color: scheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off_outlined, color: scheme.onTertiaryContainer),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Offline — showing data from '
+                '${formatTimestamp(savedAt.toIso8601String())}',
+                style: TextStyle(color: scheme.onTertiaryContainer),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

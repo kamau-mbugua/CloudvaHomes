@@ -1,7 +1,7 @@
 /// An API failure in the shape every screen can show: the server's code and message, plus
 /// per-field messages from a 422.
 class ApiError implements Exception {
-  ApiError({
+  const ApiError({
     required this.status,
     required this.code,
     required this.message,

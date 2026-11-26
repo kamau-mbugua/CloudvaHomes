@@ -15,7 +15,7 @@ class SmsBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider).valueOrNull;
-    if (session == null || !session.can('sms:view')) {
+    if (session == null || session.offline || !session.can('sms:view')) {
       return const SizedBox.shrink();
     }
     final account = ref.watch(smsAccountProvider).value;

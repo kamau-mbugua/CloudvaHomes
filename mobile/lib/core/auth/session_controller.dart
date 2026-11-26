@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
@@ -37,24 +40,134 @@ class TwoFactorChallenge {
 
 /// The session: restored from the stored refresh token at launch, null when signed out.
 class SessionController extends AsyncNotifier<Session?> {
+  static const snapshotMaxAge = Duration(days: 30);
+  static const offlineActionMessage =
+      "You're offline. Try again when you have signal.";
+
+  Timer? _reconnectTimer;
+  AppLifecycleListener? _lifecycle;
+  bool _inForeground = true;
+
   ApiClient get _api => ref.read(apiClientProvider);
   TokenStore get _store => ref.read(tokenStoreProvider);
 
+  static bool _isAuthRejection(ApiError e) =>
+      e.status == 401 || e.status == 403;
+
   @override
   Future<Session?> build() async {
+    ref.onDispose(_stopReconnectWatchers);
+    _stopReconnectWatchers();
     _api
       ..onRefresh = _refresh
       ..onAuthLost = _lost
       ..onSuspended = () => reload();
     final token = await _store.read();
-    if (token == null) return null;
+    if (token == null) {
+      _api.offlineSession = false;
+      _api.accessToken = null;
+      return null;
+    }
     try {
       return await _refreshWith(token);
     } on ApiError catch (e) {
-      // Offline at launch: keep the token and show sign-in; a 401 means it is gone for good.
-      if (!e.isNetworkError) await _store.clear();
-      if (e.isNetworkError) rethrow;
+      // Only a 401/403 from /auth/refresh means the session is gone; network errors,
+      // timeouts, 429 and 5xx keep the token and open offline mode when eligible.
+      if (_isAuthRejection(e)) {
+        await _clearAllLocalAuth();
+        return null;
+      }
+      final offline = await _tryRestoreOfflineSnapshot();
+      if (offline != null) return offline;
+      rethrow;
+    }
+  }
+
+  Future<Session?> _tryRestoreOfflineSnapshot() async {
+    final snapshot = await _store.readSessionSnapshot();
+    if (snapshot == null) return null;
+    final age = DateTime.now().toUtc().difference(snapshot.savedAt.toUtc());
+    if (age >= snapshotMaxAge) return null;
+    final Session session;
+    try {
+      session = Session.fromJson(snapshot.data, offline: true);
+    } on Object {
       return null;
+    }
+    if (effectiveMode(session, null) != AppMode.staff) return null;
+    _api.accessToken = null;
+    _api.offlineSession = true;
+    _startReconnectWatchers();
+    return session;
+  }
+
+  void _startPeriodicReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    final every = ref.read(offlineReconnectIntervalProvider);
+    if (every == null) return;
+    _reconnectTimer = Timer.periodic(every, (_) {
+      if (_inForeground && state.valueOrNull?.offline == true) {
+        unawaited(reconnect());
+      }
+    });
+  }
+
+  void _onBackgrounded() {
+    _inForeground = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
+  void _startReconnectWatchers() {
+    _stopReconnectWatchers();
+    _inForeground = true;
+    _startPeriodicReconnect();
+    try {
+      WidgetsBinding.instance;
+      _lifecycle = AppLifecycleListener(
+        onResume: () {
+          _inForeground = true;
+          if (state.valueOrNull?.offline == true) {
+            _startPeriodicReconnect();
+            unawaited(reconnect());
+          }
+        },
+        onInactive: _onBackgrounded,
+        onHide: _onBackgrounded,
+        onPause: _onBackgrounded,
+        onDetach: _onBackgrounded,
+      );
+    } on Object {
+      // Pure Dart ProviderContainer unit tests run without a WidgetsBinding.
+    }
+  }
+
+  void _stopReconnectWatchers() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _lifecycle?.dispose();
+    _lifecycle = null;
+  }
+
+  /// Tries to promote an offline session back to a live session via `/auth/refresh`.
+  Future<bool> reconnect() async {
+    if (state.valueOrNull?.offline != true) return true;
+    try {
+      final ok = await _api.refreshOnce();
+      return ok && state.valueOrNull?.offline == false;
+    } on Object {
+      return false;
+    }
+  }
+
+  void _requireOnline() {
+    if (state.valueOrNull?.offline == true) {
+      throw const ApiError(
+        status: 0,
+        code: 'OFFLINE_SESSION',
+        message: offlineActionMessage,
+      );
     }
   }
 
@@ -62,32 +175,59 @@ class SessionController extends AsyncNotifier<Session?> {
     final res = await _api.post(
       '/auth/refresh',
       body: {'refreshToken': token, 'client': 'mobile'},
+      skipAuthRefresh: true,
     );
     return _accept(res['data'] as Map<String, dynamic>);
   }
 
   Future<bool> _refresh() async {
     final token = await _store.read();
-    if (token == null) return false;
+    if (token == null) {
+      await _clearAllLocalAuth();
+      state = const AsyncData(null);
+      return false;
+    }
     try {
       state = AsyncData(await _refreshWith(token));
       return true;
     } on ApiError catch (e) {
-      if (!e.isNetworkError) await _store.clear();
-      return false;
+      if (_isAuthRejection(e)) {
+        await _clearAllLocalAuth();
+        state = const AsyncData(null);
+        return false;
+      }
+      rethrow;
     }
   }
 
   void _lost() {
-    _store.clear();
+    _stopReconnectWatchers();
+    unawaited(_store.clear());
+    unawaited(_store.clearSessionSnapshot());
+    unawaited(_clearOfflineCache());
+    _api.offlineSession = false;
     _api.accessToken = null;
+    ref.read(appModeProvider.notifier).state = null;
     state = const AsyncData(null);
   }
 
+  Future<void> _clearAllLocalAuth() async {
+    _stopReconnectWatchers();
+    await _store.clear();
+    await _store.clearSessionSnapshot();
+    await _clearOfflineCache();
+    _api.offlineSession = false;
+    _api.accessToken = null;
+    ref.read(appModeProvider.notifier).state = null;
+  }
+
   Future<Session> _accept(Map<String, dynamic> data) async {
+    _stopReconnectWatchers();
     final refresh = data['refreshToken'];
     if (refresh is String) await _store.write(refresh);
+    await _store.writeSessionSnapshot(data);
     final session = Session.fromJson(data);
+    _api.offlineSession = false;
     _api.accessToken = session.accessToken;
     await ref.read(pushNotificationsServiceProvider).registerCurrentDevice();
     return session;
@@ -174,6 +314,7 @@ class SessionController extends AsyncNotifier<Session?> {
     String organizationId, {
     String? propertyId,
   }) async {
+    _requireOnline();
     await switchContext(
       organizationId: organizationId,
       propertyId: propertyId,
@@ -184,6 +325,7 @@ class SessionController extends AsyncNotifier<Session?> {
 
   /// Saves the chosen kind of place (`STAFF`, `TENANT`, `OWNER`, `PLATFORM`) on the server.
   Future<void> setPlace(String place) async {
+    _requireOnline();
     final prev = ref.read(appModeProvider);
     ref.read(appModeProvider.notifier).state = switch (place) {
       'PLATFORM' => AppMode.platform,
@@ -205,6 +347,7 @@ class SessionController extends AsyncNotifier<Session?> {
 
   /// Accepts a pending membership invitation belonging to the signed-in user and switches into it.
   Future<Session> acceptInvitation(String membershipId) async {
+    _requireOnline();
     final res = await _api.post('/auth/memberships/$membershipId/accept');
     final next = await _accept(res['data'] as Map<String, dynamic>);
     state = AsyncData(next);
@@ -225,6 +368,7 @@ class SessionController extends AsyncNotifier<Session?> {
     String? place,
     bool setAsDefault = true,
   }) async {
+    _requireOnline();
     final body = <String, dynamic>{
       'organizationId': ?organizationId,
       if (!identical(propertyId, _omit)) 'propertyId': propertyId,
@@ -295,6 +439,7 @@ class SessionController extends AsyncNotifier<Session?> {
     required String firstName,
     required String lastName,
   }) async {
+    _requireOnline();
     await _api.patch(
       '/me',
       body: {'firstName': firstName.trim(), 'lastName': lastName.trim()},
@@ -309,6 +454,7 @@ class SessionController extends AsyncNotifier<Session?> {
     required String newPassword,
     String? stepUpToken,
   }) async {
+    _requireOnline();
     await _api.post(
       '/me/password',
       body: {'currentPassword': ?currentPassword, 'newPassword': newPassword},
@@ -319,20 +465,32 @@ class SessionController extends AsyncNotifier<Session?> {
 
   /// Re-reads the session (permissions, organisation status).
   Future<void> reload() async {
-    if (state.valueOrNull == null) return;
+    final current = state.valueOrNull;
+    if (current == null || current.offline) return;
     try {
       final res = await _api.get('/me');
-      state = AsyncData(await _accept(res['data'] as Map<String, dynamic>));
+      final data = res['data'] as Map<String, dynamic>;
+      state = AsyncData(
+        await _accept({
+          if (!data.containsKey('accessToken') && _api.accessToken != null)
+            'accessToken': _api.accessToken,
+          ...data,
+        }),
+      );
     } on ApiError {
       // Keep what we have; the next request will surface any real problem.
     }
   }
 
   /// Sends a one-time code to the person's own phone (or email) to confirm a sensitive change.
-  Future<void> requestStepUp() => _api.post('/auth/step-up/request');
+  Future<void> requestStepUp() async {
+    _requireOnline();
+    await _api.post('/auth/step-up/request');
+  }
 
   /// The code from [requestStepUp] → a short-lived grant for the `X-Step-Up` header.
   Future<String> verifyStepUp(String code) async {
+    _requireOnline();
     final res = await _api.post(
       '/auth/step-up/verify',
       body: {'code': code.trim()},
@@ -346,6 +504,7 @@ class SessionController extends AsyncNotifier<Session?> {
     required String stepUpToken,
     String? reason,
   }) async {
+    _requireOnline();
     final user = state.valueOrNull?.user;
     await _api.post(
       '/me/delete',
@@ -358,27 +517,38 @@ class SessionController extends AsyncNotifier<Session?> {
       if (id != null && id.isNotEmpty) await _store.removeSavedCredential(id);
     }
     // The server already ended every session: no logout call, just forget it here.
-    await _store.clear();
-    await _clearOfflineCache();
-    _api.accessToken = null;
-    ref.read(appModeProvider.notifier).state = null;
+    await _clearAllLocalAuth();
     state = const AsyncData(null);
   }
 
   Future<void> signOut() async {
-    await ref.read(pushNotificationsServiceProvider).unregisterCurrentDevice();
+    // Opened offline, this phone never registered for pushes in this run, and device tokens
+    // belong to the person (not the session): without a reconnect the phone would keep getting
+    // their notifications after sign-out. One reconnect lets the normal path below unregister
+    // the device and end the server session. With no signal it fails at once, otherwise it is
+    // bounded by the client's timeouts like any online sign-out. Not cut short on purpose: a
+    // refresh landing after the local sign-out would sign the person back in.
+    if (state.valueOrNull?.offline == true) await reconnect();
+    final wasOffline = state.valueOrNull?.offline == true;
+    _stopReconnectWatchers();
+    if (!wasOffline) {
+      await ref
+          .read(pushNotificationsServiceProvider)
+          .unregisterCurrentDevice();
+    }
     final token = await _store.read();
     try {
-      if (token != null) {
-        await _api.post('/auth/logout', body: {'refreshToken': token});
+      if (token != null && !wasOffline) {
+        await _api.post(
+          '/auth/logout',
+          body: {'refreshToken': token},
+          skipAuthRefresh: true,
+        );
       }
     } on ApiError {
       // Signed out locally regardless; the server session expires on its own.
     }
-    await _store.clear();
-    await _clearOfflineCache();
-    _api.accessToken = null;
-    ref.read(appModeProvider.notifier).state = null;
+    await _clearAllLocalAuth();
     state = const AsyncData(null);
   }
 
@@ -393,6 +563,11 @@ class SessionController extends AsyncNotifier<Session?> {
 }
 
 const Object _omit = Object();
+
+/// Foreground reconnect cadence while [Session.offline] is true.
+final offlineReconnectIntervalProvider = Provider<Duration?>(
+  (_) => const Duration(seconds: 60),
+);
 
 final sessionProvider = AsyncNotifierProvider<SessionController, Session?>(
   SessionController.new,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,8 @@ import '../../../core/auth/session_controller.dart';
 import '../../../core/dates.dart';
 import '../../../core/files.dart';
 import '../../../core/money.dart';
+import '../../../core/offline/cached_data.dart';
+import '../../../core/offline/offline_cache.dart';
 import '../../../core/providers.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/paged_list.dart';
@@ -55,6 +59,113 @@ class UnitsScreen extends ConsumerStatefulWidget {
 class _UnitsScreenState extends ConsumerState<UnitsScreen> {
   var _filter = const UnitFilter();
   var _initializedFromSession = false;
+  DateTime? _offlineSavedAt;
+
+  static String _pageKey(UnitFilter f, int page) =>
+      'units|${f.propertyId ?? 'all'}|${f.occupancy ?? 'all'}|$page';
+
+  Future<String?> _resolveOwner() async {
+    var owner = ref.read(cacheOwnerProvider);
+    if (owner == null && ref.read(sessionProvider).isLoading) {
+      try {
+        owner = cacheOwnerOf(await ref.read(sessionProvider.future));
+      } on Object {
+        owner = null;
+      }
+    }
+    return owner;
+  }
+
+  Future<PageResult<UnitRow>> _loadUnitsPage(
+    StaffApi api,
+    UnitFilter f,
+    int page,
+  ) async {
+    if (f.q.isNotEmpty) {
+      try {
+        final p = await api.units(
+          page: page,
+          q: f.q,
+          propertyId: f.propertyId,
+          occupancy: f.occupancy,
+        );
+        if (page == 1 && mounted && _offlineSavedAt != null) {
+          setState(() => _offlineSavedAt = null);
+        }
+        return (rows: p.rows, hasMore: p.hasMore);
+      } on ApiError catch (e) {
+        if (e.isNetworkError) {
+          if (mounted && _offlineSavedAt != null) {
+            setState(() => _offlineSavedAt = null);
+          }
+          if (page == 1) {
+            throw const ApiError(
+              status: 0,
+              code: 'SEARCH_OFFLINE',
+              message: 'Search needs a connection.',
+            );
+          }
+        }
+        rethrow;
+      }
+    }
+
+    final cacheFuture = ref.read(offlineCacheProvider.future)..ignore();
+    final owner = await _resolveOwner();
+    try {
+      final raw = await api.unitPageRaw(
+        page: page,
+        propertyId: f.propertyId,
+        occupancy: f.occupancy,
+      );
+      if (owner != null) {
+        unawaited(() async {
+          try {
+            final cache = await cacheFuture;
+            await cache.write(owner, _pageKey(f, page), raw.rows);
+          } on Object {
+            // A cache write failure must not fail the load.
+          }
+        }());
+      }
+      if (page == 1 && mounted && _offlineSavedAt != null) {
+        setState(() => _offlineSavedAt = null);
+      }
+      return (
+        rows: [for (final r in raw.rows) UnitRow.fromJson(r)],
+        hasMore: raw.hasMore,
+      );
+    } on ApiError catch (e) {
+      if (!e.isNetworkError || owner == null) rethrow;
+      CachedRows? hit;
+      CachedRows? nextHit;
+      try {
+        final cache = await cacheFuture;
+        hit = await cache.read(owner, _pageKey(f, page));
+        if (hit != null) {
+          nextHit = await cache.read(owner, _pageKey(f, page + 1));
+        }
+      } on Object {
+        hit = null;
+        nextHit = null;
+      }
+      if (hit == null) {
+        if (page == 1) rethrow;
+        return (rows: const <UnitRow>[], hasMore: false);
+      }
+      final nextBanner = oldestSavedAt([
+        page == 1 ? null : _offlineSavedAt,
+        hit.savedAt,
+      ]);
+      if (mounted && _offlineSavedAt != nextBanner && f == _filter) {
+        setState(() => _offlineSavedAt = nextBanner);
+      }
+      return (
+        rows: [for (final r in hit.rows) UnitRow.fromJson(r)],
+        hasMore: nextHit != null && nextHit.rows.isNotEmpty,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +184,10 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
       sessionProvider.select((s) => s.valueOrNull?.activePropertyId),
       (prev, next) {
         if (prev != next && _filter.propertyId != next) {
-          setState(() => _filter = _filter.copy(propertyId: () => next));
+          setState(() {
+            _offlineSavedAt = null;
+            _filter = _filter.copy(propertyId: () => next);
+          });
         }
       },
     );
@@ -97,8 +211,10 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
               children: [
                 SearchField(
                   hint: 'Unit number, or tenant name or phone',
-                  onChanged: (v) =>
-                      setState(() => _filter = _filter.copy(q: v)),
+                  onChanged: (v) => setState(() {
+                    _offlineSavedAt = null;
+                    _filter = _filter.copy(q: v);
+                  }),
                 ),
                 SizedBox(
                   height: 52,
@@ -121,39 +237,34 @@ class _UnitsScreenState extends ConsumerState<UnitsScreen> {
                             child: ChoiceChip(
                               label: Text(label),
                               selected: _filter.occupancy == value,
-                              onSelected: (_) => setState(
-                                () => _filter = _filter.copy(
-                                  occupancy: () => value,
-                                ),
-                              ),
+                              onSelected: (_) => setState(() {
+                                _offlineSavedAt = null;
+                                _filter = _filter.copy(occupancy: () => value);
+                              }),
                             ),
                           ),
                         if (properties != null && properties.length > 1)
                           _PropertyChip(
                             properties: properties,
                             selected: _filter.propertyId,
-                            onChanged: (id) => setState(
-                              () =>
-                                  _filter = _filter.copy(propertyId: () => id),
-                            ),
+                            onChanged: (id) => setState(() {
+                              _offlineSavedAt = null;
+                              _filter = _filter.copy(propertyId: () => id);
+                            }),
                           ),
                       ],
                     ),
                   ),
                 ),
+                if (_offlineSavedAt != null)
+                  OfflineCacheBanner(
+                    savedAt: _offlineSavedAt!,
+                    margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  ),
                 Expanded(
                   child: PagedList<UnitRow>(
                     resetKey: (_filter, version),
-                    load: (page) async {
-                      final f = _filter;
-                      final p = await api.units(
-                        page: page,
-                        q: f.q,
-                        propertyId: f.propertyId,
-                        occupancy: f.occupancy,
-                      );
-                      return (rows: p.rows, hasMore: p.hasMore);
-                    },
+                    load: (page) => _loadUnitsPage(api, _filter, page),
                     empty: const EmptyState(
                       icon: Icons.door_front_door_outlined,
                       title: 'No units match',
@@ -302,20 +413,19 @@ class _UnitDetailScreenState extends ConsumerState<UnitDetailScreen> {
   Widget build(BuildContext context) {
     final unitId = widget.unitId;
     final unit = ref.watch(unitProvider(unitId));
+    final loadedUnit = unit.valueOrNull?.value;
     final canUpdate = can(ref, 'units:update');
     return Scaffold(
       appBar: KodiHubAppBar(
-        title: Text(
-          unit.valueOrNull == null ? 'Unit' : 'Unit ${unit.value!.number}',
-        ),
-        subtitle: unit.valueOrNull?.property.name,
+        title: Text(loadedUnit == null ? 'Unit' : 'Unit ${loadedUnit.number}'),
+        subtitle: loadedUnit?.property.name,
         actions: [
-          if (unit.valueOrNull != null && canUpdate)
+          if (loadedUnit != null && canUpdate)
             IconButton(
               tooltip: 'Edit unit',
               icon: const Icon(Icons.edit_outlined),
               onPressed: () =>
-                  _UnitFormSheet.show(context, existing: unit.valueOrNull),
+                  _UnitFormSheet.show(context, existing: loadedUnit),
             ),
         ],
       ),
@@ -328,7 +438,8 @@ class _UnitDetailScreenState extends ConsumerState<UnitDetailScreen> {
         child: AsyncBody(
           value: unit,
           onRetry: () => ref.invalidate(unitProvider(unitId)),
-          data: (u) {
+          data: (cachedUnit) {
+            final u = cachedUnit.value;
             final hasTenancy = u.tenancy != null;
             final tabs = hasTenancy
                 ? const ['Tenancy', 'Invoices', 'Meters']
@@ -337,6 +448,11 @@ class _UnitDetailScreenState extends ConsumerState<UnitDetailScreen> {
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (cachedUnit.savedAt != null)
+                  OfflineCacheBanner(
+                    savedAt: cachedUnit.savedAt!,
+                    margin: const EdgeInsets.only(bottom: 12),
+                  ),
                 SectionCard(
                   title: '${u.number} · ${u.property.name}',
                   trailing: StatusChip(

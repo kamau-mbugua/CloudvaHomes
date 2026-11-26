@@ -39,6 +39,11 @@ class AccountSheet extends ConsumerWidget {
 
     Future<void> switchOrg(String id, String kind) async {
       final nav = Navigator.of(context);
+      if (session.offline) {
+        nav.pop();
+        showMessage(context, SessionController.offlineActionMessage);
+        return;
+      }
       final prevMode = ref.read(appModeProvider);
       final targetMode = kind == 'HOST' ? AppMode.host : AppMode.staff;
       ref.read(appModeProvider.notifier).state = targetMode;
@@ -54,6 +59,11 @@ class AccountSheet extends ConsumerWidget {
     }
 
     Future<void> confirmAndAcceptInvite(OrgInvitation inv) async {
+      if (session.offline) {
+        Navigator.of(context).pop();
+        showMessage(context, SessionController.offlineActionMessage);
+        return;
+      }
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -93,6 +103,11 @@ class AccountSheet extends ConsumerWidget {
       required String? homeId,
     }) async {
       final nav = Navigator.of(context);
+      if (session.offline) {
+        nav.pop();
+        showMessage(context, SessionController.offlineActionMessage);
+        return;
+      }
       final prevMode = ref.read(appModeProvider);
       ref.read(chosenTenantProvider.notifier).state = tenantId;
       ref
@@ -116,6 +131,11 @@ class AccountSheet extends ConsumerWidget {
 
     Future<void> switchOwner(String landlordId) async {
       final nav = Navigator.of(context);
+      if (session.offline) {
+        nav.pop();
+        showMessage(context, SessionController.offlineActionMessage);
+        return;
+      }
       final prevMode = ref.read(appModeProvider);
       ref.read(chosenOwnerProvider.notifier).state = landlordId;
       ref.read(appModeProvider.notifier).state = AppMode.owner;
@@ -492,6 +512,13 @@ class AccountSheet extends ConsumerWidget {
                 onTap: () {
                   final nav = Navigator.of(context);
                   nav.pop();
+                  if (session.offline) {
+                    showMessage(
+                      nav.context,
+                      SessionController.offlineActionMessage,
+                    );
+                    return;
+                  }
                   DevicesScreen.open(nav.context);
                 },
               ),
@@ -520,6 +547,13 @@ class AccountSheet extends ConsumerWidget {
                 onTap: () {
                   final nav = Navigator.of(context);
                   nav.pop();
+                  if (session.offline) {
+                    showMessage(
+                      nav.context,
+                      SessionController.offlineActionMessage,
+                    );
+                    return;
+                  }
                   DeleteAccountScreen.open(nav.context);
                 },
               ),

@@ -77,7 +77,7 @@ class _MetersScreenState extends ConsumerState<MetersScreen> {
             return Column(
               children: [
                 if (cachedProps.savedAt != null)
-                  _OfflineCacheBanner(savedAt: cachedProps.savedAt!),
+                  OfflineCacheBanner(savedAt: cachedProps.savedAt!),
                 const Expanded(child: EmptyState(title: 'No properties yet')),
               ],
             );
@@ -87,7 +87,7 @@ class _MetersScreenState extends ConsumerState<MetersScreen> {
           return Column(
             children: [
               if (propertyId == null && cachedProps.savedAt != null)
-                _OfflineCacheBanner(savedAt: cachedProps.savedAt!),
+                OfflineCacheBanner(savedAt: cachedProps.savedAt!),
               const PendingReadingsBanner(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -167,7 +167,7 @@ class _MeterListState extends ConsumerState<_MeterList> {
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
-                if (bannerAt != null) _OfflineCacheBanner(savedAt: bannerAt),
+                if (bannerAt != null) OfflineCacheBanner(savedAt: bannerAt),
                 const EmptyState(
                   icon: Icons.speed_outlined,
                   title: 'No meters in this property',
@@ -194,7 +194,7 @@ class _MeterListState extends ConsumerState<_MeterList> {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
             children: [
               if (bannerAt != null)
-                _OfflineCacheBanner(
+                OfflineCacheBanner(
                   savedAt: bannerAt,
                   margin: const EdgeInsets.only(bottom: 10),
                 ),
@@ -571,7 +571,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             if (cachedSheet?.savedAt != null)
-              _OfflineCacheBanner(
+              OfflineCacheBanner(
                 savedAt: cachedSheet!.savedAt!,
                 margin: const EdgeInsets.only(bottom: 12),
               ),
@@ -758,38 +758,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 }
 
-class _OfflineCacheBanner extends StatelessWidget {
-  const _OfflineCacheBanner({required this.savedAt, this.margin});
-  final DateTime savedAt;
-  final EdgeInsetsGeometry? margin;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      key: const Key('meter-offline-banner'),
-      margin: margin ?? const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      color: scheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(Icons.cloud_off_outlined, color: scheme.onTertiaryContainer),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Offline — showing data from '
-                '${formatTimestamp(savedAt.toIso8601String())}',
-                style: TextStyle(color: scheme.onTertiaryContainer),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Readings waiting on this phone (phase 13).
 final pendingReadingsProvider = FutureProvider<List<PendingReading>>((
   ref,
@@ -826,6 +794,7 @@ Future<FlushResult?> flushPendingReadings(WidgetRef ref) async {
       ref.invalidate(readingSheetProvider);
       ref.invalidate(meterListProvider);
       ref.invalidate(metersProvider);
+      ref.invalidate(todayProvider);
     }
     return result;
   } catch (_) {

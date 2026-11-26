@@ -41,7 +41,13 @@ class ApiClient {
   /// In memory only. The refresh token lives in secure storage (see TokenStore).
   String? accessToken;
 
-  /// Gets a new access token (and sets [accessToken]); false when the session is gone.
+  /// True while the app opened from a local session snapshot with no signal; cleared as soon
+  /// as [onRefresh] succeeds or signs out. While true, [_send] refreshes first so no request
+  /// goes out without an access token (which would receive 401 and sign the person out).
+  bool offlineSession = false;
+
+  /// Gets a new access token (and sets [accessToken]); false when the session is gone (401/403).
+  /// Throws [ApiError] on transient failures (network, 5xx, 429) so nothing is cleared.
   Future<bool> Function()? onRefresh;
 
   /// The session couldn't be refreshed: sign the person out.
@@ -52,12 +58,13 @@ class ApiClient {
 
   Future<bool>? _refreshing;
 
-  Future<bool> _refreshOnce() {
+  /// Runs a single shared [onRefresh] call across concurrent callers.
+  Future<bool> refreshOnce() {
     final running = _refreshing;
     if (running != null) return running;
-    final next = (onRefresh?.call() ?? Future.value(false))
-        .catchError((Object _) => false)
-        .whenComplete(() => _refreshing = null);
+    final next = Future<bool>.sync(
+      () => onRefresh?.call() ?? Future.value(false),
+    ).whenComplete(() => _refreshing = null);
     _refreshing = next;
     return next;
   }
@@ -80,8 +87,15 @@ class ApiClient {
     String path, {
     Object? body,
     Map<String, String>? headers,
+    bool skipAuthRefresh = false,
   }) async => _json(
-    await _send('POST', path, body: body ?? const {}, headers: headers),
+    await _send(
+      'POST',
+      path,
+      body: body ?? const {},
+      headers: headers,
+      skipAuthRefresh: skipAuthRefresh,
+    ),
   );
 
   Future<Map<String, dynamic>> patch(String path, {Object? body}) async =>
@@ -124,7 +138,26 @@ class ApiClient {
     Map<String, String>? headers,
     ResponseType? responseType,
     bool retried = false,
+    bool skipAuthRefresh = false,
   }) async {
+    if (offlineSession && !skipAuthRefresh) {
+      bool refreshed;
+      try {
+        refreshed = await refreshOnce();
+      } on ApiError {
+        throw ApiError.network();
+      } on Object {
+        throw ApiError.network();
+      }
+      if (!refreshed) {
+        onAuthLost?.call();
+        throw const ApiError(
+          status: 401,
+          code: 'UNAUTHENTICATED',
+          message: 'Please sign in.',
+        );
+      }
+    }
     final cleanQuery = query == null
         ? null
         : {
@@ -165,7 +198,15 @@ class ApiClient {
       if (error.status == 401 &&
           error.code == ApiError.tokenExpired &&
           !retried) {
-        if (await _refreshOnce()) {
+        bool refreshed;
+        try {
+          refreshed = await refreshOnce();
+        } on ApiError {
+          rethrow;
+        } on Object {
+          refreshed = false;
+        }
+        if (refreshed) {
           return _send(
             method,
             path,
@@ -178,7 +219,7 @@ class ApiClient {
           );
         }
         onAuthLost?.call();
-      } else if (error.status == 401) {
+      } else if (error.status == 401 && !skipAuthRefresh) {
         onAuthLost?.call();
       } else if (error.code == ApiError.orgSuspended) {
         onSuspended?.call();

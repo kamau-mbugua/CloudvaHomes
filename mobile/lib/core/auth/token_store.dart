@@ -62,12 +62,21 @@ class SavedCredential {
   );
 }
 
+typedef SessionSnapshot = ({Map<String, dynamic> data, DateTime savedAt});
+
 /// Where the refresh token and saved logins live between launches:
 /// Keychain (iOS) / Keystore-backed (Android).
 abstract class TokenStore {
   Future<String?> read();
   Future<void> write(String token);
   Future<void> clear();
+
+  Future<SessionSnapshot?> readSessionSnapshot() async => null;
+  Future<void> writeSessionSnapshot(
+    Map<String, dynamic> data, {
+    DateTime? savedAt,
+  }) async {}
+  Future<void> clearSessionSnapshot() async {}
 
   Future<List<SavedCredential>> readSavedCredentials() async => const [];
   Future<void> saveCredential(SavedCredential credential) async {}
@@ -85,6 +94,7 @@ class SecureTokenStore extends TokenStore {
           );
 
   static const _key = 'hodi.refreshToken';
+  static const _snapshotKey = 'hodi.sessionSnapshot';
   static const _savedCredentialsKey = 'hodi.savedCredentials';
   final FlutterSecureStorage _storage;
 
@@ -94,6 +104,55 @@ class SecureTokenStore extends TokenStore {
   Future<void> write(String token) => _storage.write(key: _key, value: token);
   @override
   Future<void> clear() => _storage.delete(key: _key);
+
+  @override
+  Future<SessionSnapshot?> readSessionSnapshot() async {
+    try {
+      final raw = await _storage.read(key: _snapshotKey);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      final savedAtRaw = decoded['savedAt'];
+      final sessionRaw = decoded['session'];
+      if (savedAtRaw is! String || sessionRaw is! Map<String, dynamic>) {
+        return null;
+      }
+      final savedAt = DateTime.tryParse(savedAtRaw);
+      if (savedAt == null) return null;
+      if (sessionRaw.containsKey('accessToken') ||
+          sessionRaw.containsKey('refreshToken')) {
+        return null;
+      }
+      return (data: sessionRaw, savedAt: savedAt);
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> writeSessionSnapshot(
+    Map<String, dynamic> data, {
+    DateTime? savedAt,
+  }) {
+    final cleaned = <String, dynamic>{
+      for (final e in data.entries)
+        if (e.key != 'accessToken' &&
+            e.key != 'refreshToken' &&
+            e.key != 'accessTokenExpiresAt')
+          e.key: e.value,
+    };
+    final stamp = (savedAt ?? DateTime.now()).toUtc();
+    return _storage.write(
+      key: _snapshotKey,
+      value: jsonEncode({
+        'savedAt': stamp.toIso8601String(),
+        'session': cleaned,
+      }),
+    );
+  }
+
+  @override
+  Future<void> clearSessionSnapshot() => _storage.delete(key: _snapshotKey);
 
   @override
   Future<List<SavedCredential>> readSavedCredentials() async {
@@ -169,6 +228,7 @@ class SecureTokenStore extends TokenStore {
 /// For tests.
 class MemoryTokenStore extends TokenStore {
   String? token;
+  SessionSnapshot? _snapshot;
   final List<SavedCredential> savedCredentials = [];
 
   @override
@@ -177,6 +237,35 @@ class MemoryTokenStore extends TokenStore {
   Future<void> write(String t) async => token = t;
   @override
   Future<void> clear() async => token = null;
+
+  @override
+  Future<SessionSnapshot?> readSessionSnapshot() async => _snapshot == null
+      ? null
+      : (
+          data: jsonDecode(jsonEncode(_snapshot!.data)) as Map<String, dynamic>,
+          savedAt: _snapshot!.savedAt,
+        );
+
+  @override
+  Future<void> writeSessionSnapshot(
+    Map<String, dynamic> data, {
+    DateTime? savedAt,
+  }) async {
+    final cleaned = <String, dynamic>{
+      for (final e in data.entries)
+        if (e.key != 'accessToken' &&
+            e.key != 'refreshToken' &&
+            e.key != 'accessTokenExpiresAt')
+          e.key: e.value,
+    };
+    _snapshot = (
+      data: jsonDecode(jsonEncode(cleaned)) as Map<String, dynamic>,
+      savedAt: (savedAt ?? DateTime.now()).toUtc(),
+    );
+  }
+
+  @override
+  Future<void> clearSessionSnapshot() async => _snapshot = null;
 
   @override
   Future<List<SavedCredential>> readSavedCredentials() async =>

@@ -23,7 +23,9 @@ class BillingBanner extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final canView = session.can('settings:view');
-    final billing = canView ? ref.watch(hodiBillingProvider).valueOrNull : null;
+    final billing = canView && !session.offline
+        ? ref.watch(hodiBillingProvider).valueOrNull
+        : null;
     final suspended = status == 'SUSPENDED';
     final scheme = Theme.of(context).colorScheme;
     final color = suspended || status == 'CLOSED'

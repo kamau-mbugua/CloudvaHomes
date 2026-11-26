@@ -1355,18 +1355,35 @@ class _TodayBody extends ConsumerWidget {
     return AsyncBody(
       value: today,
       onRetry: () => ref.invalidate(todayProvider),
-      data: (d) {
+      data: (cachedToday) {
+        final d = cachedToday.value;
+        final savedAt = cachedToday.savedAt;
         if (d.isEmpty) {
-          return const EmptyState(
-            icon: Icons.task_alt_outlined,
-            title: 'Nothing waiting today',
-            body:
-                'All meters are read, inspections are up to date and no open repairs need attention.',
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (savedAt != null)
+                OfflineCacheBanner(
+                  savedAt: savedAt,
+                  margin: const EdgeInsets.only(bottom: 12),
+                ),
+              const EmptyState(
+                icon: Icons.task_alt_outlined,
+                title: 'Nothing waiting today',
+                body:
+                    'All meters are read, inspections are up to date and no open repairs need attention.',
+              ),
+            ],
           );
         }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (savedAt != null)
+              OfflineCacheBanner(
+                savedAt: savedAt,
+                margin: const EdgeInsets.only(bottom: 12),
+              ),
             if (d.unreadMeters.isNotEmpty) ...[
               SectionCard(
                 title:

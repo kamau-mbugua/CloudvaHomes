@@ -9,6 +9,7 @@ import '../../core/auth/session.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/config.dart';
 import '../../core/money.dart';
+import '../../core/offline/cached_data.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/stk_sheet.dart';
 import 'staff_models.dart';
@@ -29,9 +30,12 @@ class StaffApi {
   ];
 
   // ── today (caretaker operational tasks)
-  Future<TodayList> today({String? propertyId}) async => TodayList.fromJson(
-    _data(await _api.get('/reports/today', query: {'propertyId': ?propertyId})),
+  Future<Json> todayJson({String? propertyId}) async => _data(
+    await _api.get('/reports/today', query: {'propertyId': ?propertyId}),
   );
+
+  Future<TodayList> today({String? propertyId}) async =>
+      TodayList.fromJson(await todayJson(propertyId: propertyId));
 
   // ── dashboard
   Future<Dashboard> dashboard({String? propertyId}) async {
@@ -111,6 +115,28 @@ class StaffApi {
   ];
 
   // ── units
+  Future<({List<Json> rows, bool hasMore})> unitPageRaw({
+    required int page,
+    String? q,
+    String? propertyId,
+    String? occupancy,
+  }) async {
+    final body = await _api.get(
+      '/units',
+      query: {
+        'page': page,
+        'pageSize': pageSize,
+        'q': q,
+        'propertyId': propertyId,
+        'occupancy': occupancy,
+      },
+    );
+    final meta = body['meta'] as Map<String, dynamic>? ?? const {};
+    final p = (meta['page'] as num?)?.toInt() ?? 0;
+    final pages = (meta['pages'] as num?)?.toInt() ?? 0;
+    return (rows: _rows(body), hasMore: p < pages);
+  }
+
   Future<Page<UnitRow>> units({
     required int page,
     String? q,
@@ -130,8 +156,9 @@ class StaffApi {
     UnitRow.fromJson,
   );
 
-  Future<UnitRow> unit(String id) async =>
-      UnitRow.fromJson(_data(await _api.get('/units/$id')));
+  Future<Json> unitJson(String id) async => _data(await _api.get('/units/$id'));
+
+  Future<UnitRow> unit(String id) async => UnitRow.fromJson(await unitJson(id));
 
   Future<Tenancy> tenancy(String id) async =>
       Tenancy.fromJson(_data(await _api.get('/tenancies/$id')));
@@ -627,11 +654,17 @@ final dashboardProvider = FutureProvider.autoDispose((ref) {
   return ref.watch(staffApiProvider).dashboard(propertyId: activePropertyId);
 });
 
-final todayProvider = FutureProvider.autoDispose((ref) {
+final todayProvider = FutureProvider.autoDispose<Cached<TodayList>>((ref) {
   final activePropertyId = ref.watch(
     sessionProvider.select((s) => s.valueOrNull?.activePropertyId),
   );
-  return ref.watch(staffApiProvider).today(propertyId: activePropertyId);
+  final api = ref.watch(staffApiProvider);
+  return fetchObjectOrCached(
+    ref,
+    cacheKey: 'today|${activePropertyId ?? 'all'}',
+    fetch: () => api.todayJson(propertyId: activePropertyId),
+    parse: TodayList.fromJson,
+  );
 });
 
 List<PropertyOption> mergeSessionProperties(
@@ -668,8 +701,16 @@ final propertiesProvider = FutureProvider.autoDispose((ref) async {
   return mergeSessionProperties(sessionProps, fetched);
 });
 
-final unitProvider = FutureProvider.autoDispose.family<UnitRow, String>(
-  (ref, id) => ref.watch(staffApiProvider).unit(id),
+final unitProvider = FutureProvider.autoDispose.family<Cached<UnitRow>, String>(
+  (ref, id) {
+    final api = ref.watch(staffApiProvider);
+    return fetchObjectOrCached(
+      ref,
+      cacheKey: 'unit|$id',
+      fetch: () => api.unitJson(id),
+      parse: UnitRow.fromJson,
+    );
+  },
 );
 
 final tenancyProvider = FutureProvider.autoDispose.family<Tenancy, String>(
