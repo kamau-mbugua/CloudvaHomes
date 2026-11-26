@@ -410,7 +410,8 @@ Smart meters and prepaid tokens (deferred, §15).
 - [x] Offline cache of the meters screens: property list, meter list and this month's reading
   sheet, shown with an "Offline — showing data from …" banner (JSON file, per user and
   organisation, cleared on sign-out).
-- [ ] Offline cache of units (and starting the app with no signal).
+- [x] Offline cache of units and Today, and starting the app with no signal (staff, from a
+  saved session under 30 days old; only a refused refresh signs out).
 - [x] Reading checks: below the last reading, or more than 3× the usual use, asks before
   saving (app, including offline, and web). Readings record `ocrUsed` / `ocrEdited`.
 - [x] OCR suggestion from the meter photo (on-device ML Kit; the caretaker confirms it).
